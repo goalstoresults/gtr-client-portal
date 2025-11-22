@@ -169,9 +169,9 @@ async function renderReview(container, portalState, noteId) {
     console.log("[Review] Fetching URL:", url);
     const res = await fetch(url, { cache: "no-cache" });
     console.log("[Review] Response status:", res.status);
-    console.log("[Review] Response JSON:", data);
 
     const data = await res.json();
+    console.log("[Review] Response JSON:", data);
 
     if (!res.ok || !data.note) {
       container.innerHTML = `<p>Error loading note review: ${data.error || "Not found"}</p>`;
