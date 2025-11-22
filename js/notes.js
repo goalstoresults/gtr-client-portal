@@ -115,6 +115,7 @@ async function renderHistory(container, portalState) {
       btn.addEventListener("click", () => {
         const noteId = btn.getAttribute("data-note-id");
         portalState.selectedNoteId = noteId;
+        console.log("[History] Selected note ID:", noteId);
         setSubtabEnabled("review", true);
         setSubtabEnabled("relationships", true);
         renderReview(container, portalState, noteId);
@@ -155,6 +156,8 @@ function renderAdd(container, portalState) {
 
 /* Review (GET /note_review) */
 async function renderReview(container, portalState, noteId) {
+  console.log("[Review] Called with noteId:", noteId);
+
   if (!noteId) {
     container.innerHTML = `<p>Select a note from History to review.</p>`;
     return;
@@ -163,11 +166,16 @@ async function renderReview(container, portalState, noteId) {
   try {
     const params = new URLSearchParams({ project: portalState.project, id: noteId });
     const url = `https://notes-history-module.dennis-e64.workers.dev/note_review?${params}`;
+    console.log("[Review] Fetching URL:", url);
     const res = await fetch(url, { cache: "no-cache" });
+    console.log("[Review] Response status:", res.status);
+    console.log("[Review] Response JSON:", data);
+
     const data = await res.json();
 
     if (!res.ok || !data.note) {
       container.innerHTML = `<p>Error loading note review: ${data.error || "Not found"}</p>`;
+      console.warn("[Review] No note found:", data);
       return;
     }
 
@@ -225,6 +233,8 @@ async function renderReview(container, portalState, noteId) {
 
 /* Relationships (GET /note_relationships) */
 function renderRelationships(container, portalState) {
+  console.log("[Relationships] Called with noteId:", portalState.selectedNoteId);
+
   if (!portalState.selectedNoteId) {
     container.innerHTML = `<p>Select a note from History to view relationships.</p>`;
     return;
@@ -236,7 +246,9 @@ function renderRelationships(container, portalState) {
     try {
       const params = new URLSearchParams({ project: portalState.project, note_id: portalState.selectedNoteId });
       const url = `https://notes-history-module.dennis-e64.workers.dev/note_relationships?${params}`;
+      console.log("[Relationships] Fetching URL:", url);
       const res = await fetch(url, { cache: "no-cache" });
+      console.log("[Relationships] Response JSON:", data);
       const data = await res.json();
       const result = document.getElementById("relResult");
       if (res.ok && data.status === "ok" && Array.isArray(data.relationships)) {
