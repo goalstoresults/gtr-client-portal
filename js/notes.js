@@ -180,6 +180,8 @@ async function renderReview(container, portalState, noteId) {
     }
 
     const note = data.note;
+    const relationships = data.relationships || [];
+
     container.innerHTML = `
       <section class="card">
         <h2>Note Review</h2>
@@ -199,7 +201,6 @@ async function renderReview(container, portalState, noteId) {
         ` : ""}
 
         ${Array.isArray(note.participants) && note.participants.length > 0 ? `
-          <h3 style="margin-top:
           <h3 style="margin-top:20px;">Participants Detected in Note</h3>
           <table class="notes-table">
             <thead>
@@ -224,12 +225,45 @@ async function renderReview(container, portalState, noteId) {
             </tbody>
           </table>
         ` : ""}
+
+        ${Array.isArray(relationships) && relationships.length > 0 ? `
+          <h3 style="margin-top:20px;">Relationships Detected in Note</h3>
+          <table class="notes-table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Role</th>
+                <th>Email</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${relationships.map(r => `
+                <tr>
+                  <td>${escapeHtml(r.relationship_type || "")}</td>
+                  <td>${escapeHtml(r.relationship_role || "")}</td>
+                  <td>${escapeHtml(r.related_email || "")}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+          <div style="margin-top:12px;">
+            <button id="btnPromoteRelationships" class="primary">Promote Relationships</button>
+          </div>
+        ` : ""}
       </section>
     `;
+
+    // Wire the promote button to switch tabs
+    document.getElementById("btnPromoteRelationships")?.addEventListener("click", () => {
+      document.querySelector('#notes-subtabs button[data-subtab="relationships"]')?.click();
+    });
+
   } catch (err) {
     container.innerHTML = `<p>Error loading note review: ${err.message}</p>`;
   }
 }
+
+
 
 /* Relationships (GET /note_relationships) */
 function renderRelationships(container, portalState) {
