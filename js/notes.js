@@ -226,30 +226,6 @@ async function renderReview(container, portalState, noteId) {
           </table>
         ` : ""}
 
-        ${Array.isArray(relationships) && relationships.length > 0 ? `
-          <h3 style="margin-top:20px;">Relationships Detected in Note</h3>
-          <table class="notes-table">
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Role</th>
-                <th>Email</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${relationships.map(r => `
-                <tr>
-                  <td>${escapeHtml(r.relationship_type || "")}</td>
-                  <td>${escapeHtml(r.relationship_role || "")}</td>
-                  <td>${escapeHtml(r.related_email || "")}</td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-          <div style="margin-top:12px;">
-            <button id="btnPromoteRelationships" class="primary">Promote Relationships</button>
-          </div>
-        ` : ""}
       </section>
     `;
 
