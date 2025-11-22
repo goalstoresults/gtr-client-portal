@@ -15,6 +15,7 @@
     </div>
   </header>
 
+  <!-- Top-level tabs -->
   <nav id="tabs" style="display:none;">
     <button data-tab="notes">Notes</button>
   </nav>
@@ -22,7 +23,7 @@
   <div id="tab-content"></div>
 
   <footer style="margin-top:20px; text-align:center; color:#666;">
-    <small>Portal Version: 1.1.7</small>
+    <small>Portal Version: 1.1.8</small>
   </footer>
 
   <script type="module">
@@ -98,15 +99,19 @@
     }
 
     async function loadTab(tab) {
+      // 🔵 Apply .active class to top-level tabs
+      document.querySelectorAll("#tabs button").forEach(btn =>
+        btn.classList.remove("active")
+      );
+      document.querySelector(`#tabs button[data-tab="${tab}"]`)?.classList.add("active");
+
       if (tab === "notes") {
-        document.querySelectorAll("#tabs button").forEach(btn =>
-          btn.classList.toggle("primary", btn.dataset.tab === tab)
-        );
         tabContent.innerHTML = "";
         await loadNotesTab({ portalState, tabContent });
       }
     }
 
+    // Wire up Notes tab click
     document.querySelector("#tabs button[data-tab='notes']").addEventListener("click", () => loadTab("notes"));
 
     window.addEventListener("DOMContentLoaded", async () => {
@@ -115,3 +120,4 @@
   </script>
 </body>
 </html>
+
