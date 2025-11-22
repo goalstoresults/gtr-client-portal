@@ -180,7 +180,6 @@ async function renderReview(container, portalState, noteId) {
     }
 
     const note = data.note;
-    const relationships = data.relationships || [];
 
     container.innerHTML = `
       <section class="card">
@@ -189,7 +188,8 @@ async function renderReview(container, portalState, noteId) {
         <p><strong>From:</strong> ${note.from_name || "(unknown)"} (${note.from_email || "no email"})</p>
         <p><strong>Created:</strong> ${note.created}</p>
         <p><strong>Client:</strong> ${note.client_name || "(unknown)"}</p>
-        <p><strong>Status:</strong> ${note.status || "pending"} • <strong>Needs review:</strong> ${note.needs_review ? "Yes" : "No"}</p>
+        <p><strong>Status:</strong> ${note.status || "pending"} • 
+           <strong>Needs review:</strong> ${note.needs_review ? "Yes" : "No"}</p>
         <p><strong>Summary:</strong></p>
         <p>${note.summary || "(no summary available)"}</p>
 
@@ -225,43 +225,8 @@ async function renderReview(container, portalState, noteId) {
             </tbody>
           </table>
         ` : ""}
-
-        ${Array.isArray(relationships) && relationships.length > 0 ? `
-          <h3 style="margin-top:20px;">Relationships Detected in Note</h3>
-          <table class="notes-table">
-            <thead>
-              <tr>
-                <th>Raw Name</th>
-                <th>AI First</th>
-                <th>AI Last</th>
-                <th>Role/Type</th>
-                <th>Context</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${relationships.map(r => `
-                <tr>
-                  <td>${escapeHtml(r.raw_name || "")}</td>
-                  <td>${escapeHtml(r.first_name_ai || "")}</td>
-                  <td>${escapeHtml(r.last_name_ai || "")}</td>
-                  <td>${escapeHtml(r.role_label_ai || "")}</td>
-                  <td>${escapeHtml(r.context_description_ai || "")}</td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-          <div style="margin-top:12px;">
-            <button id="btnPromoteRelationships" class="primary">Promote Relationships</button>
-          </div>
-        ` : ""}
       </section>
     `;
-
-    // Wire the promote button to switch tabs
-    document.getElementById("btnPromoteRelationships")?.addEventListener("click", () => {
-      document.querySelector('#notes-subtabs button[data-subtab="relationships"]')?.click();
-    });
-
   } catch (err) {
     container.innerHTML = `<p>Error loading note review: ${err.message}</p>`;
   }
