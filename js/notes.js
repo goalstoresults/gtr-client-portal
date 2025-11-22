@@ -1,6 +1,8 @@
 // js/notes.js v1.1.6
 // Notes module with full Worker URLs (notes-history-module.dennis-e64.workers.dev)
 
+console.log("[Notes.js] loaded");
+
 export async function loadNotesTab({ portalState, tabContent }) {
   await loadPartial("/components/notes.html", tabContent);
   initNotes(portalState);
