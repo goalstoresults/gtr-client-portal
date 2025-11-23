@@ -180,7 +180,7 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `
       <section class="card">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-          <h2 style="margin:0;">Note Review (1.2.6)</h2>
+          <h2 style="margin:0;">Note Review (1.2.7)</h2>
           <button id="btnSetClient" class="primary"
                   style="background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
             Set Client
@@ -292,7 +292,7 @@ async function renderReview(container, portalState, noteId) {
               const emailSafe = r.email || "";
               return `
                 <div style="padding:8px; border-bottom:1px solid #eee; cursor:pointer;"
-                     onclick="attachClientToNote('${r.contact_id}', '${fullName}', '${typeLabel}', '${emailSafe}')">
+                    onclick="attachClientToNote('${r.contact_id}', '${fullName}', '${typeLabel}', '${emailSafe}', portalState)">
                   <strong>${fullName}</strong>
                   <span style="background:#eef; color:#336; padding:2px 6px; border-radius:12px; font-size:0.75em; margin-left:6px;">
                     ${typeLabel}
@@ -314,7 +314,7 @@ async function renderReview(container, portalState, noteId) {
 
 
 /* Add Client to Note */
-async function attachClientToNote(contactId, contactName, contactType, contactEmail) {
+async function attachClientToNote(contactId, contactName, contactType, contactEmail, portalState) {
   try {
     const payload = {
       id: portalState.selectedNoteId,
@@ -346,6 +346,7 @@ async function attachClientToNote(contactId, contactName, contactType, contactEm
 
     alert("✅ Client attached to note.");
 
+    // 🔄 Refresh Note Review so the updated client info shows immediately
     const container = document.getElementById("notesContent");
     if (container) {
       await renderReview(container, portalState, portalState.selectedNoteId);
@@ -355,6 +356,7 @@ async function attachClientToNote(contactId, contactName, contactType, contactEm
     console.error(err);
   }
 }
+
 
 // 🔧 Make it globally accessible for inline onclick
 window.attachClientToNote = attachClientToNote;
