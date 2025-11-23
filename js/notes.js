@@ -155,6 +155,7 @@ function renderAdd(container, portalState) {
 }
 
 /* Review (GET /note_review) */
+
 async function renderReview(container, portalState, noteId) {
   console.log("[Review] Called with noteId:", noteId);
 
@@ -180,6 +181,7 @@ async function renderReview(container, portalState, noteId) {
     }
 
     const note = data.note;
+    const relationships = data.relationships || [];
 
     container.innerHTML = `
       <section class="card">
@@ -220,6 +222,32 @@ async function renderReview(container, portalState, noteId) {
                   <td>${escapeHtml(p.last_name || "")}</td>
                   <td>${escapeHtml(p.role || "")}</td>
                   <td>${escapeHtml(p.context || "")}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        ` : ""}
+
+        ${Array.isArray(relationships) && relationships.length > 0 ? `
+          <h3 style="margin-top:20px;">Relationships Detected in Note</h3>
+          <table class="notes-table">
+            <thead>
+              <tr>
+                <th>Raw Name</th>
+                <th>AI First</th>
+                <th>AI Last</th>
+                <th>Role/Type</th>
+                <th>Context</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${relationships.map(r => `
+                <tr>
+                  <td>${escapeHtml(r.raw_name || "")}</td>
+                  <td>${escapeHtml(r.first_name_ai || "")}</td>
+                  <td>${escapeHtml(r.last_name_ai || "")}</td>
+                  <td>${escapeHtml(r.role_label_ai || "")}</td>
+                  <td>${escapeHtml(r.context_description_ai || "")}</td>
                 </tr>
               `).join("")}
             </tbody>
