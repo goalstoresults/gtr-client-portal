@@ -180,8 +180,7 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `
       <section class="card">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-          <h2 style="margin:0;">Note Review (1.2.5)</h2>
-          <!-- 🔵 Styled Set Client button -->
+          <h2 style="margin:0;">Note Review (1.2.6)</h2>
           <button id="btnSetClient" class="primary"
                   style="background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
             Set Client
@@ -194,7 +193,6 @@ async function renderReview(container, portalState, noteId) {
           <div class="row" style="gap:12px; margin-bottom:12px;">
             <input id="filter-first" placeholder="First name" />
             <input id="filter-last" placeholder="Last name" />
-            <input id="filter-email" placeholder="Email" />
             <button id="btnFindClient" class="primary">Find</button>
           </div>
           <div id="clientSearchResults" class="muted">Enter criteria and click Find.</div>
@@ -250,39 +248,29 @@ async function renderReview(container, portalState, noteId) {
       form.style.display = form.style.display === "none" ? "block" : "none";
     });
 
-    // Find client handler
+    // Find client handler (name-only search)
     document.getElementById("btnFindClient").addEventListener("click", async () => {
       const first = document.getElementById("filter-first").value.trim();
       const last = document.getElementById("filter-last").value.trim();
-      const email = document.getElementById("filter-email").value.trim();
 
-      if (email) {
-        if (email.length < 3) { alert("Email must be at least 3 characters."); return; }
-      } else {
-        if (!first && !last) { alert("Enter at least a first or last name."); return; }
-        if ((first && first.length < 3) || (last && last.length < 3)) {
-          alert("Names must be at least 3 characters."); return;
-        }
+      if (!first && !last) { alert("Enter at least a first or last name."); return; }
+      if ((first && first.length < 3) || (last && last.length < 3)) {
+        alert("Names must be at least 3 characters."); return;
       }
 
       const params = new URLSearchParams();
       const selectCols = "contact_id,first_name,last_name,email,contact_type";
 
-      if (email) {
-        params.set("project.eq", portalState.project); // ✅ fixed project filter
-        params.set("email.ilike", `*${email}*`);       // ✅ fixed email filter
-      } else {
-        const filters = [`project.eq.${portalState.project}`];
-        if (first) filters.push(`first_name.ilike.*${first}*`);
-        if (last)  filters.push(`last_name.ilike.*${last}*`);
+      const filters = [`project.eq.${portalState.project}`];
+      if (first) filters.push(`first_name.ilike.*${first}*`);
+      if (last)  filters.push(`last_name.ilike.*${last}*`);
 
-        if (filters.length > 1) {
-          params.set("and", `(${filters.join(",")})`);
-        } else {
-          const [filter] = filters;
-          const [key, operator, value] = filter.split(".");
-          params.set(`${key}.${operator}`, value);
-        }
+      if (filters.length > 1) {
+        params.set("and", `(${filters.join(",")})`);
+      } else {
+        const [filter] = filters;
+        const [key, operator, value] = filter.split(".");
+        params.set(`${key}.${operator}`, value);
       }
 
       const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${params.toString()}&select=${encodeURIComponent(selectCols)}`;
@@ -324,6 +312,7 @@ async function renderReview(container, portalState, noteId) {
   }
 }
 
+
 /* Add Client to Note */
 async function attachClientToNote(contactId, contactName, contactType, contactEmail) {
   try {
@@ -357,7 +346,6 @@ async function attachClientToNote(contactId, contactName, contactType, contactEm
 
     alert("✅ Client attached to note.");
 
-    // 🔄 Refresh Note Review so the updated client info shows immediately
     const container = document.getElementById("notesContent");
     if (container) {
       await renderReview(container, portalState, portalState.selectedNoteId);
@@ -367,6 +355,9 @@ async function attachClientToNote(contactId, contactName, contactType, contactEm
     console.error(err);
   }
 }
+
+// 🔧 Make it globally accessible for inline onclick
+window.attachClientToNote = attachClientToNote;
 
 
 
