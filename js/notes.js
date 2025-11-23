@@ -180,7 +180,7 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `
       <section class="card">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-          <h2 style="margin:0;">Note Review (v.1.2.0)</h2>
+          <h2 style="margin:0;">Note Review (v.1.2.2)</h2>
           <button id="btnSetClient" class="primary">Set Client</button>
         </div>
 
