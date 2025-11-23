@@ -270,34 +270,38 @@ async function renderReview(container, portalState, noteId) {
       </section>
     `;
 
-    // Wire Set Client button
     document.getElementById("btnSetClient").addEventListener("click", () => {
       const form = document.getElementById("setClientForm");
       form.style.display = form.style.display === "none" ? "block" : "none";
     });
 
-    // Wire Find Client button
     document.getElementById("btnFindClient").addEventListener("click", async () => {
       const first = document.getElementById("filter-first").value.trim();
       const last = document.getElementById("filter-last").value.trim();
       const email = document.getElementById("filter-email").value.trim();
+      const project = portalState.project;
+      const base = "https://client-portal-api.dennis-e64.workers.dev/api/contacts";
 
-      if (email) {
-        if (email.length < 3) { alert("Email must be at least 3 characters."); return; }
+      let url = "";
+      if (email && email.length >= 3) {
+        const params = new URLSearchParams({
+          project,
+          email: `ilike.*${email}*`,
+          select: "contact_id,first_name,last_name,email,type"
+        });
+        url = `${base}?${params}`;
+      } else if (first.length >= 3 && last.length >= 3) {
+        const filters = [
+          `project.eq.${project}`,
+          `first_name.ilike.*${first}*`,
+          `last_name.ilike.*${last}*`
+        ];
+        url = `${base}?and=(${filters.join(",")})&select=contact_id,first_name,last_name,email,type`;
       } else {
-        if (!first || !last) { alert("Both first and last name required."); return; }
-        if (first.length < 3 || last.length < 3) { alert("Names must be at least 3 characters."); return; }
+        alert("Enter at least 3 characters for email, or both first and last name.");
+        return;
       }
 
-      const params = new URLSearchParams({ project: portalState.project });
-      if (email) {
-        params.set("email", `ilike.*${email}*`);
-      } else {
-        params.set("first_name", `ilike.*${first}*`);
-        params.set("last_name", `ilike.*${last}*`);
-      }
-
-      const url = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${params}`;
       console.log("[SetClient] Searching contacts:", url);
 
       try {
@@ -323,7 +327,7 @@ async function renderReview(container, portalState, noteId) {
   }
 }
 
-// Helper to attach client
+// Attach client helper
 async function attachClientToNote(contactId, contactName, contactType, contactEmail) {
   try {
     const res = await fetch(
