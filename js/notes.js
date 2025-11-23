@@ -166,10 +166,8 @@ async function renderReview(container, portalState, noteId) {
   try {
     const params = new URLSearchParams({ project: portalState.project, id: noteId });
     const url = `https://notes-history-module.dennis-e64.workers.dev/note_review?${params}`;
-    console.log("[Review] Fetching URL:", url);
     const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
-    console.log("[Review] Response JSON:", data);
 
     if (!res.ok || !data.note) {
       container.innerHTML = `<p>Error loading note review: ${data.error || "Not found"}</p>`;
@@ -182,7 +180,7 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `
       <section class="card">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-          <h2 style="margin:0;">Note Review</h2>
+          <h2 style="margin:0;">Note Review (version 1.2.0)</h2>
           <button id="btnSetClient" class="primary">Set Client</button>
         </div>
 
@@ -247,7 +245,7 @@ async function renderReview(container, portalState, noteId) {
       form.style.display = form.style.display === "none" ? "block" : "none";
     });
 
-    // Find client handler
+    // Find client handler (legacy style)
     document.getElementById("btnFindClient").addEventListener("click", async () => {
       const first = document.getElementById("filter-first").value.trim();
       const last = document.getElementById("filter-last").value.trim();
@@ -256,24 +254,31 @@ async function renderReview(container, portalState, noteId) {
       if (email) {
         if (email.length < 3) { alert("Email must be at least 3 characters."); return; }
       } else {
-        if (!first || !last) { alert("Both first and last name required."); return; }
-        if (first.length < 3 || last.length < 3) { alert("Names must be at least 3 characters."); return; }
+        if (!first && !last) { alert("Enter at least a first or last name."); return; }
+        if ((first && first.length < 3) || (last && last.length < 3)) {
+          alert("Names must be at least 3 characters."); return;
+        }
       }
 
-      const base = "https://client-portal-api.dennis-e64.workers.dev/api/contacts";
-      const qs = new URLSearchParams();
-      qs.set("select", "contact_id,first_name,last_name,email,type");
-
+      const params = new URLSearchParams();
       if (email) {
-        qs.set("project.eq", portalState.project);
-        qs.set("email.ilike", `*${email}*`);
+        params.set("project", portalState.project); // plain project param
+        params.set("email", `ilike.*${email}*`);
       } else {
-        qs.set("project.eq", portalState.project);
-        qs.set("first_name.ilike", `*${first}*`);
-        qs.set("last_name.ilike", `*${last}*`);
+        const filters = [`project.eq.${portalState.project}`];
+        if (first) filters.push(`first_name.ilike.*${first}*`);
+        if (last)  filters.push(`last_name.ilike.*${last}*`);
+
+        if (filters.length > 1) {
+          params.set("and", `(${filters.join(",")})`);
+        } else {
+          const [filter] = filters;
+          const [key, operator, value] = filter.split(".");
+          params.set(`${key}.${operator}`, value);
+        }
       }
 
-      const searchUrl = `${base}?${qs.toString()}`;
+      const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${params.toString()}&select=contact_id,first_name,last_name,email,type`;
       console.log("[SetClient] Searching contacts:", searchUrl);
 
       try {
@@ -303,37 +308,6 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `<p>Error loading note review: ${err.message}</p>`;
   }
 }
-
-// Helper to attach client
-async function attachClientToNote(contactId, contactName, contactType, contactEmail) {
-  try {
-    const res = await fetch(
-      `https://notes-history-module.dennis-e64.workers.dev?project=${encodeURIComponent(activeProject)}&id=eq.${selectedNoteId}`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contact_id: contactId,
-          contact_name: contactName,
-          contact_type: contactType,
-          contact_email: contactEmail || null,
-          updated_at: new Date().toISOString()
-        })
-      }
-    );
-
-    if (!res.ok) {
-      const msg = await res.text().catch(() => "");
-      alert(`❌ Failed to attach client (${res.status}). ${msg}`);
-      return;
-    }
-
-    alert("✅ Client attached to note.");
-  } catch (err) {
-    alert("Error attaching client: " + err.message);
-  }
-}
-
 
 
 
