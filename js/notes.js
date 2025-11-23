@@ -168,14 +168,11 @@ async function renderReview(container, portalState, noteId) {
     const url = `https://notes-history-module.dennis-e64.workers.dev/note_review?${params}`;
     console.log("[Review] Fetching URL:", url);
     const res = await fetch(url, { cache: "no-cache" });
-    console.log("[Review] Response status:", res.status);
-
     const data = await res.json();
     console.log("[Review] Response JSON:", data);
 
     if (!res.ok || !data.note) {
       container.innerHTML = `<p>Error loading note review: ${data.error || "Not found"}</p>`;
-      console.warn("[Review] No note found:", data);
       return;
     }
 
@@ -203,32 +200,6 @@ async function renderReview(container, portalState, noteId) {
             <summary>Raw Text (click to expand)</summary>
             <pre style="margin-top:8px;">${note.raw_text}</pre>
           </details>
-        ` : ""}
-
-        ${Array.isArray(note.participants) && note.participants.length > 0 ? `
-          <h3 style="margin-top:20px;">Participants Detected in Note</h3>
-          <table class="notes-table">
-            <thead>
-              <tr>
-                <th>Raw Name</th>
-                <th>AI First</th>
-                <th>AI Last</th>
-                <th>Role/Type</th>
-                <th>Context</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${note.participants.map(p => `
-                <tr>
-                  <td>${escapeHtml(p.raw_name || "")}</td>
-                  <td>${escapeHtml(p.first_name || "")}</td>
-                  <td>${escapeHtml(p.last_name || "")}</td>
-                  <td>${escapeHtml(p.role || "")}</td>
-                  <td>${escapeHtml(p.context || "")}</td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
         ` : ""}
 
         ${Array.isArray(relationships) && relationships.length > 0 ? `
@@ -270,56 +241,62 @@ async function renderReview(container, portalState, noteId) {
       </section>
     `;
 
+    // Toggle Set Client form
     document.getElementById("btnSetClient").addEventListener("click", () => {
       const form = document.getElementById("setClientForm");
       form.style.display = form.style.display === "none" ? "block" : "none";
     });
 
+    // Find client handler
     document.getElementById("btnFindClient").addEventListener("click", async () => {
       const first = document.getElementById("filter-first").value.trim();
       const last = document.getElementById("filter-last").value.trim();
       const email = document.getElementById("filter-email").value.trim();
-      const project = portalState.project;
-      const base = "https://client-portal-api.dennis-e64.workers.dev/api/contacts";
 
-      let url = "";
-      if (email && email.length >= 3) {
-        const params = new URLSearchParams({
-          project,
-          email: `ilike.*${email}*`,
-          select: "contact_id,first_name,last_name,email,type"
-        });
-        url = `${base}?${params}`;
-      } else if (first.length >= 3 && last.length >= 3) {
-        const filters = [
-          `project.eq.${project}`,
-          `first_name.ilike.*${first}*`,
-          `last_name.ilike.*${last}*`
-        ];
-        url = `${base}?and=(${filters.join(",")})&select=contact_id,first_name,last_name,email,type`;
+      if (email) {
+        if (email.length < 3) { alert("Email must be at least 3 characters."); return; }
       } else {
-        alert("Enter at least 3 characters for email, or both first and last name.");
-        return;
+        if (!first || !last) { alert("Both first and last name required."); return; }
+        if (first.length < 3 || last.length < 3) { alert("Names must be at least 3 characters."); return; }
       }
 
-      console.log("[SetClient] Searching contacts:", url);
+      const base = "https://client-portal-api.dennis-e64.workers.dev/api/contacts";
+      const qs = new URLSearchParams();
+      qs.set("select", "contact_id,first_name,last_name,email,type");
+
+      if (email) {
+        qs.set("project.eq", portalState.project);
+        qs.set("email.ilike", `*${email}*`);
+      } else {
+        qs.set("project.eq", portalState.project);
+        qs.set("first_name.ilike", `*${first}*`);
+        qs.set("last_name.ilike", `*${last}*`);
+      }
+
+      const searchUrl = `${base}?${qs.toString()}`;
+      console.log("[SetClient] Searching contacts:", searchUrl);
 
       try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Search failed");
-        const rows = await res.json();
+        const resp = await fetch(searchUrl);
+        if (!resp.ok) {
+          const msg = await resp.text().catch(() => "");
+          alert(`Search failed (${resp.status}). ${msg}`);
+          return;
+        }
+        const rows = await resp.json();
         const container = document.getElementById("clientSearchResults");
         container.innerHTML = rows.length > 0
           ? rows.map(r => `
               <div style="padding:8px; border-bottom:1px solid #eee; cursor:pointer;"
-                   onclick="attachClientToNote('${r.contact_id}', '${r.first_name || ""} ${r.last_name || ""}', '${r.type || "contact"}', '${r.email || ""}')">
-                <strong>${r.first_name || ""} ${r.last_name || ""}</strong>
+                   onclick="attachClientToNote('${r.contact_id}', '${(r.first_name || "")} ${(r.last_name || "")}', '${(r.type || "contact")}', '${(r.email || "")}')">
+                <strong>${(r.first_name || "")} ${(r.last_name || "")}</strong>
                 <span class="muted">${r.email || ""}</span>
               </div>
             `).join("")
           : "<div class='muted'>No contacts found.</div>";
       } catch (err) {
-        alert("Error searching contacts: " + err.message);
+        alert("Network error searching contacts");
+        console.error(err);
       }
     });
   } catch (err) {
@@ -327,7 +304,7 @@ async function renderReview(container, portalState, noteId) {
   }
 }
 
-// Attach client helper
+// Helper to attach client
 async function attachClientToNote(contactId, contactName, contactType, contactEmail) {
   try {
     const res = await fetch(
