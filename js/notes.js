@@ -180,7 +180,7 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `
       <section class="card">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-          <h2 style="margin:0;">Note Review (1.2.7)</h2>
+          <h2 style="margin:0;">Note Review (1.2.8)</h2>
           <button id="btnSetClient" class="primary"
                   style="background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
             Set Client
@@ -292,7 +292,7 @@ async function renderReview(container, portalState, noteId) {
               const emailSafe = r.email || "";
               return `
                 <div style="padding:8px; border-bottom:1px solid #eee; cursor:pointer;"
-                    onclick="attachClientToNote('${r.contact_id}', '${fullName}', '${typeLabel}', '${emailSafe}', portalState)">
+                onclick="attachClientToNote('${r.contact_id}', '${fullName}', '${typeLabel}', '${emailSafe}', { selectedNoteId: '${portalState.selectedNoteId}', project: '${portalState.project}' })">
                   <strong>${fullName}</strong>
                   <span style="background:#eef; color:#336; padding:2px 6px; border-radius:12px; font-size:0.75em; margin-left:6px;">
                     ${typeLabel}
