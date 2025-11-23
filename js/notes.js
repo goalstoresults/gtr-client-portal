@@ -21,6 +21,14 @@ async function loadPartial(url, tabContent) {
   }
 }
 
+function setActiveSubtab(tabId) {
+  const tabs = document.querySelectorAll("nav#notes-subtabs button");
+  tabs.forEach(t => t.classList.remove("active"));
+
+  const selected = document.getElementById(tabId);
+  if (selected) selected.classList.add("active");
+}
+
 function initNotes(portalState) {
   const historyBtn = document.querySelector('#notes-subtabs button[data-subtab="history"]');
   if (historyBtn) historyBtn.classList.add('active');  
