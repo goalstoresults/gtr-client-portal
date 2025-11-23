@@ -171,7 +171,6 @@ function renderAdd(container, portalState) {
 }
 
 /* Review (GET /note_review) */
-/* Review (GET /note_review) */
 async function renderReview(container, portalState, noteId) {
   console.log("[Review] Called with noteId:", noteId);
 
@@ -396,9 +395,6 @@ async function renderReview(container, portalState, noteId) {
 }
 
 
-
-
-
 /* Add Client to Note */
 async function attachClientToNote(contactId, contactName, contactType, contactEmail, portalState) {
   try {
@@ -485,6 +481,236 @@ function renderRelationships(container, portalState) {
     }
   });
 }
+
+async function renderRelationships(container, portalState) {
+  const noteId = portalState.selectedNoteId;
+  const project = portalState.project;
+
+  container.innerHTML = `
+    <section class="card">
+      <h2>Relationships for Note ${noteId}</h2>
+      <div id="existingRelationships" class="card" style="margin-bottom:16px;">
+        <h3>Existing Contact Relationships</h3>
+        <div id="existingRelGrid" class="muted">Loading...</div>
+      </div>
+      <h3 style="margin-top:20px;">Detected Relationships in Note</h3>
+      <table class="notes-table">
+        <thead>
+          <tr>
+            <th>Raw Name</th>
+            <th>Relationship Type</th>
+            <th>Relationship Role</th>
+            <th>Contact ID</th>
+            <th>Contact Name</th>
+            <th>Contact Type</th>
+            <th>Contact Email</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="relationshipsGrid"></tbody>
+      </table>
+      <button id="btnSavePromotions" class="primary"
+              style="margin-top:12px; background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
+        Save Promotions
+      </button>
+    </section>
+  `;
+
+  // Load existing contact_relationships for this client
+  if (portalState.clientId) {
+    const relUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships?client_id=eq.${portalState.clientId}`;
+    try {
+      const res = await fetch(relUrl);
+      const rows = await res.json();
+      const grid = document.getElementById("existingRelGrid");
+      grid.innerHTML = rows.length > 0
+        ? `<ul>${rows.map(r => `<li>${r.related_contact_name} (${r.relationship_type})</li>`).join("")}</ul>`
+        : "<div class='muted'>No existing relationships.</div>";
+    } catch (err) {
+      document.getElementById("existingRelGrid").innerHTML = "Error loading existing relationships.";
+      console.error(err);
+    }
+  }
+
+  // Load note relationships
+  const reviewUrl = `https://notes-history-module.dennis-e64.workers.dev/note_review?project=${project}&id=${noteId}`;
+  try {
+    const res = await fetch(reviewUrl);
+    const data = await res.json();
+    const rows = data.relationships || [];
+    const grid = document.getElementById("relationshipsGrid");
+
+    grid.innerHTML = rows.map(r => `
+      <tr data-relid="${r.id}">
+        <td>${escapeHtml(r.raw_name || "")}</td>
+        <td><input type="text" value="${escapeHtml(r.relationship_type_ai || "")}" class="rel-type"/></td>
+        <td><input type="text" value="${escapeHtml(r.role_label_ai || "")}" class="rel-role"/></td>
+        <td>${escapeHtml(r.contact_id || "")}</td>
+        <td>${escapeHtml(r.contact_name || "")}</td>
+        <td>${escapeHtml(r.contact_type || "")}</td>
+        <td>${escapeHtml(r.contact_email || "")}</td>
+        <td>
+          ${
+            r.contact_id
+              ? `<input type="checkbox" class="promote-checkbox"/>`
+              : `<button class="get-id-btn">Get Contact ID</button>`
+          }
+        </td>
+      </tr>
+    `).join("");
+
+    // Wire up Get ID buttons
+    grid.querySelectorAll(".get-id-btn").forEach(btn => {
+      btn.addEventListener("click", e => {
+        const row = e.target.closest("tr");
+        const relId = row.dataset.relid;
+
+        // Render inline search form
+        row.querySelector("td:last-child").innerHTML = `
+          <div>
+            <input class="search-first" placeholder="First name"/>
+            <input class="search-last" placeholder="Last name"/>
+            <button class="do-search">Find</button>
+            <div class="search-results muted">Enter criteria and click Find.</div>
+          </div>
+        `;
+
+        // Wire up search
+        row.querySelector(".do-search").addEventListener("click", async () => {
+          const first = row.querySelector(".search-first").value.trim();
+          const last = row.querySelector(".search-last").value.trim();
+          if (!first && !last) { alert("Enter at least a first or last name."); return; }
+
+          const params = new URLSearchParams();
+          params.set("project", project);
+          if (first) params.set("first_name.ilike", `*${first}*`);
+          if (last)  params.set("last_name.ilike", `*${last}*`);
+
+          const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${params.toString()}&select=contact_id,first_name,last_name,email,contact_type`;
+          const resp = await fetch(searchUrl);
+          const contacts = await resp.json();
+
+          const resultsDiv = row.querySelector(".search-results");
+          resultsDiv.innerHTML = contacts.map(c => `
+            <div style="padding:4px; cursor:pointer;"
+              onclick="attachRelationshipContact('${relId}', '${c.contact_id}', '${c.first_name} ${c.last_name}', '${c.contact_type}', '${c.email}', '${project}')">
+              <strong>${c.first_name} ${c.last_name}</strong> (${c.contact_type})<br/>
+              <small>${c.email}</small>
+            </div>
+          `).join("");
+        });
+      });
+    });
+
+    // Wire up Save Promotions
+    document.getElementById("btnSavePromotions").addEventListener("click", async () => {
+      const promoteRows = [...grid.querySelectorAll("tr")].filter(r => r.querySelector(".promote-checkbox")?.checked);
+      for (const row of promoteRows) {
+        const relId = row.dataset.relid;
+        const contactId = row.querySelector("td:nth-child(4)").textContent.trim();
+        const role = row.querySelector(".rel-role").value.trim();
+        const type = row.querySelector(".rel-type").value.trim();
+
+        const payload = {
+          client_id: portalState.clientId,
+          related_contact_id: contactId,
+          relationship_role: role,
+          relationship_type: type
+        };
+
+        const endpoint = `https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships`;
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        console.log("Promote response", res.status);
+      }
+      alert("✅ Promotions saved.");
+      renderRelationships(container, portalState); // refresh
+    });
+  } catch (err) {
+    console.error(err);
+    document.getElementById("relationshipsGrid").innerHTML = "<tr><td colspan='8'>Error loading relationships.</td></tr>";
+  }
+}
+
+// Helper: PATCH notes_relationships with chosen contact
+async function attachRelationshipContact(relId, contactId, name, type, email, project) {
+  const endpoint = `https://notes-history-module.dennis-e64.workers.dev/note_relationships?id=eq.${relId}&project=eq.${project}`;
+  const payload = {
+    contact_id: contactId,
+    contact_name: name,
+    contact_type: type,
+    contact_email: email
+  };
+
+  const res = await fetch(endpoint, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (res.ok) {
+    alert("✅ Relationship updated");
+    renderRelationships(document.getElementById("notesContent"), portalState);
+  } else {
+    alert("Failed to update relationship");
+  }
+}
+
+async function handlePromoteRelationship(request, env, cors) {
+  try {
+    const body = await request.json();
+    const { client_id, related_contact_id, relationship_role, relationship_type } = body;
+
+    if (!client_id || !related_contact_id) {
+      return new Response(JSON.stringify({ status: "error", error: "Missing client_id or related_contact_id" }), {
+        status: 400,
+        headers: cors
+      });
+    }
+
+    const payload = {
+      client_id,
+      related_contact_id,
+      relationship_role: relationship_role || "unknown",
+      relationship_type: relationship_type || "unknown"
+    };
+
+    const endpoint = `${env.SUPABASE_URL}/rest/v1/contact_relationships`;
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      return new Response(JSON.stringify({ status: "error", error: "Insert failed", details: data }), {
+        status: 500,
+        headers: cors
+      });
+    }
+
+    return new Response(JSON.stringify({ status: "ok", relationship: data[0] }), {
+      status: 200,
+      headers: cors
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ status: "error", error: err.message }), {
+      status: 500,
+      headers: cors
+    });
+  }
+}
+
+
 
 /* -------------------------
    Utils
