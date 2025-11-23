@@ -30,8 +30,6 @@ function setActiveSubtab(tabId) {
 }
 
 function initNotes(portalState) {
-  const historyBtn = document.querySelector('#notes-subtabs button[data-subtab="history"]');
-  if (historyBtn) historyBtn.classList.add('active');  
   
   const container = document.getElementById("notesContent");
   if (container) container.innerHTML = `<p>Select a subtab to begin.</p>`;
