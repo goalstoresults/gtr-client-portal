@@ -180,7 +180,7 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `
       <section class="card">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-          <h2 style="margin:0;">Note Review (1.2.3)</h2>
+          <h2 style="margin:0;">Note Review (1.2.4)</h2>
           <!-- 🔵 Styled Set Client button -->
           <button id="btnSetClient" class="primary"
                   style="background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
@@ -323,6 +323,51 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `<p>Error loading note review: ${err.message}</p>`;
   }
 }
+
+/* Add Client to Note */
+async function attachClientToNote(contactId, contactName, contactType, contactEmail) {
+  try {
+    const payload = {
+      id: portalState.selectedNoteId,
+      updates: {
+        contact_id: contactId,
+        contact_name: contactName,
+        contact_type: contactType,
+        contact_email: contactEmail || null,
+        updated_at: new Date().toISOString()
+      }
+    };
+
+    const res = await fetch(
+      "https://notes-history-module.dennis-e64.workers.dev",
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }
+    );
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok || data.status !== "ok") {
+      alert(`❌ Failed to attach client: ${data.error || "Unknown error"}`);
+      console.error("Attach error:", data);
+      return;
+    }
+
+    alert("✅ Client attached to note.");
+
+    // 🔄 Refresh Note Review so the updated client info shows immediately
+    const container = document.getElementById("notesContent");
+    if (container) {
+      await renderReview(container, portalState, portalState.selectedNoteId);
+    }
+  } catch (err) {
+    alert("Error attaching client: " + err.message);
+    console.error(err);
+  }
+}
+
 
 
 
