@@ -117,13 +117,22 @@ async function renderHistory(container, portalState) {
     `;
     container.appendChild(table);
 
+    // Attach Review button handlers
     table.querySelectorAll("button[data-note-id]").forEach(btn =>
       btn.addEventListener("click", () => {
         const noteId = btn.getAttribute("data-note-id");
         portalState.selectedNoteId = noteId;
         console.log("[History] Selected note ID:", noteId);
+
+        // Enable Review and Relationships tabs
         setSubtabEnabled("review", true);
         setSubtabEnabled("relationships", true);
+
+        // 🔧 Switch tab highlight to Review
+        document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
+        document.querySelector('#notes-subtabs button[data-subtab="review"]')?.classList.add("active");
+
+        // 🔄 Render Review content
         renderReview(container, portalState, noteId);
       })
     );
@@ -131,6 +140,7 @@ async function renderHistory(container, portalState) {
     container.innerHTML = `<p>Error loading history: ${err.message}</p>`;
   }
 }
+
 
 /* Add (POST /notes-history-module) */
 function renderAdd(container, portalState) {
