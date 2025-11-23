@@ -447,41 +447,6 @@ window.attachClientToNote = attachClientToNote;
 
 
 /* Relationships (GET /note_relationships) */
-function renderRelationships(container, portalState) {
-  console.log("[Relationships] Called with noteId:", portalState.selectedNoteId);
-
-  if (!portalState.selectedNoteId) {
-    container.innerHTML = `<p>Select a note from History to view relationships.</p>`;
-    return;
-  }
-  container.innerHTML = `<h4>Relationships</h4><p>Note ID: ${portalState.selectedNoteId}</p>
-    <div style="margin-top:8px;"><button id="btnRelFetch">Fetch relationships</button></div>
-    <div id="relResult" style="margin-top:8px;"></div>`;
-  document.getElementById("btnRelFetch").addEventListener("click", async () => {
-    try {
-      const params = new URLSearchParams({ project: portalState.project, note_id: portalState.selectedNoteId });
-      const url = `https://notes-history-module.dennis-e64.workers.dev/note_relationships?${params}`;
-      console.log("[Relationships] Fetching URL:", url);
-      const res = await fetch(url, { cache: "no-cache" });
-      console.log("[Relationships] Response JSON:", data);
-      const data = await res.json();
-      const result = document.getElementById("relResult");
-      if (res.ok && data.status === "ok" && Array.isArray(data.relationships)) {
-        const items = data.relationships.map(r =>
-          `id ${r.id ?? "?"}: ${r.relationship_type ?? "type?"} — ${r.relationship_role ?? "role?"} — ${r.related_email ?? "email?"}`
-        );
-        result.innerHTML = items.length
-          ? `<ul>${items.map(i => `<li>${escapeHtml(i)}</li>`).join("")}</ul>`
-          : "No relationships.";
-      } else {
-        result.textContent = `Error: ${data.error || "Unknown error"}`;
-      }
-    } catch (err) {
-      document.getElementById("relResult").textContent = `Error: ${err.message}`;
-    }
-  });
-}
-
 async function renderRelationships(container, portalState) {
   const noteId = portalState.selectedNoteId;
   const project = portalState.project;
