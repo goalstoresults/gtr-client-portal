@@ -180,15 +180,15 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `
       <section class="card">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-          <h2 style="margin:0;">Note Review</h2>
+          <h2 style="margin:0;">Note Review (1.2.3)</h2>
           <!-- 🔵 Styled Set Client button -->
-          <button id="btnSetClient" class="primary" 
+          <button id="btnSetClient" class="primary"
                   style="background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
             Set Client
           </button>
         </div>
 
-        <!-- 👇 Form moved directly below the heading/button -->
+        <!-- 👇 Form directly below heading/button -->
         <section id="setClientForm" class="card" style="display:none; margin-bottom:16px;">
           <h3>Attach Client to Note</h3>
           <div class="row" style="gap:12px; margin-bottom:12px;">
@@ -203,7 +203,7 @@ async function renderReview(container, portalState, noteId) {
         <p><strong>Subject:</strong> ${note.subject || "(no subject)"}</p>
         <p><strong>From:</strong> ${note.from_name || "(unknown)"} (${note.from_email || "no email"})</p>
         <p><strong>Created:</strong> ${note.created}</p>
-        <p><strong>Client:</strong> ${note.client_name || "(unknown)"}</p>
+        <p><strong>Client:</strong> ${note.contact_name || "(unknown)"} (${note.contact_email || ""})</p>
         <p><strong>Status:</strong> ${note.status || "pending"} • 
            <strong>Needs review:</strong> ${note.needs_review ? "Yes" : "No"}</p>
         <p><strong>Summary:</strong></p>
@@ -250,7 +250,7 @@ async function renderReview(container, portalState, noteId) {
       form.style.display = form.style.display === "none" ? "block" : "none";
     });
 
-    // Find client handler — corrected email filter
+    // Find client handler
     document.getElementById("btnFindClient").addEventListener("click", async () => {
       const first = document.getElementById("filter-first").value.trim();
       const last = document.getElementById("filter-last").value.trim();
@@ -269,8 +269,8 @@ async function renderReview(container, portalState, noteId) {
       const selectCols = "contact_id,first_name,last_name,email,contact_type";
 
       if (email) {
-        params.set("project", portalState.project);
-        params.set("email.ilike", `*${email}*`); // ✅ fixed email filter
+        params.set("project.eq", portalState.project); // ✅ fixed project filter
+        params.set("email.ilike", `*${email}*`);       // ✅ fixed email filter
       } else {
         const filters = [`project.eq.${portalState.project}`];
         if (first) filters.push(`first_name.ilike.*${first}*`);
@@ -323,8 +323,6 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `<p>Error loading note review: ${err.message}</p>`;
   }
 }
-
-
 
 
 
