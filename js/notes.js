@@ -155,7 +155,6 @@ function renderAdd(container, portalState) {
 }
 
 /* Review (GET /note_review) */
-
 async function renderReview(container, portalState, noteId) {
   console.log("[Review] Called with noteId:", noteId);
 
@@ -185,7 +184,11 @@ async function renderReview(container, portalState, noteId) {
 
     container.innerHTML = `
       <section class="card">
-        <h2>Note Review</h2>
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+          <h2 style="margin:0;">Note Review</h2>
+          <button id="btnSetClient" class="primary">Set Client</button>
+        </div>
+
         <p><strong>Subject:</strong> ${note.subject || "(no subject)"}</p>
         <p><strong>From:</strong> ${note.from_name || "(unknown)"} (${note.from_email || "no email"})</p>
         <p><strong>Created:</strong> ${note.created}</p>
@@ -254,11 +257,102 @@ async function renderReview(container, portalState, noteId) {
           </table>
         ` : ""}
       </section>
+
+      <section id="setClientForm" class="card" style="display:none; margin-top:16px;">
+        <h3>Attach Client to Note</h3>
+        <div class="row" style="gap:12px; margin-bottom:12px;">
+          <input id="filter-first" placeholder="First name" />
+          <input id="filter-last" placeholder="Last name" />
+          <input id="filter-email" placeholder="Email" />
+          <button id="btnFindClient" class="primary">Find</button>
+        </div>
+        <div id="clientSearchResults" class="muted">Enter criteria and click Find.</div>
+      </section>
     `;
+
+    // Wire Set Client button
+    document.getElementById("btnSetClient").addEventListener("click", () => {
+      const form = document.getElementById("setClientForm");
+      form.style.display = form.style.display === "none" ? "block" : "none";
+    });
+
+    // Wire Find Client button
+    document.getElementById("btnFindClient").addEventListener("click", async () => {
+      const first = document.getElementById("filter-first").value.trim();
+      const last = document.getElementById("filter-last").value.trim();
+      const email = document.getElementById("filter-email").value.trim();
+
+      if (email) {
+        if (email.length < 3) { alert("Email must be at least 3 characters."); return; }
+      } else {
+        if (!first || !last) { alert("Both first and last name required."); return; }
+        if (first.length < 3 || last.length < 3) { alert("Names must be at least 3 characters."); return; }
+      }
+
+      const params = new URLSearchParams({ project: portalState.project });
+      if (email) {
+        params.set("email", `ilike.*${email}*`);
+      } else {
+        params.set("first_name", `ilike.*${first}*`);
+        params.set("last_name", `ilike.*${last}*`);
+      }
+
+      const url = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${params}`;
+      console.log("[SetClient] Searching contacts:", url);
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Search failed");
+        const rows = await res.json();
+        const container = document.getElementById("clientSearchResults");
+        container.innerHTML = rows.length > 0
+          ? rows.map(r => `
+              <div style="padding:8px; border-bottom:1px solid #eee; cursor:pointer;"
+                   onclick="attachClientToNote('${r.contact_id}', '${r.first_name || ""} ${r.last_name || ""}', '${r.type || "contact"}', '${r.email || ""}')">
+                <strong>${r.first_name || ""} ${r.last_name || ""}</strong>
+                <span class="muted">${r.email || ""}</span>
+              </div>
+            `).join("")
+          : "<div class='muted'>No contacts found.</div>";
+      } catch (err) {
+        alert("Error searching contacts: " + err.message);
+      }
+    });
   } catch (err) {
     container.innerHTML = `<p>Error loading note review: ${err.message}</p>`;
   }
 }
+
+// Helper to attach client
+async function attachClientToNote(contactId, contactName, contactType, contactEmail) {
+  try {
+    const res = await fetch(
+      `https://notes-history-module.dennis-e64.workers.dev?project=${encodeURIComponent(activeProject)}&id=eq.${selectedNoteId}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contact_id: contactId,
+          contact_name: contactName,
+          contact_type: contactType,
+          contact_email: contactEmail || null,
+          updated_at: new Date().toISOString()
+        })
+      }
+    );
+
+    if (!res.ok) {
+      const msg = await res.text().catch(() => "");
+      alert(`❌ Failed to attach client (${res.status}). ${msg}`);
+      return;
+    }
+
+    alert("✅ Client attached to note.");
+  } catch (err) {
+    alert("Error attaching client: " + err.message);
+  }
+}
+
 
 
 
