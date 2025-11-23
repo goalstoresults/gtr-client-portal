@@ -197,7 +197,7 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `
       <section class="card">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-        <h2 style="margin:0;">Note Review for Note Id (${noteId}) Version 1.2.9</h2>
+          <h2 style="margin:0;">Note Review for Note Id (${noteId})</h2>
           <button id="btnSetClient" class="primary"
                   style="background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
             Set Client
@@ -236,8 +236,18 @@ async function renderReview(container, portalState, noteId) {
         ` : ""}
 
         ${Array.isArray(relationships) && relationships.length > 0 ? `
-          <h3 style="margin-top:20px;">Relationships Detected in Note</h3>
-          <table class="notes-table">
+          <div style="display:flex; align-items:center; gap:12px; margin-top:20px;">
+            <h3 style="margin:0;">Relationships Detected in Note</h3>
+            ${
+              note.contact_id
+                ? `<button id="btnRelationships" class="primary"
+                           style="background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
+                     Notes Relationships
+                   </button>`
+                : `<span style="color:#999; font-size:0.9em;">(need to set client to continue)</span>`
+            }
+          </div>
+          <table class="notes-table" style="margin-top:12px;">
             <thead>
               <tr>
                 <th>Raw Name</th>
@@ -311,6 +321,16 @@ async function renderReview(container, portalState, noteId) {
       }
     });
 
+    // Relationships button handler
+    const relBtn = document.getElementById("btnRelationships");
+    if (relBtn) {
+      relBtn.addEventListener("click", () => {
+        document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
+        document.querySelector('#notes-subtabs button[data-subtab="relationships"]')?.classList.add("active");
+        renderRelationships(container, portalState);
+      });
+    }
+
     // Find client handler (name-only search)
     document.getElementById("btnFindClient").addEventListener("click", async () => {
       const first = document.getElementById("filter-first").value.trim();
@@ -374,6 +394,7 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `<p>Error loading note review: ${err.message}</p>`;
   }
 }
+
 
 
 
