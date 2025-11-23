@@ -171,6 +171,7 @@ function renderAdd(container, portalState) {
 }
 
 /* Review (GET /note_review) */
+/* Review (GET /note_review) */
 async function renderReview(container, portalState, noteId) {
   console.log("[Review] Called with noteId:", noteId);
 
@@ -196,10 +197,14 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `
       <section class="card">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-          <h2 style="margin:0;">Note Review (1.2.8)</h2>
+          <h2 style="margin:0;">Note Review (1.2.9)</h2>
           <button id="btnSetClient" class="primary"
                   style="background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
             Set Client
+          </button>
+          <button id="btnDeleteNote" class="primary"
+                  style="background:#e53935; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
+            Delete
           </button>
         </div>
 
@@ -262,6 +267,48 @@ async function renderReview(container, portalState, noteId) {
     document.getElementById("btnSetClient").addEventListener("click", () => {
       const form = document.getElementById("setClientForm");
       form.style.display = form.style.display === "none" ? "block" : "none";
+    });
+
+    // Delete note + relationships
+    document.getElementById("btnDeleteNote").addEventListener("click", async () => {
+      if (!confirm("Are you sure you want to delete this note and all its relationships?")) return;
+
+      try {
+        const noteId = portalState.selectedNoteId;
+        const project = portalState.project;
+
+        // Delete relationships first
+        const relUrl = `https://notes-history-module.dennis-e64.workers.dev/note_relationships?project=${project}&note_id=${noteId}`;
+        const relRes = await fetch(relUrl, { method: "DELETE" });
+        if (!relRes.ok) {
+          const msg = await relRes.text().catch(() => "");
+          alert(`Failed to delete relationships: ${msg}`);
+          return;
+        }
+
+        // Delete note itself
+        const noteUrl = `https://notes-history-module.dennis-e64.workers.dev/note_history?id=${noteId}&project=${project}`;
+        const noteRes = await fetch(noteUrl, { method: "DELETE" });
+        if (!noteRes.ok) {
+          const msg = await noteRes.text().catch(() => "");
+          alert(`Failed to delete note: ${msg}`);
+          return;
+        }
+
+        alert("✅ Note and relationships deleted.");
+
+        // Reset UI back to History view
+        const container = document.getElementById("notesContent");
+        if (container) {
+          await renderHistory(container, portalState);
+          // Switch tab highlight back to History
+          document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
+          document.querySelector('#notes-subtabs button[data-subtab="history"]')?.classList.add("active");
+        }
+      } catch (err) {
+        alert("Error deleting note: " + err.message);
+        console.error(err);
+      }
     });
 
     // Find client handler (name-only search)
@@ -327,6 +374,8 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `<p>Error loading note review: ${err.message}</p>`;
   }
 }
+
+
 
 
 /* Add Client to Note */
