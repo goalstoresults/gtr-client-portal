@@ -180,7 +180,7 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `
       <section class="card">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-          <h2 style="margin:0;">Note Review (version 1.2.0)</h2>
+          <h2 style="margin:0;">Note Review (v.1.2.0)</h2>
           <button id="btnSetClient" class="primary">Set Client</button>
         </div>
 
@@ -245,7 +245,7 @@ async function renderReview(container, portalState, noteId) {
       form.style.display = form.style.display === "none" ? "block" : "none";
     });
 
-    // Find client handler (legacy style)
+    // Find client handler — corrected to use contact_type
     document.getElementById("btnFindClient").addEventListener("click", async () => {
       const first = document.getElementById("filter-first").value.trim();
       const last = document.getElementById("filter-last").value.trim();
@@ -261,8 +261,10 @@ async function renderReview(container, portalState, noteId) {
       }
 
       const params = new URLSearchParams();
+      const selectCols = "contact_id,first_name,last_name,email,contact_type";
+
       if (email) {
-        params.set("project", portalState.project); // plain project param
+        params.set("project", portalState.project);
         params.set("email", `ilike.*${email}*`);
       } else {
         const filters = [`project.eq.${portalState.project}`];
@@ -278,7 +280,7 @@ async function renderReview(container, portalState, noteId) {
         }
       }
 
-      const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${params.toString()}&select=contact_id,first_name,last_name,email,type`;
+      const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${params.toString()}&select=${encodeURIComponent(selectCols)}`;
       console.log("[SetClient] Searching contacts:", searchUrl);
 
       try {
@@ -291,13 +293,21 @@ async function renderReview(container, portalState, noteId) {
         const rows = await resp.json();
         const container = document.getElementById("clientSearchResults");
         container.innerHTML = rows.length > 0
-          ? rows.map(r => `
-              <div style="padding:8px; border-bottom:1px solid #eee; cursor:pointer;"
-                   onclick="attachClientToNote('${r.contact_id}', '${(r.first_name || "")} ${(r.last_name || "")}', '${(r.type || "contact")}', '${(r.email || "")}')">
-                <strong>${(r.first_name || "")} ${(r.last_name || "")}</strong>
-                <span class="muted">${r.email || ""}</span>
-              </div>
-            `).join("")
+          ? rows.map(r => {
+              const fullName = `${r.first_name || ""} ${r.last_name || ""}`.trim();
+              const typeLabel = (r.contact_type || "contact").toLowerCase();
+              const emailSafe = r.email || "";
+              return `
+                <div style="padding:8px; border-bottom:1px solid #eee; cursor:pointer;"
+                     onclick="attachClientToNote('${r.contact_id}', '${fullName}', '${typeLabel}', '${emailSafe}')">
+                  <strong>${fullName}</strong>
+                  <span style="background:#eef; color:#336; padding:2px 6px; border-radius:12px; font-size:0.75em; margin-left:6px;">
+                    ${typeLabel}
+                  </span><br/>
+                  <small>${emailSafe}</small>
+                </div>
+              `;
+            }).join("")
           : "<div class='muted'>No contacts found.</div>";
       } catch (err) {
         alert("Network error searching contacts");
@@ -308,6 +318,7 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `<p>Error loading note review: ${err.message}</p>`;
   }
 }
+
 
 
 
