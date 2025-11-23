@@ -180,9 +180,25 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `
       <section class="card">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-          <h2 style="margin:0;">Note Review (v.1.2.2)</h2>
-          <button id="btnSetClient" class="primary">Set Client</button>
+          <h2 style="margin:0;">Note Review</h2>
+          <!-- 🔵 Styled Set Client button -->
+          <button id="btnSetClient" class="primary" 
+                  style="background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
+            Set Client
+          </button>
         </div>
+
+        <!-- 👇 Form moved directly below the heading/button -->
+        <section id="setClientForm" class="card" style="display:none; margin-bottom:16px;">
+          <h3>Attach Client to Note</h3>
+          <div class="row" style="gap:12px; margin-bottom:12px;">
+            <input id="filter-first" placeholder="First name" />
+            <input id="filter-last" placeholder="Last name" />
+            <input id="filter-email" placeholder="Email" />
+            <button id="btnFindClient" class="primary">Find</button>
+          </div>
+          <div id="clientSearchResults" class="muted">Enter criteria and click Find.</div>
+        </section>
 
         <p><strong>Subject:</strong> ${note.subject || "(no subject)"}</p>
         <p><strong>From:</strong> ${note.from_name || "(unknown)"} (${note.from_email || "no email"})</p>
@@ -226,17 +242,6 @@ async function renderReview(container, portalState, noteId) {
           </table>
         ` : ""}
       </section>
-
-      <section id="setClientForm" class="card" style="display:none; margin-top:16px;">
-        <h3>Attach Client to Note</h3>
-        <div class="row" style="gap:12px; margin-bottom:12px;">
-          <input id="filter-first" placeholder="First name" />
-          <input id="filter-last" placeholder="Last name" />
-          <input id="filter-email" placeholder="Email" />
-          <button id="btnFindClient" class="primary">Find</button>
-        </div>
-        <div id="clientSearchResults" class="muted">Enter criteria and click Find.</div>
-      </section>
     `;
 
     // Toggle Set Client form
@@ -245,7 +250,7 @@ async function renderReview(container, portalState, noteId) {
       form.style.display = form.style.display === "none" ? "block" : "none";
     });
 
-    // Find client handler — corrected to use contact_type
+    // Find client handler — corrected email filter
     document.getElementById("btnFindClient").addEventListener("click", async () => {
       const first = document.getElementById("filter-first").value.trim();
       const last = document.getElementById("filter-last").value.trim();
@@ -265,7 +270,7 @@ async function renderReview(container, portalState, noteId) {
 
       if (email) {
         params.set("project", portalState.project);
-        params.set("email", `ilike.*${email}*`);
+        params.set("email.ilike", `*${email}*`); // ✅ fixed email filter
       } else {
         const filters = [`project.eq.${portalState.project}`];
         if (first) filters.push(`first_name.ilike.*${first}*`);
@@ -318,6 +323,7 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `<p>Error loading note review: ${err.message}</p>`;
   }
 }
+
 
 
 
