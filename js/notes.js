@@ -651,30 +651,6 @@ async function attachRelationshipContact(relId, contactId, name, type, email, pr
 }
 
 
-// Helper: PATCH notes_relationships with chosen contact
-async function attachRelationshipContact(relId, contactId, name, type, email, project) {
-  const endpoint = `https://notes-history-module.dennis-e64.workers.dev/note_relationships?id=eq.${relId}&project=eq.${project}`;
-  const payload = {
-    contact_id: contactId,
-    contact_name: name,
-    contact_type: type,
-    contact_email: email
-  };
-
-  const res = await fetch(endpoint, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-
-  if (res.ok) {
-    alert("✅ Relationship updated");
-    renderRelationships(document.getElementById("notesContent"), portalState);
-  } else {
-    alert("Failed to update relationship");
-  }
-}
-
 async function handlePromoteRelationship(request, env, cors) {
   try {
     const body = await request.json();
