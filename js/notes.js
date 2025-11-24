@@ -272,3 +272,13 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `<p>Error loading note review: ${err.message}</p>`;
   }
 }
+
+/* -------------------------
+   Utils
+------------------------- */
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
