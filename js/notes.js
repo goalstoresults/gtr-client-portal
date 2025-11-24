@@ -1,4 +1,4 @@
-// js/notes.js v1.1.7
+// js/notes.js v1.1.6
 // Notes module with full Worker URLs (notes-history-module.dennis-e64.workers.dev)
 
 console.log("[Notes.js] loaded");
@@ -15,7 +15,7 @@ async function loadPartial(url, tabContent) {
     const html = await res.text();
     tabContent.innerHTML = html;
     const header = tabContent.querySelector("h2");
-    if (header) header.textContent = "Notes (v1.1.7)";
+    if (header) header.textContent = "Notes (v1.1.6)";
   } catch (err) {
     tabContent.innerHTML = `<section class="card"><p>Error loading partial (${url}): ${err.message}</p></section>`;
   }
@@ -24,11 +24,13 @@ async function loadPartial(url, tabContent) {
 function setActiveSubtab(tabId) {
   const tabs = document.querySelectorAll("nav#notes-subtabs button");
   tabs.forEach(t => t.classList.remove("active"));
+
   const selected = document.getElementById(tabId);
   if (selected) selected.classList.add("active");
 }
 
 function initNotes(portalState) {
+  
   const container = document.getElementById("notesContent");
   if (container) container.innerHTML = `<p>Select a subtab to begin.</p>`;
   document.querySelectorAll("#notes-subtabs button").forEach(btn =>
@@ -59,7 +61,7 @@ async function loadNotesSubtab(subtab, portalState) {
   container.innerHTML = `<p>Unknown subtab</p>`;
 }
 
-/* History */
+/* History (GET /notes-history-module) */
 async function renderHistory(container, portalState) {
   try {
     const now = new Date(), sevenDaysAgo = new Date(now.getTime() - 7*24*60*60*1000);
@@ -115,15 +117,22 @@ async function renderHistory(container, portalState) {
     `;
     container.appendChild(table);
 
+    // Attach Review button handlers
     table.querySelectorAll("button[data-note-id]").forEach(btn =>
       btn.addEventListener("click", () => {
         const noteId = btn.getAttribute("data-note-id");
         portalState.selectedNoteId = noteId;
         console.log("[History] Selected note ID:", noteId);
+
+        // Enable Review and Relationships tabs
         setSubtabEnabled("review", true);
         setSubtabEnabled("relationships", true);
+
+        // 🔧 Switch tab highlight to Review
         document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
         document.querySelector('#notes-subtabs button[data-subtab="review"]')?.classList.add("active");
+
+        // 🔄 Render Review content
         renderReview(container, portalState, noteId);
       })
     );
@@ -132,9 +141,10 @@ async function renderHistory(container, portalState) {
   }
 }
 
-/* Add */
+
+/* Add (POST /notes-history-module) */
 function renderAdd(container, portalState) {
-  container.innerHTML = `<h4>Add Note (v1.2.5)</h4>
+  container.innerHTML = `<h4>Add Note (v1.2.7)</h4>
     <textarea id="noteContent" placeholder="Enter note text..." style="width:100%;min-height:100px;"></textarea>
     <div style="margin-top:8px;"><button id="btnSaveNote" class="primary">Save</button></div>
     <div id="noteAddResult" style="margin-top:8px;"></div>`;
@@ -150,6 +160,7 @@ function renderAdd(container, portalState) {
           raw_text: content
         })
       });
+
       const data = await res.json();
       document.getElementById("noteAddResult").textContent =
         data.success || data.status === "ok" ? "Note saved!" : `Error: ${data.error||"Unknown error"}`;
@@ -159,17 +170,25 @@ function renderAdd(container, portalState) {
   });
 }
 
-/* Review */
+/* Review (GET /note_review) */
 async function renderReview(container, portalState, noteId) {
   console.log("[Review] Called with noteId:", noteId);
-  if (!noteId) { container.innerHTML = `<p>Select a note from History to review.</p>`; return; }
+
+  if (!noteId) {
+    container.innerHTML = `<p>Select a note from History to review.</p>`;
+    return;
+  }
 
   try {
     const params = new URLSearchParams({ project: portalState.project, id: noteId });
     const url = `https://notes-history-module.dennis-e64.workers.dev/note_review?${params}`;
     const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
-    if (!res.ok || !data.note) { container.innerHTML = `<p>Error loading note review: ${data.error || "Not found"}</p>`; return; }
+
+    if (!res.ok || !data.note) {
+      container.innerHTML = `<p>Error loading note review: ${data.error || "Not found"}</p>`;
+      return;
+    }
 
     const note = data.note;
     const relationships = data.relationships || [];
@@ -178,9 +197,17 @@ async function renderReview(container, portalState, noteId) {
       <section class="card">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
           <h2 style="margin:0;">Note Review for Note Id (${noteId})</h2>
-          <button id="btnSetClient" class="primary">Set Client</button>
-          <button id="btnDeleteNote" class="primary" style="background:#e53935;">Delete</button>
+          <button id="btnSetClient" class="primary"
+                  style="background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
+            Set Client
+          </button>
+          <button id="btnDeleteNote" class="primary"
+                  style="background:#e53935; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
+            Delete
+          </button>
         </div>
+
+        <!-- 👇 Form directly below heading/button -->
         <section id="setClientForm" class="card" style="display:none; margin-bottom:16px;">
           <h3>Attach Client to Note</h3>
           <div class="row" style="gap:12px; margin-bottom:12px;">
@@ -199,6 +226,49 @@ async function renderReview(container, portalState, noteId) {
            <strong>Needs review:</strong> ${note.needs_review ? "Yes" : "No"}</p>
         <p><strong>Summary:</strong></p>
         <p>${note.summary || "(no summary available)"}</p>
+
+        ${note.raw_text ? `
+          <details style="margin-top:12px;">
+            <summary>Raw Text (click to expand)</summary>
+            <pre style="margin-top:8px;">${note.raw_text}</pre>
+          </details>
+        ` : ""}
+
+        ${Array.isArray(relationships) && relationships.length > 0 ? `
+          <div style="display:flex; align-items:center; gap:12px; margin-top:20px;">
+            <h3 style="margin:0;">Relationships Detected in Note</h3>
+            ${
+              note.contact_id
+                ? `<button id="btnRelationships" class="primary"
+                           style="background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
+                     Notes Relationships
+                   </button>`
+                : `<span style="color:#999; font-size:0.9em;">(need to set client to continue)</span>`
+            }
+          </div>
+          <table class="notes-table" style="margin-top:12px;">
+            <thead>
+              <tr>
+                <th>Raw Name</th>
+                <th>AI First</th>
+                <th>AI Last</th>
+                <th>Role/Type</th>
+                <th>Context</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${relationships.map(r => `
+                <tr>
+                  <td>${escapeHtml(r.raw_name || "")}</td>
+                  <td>${escapeHtml(r.first_name_ai || "")}</td>
+                  <td>${escapeHtml(r.last_name_ai || "")}</td>
+                  <td>${escapeHtml(r.role_label_ai || "")}</td>
+                  <td>${escapeHtml(r.context_description_ai || "")}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        ` : ""}
       </section>
     `;
 
@@ -208,70 +278,213 @@ async function renderReview(container, portalState, noteId) {
       form.style.display = form.style.display === "none" ? "block" : "none";
     });
 
-    // Delete note handler
+    // Delete note + relationships
     document.getElementById("btnDeleteNote").addEventListener("click", async () => {
       if (!confirm("Are you sure you want to delete this note and all its relationships?")) return;
+
       try {
-        const project = portalState.project;
         const noteId = portalState.selectedNoteId;
+        const project = portalState.project;
+
+        // Delete relationships first
         const relUrl = `https://notes-history-module.dennis-e64.workers.dev/note_relationships?project=${project}&note_id=${noteId}`;
-        await fetch(relUrl, { method: "DELETE" });
+        const relRes = await fetch(relUrl, { method: "DELETE" });
+        if (!relRes.ok) {
+          const msg = await relRes.text().catch(() => "");
+          alert(`Failed to delete relationships: ${msg}`);
+          return;
+        }
+
+        // Delete note itself
         const noteUrl = `https://notes-history-module.dennis-e64.workers.dev/note_history?id=${noteId}&project=${project}`;
-        await fetch(noteUrl, { method: "DELETE" });
+        const noteRes = await fetch(noteUrl, { method: "DELETE" });
+        if (!noteRes.ok) {
+          const msg = await noteRes.text().catch(() => "");
+          alert(`Failed to delete note: ${msg}`);
+          return;
+        }
+
         alert("✅ Note and relationships deleted.");
-        await renderHistory(container, portalState);
+
+        // Reset UI back to History view
+        const container = document.getElementById("notesContent");
+        if (container) {
+          await renderHistory(container, portalState);
+          // Switch tab highlight back to History
+          document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
+          document.querySelector('#notes-subtabs button[data-subtab="history"]')?.classList.add("active");
+        }
       } catch (err) {
         alert("Error deleting note: " + err.message);
+        console.error(err);
       }
     });
 
-    // Find client handler
+    // Relationships button handler
+    const relBtn = document.getElementById("btnRelationships");
+    if (relBtn) {
+      relBtn.addEventListener("click", () => {
+        document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
+        document.querySelector('#notes-subtabs button[data-subtab="relationships"]')?.classList.add("active");
+        renderRelationships(container, portalState);
+      });
+    }
+
+    // Find client handler (name-only search)
     document.getElementById("btnFindClient").addEventListener("click", async () => {
       const first = document.getElementById("filter-first").value.trim();
       const last = document.getElementById("filter-last").value.trim();
+
       if (!first && !last) { alert("Enter at least a first or last name."); return; }
+      if ((first && first.length < 3) || (last && last.length < 3)) {
+        alert("Names must be at least 3 characters."); return;
+      }
 
       const params = new URLSearchParams();
       const selectCols = "contact_id,first_name,last_name,email,contact_type";
+
       const filters = [`project.eq.${portalState.project}`];
       if (first) filters.push(`first_name.ilike.*${first}*`);
-      if (last) filters.push(`last_name.ilike.*${last}*`);
-      params.set("and", `(${filters.join(",")})`);
+      if (last)  filters.push(`last_name.ilike.*${last}*`);
+
+      if (filters.length > 1) {
+        params.set("and", `(${filters.join(",")})`);
+      } else {
+        const [filter] = filters;
+        const [key, operator, value] = filter.split(".");
+        params.set(`${key}.${operator}`, value);
+      }
 
       const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${params.toString()}&select=${encodeURIComponent(selectCols)}`;
-      const resp = await fetch(searchUrl);
-      const rows = await resp.json();
-      const resultsDiv = document.getElementById("clientSearchResults");
-      resultsDiv.innerHTML = rows.length > 0
-        ? rows.map(r => `
-            <div class="client-result"
-                 data-contactid="${r.contact_id}"
-                 data-name="${r.first_name} ${r.last_name}"
-                 data-type="${r.contact_type}"
-                 data-email="${r.email}">
-              <strong>${r.first_name} ${r.last_name}</strong> (${r.contact_type})<br/>
-              <small>${r.email}</small>
-            </div>
-          `).join("")
-        : "<div class='muted'>No contacts found.</div>";
+      console.log("[SetClient] Searching contacts:", searchUrl);
 
-      // Attach listeners to each result
-      resultsDiv.querySelectorAll(".client-result").forEach(el => {
-        el.addEventListener("click", () => {
-          attachClientToNote(
-            el.dataset.contactid,
-            el.dataset.name,
-            el.dataset.type,
-            el.dataset.email,
-            portalState
-          );
-        });
-      });
+      try {
+        const resp = await fetch(searchUrl);
+        if (!resp.ok) {
+          const msg = await resp.text().catch(() => "");
+          alert(`Search failed (${resp.status}). ${msg}`);
+          return;
+        }
+        const rows = await resp.json();
+        const container = document.getElementById("clientSearchResults");
+        container.innerHTML = rows.length > 0
+          ? rows.map(r => {
+              const fullName = `${r.first_name || ""} ${r.last_name || ""}`.trim();
+              const typeLabel = (r.contact_type || "contact").toLowerCase();
+              const emailSafe = r.email || "";
+              return `
+                <div style="padding:8px; border-bottom:1px solid #eee; cursor:pointer;"
+                onclick="attachClientToNote('${r.contact_id}', '${fullName}', '${typeLabel}', '${emailSafe}', { selectedNoteId: '${portalState.selectedNoteId}', project: '${portalState.project}' })">
+                  <strong>${fullName}</strong>
+                  <span style="background:#eef; color:#336; padding:2px 6px; border-radius:12px; font-size:0.75em; margin-left:6px;">
+                    ${typeLabel}
+                  </span><br/>
+                  <small>${emailSafe}</small>
+                </div>
+              `;
+            }).join("")
+          : "<div class='muted'>No contacts found.</div>";
+      } catch (err) {
+        alert("Network error searching contacts");
+        console.error(err);
+      }
     });
   } catch (err) {
     container.innerHTML = `<p>Error loading note review: ${err.message}</p>`;
   }
 }
+
+
+/* Add Client to Note */
+async function attachClientToNote(contactId, contactName, contactType, contactEmail, portalState) {
+  try {
+    const payload = {
+      id: portalState.selectedNoteId,
+      updates: {
+        contact_id: contactId,
+        contact_name: contactName,
+        contact_type: contactType,
+        contact_email: contactEmail || null,
+        updated_at: new Date().toISOString()
+      }
+    };
+
+    const res = await fetch(
+      "https://notes-history-module.dennis-e64.workers.dev",
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }
+    );
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok || data.status !== "ok") {
+      alert(`❌ Failed to attach client: ${data.error || "Unknown error"}`);
+      console.error("Attach error:", data);
+      return;
+    }
+
+    alert("✅ Client attached to note.");
+
+    // 🔄 Refresh Note Review so the updated client info shows immediately
+    const container = document.getElementById("notesContent");
+    if (container) {
+      await renderReview(container, portalState, portalState.selectedNoteId);
+    }
+  } catch (err) {
+    alert("Error attaching client: " + err.message);
+    console.error(err);
+  }
+}
+
+
+// 🔧 Make it globally accessible for inline onclick
+window.attachClientToNote = attachClientToNote;
+
+
+
+
+/* Relationships (GET /note_relationships) */
+async function attachRelationshipContact(relId, contactId, name, type, email) {
+  const payload = {
+    contact_id: contactId,
+    contact_name: name,
+    contact_type: type,
+    contact_email: email
+  };
+
+  const endpoint = `https://notes-history-module.dennis-e64.workers.dev/notes_relationships?id=eq.${relId}`;
+  console.log("[AttachContact] PATCH endpoint:", endpoint);
+  console.log("[AttachContact] Payload:", payload);
+
+  try {
+    const res = await fetch(endpoint, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const raw = await res.text();
+    console.log("[AttachContact] Response status:", res.status, "raw:", raw);
+
+    if (res.ok) {
+      alert("✅ Relationship updated");
+      renderRelationships(document.getElementById("notesContent"), portalState); // ✅ refresh tab
+    } else {
+      alert("❌ Failed to update relationship");
+    }
+  } catch (err) {
+    console.error("[AttachContact] Error:", err);
+    alert("Network error while updating relationship");
+  }
+}
+
+// 🔧 Make it globally accessible for inline onclick
+window.attachRelationshipContact = attachRelationshipContact;
+
+
 
 /* -------------------------
    Utils
