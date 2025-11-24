@@ -144,7 +144,7 @@ async function renderHistory(container, portalState) {
 
 /* Add (POST /notes-history-module) */
 function renderAdd(container, portalState) {
-  container.innerHTML = `<h4>Add Note</h4>
+  container.innerHTML = `<h4>Add Note (v1.2.0)</h4>
     <textarea id="noteContent" placeholder="Enter note text..." style="width:100%;min-height:100px;"></textarea>
     <div style="margin-top:8px;"><button id="btnSaveNote" class="primary">Save</button></div>
     <div id="noteAddResult" style="margin-top:8px;"></div>`;
@@ -638,8 +638,10 @@ async function attachRelationshipContact(relId, contactId, name, type, email, pr
 
   const res = await fetch(endpoint, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload) // ✅ no wrapper
   });
 
   if (res.ok) {
