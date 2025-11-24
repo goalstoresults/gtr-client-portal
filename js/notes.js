@@ -628,7 +628,7 @@ async function renderRelationships(container, portalState) {
 
 // Helper: PATCH notes_relationships with chosen contact
 async function attachRelationshipContact(relId, contactId, name, type, email, project) {
-  const endpoint = `https://notes-history-module.dennis-e64.workers.dev/note_relationships?id=eq.${relId}&project=eq.${project}`;
+  const endpoint = `https://notes-history-module.dennis-e64.workers.dev/notes_relationships?id=eq.${relId}&project=eq.${project}`;
   const payload = {
     contact_id: contactId,
     contact_name: name,
