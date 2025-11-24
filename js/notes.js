@@ -451,12 +451,17 @@ async function renderRelationships(container, portalState) {
   const noteId = portalState.selectedNoteId;
   const project = portalState.project;
 
+  if (!noteId) {
+    container.innerHTML = `<p>Select a note from History to view relationships.</p>`;
+    return;
+  }
+
   container.innerHTML = `
     <section class="card">
       <h2>Relationships for Note ${noteId}</h2>
       <div id="existingRelationships" class="card" style="margin-bottom:16px;">
         <h3>Existing Contact Relationships</h3>
-        <div id="existingRelGrid" class="muted">Loading...</div>
+        <div id="existingRelGrid"></div>
       </div>
       <h3 style="margin-top:20px;">Detected Relationships in Note</h3>
       <table class="notes-table">
@@ -508,8 +513,8 @@ async function renderRelationships(container, portalState) {
     grid.innerHTML = rows.map(r => `
       <tr data-relid="${r.id}">
         <td>${escapeHtml(r.raw_name || "")}</td>
-        <td><input type="text" value="${escapeHtml(r.relationship_type_ai || "")}" class="rel-type"/></td>
-        <td><input type="text" value="${escapeHtml(r.role_label_ai || "")}" class="rel-role"/></td>
+        <td><input type="text" value="${escapeHtml(r.relationship_type || "")}" class="rel-type"/></td>
+        <td><input type="text" value="${escapeHtml(r.relationship_role || "")}" class="rel-role"/></td>
         <td>${escapeHtml(r.contact_id || "")}</td>
         <td>${escapeHtml(r.contact_name || "")}</td>
         <td>${escapeHtml(r.contact_type || "")}</td>
@@ -544,25 +549,46 @@ async function renderRelationships(container, portalState) {
         row.querySelector(".do-search").addEventListener("click", async () => {
           const first = row.querySelector(".search-first").value.trim();
           const last = row.querySelector(".search-last").value.trim();
-          if (!first && !last) { alert("Enter at least a first or last name."); return; }
+          if (!first && !last) {
+            alert("Enter at least a first or last name.");
+            return;
+          }
 
-          const params = new URLSearchParams();
-          params.set("project", project);
-          if (first) params.set("first_name.ilike", `*${first}*`);
-          if (last)  params.set("last_name.ilike", `*${last}*`);
+          const filters = [];
+          if (first) filters.push(`first_name.ilike.*${first}*`);
+          if (last)  filters.push(`last_name.ilike.*${last}*`);
 
-          const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${params.toString()}&select=contact_id,first_name,last_name,email,contact_type`;
-          const resp = await fetch(searchUrl);
-          const contacts = await resp.json();
+          const query = filters.length > 1
+            ? `and=(${filters.join(",")})`
+            : filters[0];
 
-          const resultsDiv = row.querySelector(".search-results");
-          resultsDiv.innerHTML = contacts.map(c => `
-            <div style="padding:4px; cursor:pointer;"
-              onclick="attachRelationshipContact('${relId}', '${c.contact_id}', '${c.first_name} ${c.last_name}', '${c.contact_type}', '${c.email}', '${project}')">
-              <strong>${c.first_name} ${c.last_name}</strong> (${c.contact_type})<br/>
-              <small>${c.email}</small>
-            </div>
-          `).join("");
+          const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${query}&select=contact_id,first_name,last_name,email,contact_type`;
+          console.log("[GetID] Search URL:", searchUrl);
+
+          try {
+            const resp = await fetch(searchUrl);
+            const contacts = await resp.json();
+
+            if (!Array.isArray(contacts)) {
+              console.error("Invalid contacts response:", contacts);
+              alert("Search failed. Please try again.");
+              return;
+            }
+
+            const resultsDiv = row.querySelector(".search-results");
+            resultsDiv.innerHTML = contacts.length > 0
+              ? contacts.map(c => `
+                  <div style="padding:4px; cursor:pointer;"
+                    onclick="attachRelationshipContact('${relId}', '${c.contact_id}', '${c.first_name} ${c.last_name}', '${c.contact_type}', '${c.email}', '${project}')">
+                    <strong>${c.first_name} ${c.last_name}</strong> (${c.contact_type})<br/>
+                    <small>${c.email}</small>
+                  </div>
+                `).join("")
+              : "<div class='muted'>No contacts found.</div>";
+          } catch (err) {
+            console.error("Search error:", err);
+            alert("Network error during search.");
+          }
         });
       });
     });
@@ -599,6 +625,31 @@ async function renderRelationships(container, portalState) {
     document.getElementById("relationshipsGrid").innerHTML = "<tr><td colspan='8'>Error loading relationships.</td></tr>";
   }
 }
+
+// Helper: PATCH notes_relationships with chosen contact
+async function attachRelationshipContact(relId, contactId, name, type, email, project) {
+  const endpoint = `https://notes-history-module.dennis-e64.workers.dev/note_relationships?id=eq.${relId}&project=eq.${project}`;
+  const payload = {
+    contact_id: contactId,
+    contact_name: name,
+    contact_type: type,
+    contact_email: email
+  };
+
+  const res = await fetch(endpoint, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (res.ok) {
+    alert("✅ Relationship updated");
+    renderRelationships(document.getElementById("notesContent"), portalState);
+  } else {
+    alert("Failed to update relationship");
+  }
+}
+
 
 // Helper: PATCH notes_relationships with chosen contact
 async function attachRelationshipContact(relId, contactId, name, type, email, project) {
