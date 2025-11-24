@@ -651,7 +651,7 @@ async function attachRelationshipContact(relId, contactId, name, type, email, pr
 }
 
 // 🔧 Make it globally accessible for inline onclick
-window.attachClientToNote = attachRelationshipContact;
+window.attachRelationshipContact = attachRelationshipContact;
 
 async function handlePromoteRelationship(request, env, cors) {
   try {
