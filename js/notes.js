@@ -144,7 +144,7 @@ async function renderHistory(container, portalState) {
 
 /* Add (POST /notes-history-module) */
 function renderAdd(container, portalState) {
-  container.innerHTML = `<h4>Add Note (v1.2.0)</h4>
+  container.innerHTML = `<h4>Add Note (v1.2.1)</h4>
     <textarea id="noteContent" placeholder="Enter note text..." style="width:100%;min-height:100px;"></textarea>
     <div style="margin-top:8px;"><button id="btnSaveNote" class="primary">Save</button></div>
     <div id="noteAddResult" style="margin-top:8px;"></div>`;
@@ -627,8 +627,8 @@ async function renderRelationships(container, portalState) {
 }
 
 // Helper: PATCH notes_relationships with chosen contact
-async function attachRelationshipContact(relId, contactId, name, type, email, project) {
-  const endpoint = `https://notes-history-module.dennis-e64.workers.dev/notes_relationships?id=eq.${relId}&project=eq.${project}`;
+// Frontend helper: attach a contact to a relationship row
+async function attachRelationshipContact(relId, contactId, name, type, email) {
   const payload = {
     contact_id: contactId,
     contact_name: name,
@@ -636,73 +636,30 @@ async function attachRelationshipContact(relId, contactId, name, type, email, pr
     contact_email: email
   };
 
-  const res = await fetch(endpoint, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload) // ✅ no wrapper
-  });
+  const endpoint = `https://notes-history-module.dennis-e64.workers.dev/notes_relationships?id=eq.${relId}`;
+  console.log("[AttachContact] PATCH endpoint:", endpoint);
+  console.log("[AttachContact] Payload:", payload);
 
-  if (res.ok) {
-    alert("✅ Relationship updated");
-    renderRelationships(document.getElementById("notesContent"), portalState);
-  } else {
-    alert("Failed to update relationship");
-  }
-}
-
-// 🔧 Make it globally accessible for inline onclick
-window.attachRelationshipContact = attachRelationshipContact;
-
-async function handlePromoteRelationship(request, env, cors) {
   try {
-    const body = await request.json();
-    const { client_id, related_contact_id, relationship_role, relationship_type } = body;
-
-    if (!client_id || !related_contact_id) {
-      return new Response(JSON.stringify({ status: "error", error: "Missing client_id or related_contact_id" }), {
-        status: 400,
-        headers: cors
-      });
-    }
-
-    const payload = {
-      client_id,
-      related_contact_id,
-      relationship_role: relationship_role || "unknown",
-      relationship_type: relationship_type || "unknown"
-    };
-
-    const endpoint = `${env.SUPABASE_URL}/rest/v1/contact_relationships`;
     const res = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        apikey: env.SUPABASE_SERVICE_ROLE,
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE}`,
-        "Content-Type": "application/json",
-        Prefer: "return=representation"
-      },
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
 
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
-      return new Response(JSON.stringify({ status: "error", error: "Insert failed", details: data }), {
-        status: 500,
-        headers: cors
-      });
-    }
+    const raw = await res.text();
+    console.log("[AttachContact] Response status:", res.status, "raw:", raw);
 
-    return new Response(JSON.stringify({ status: "ok", relationship: data[0] }), {
-      status: 200,
-      headers: cors
-    });
+    if (res.ok) {
+      alert("✅ Relationship updated");
+      // Refresh relationships tab
+      renderRelationships(document.getElementById("notesContent"), portalState);
+    } else {
+      alert("❌ Failed to update relationship");
+    }
   } catch (err) {
-    return new Response(JSON.stringify({ status: "error", error: err.message }), {
-      status: 500,
-      headers: cors
-    });
+    console.error("[AttachContact] Error:", err);
+    alert("Network error while updating relationship");
   }
 }
 
