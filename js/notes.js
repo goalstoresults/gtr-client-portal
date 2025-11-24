@@ -144,7 +144,7 @@ async function renderHistory(container, portalState) {
 
 /* Add (POST /notes-history-module) */
 function renderAdd(container, portalState) {
-  container.innerHTML = `<h4>Add Note (v1.2.1)</h4>
+  container.innerHTML = `<h4>Add Note (v1.2.4)</h4>
     <textarea id="noteContent" placeholder="Enter note text..." style="width:100%;min-height:100px;"></textarea>
     <div style="margin-top:8px;"><button id="btnSaveNote" class="primary">Save</button></div>
     <div id="noteAddResult" style="margin-top:8px;"></div>`;
@@ -626,7 +626,6 @@ async function renderRelationships(container, portalState) {
   }
 }
 
-// Helper: PATCH notes_relationships with chosen contact
 // Frontend helper: attach a contact to a relationship row
 async function attachRelationshipContact(relId, contactId, name, type, email) {
   const payload = {
@@ -662,6 +661,9 @@ async function attachRelationshipContact(relId, contactId, name, type, email) {
     alert("Network error while updating relationship");
   }
 }
+
+// 🔧 Make it globally accessible for inline onclick
+window.attachRelationshipContact = attachRelationshipContact;
 
 
 
