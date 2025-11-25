@@ -524,221 +524,138 @@ window.attachRelationshipContact = attachRelationshipContact;
 
 
 /* Relationships (GET /note_relationships) */
-async function renderRelationships(container, portalState) {
-  const noteId = portalState.selectedNoteId;
+async function renderRelationships(noteId) {
+  const container = document.getElementById("relationships-panel");
+  container.innerHTML = `<p>Loading relationships...</p>`;
+
   const project = portalState.project;
 
-  if (!noteId) {
-    container.innerHTML = `<p>Select a note from History to view relationships.</p>`;
-    return;
+  // Fetch lookups
+  const lookupRes = await fetch(`/api/lookups?project=${encodeURIComponent(project)}`);
+  const lookupData = await lookupRes.json();
+
+  const roles = lookupData.filter(l => l.lookup_type === "relationship_role");
+  const types = lookupData.filter(l => l.lookup_type === "relationship_type");
+
+  // Fetch existing relationships
+  const relRes = await fetch(`/api/contact_relationships?project=${encodeURIComponent(project)}&source_contact_id=${encodeURIComponent(portalState.clientId)}`);
+  const existing = await relRes.json();
+
+  // Fetch detected relationships
+  const noteRelRes = await fetch(`/api/note_relationships?project=${encodeURIComponent(project)}&note_id=${encodeURIComponent(noteId)}`);
+  const noteRelData = await noteRelRes.json();
+  const detected = Array.isArray(noteRelData.relationships) ? noteRelData.relationships : [];
+
+  // Build dropdown HTML
+  function buildDropdown(options, selectedValue) {
+    return `<select>
+      <option value="Select">-- Select --</option>
+      ${options.map(opt => `
+        <option value="${escapeHtml(opt.value)}"
+                ${opt.value === selectedValue ? "selected" : ""}>
+          ${escapeHtml(opt.value)}
+        </option>`).join("")}
+    </select>`;
   }
 
-  try {
-    // --- Step 1: Fetch note review (subject + detected relationships) ---
-    const reviewUrl = `https://notes-history-module.dennis-e64.workers.dev/note_review?project=${project}&id=${noteId}`;
-    const res = await fetch(reviewUrl);
-    const data = await res.json();
+  // Render existing relationships
+  const existingHtml = `
+    <h3>Existing Contact Relationships</h3>
+    <table>
+      <tr><th>Related Contact ID</th><th>Relationship Type</th><th>Relationship Role</th><th>Created At</th></tr>
+      ${existing.map(r => `
+        <tr>
+          <td>${escapeHtml(r.related_contact_id)}</td>
+          <td>${escapeHtml(r.relationship_type)}</td>
+          <td>${escapeHtml(r.relationship_role)}</td>
+          <td>${escapeHtml(r.created_at)}</td>
+        </tr>`).join("")}
+    </table>`;
 
-    const subject = data.note?.subject || "(no subject)";
-    const rows = data.relationships || [];
+  // Render detected relationships
+  const detectedHtml = `
+    <h3>Detected Relationships in Note</h3>
+    <table>
+      <tr><th>Raw Name</th><th>Relationship Type</th><th>Relationship Role</th><th>Contact ID</th><th>Contact Name</th><th>Contact Type</th><th>Contact Email</th><th>Action</th></tr>
+      ${detected.map((r, i) => `
+        <tr class="rel-row">
+          <td class="rel-raw">${escapeHtml(r.raw_name)}</td>
+          <td class="rel-type">${buildDropdown(types, r.relationship_type)}</td>
+          <td class="rel-role">${buildDropdown(roles, r.relationship_role)}</td>
+          <td class="rel-contact-id"></td>
+          <td class="rel-contact-name"></td>
+          <td class="rel-contact-type"></td>
+          <td class="rel-contact-email"></td>
+          <td><button class="get-contact-id">Get Contact ID</button></td>
+        </tr>`).join("")}
+    </table>
+    <button id="save-promotions">Save Promotions</button>`;
 
-    // --- Step 2: Fetch lookups for dropdowns ---
-    const lookupUrl = `https://client-portal-api.dennis-e64.workers.dev/api/lookups?project=${project}`;
-    const lookupRes = await fetch(lookupUrl);
-    const lookupData = await lookupRes.json();
+  container.innerHTML = `
+    <div>
+      <h2>Relationships for Note: ${escapeHtml(portalState.noteSubject)}</h2>
+      ${existingHtml}
+      ${detectedHtml}
+    </div>`;
 
-    const roles = lookupData
-      .filter(l => l.lookup_type === "relationship_role")
-      .sort((a, b) => a.sort_order - b.sort_order);
+  // Wire up Get Contact ID buttons
+  container.querySelectorAll(".get-contact-id").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const row = btn.closest("tr");
+      const typeVal = row.querySelector(".rel-type select")?.value.trim();
+      const roleVal = row.querySelector(".rel-role select")?.value.trim();
 
-    const types = lookupData
-      .filter(l => l.lookup_type === "relationship_type")
-      .sort((a, b) => a.sort_order - b.sort_order);
-
-    function buildDropdown(options, selectedValue) {
-      return `<select>
-        <option value="Select">-- Select --</option>
-        ${options.map(opt => `
-          <option value="${escapeHtml(opt.value)}"
-                  ${opt.value === selectedValue ? "selected" : ""}>
-            ${escapeHtml(opt.value)}
-          </option>`).join("")}
-      </select>`;
-    }
-
-
-    // --- Step 3: Build base UI ---
-    container.innerHTML = `
-      <section class="card">
-        <h2>Relationships for Note: ${escapeHtml(subject)}</h2>
-
-        <div id="existingRelationships" class="card" style="margin-bottom:16px;">
-          <h3>Existing Contact Relationships</h3>
-          <div id="existingRelGrid"></div>
-        </div>
-
-        <h3 style="margin-top:20px;">Detected Relationships in Note</h3>
-        <table class="notes-table">
-          <thead>
-            <tr>
-              <th>Raw Name</th>
-              <th>Relationship Type</th>
-              <th>Relationship Role</th>
-              <th>Contact ID</th>
-              <th>Contact Name</th>
-              <th>Contact Type</th>
-              <th>Contact Email</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody id="relationshipsGrid"></tbody>
-        </table>
-
-        <button id="btnSavePromotions" class="primary"
-                style="margin-top:12px; background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
-          Save Promotions
-        </button>
-      </section>
-    `;
-
-    // --- Step 4: Populate detected relationships with dropdowns ---
-    const grid = document.getElementById("relationshipsGrid");
-    grid.innerHTML = rows.map(r => `
-      <tr data-relid="${r.id}">
-        <td>${escapeHtml(r.raw_name || "")}</td>
-        <td>${buildDropdown(types, r.relationship_type)}</td>
-        <td>${buildDropdown(roles, r.relationship_role)}</td>
-        <td>${escapeHtml(r.contact_id || "")}</td>
-        <td>${escapeHtml(r.contact_name || "")}</td>
-        <td>${escapeHtml(r.contact_type || "")}</td>
-        <td>${escapeHtml(r.contact_email || "")}</td>
-        <td>
-          ${
-            r.contact_id
-              ? `<input type="checkbox" class="promote-checkbox"/>`
-              : `<button class="get-id-btn">Get Contact ID</button>`
-          }
-        </td>
-      </tr>
-    `).join("");
-
-    // --- Step 5: Populate existing contact relationships ---
-    const relUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships?project=${project}&source_contact_id=${portalState.clientId}`;
-    try {
-      const relRes = await fetch(relUrl);
-      const relData = await relRes.json();
-
-      const existingGrid = document.getElementById("existingRelGrid");
-      if (Array.isArray(relData) && relData.length > 0) {
-        existingGrid.innerHTML = `
-          <table class="notes-table">
-            <thead>
-              <tr>
-                <th>Related Contact ID</th>
-                <th>Relationship Type</th>
-                <th>Relationship Role</th>
-                <th>Created At</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${relData.map(r => `
-                <tr>
-                  <td>${escapeHtml(r.related_contact_id || "")}</td>
-                  <td>${escapeHtml(r.relationship_type || "")}</td>
-                  <td>${escapeHtml(r.relationship_role || "")}</td>
-                  <td>${escapeHtml(r.created_at || "")}</td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-        `;
-      } else {
-        existingGrid.innerHTML = "<p>No existing relationships found.</p>";
-      }
-    } catch (err) {
-      console.error("Existing relationships fetch error:", err);
-      document.getElementById("existingRelGrid").innerHTML = "<p>Error loading existing relationships.</p>";
-    }
-
-    // --- Step 6: Save Promotions handler ---
-    document.getElementById("btnSavePromotions").addEventListener("click", async () => {
-      const promoteRows = [...grid.querySelectorAll("tr")].filter(r => r.querySelector(".promote-checkbox")?.checked);
-
-      if (promoteRows.length === 0) {
-        alert("No promotions selected.");
+      if (!typeVal || typeVal === "Select" || !roleVal || roleVal === "Select") {
+        alert("❌ Please select both Relationship Type and Role before getting Contact ID.");
         return;
       }
 
-      for (const row of promoteRows) {
-        const relId = row.dataset.relid;
-        const contactId = row.querySelector("td:nth-child(4)").textContent.trim();
-        const type = row.querySelector("td:nth-child(2) select").value.trim();
-        const role = row.querySelector("td:nth-child(3) select").value.trim();
+      attachRelationshipContact(row, project, noteId);
+    });
+  });
 
-        if (!contactId) {
-          alert("❌ Cannot promote relationship without a Contact ID.");
-          continue;
-        }
-        if (!role || !type) {
-          alert("❌ Relationship Type and Role cannot be blank.");
-          continue;
-        }
+  // Wire up Save Promotions button
+  document.getElementById("save-promotions").addEventListener("click", () => {
+    const rows = container.querySelectorAll(".rel-row");
+    const rowsToSave = [];
 
-        // Step 1: PATCH notes_relationships
-        const patchPayload = { relationship_type: type, relationship_role: role, contact_id: contactId };
-        try {
-          const patchRes = await fetch(
-            `https://notes-history-module.dennis-e64.workers.dev/notes_relationships?id=eq.${relId}`,
-            {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(patchPayload)
-            }
-          );
-          if (!patchRes.ok) {
-            const patchText = await patchRes.text();
-            alert(`❌ Failed to update note relationship: ${patchText}`);
-            continue;
-          }
-        } catch (err) {
-          console.error("PATCH error:", err);
-          alert("Network error while updating note relationship.");
-          continue;
-        }
+    rows.forEach(row => {
+      const contactId = row.querySelector(".rel-contact-id")?.textContent.trim();
+      const typeVal = row.querySelector(".rel-type select")?.value.trim();
+      const roleVal = row.querySelector(".rel-role select")?.value.trim();
 
-        // Step 2: POST contact_relationships
-        const insertPayload = {
-          project: portalState.project,
-          source_contact_id: portalState.clientId,
-          related_contact_id: contactId,
-          relationship_role: role,
-          relationship_type: type,
-          notes: "", // schema has notes, not email
-          created_at: new Date().toISOString()
-        };
-
-        console.log("[SavePromotions] Insert payload:", JSON.stringify(insertPayload, null, 2));
-
-        try {
-          const res = await fetch("https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(insertPayload)
-          });
-
-          const text = await res.text();
-          console.log("[SavePromotions] POST contact_relationships:", res.status, text);
-
-          if (!res.ok) {
-            alert(`❌ Failed to save promotion: ${text}`);
-          } else {
-            console.log("Promotion saved successfully");
-          }
-        } catch (err) {
-          console.error("Promotion error:", err);
-          alert("Network error while saving promotion.");
-        }
+      if (!contactId || !typeVal || typeVal === "Select" || !roleVal || roleVal === "Select") {
+        alert("❌ Relationship Type, Role, and Contact ID are required for saving.");
+        return;
       }
+
+      rowsToSave.push({
+        source_contact_id: portalState.clientId,
+        related_contact_id: contactId,
+        relationship_type: typeVal,
+        relationship_role: roleVal,
+        related_email: row.querySelector(".rel-contact-email")?.textContent.trim() || null
+      });
+    });
+
+    if (!rowsToSave.length) return;
+
+    fetch("/api/relationships_bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project, rows: rowsToSave })
+    }).then(res => res.json()).then(data => {
+      if (data.success) {
+        alert("✅ Relationships saved successfully.");
+      } else {
+        alert("❌ Failed to save relationships.");
+      }
+    }).catch(err => {
+      console.error("Save error:", err);
+      alert("❌ Error saving relationships.");
+    });
+  });
+}
 
       alert("✅ Promotions attempted.");
       renderRelationships(container, portalState); // refresh
