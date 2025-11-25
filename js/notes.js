@@ -641,7 +641,7 @@ async function renderRelationships(container, portalState) {
     });
 
     // Wire up Save Promotions
-document.getElementById("btnSavePromotions").addEventListener("click", async () => {
+    document.getElementById("btnSavePromotions").addEventListener("click", async () => {
   const promoteRows = [...grid.querySelectorAll("tr")].filter(r => r.querySelector(".promote-checkbox")?.checked);
 
   if (promoteRows.length === 0) {
@@ -700,6 +700,11 @@ document.getElementById("btnSavePromotions").addEventListener("click", async () 
   renderRelationships(container, portalState); // refresh
 });
 
+  } catch (err) {
+    console.error(err);
+    document.getElementById("relationshipsGrid").innerHTML = "<tr><td colspan='8'>Error loading relationships.</td></tr>";
+  }
+}
 
 
 /* -------------------------
