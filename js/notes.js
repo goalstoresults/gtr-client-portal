@@ -525,22 +525,6 @@ async function renderRelationships(container, portalState) {
     </section>
   `;
 
-  // Load existing contact_relationships for this client
-  if (portalState.clientId) {
-    const relUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships?client_id=eq.${portalState.clientId}`;
-    try {
-      const res = await fetch(relUrl);
-      const rows = await res.json();
-      const grid = document.getElementById("existingRelGrid");
-      grid.innerHTML = rows.length > 0
-        ? `<ul>${rows.map(r => `<li>${r.related_contact_name} (${r.relationship_type})</li>`).join("")}</ul>`
-        : "<div class='muted'>No existing relationships.</div>";
-    } catch (err) {
-      document.getElementById("existingRelGrid").innerHTML = "Error loading existing relationships.";
-      console.error(err);
-    }
-  }
-
   // Load note relationships
   const reviewUrl = `https://notes-history-module.dennis-e64.workers.dev/note_review?project=${project}&id=${noteId}`;
   try {
@@ -574,7 +558,15 @@ async function renderRelationships(container, portalState) {
         const row = e.target.closest("tr");
         const relId = row.dataset.relid;
 
-        // Render inline search form
+        const type = row.querySelector(".rel-type")?.value.trim();
+        const role = row.querySelector(".rel-role")?.value.trim();
+
+        if (!type || !role) {
+          alert("Relationship Type and Role cannot be blank.");
+          return;
+        }
+
+        // Render inline search form only if both fields are filled
         row.querySelector("td:last-child").innerHTML = `
           <div>
             <input class="search-first" placeholder="First name"/>
@@ -608,22 +600,34 @@ async function renderRelationships(container, portalState) {
             const resp = await fetch(searchUrl);
             const contacts = await resp.json();
 
-            if (!Array.isArray(contacts)) {
-              console.error("Invalid contacts response:", contacts);
-              alert("Search failed. Please try again.");
-              return;
-            }
-
             const resultsDiv = row.querySelector(".search-results");
             resultsDiv.innerHTML = contacts.length > 0
               ? contacts.map(c => `
-                  <div style="padding:4px; cursor:pointer;"
-                    onclick="attachRelationshipContact('${relId}', '${c.contact_id}', '${c.first_name} ${c.last_name}', '${c.contact_type}', '${c.email}', '${project}')">
+                  <div class="contact-result"
+                       data-relid="${relId}"
+                       data-contactid="${c.contact_id}"
+                       data-name="${c.first_name} ${c.last_name}"
+                       data-type="${c.contact_type}"
+                       data-email="${c.email}">
                     <strong>${c.first_name} ${c.last_name}</strong> (${c.contact_type})<br/>
                     <small>${c.email}</small>
                   </div>
                 `).join("")
               : "<div class='muted'>No contacts found.</div>";
+
+            // Attach click handlers to results
+            resultsDiv.querySelectorAll(".contact-result").forEach(el => {
+              el.addEventListener("click", () => {
+                attachRelationshipContact(
+                  el.dataset.relid,
+                  el.dataset.contactid,
+                  el.dataset.name,
+                  el.dataset.type,
+                  el.dataset.email,
+                  portalState // ✅ pass actual portalState
+                );
+              });
+            });
           } catch (err) {
             console.error("Search error:", err);
             alert("Network error during search.");
@@ -636,10 +640,11 @@ async function renderRelationships(container, portalState) {
     document.getElementById("btnSavePromotions").addEventListener("click", async () => {
       const promoteRows = [...grid.querySelectorAll("tr")].filter(r => r.querySelector(".promote-checkbox")?.checked);
       for (const row of promoteRows) {
-        const relId = row.dataset.relid;
         const contactId = row.querySelector("td:nth-child(4)").textContent.trim();
         const role = row.querySelector(".rel-role").value.trim();
         const type = row.querySelector(".rel-type").value.trim();
+
+        if (!contactId) continue;
 
         const payload = {
           client_id: portalState.clientId,
@@ -649,12 +654,11 @@ async function renderRelationships(container, portalState) {
         };
 
         const endpoint = `https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships`;
-        const res = await fetch(endpoint, {
+        await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-        console.log("Promote response", res.status);
       }
       alert("✅ Promotions saved.");
       renderRelationships(container, portalState); // refresh
