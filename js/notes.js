@@ -721,11 +721,11 @@ document.getElementById("btnSavePromotions").addEventListener("click", async () 
     // --- Step 2: POST contact_relationships ---
     const insertPayload = {
       project: portalState.project,
-      source_contact_id: portalState.clientId,   // ✅ client side
-      related_contact_id: contactId,             // ✅ promoted contact
+      source_contact_id: portalState.clientId,
+      related_contact_id: contactId,
       relationship_role: role,
       relationship_type: type,
-      related_email: row.querySelector("td:nth-child(7)")?.textContent.trim() || null,
+      notes: "", // optional
       created_at: new Date().toISOString()
     };
 
