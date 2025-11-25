@@ -461,6 +461,28 @@ async function attachRelationshipContact(relId, contactId, name, type, email, po
   };
 
   const endpoint = `https://notes-history-module.dennis-e64.workers.dev/notes_relationships?id=eq.${relId}`;
+  try {
+    const res = await fetch(endpoint, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const raw = await res.text();
+    console.log("[AttachContact] Response status:", res.status, "raw:", raw);
+
+    if (res.ok) {
+      alert("✅ Relationship updated");
+      renderRelationships(document.getElementById("notesContent"), portalState);
+    } else {
+      alert("❌ Failed to update relationship");
+    }
+  } catch (err) {
+    console.error("[AttachContact] Error:", err);
+    alert("Network error while updating relationship");
+  }
+}   // ← this closing brace is missing in your file
+  
 
 
 // 🔧 Make it globally accessible for inline onclick
