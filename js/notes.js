@@ -512,6 +512,8 @@ window.attachRelationshipContact = attachRelationshipContact;
 async function renderRelationships(container, portalState) {
   const noteId = portalState.selectedNoteId;
   const project = portalState.project;
+  // ✅ Get subject from note
+  const subject = data.note?.subject || "(no subject)";
 
   if (!noteId) {
     container.innerHTML = `<p>Select a note from History to view relationships.</p>`;
@@ -520,7 +522,7 @@ async function renderRelationships(container, portalState) {
 
   container.innerHTML = `
     <section class="card">
-      <h2>Relationships for Note ${noteId}</h2>
+     <h2>Relationships for Note: ${escapeHtml(subject)}</h2>
       <div id="existingRelationships" class="card" style="margin-bottom:16px;">
         <h3>Existing Contact Relationships</h3>
         <div id="existingRelGrid"></div>
@@ -660,7 +662,8 @@ async function renderRelationships(container, portalState) {
     });
 
     // Wire up Save Promotions
-    document.getElementById("btnSavePromotions").addEventListener("click", async () => {
+// Wire up Save Promotions
+document.getElementById("btnSavePromotions").addEventListener("click", async () => {
   const promoteRows = [...grid.querySelectorAll("tr")].filter(r => r.querySelector(".promote-checkbox")?.checked);
 
   if (promoteRows.length === 0) {
@@ -669,27 +672,63 @@ async function renderRelationships(container, portalState) {
   }
 
   for (const row of promoteRows) {
+    const relId = row.dataset.relid;
     const contactId = row.querySelector("td:nth-child(4)").textContent.trim();
     const role = row.querySelector(".rel-role").value.trim();
     const type = row.querySelector(".rel-type").value.trim();
 
-    const payload = {
+    if (!contactId) {
+      alert("❌ Cannot promote relationship without a Contact ID.");
+      continue;
+    }
+    if (!role || !type) {
+      alert("❌ Relationship Type and Role cannot be blank.");
+      continue;
+    }
+
+    // --- Step 1: PATCH notes_relationships ---
+    const patchPayload = {
+      relationship_type: type,
+      relationship_role: role,
+      contact_id: contactId
+    };
+
+    try {
+      const patchRes = await fetch(
+        `https://notes-history-module.dennis-e64.workers.dev/notes_relationships?id=eq.${relId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patchPayload)
+        }
+      );
+      const patchText = await patchRes.text();
+      console.log("[SavePromotions] PATCH notes_relationships:", patchRes.status, patchText);
+      if (!patchRes.ok) {
+        alert(`❌ Failed to update note relationship: ${patchText}`);
+        continue;
+      }
+    } catch (err) {
+      console.error("PATCH error:", err);
+      alert("Network error while updating note relationship.");
+      continue;
+    }
+
+    // --- Step 2: POST contact_relationships ---
+    const insertPayload = {
       project: portalState.project,
-      client_id: portalState.clientId,
-      related_contact_id: contactId,
+      source_contact_id: portalState.clientId,   // ✅ client side
+      related_contact_id: contactId,             // ✅ promoted contact
       relationship_role: role,
       relationship_type: type,
       related_email: row.querySelector("td:nth-child(7)")?.textContent.trim() || null,
       created_at: new Date().toISOString()
     };
 
-    // 🔎 Add detailed logging
-    console.log("[SavePromotions] Row relId:", row.dataset.relid);
-    console.log("[SavePromotions] Built payload:", JSON.stringify(payload, null, 2));
-    console.log("[SavePromotions] portalState:", portalState);
+    console.log("[SavePromotions] Insert payload:", JSON.stringify(insertPayload, null, 2));
 
-    if (!payload.project || !payload.client_id || !payload.related_contact_id) {
-      console.error("[SavePromotions] Missing required fields →", payload);
+    if (!insertPayload.project || !insertPayload.source_contact_id || !insertPayload.related_contact_id) {
+      console.error("[SavePromotions] Missing required fields →", insertPayload);
       alert("❌ Missing required fields. Cannot save promotion.");
       continue;
     }
@@ -698,11 +737,11 @@ async function renderRelationships(container, portalState) {
       const res = await fetch("https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(insertPayload)
       });
 
       const text = await res.text();
-      console.log("[SavePromotions] Response status:", res.status, "body:", text);
+      console.log("[SavePromotions] POST contact_relationships:", res.status, text);
 
       if (!res.ok) {
         alert(`❌ Failed to save promotion: ${text}`);
