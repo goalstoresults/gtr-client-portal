@@ -197,8 +197,12 @@ async function renderReview(container, portalState, noteId) {
     // ✅ Hydrate clientId if note already has a client
     if (note.client_id) {
       portalState.clientId = note.client_id;
+    } else if (note.contact_id) {
+      portalState.clientId = note.contact_id;
     }
 
+    console.log("[Review] Hydrated clientId:", portalState.clientId);
+    
     container.innerHTML = `
       <section class="card">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
