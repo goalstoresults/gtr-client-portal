@@ -527,7 +527,28 @@ async function renderRelationships(container, portalState) {
     const subject = data.note?.subject || "(no subject)";
     const rows = data.relationships || [];
 
-    // --- Step 2: Build base UI ---
+    // --- Step 2: Fetch lookups for dropdowns ---
+    const lookupUrl = `https://client-portal-api.dennis-e64.workers.dev/api/lookups?project=${project}`;
+    const lookupRes = await fetch(lookupUrl);
+    const lookupData = await lookupRes.json();
+
+    const roles = lookupData
+      .filter(l => l.lookup_type === "relationship_role")
+      .sort((a, b) => a.sort_order - b.sort_order);
+
+    const types = lookupData
+      .filter(l => l.lookup_type === "relationship_type")
+      .sort((a, b) => a.sort_order - b.sort_order);
+
+    function buildDropdown(options, selectedValue) {
+      return `<select>${options.map(opt => `
+        <option value="${escapeHtml(opt.lookup_value)}"
+                ${opt.lookup_value === selectedValue ? "selected" : ""}>
+          ${escapeHtml(opt.lookup_label)}
+        </option>`).join("")}</select>`;
+    }
+
+    // --- Step 3: Build base UI ---
     container.innerHTML = `
       <section class="card">
         <h2>Relationships for Note: ${escapeHtml(subject)}</h2>
@@ -561,13 +582,13 @@ async function renderRelationships(container, portalState) {
       </section>
     `;
 
-    // --- Step 3: Populate detected relationships ---
+    // --- Step 4: Populate detected relationships with dropdowns ---
     const grid = document.getElementById("relationshipsGrid");
     grid.innerHTML = rows.map(r => `
       <tr data-relid="${r.id}">
         <td>${escapeHtml(r.raw_name || "")}</td>
-        <td><input type="text" value="${escapeHtml(r.relationship_type || "")}" class="rel-type"/></td>
-        <td><input type="text" value="${escapeHtml(r.relationship_role || "")}" class="rel-role"/></td>
+        <td>${buildDropdown(types, r.relationship_type)}</td>
+        <td>${buildDropdown(roles, r.relationship_role)}</td>
         <td>${escapeHtml(r.contact_id || "")}</td>
         <td>${escapeHtml(r.contact_name || "")}</td>
         <td>${escapeHtml(r.contact_type || "")}</td>
@@ -582,7 +603,7 @@ async function renderRelationships(container, portalState) {
       </tr>
     `).join("");
 
-    // --- Step 4: Populate existing contact relationships ---
+    // --- Step 5: Populate existing contact relationships ---
     const relUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships?project=${project}&source_contact_id=${portalState.clientId}`;
     try {
       const relRes = await fetch(relUrl);
@@ -620,7 +641,7 @@ async function renderRelationships(container, portalState) {
       document.getElementById("existingRelGrid").innerHTML = "<p>Error loading existing relationships.</p>";
     }
 
-    // --- Step 5: Save Promotions handler ---
+    // --- Step 6: Save Promotions handler ---
     document.getElementById("btnSavePromotions").addEventListener("click", async () => {
       const promoteRows = [...grid.querySelectorAll("tr")].filter(r => r.querySelector(".promote-checkbox")?.checked);
 
@@ -632,8 +653,8 @@ async function renderRelationships(container, portalState) {
       for (const row of promoteRows) {
         const relId = row.dataset.relid;
         const contactId = row.querySelector("td:nth-child(4)").textContent.trim();
-        const role = row.querySelector(".rel-role").value.trim();
-        const type = row.querySelector(".rel-type").value.trim();
+        const type = row.querySelector("td:nth-child(2) select").value.trim();
+        const role = row.querySelector("td:nth-child(3) select").value.trim();
 
         if (!contactId) {
           alert("❌ Cannot promote relationship without a Contact ID.");
@@ -717,5 +738,8 @@ function escapeHtml(str) {
   return String(str)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
+
