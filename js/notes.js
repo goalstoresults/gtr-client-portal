@@ -81,7 +81,7 @@ async function renderHistory(container, portalState) {
       return;
     }
 
-    container.innerHTML = `<h4>Notes History</h4>`;
+    container.innerHTML = `<h4>Notes History NEW</h4>`;
     const table = document.createElement("table");
     table.className = "notes-table";
     table.innerHTML = `
@@ -525,145 +525,146 @@ window.attachRelationshipContact = attachRelationshipContact;
 
 /* Relationships (GET /note_relationships) */
 async function renderRelationships(noteId) {
-  try {
-    const container = document.getElementById("relationships-panel");
-    container.innerHTML = `<p>Loading relationships...</p>`;
+  const container = document.getElementById("relationships-panel");
+  container.innerHTML = `<p>Loading relationships...</p>`;
 
-    const project = portalState.project;
+  const project = portalState.project;
 
-    // Fetch lookups
-    const lookupRes = await fetch(`/api/lookups?project=${encodeURIComponent(project)}`);
-    const lookupData = await lookupRes.json();
+  // Fetch lookups
+  const lookupRes = await fetch(`/api/lookups?project=${encodeURIComponent(project)}`);
+  const lookupData = await lookupRes.json();
 
-    const roles = lookupData.filter(l => l.lookup_type === "relationship_role");
-    const types = lookupData.filter(l => l.lookup_type === "relationship_type");
+  const roles = lookupData.filter(l => l.lookup_type === "relationship_role");
+  const types = lookupData.filter(l => l.lookup_type === "relationship_type");
 
-    // Fetch existing relationships
-    const relRes = await fetch(`/api/contact_relationships?project=${encodeURIComponent(project)}&source_contact_id=${encodeURIComponent(portalState.clientId)}`);
-    const existing = await relRes.json();
+  // Fetch existing relationships
+  const relRes = await fetch(`/api/contact_relationships?project=${encodeURIComponent(project)}&source_contact_id=${encodeURIComponent(portalState.clientId)}`);
+  const existing = await relRes.json();
 
-    // Fetch detected relationships
-    const noteRelRes = await fetch(`/api/note_relationships?project=${encodeURIComponent(project)}&note_id=${encodeURIComponent(noteId)}`);
-    const noteRelData = await noteRelRes.json();
-    const detected = Array.isArray(noteRelData.relationships) ? noteRelData.relationships : [];
+  // Fetch detected relationships
+  const noteRelRes = await fetch(`/api/note_relationships?project=${encodeURIComponent(project)}&note_id=${encodeURIComponent(noteId)}`);
+  const noteRelData = await noteRelRes.json();
+  const detected = Array.isArray(noteRelData.relationships) ? noteRelData.relationships : [];
 
-    // Build dropdown HTML
-    function buildDropdown(options, selectedValue) {
-      return `<select>
-        <option value="Select">-- Select --</option>
-        ${options.map(opt => `
-          <option value="${escapeHtml(opt.value)}"
-                  ${opt.value === selectedValue ? "selected" : ""}>
-            ${escapeHtml(opt.value)}
-          </option>`).join("")}
-      </select>`;
-    }
+  // Build dropdown HTML
+  function buildDropdown(options, selectedValue) {
+    return `<select>
+      <option value="Select">-- Select --</option>
+      ${options.map(opt => `
+        <option value="${escapeHtml(opt.value)}"
+                ${opt.value === selectedValue ? "selected" : ""}>
+          ${escapeHtml(opt.value)}
+        </option>`).join("")}
+    </select>`;
+  }
 
-    // Render existing relationships
-    const existingHtml = `
-      <h3>Existing Contact Relationships</h3>
-      <table>
-        <tr><th>Related Contact ID</th><th>Relationship Type</th><th>Relationship Role</th><th>Created At</th></tr>
-        ${existing.map(r => `
-          <tr>
-            <td>${escapeHtml(r.related_contact_id)}</td>
-            <td>${escapeHtml(r.relationship_type)}</td>
-            <td>${escapeHtml(r.relationship_role)}</td>
-            <td>${escapeHtml(r.created_at)}</td>
-          </tr>`).join("")}
-      </table>`;
+  // Render existing relationships
+  const existingHtml = `
+    <h3>Existing Contact Relationships</h3>
+    <table>
+      <tr><th>Related Contact ID</th><th>Relationship Type</th><th>Relationship Role</th><th>Created At</th></tr>
+      ${existing.map(r => `
+        <tr>
+          <td>${escapeHtml(r.related_contact_id)}</td>
+          <td>${escapeHtml(r.relationship_type)}</td>
+          <td>${escapeHtml(r.relationship_role)}</td>
+          <td>${escapeHtml(r.created_at)}</td>
+        </tr>`).join("")}
+    </table>`;
 
-    // Render detected relationships
-    const detectedHtml = `
-      <h3>Detected Relationships in Note</h3>
-      <table>
-        <tr><th>Raw Name</th><th>Relationship Type</th><th>Relationship Role</th><th>Contact ID</th><th>Contact Name</th><th>Contact Type</th><th>Contact Email</th><th>Action</th></tr>
-        ${detected.map((r, i) => `
-          <tr class="rel-row">
-            <td class="rel-raw">${escapeHtml(r.raw_name)}</td>
-            <td class="rel-type">${buildDropdown(types, r.relationship_type)}</td>
-            <td class="rel-role">${buildDropdown(roles, r.relationship_role)}</td>
-            <td class="rel-contact-id"></td>
-            <td class="rel-contact-name"></td>
-            <td class="rel-contact-type"></td>
-            <td class="rel-contact-email"></td>
-            <td><button class="get-contact-id">Get Contact ID</button></td>
-          </tr>`).join("")}
-      </table>
-      <button id="save-promotions">Save Promotions</button>`;
+  // Render detected relationships
+  const detectedHtml = `
+    <h3>Detected Relationships in Note</h3>
+    <table>
+      <tr><th>Raw Name</th><th>Relationship Type</th><th>Relationship Role</th><th>Contact ID</th><th>Contact Name</th><th>Contact Type</th><th>Contact Email</th><th>Action</th></tr>
+      ${detected.map((r, i) => `
+        <tr class="rel-row">
+          <td class="rel-raw">${escapeHtml(r.raw_name)}</td>
+          <td class="rel-type">${buildDropdown(types, r.relationship_type)}</td>
+          <td class="rel-role">${buildDropdown(roles, r.relationship_role)}</td>
+          <td class="rel-contact-id"></td>
+          <td class="rel-contact-name"></td>
+          <td class="rel-contact-type"></td>
+          <td class="rel-contact-email"></td>
+          <td><button class="get-contact-id">Get Contact ID</button></td>
+        </tr>`).join("")}
+    </table>
+    <button id="save-promotions">Save Promotions</button>`;
 
-    container.innerHTML = `
-      <div>
-        <h2>Relationships for Note: ${escapeHtml(portalState.noteSubject)}</h2>
-        ${existingHtml}
-        ${detectedHtml}
-      </div>`;
+  container.innerHTML = `
+    <div>
+      <h2>Relationships for Note: ${escapeHtml(portalState.noteSubject)}</h2>
+      ${existingHtml}
+      ${detectedHtml}
+    </div>`;
 
-    // Wire up Get Contact ID buttons
-    container.querySelectorAll(".get-contact-id").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const row = btn.closest("tr");
-        const typeVal = row.querySelector(".rel-type select")?.value.trim();
-        const roleVal = row.querySelector(".rel-role select")?.value.trim();
+  // Wire up Get Contact ID buttons
+  container.querySelectorAll(".get-contact-id").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const row = btn.closest("tr");
+      const typeVal = row.querySelector(".rel-type select")?.value.trim();
+      const roleVal = row.querySelector(".rel-role select")?.value.trim();
 
-        if (!typeVal || typeVal === "Select" || !roleVal || roleVal === "Select") {
-          alert("❌ Please select both Relationship Type and Role before getting Contact ID.");
-          return;
-        }
+      if (!typeVal || typeVal === "Select" || !roleVal || roleVal === "Select") {
+        alert("❌ Please select both Relationship Type and Role before getting Contact ID.");
+        return;
+      }
 
-        attachRelationshipContact(row, project, noteId);
+      attachRelationshipContact(row, project, noteId);
+    });
+  });
+
+  // Wire up Save Promotions button
+  document.getElementById("save-promotions").addEventListener("click", () => {
+    const rows = container.querySelectorAll(".rel-row");
+    const rowsToSave = [];
+
+    rows.forEach(row => {
+      const contactId = row.querySelector(".rel-contact-id")?.textContent.trim();
+      const typeVal = row.querySelector(".rel-type select")?.value.trim();
+      const roleVal = row.querySelector(".rel-role select")?.value.trim();
+
+      if (!contactId || !typeVal || typeVal === "Select" || !roleVal || roleVal === "Select") {
+        alert("❌ Relationship Type, Role, and Contact ID are required for saving.");
+        return;
+      }
+
+      rowsToSave.push({
+        source_contact_id: portalState.clientId,
+        related_contact_id: contactId,
+        relationship_type: typeVal,
+        relationship_role: roleVal,
+        related_email: row.querySelector(".rel-contact-email")?.textContent.trim() || null
       });
     });
 
-    // Wire up Save Promotions button
-    document.getElementById("save-promotions").addEventListener("click", () => {
-      const rows = container.querySelectorAll(".rel-row");
-      const rowsToSave = [];
+    if (!rowsToSave.length) return;
 
-      rows.forEach(row => {
-        const contactId = row.querySelector(".rel-contact-id")?.textContent.trim();
-        const typeVal = row.querySelector(".rel-type select")?.value.trim();
-        const roleVal = row.querySelector(".rel-role select")?.value.trim();
+    fetch("/api/relationships_bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project, rows: rowsToSave })
+    }).then(res => res.json()).then(data => {
+      if (data.success) {
+        alert("✅ Relationships saved successfully.");
+      } else {
+        alert("❌ Failed to save relationships.");
+      }
+    }).catch(err => {
+      console.error("Save error:", err);
+      alert("❌ Error saving relationships.");
+    });
+  });
+}
 
-        if (!contactId || !typeVal || typeVal === "Select" || !roleVal || roleVal === "Select") {
-          alert("❌ Relationship Type, Role, and Contact ID are required for saving.");
-          return;
-        }
-
-        rowsToSave.push({
-          source_contact_id: portalState.clientId,
-          related_contact_id: contactId,
-          relationship_type: typeVal,
-          relationship_role: roleVal,
-          related_email: row.querySelector(".rel-contact-email")?.textContent.trim() || null
-        });
-      });
-
-      if (!rowsToSave.length) return;
-
-      fetch("/api/relationships_bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project, rows: rowsToSave })
-      }).then(res => res.json()).then(data => {
-        if (data.success) {
-          alert("✅ Promotions attempted.");
-          renderRelationships(container, portalState); // original refresh call
-        } else {
-          alert("❌ Failed to save relationships.");
-        }
-      }).catch(err => {
-        console.error("Save error:", err);
-        alert("❌ Error saving relationships.");
-      });
+      alert("✅ Promotions attempted.");
+      renderRelationships(container, portalState); // refresh
     });
   } catch (err) {
     console.error(err);
     container.innerHTML = `<p>Error loading relationships: ${err.message}</p>`;
   }
 }
-
-
 
 
 /* -------------------------
