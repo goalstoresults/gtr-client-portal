@@ -448,7 +448,7 @@ window.attachClientToNote = attachClientToNote;
 
 /* Relationships (GET /note_relationships) */
 // Frontend helper: attach a contact to a relationship row
-async function attachRelationshipContact(relId, contactId, name, type, email) {
+async function attachRelationshipContact(relId, contactId, name, type, email, portalState) {
   const payload = {
     contact_id: contactId,
     contact_name: name,
@@ -472,7 +472,6 @@ async function attachRelationshipContact(relId, contactId, name, type, email) {
 
     if (res.ok) {
       alert("✅ Relationship updated");
-      // Refresh relationships tab
       renderRelationships(document.getElementById("notesContent"), portalState);
     } else {
       alert("❌ Failed to update relationship");
@@ -482,7 +481,6 @@ async function attachRelationshipContact(relId, contactId, name, type, email) {
     alert("Network error while updating relationship");
   }
 }
-
 
 // 🔧 Make it globally accessible for inline onclick
 window.attachRelationshipContact = attachRelationshipContact;
