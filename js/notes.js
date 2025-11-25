@@ -542,9 +542,9 @@ async function renderRelationships(container, portalState) {
 
     function buildDropdown(options, selectedValue) {
       return `<select>${options.map(opt => `
-        <option value="${escapeHtml(opt.lookup_value)}"
-                ${opt.lookup_value === selectedValue ? "selected" : ""}>
-          ${escapeHtml(opt.lookup_label)}
+        <option value="${escapeHtml(opt.value)}"
+                ${opt.value === selectedValue ? "selected" : ""}>
+          ${escapeHtml(opt.value)}
         </option>`).join("")}</select>`;
     }
 
