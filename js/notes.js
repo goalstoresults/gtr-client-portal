@@ -662,7 +662,6 @@ async function renderRelationships(container, portalState) {
     });
 
     // Wire up Save Promotions
-// Wire up Save Promotions
 document.getElementById("btnSavePromotions").addEventListener("click", async () => {
   const promoteRows = [...grid.querySelectorAll("tr")].filter(r => r.querySelector(".promote-checkbox")?.checked);
 
@@ -676,6 +675,11 @@ document.getElementById("btnSavePromotions").addEventListener("click", async () 
     const contactId = row.querySelector("td:nth-child(4)").textContent.trim();
     const role = row.querySelector(".rel-role").value.trim();
     const type = row.querySelector(".rel-type").value.trim();
+
+    // 🔥 Debug logs to confirm values
+    console.log("🔥 portalState.project:", portalState.project);
+    console.log("🔥 portalState.clientId:", portalState.clientId);
+    console.log("🔥 related_contact_id:", contactId);
 
     if (!contactId) {
       alert("❌ Cannot promote relationship without a Contact ID.");
@@ -757,7 +761,6 @@ document.getElementById("btnSavePromotions").addEventListener("click", async () 
   alert("✅ Promotions attempted.");
   renderRelationships(container, portalState); // refresh
 });
-
   } catch (err) {
     console.error(err);
     document.getElementById("relationshipsGrid").innerHTML = "<tr><td colspan='8'>Error loading relationships.</td></tr>";
