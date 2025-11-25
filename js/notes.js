@@ -598,13 +598,14 @@ async function renderRelationships(noteId) {
       ${detectedHtml}
     </div>`;
 
-  // Wire up Get Contact ID buttons
+  // Wire up Get Contact ID buttons (only change here)
   container.querySelectorAll(".get-contact-id").forEach(btn => {
     btn.addEventListener("click", () => {
       const row = btn.closest("tr");
       const typeVal = row.querySelector(".rel-type select")?.value.trim();
       const roleVal = row.querySelector(".rel-role select")?.value.trim();
 
+      // ✅ enforce rule: both must be valid
       if (!typeVal || typeVal === "Select" || !roleVal || roleVal === "Select") {
         alert("❌ Please select both Relationship Type and Role before getting Contact ID.");
         return;
@@ -670,4 +671,3 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
-
