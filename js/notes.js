@@ -444,16 +444,22 @@ async function attachClientToNote(contactId, contactName, contactType, contactEm
 window.attachClientToNote = attachClientToNote;
 
 
-
-
 /* Relationships (GET /note_relationships) */
 // Frontend helper: attach a contact to a relationship row
+
 async function attachRelationshipContact(relId, contactId, name, type, email, portalState) {
+  // Grab the row so we can read current inputs
+  const row = document.querySelector(`tr[data-relid="${relId}"]`);
+  const roleVal = row?.querySelector(".rel-role")?.value.trim() || "";
+  const typeVal = row?.querySelector(".rel-type")?.value.trim() || "";
+
   const payload = {
     contact_id: contactId,
     contact_name: name,
     contact_type: type,
-    contact_email: email
+    contact_email: email,
+    relationship_role: roleVal,
+    relationship_type: typeVal
   };
 
   const endpoint = `https://notes-history-module.dennis-e64.workers.dev/notes_relationships?id=eq.${relId}`;
@@ -472,7 +478,7 @@ async function attachRelationshipContact(relId, contactId, name, type, email, po
 
     if (res.ok) {
       alert("✅ Relationship updated");
-      renderRelationships(document.getElementById("notesContent"), portalState);
+      renderRelationships(document.getElementById("notesContent"), portalState); // refresh tab
     } else {
       alert("❌ Failed to update relationship");
     }
@@ -484,6 +490,7 @@ async function attachRelationshipContact(relId, contactId, name, type, email, po
 
 // 🔧 Make it globally accessible for inline onclick
 window.attachRelationshipContact = attachRelationshipContact;
+
 
 /* Relationships (GET /note_relationships) */
 async function renderRelationships(container, portalState) {
