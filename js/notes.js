@@ -518,20 +518,76 @@ async function renderRelationships(container, portalState) {
     return;
   }
 
-  const reviewUrl = `https://notes-history-module.dennis-e64.workers.dev/note_review?project=${project}&id=${noteId}`;
   try {
+    // --- Step 1: Fetch note review (subject + detected relationships) ---
+    const reviewUrl = `https://notes-history-module.dennis-e64.workers.dev/note_review?project=${project}&id=${noteId}`;
     const res = await fetch(reviewUrl);
     const data = await res.json();
 
     const subject = data.note?.subject || "(no subject)";
     const rows = data.relationships || [];
 
-    // Load existing contact relationships for this client/project
+    // --- Step 2: Build base UI ---
+    container.innerHTML = `
+      <section class="card">
+        <h2>Relationships for Note: ${escapeHtml(subject)}</h2>
+
+        <div id="existingRelationships" class="card" style="margin-bottom:16px;">
+          <h3>Existing Contact Relationships</h3>
+          <div id="existingRelGrid"></div>
+        </div>
+
+        <h3 style="margin-top:20px;">Detected Relationships in Note</h3>
+        <table class="notes-table">
+          <thead>
+            <tr>
+              <th>Raw Name</th>
+              <th>Relationship Type</th>
+              <th>Relationship Role</th>
+              <th>Contact ID</th>
+              <th>Contact Name</th>
+              <th>Contact Type</th>
+              <th>Contact Email</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="relationshipsGrid"></tbody>
+        </table>
+
+        <button id="btnSavePromotions" class="primary"
+                style="margin-top:12px; background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
+          Save Promotions
+        </button>
+      </section>
+    `;
+
+    // --- Step 3: Populate detected relationships ---
+    const grid = document.getElementById("relationshipsGrid");
+    grid.innerHTML = rows.map(r => `
+      <tr data-relid="${r.id}">
+        <td>${escapeHtml(r.raw_name || "")}</td>
+        <td><input type="text" value="${escapeHtml(r.relationship_type || "")}" class="rel-type"/></td>
+        <td><input type="text" value="${escapeHtml(r.relationship_role || "")}" class="rel-role"/></td>
+        <td>${escapeHtml(r.contact_id || "")}</td>
+        <td>${escapeHtml(r.contact_name || "")}</td>
+        <td>${escapeHtml(r.contact_type || "")}</td>
+        <td>${escapeHtml(r.contact_email || "")}</td>
+        <td>
+          ${
+            r.contact_id
+              ? `<input type="checkbox" class="promote-checkbox"/>`
+              : `<button class="get-id-btn">Get Contact ID</button>`
+          }
+        </td>
+      </tr>
+    `).join("");
+
+    // --- Step 4: Populate existing contact relationships ---
     const relUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships?project=${project}&source_contact_id=${portalState.clientId}`;
     try {
       const relRes = await fetch(relUrl);
       const relData = await relRes.json();
-    
+
       const existingGrid = document.getElementById("existingRelGrid");
       if (Array.isArray(relData) && relData.length > 0) {
         existingGrid.innerHTML = `
@@ -564,59 +620,7 @@ async function renderRelationships(container, portalState) {
       document.getElementById("existingRelGrid").innerHTML = "<p>Error loading existing relationships.</p>";
     }
 
-
-    // ✅ Build header with subject now that data exists
-    container.innerHTML = `
-      <section class="card">
-        <h2>Relationships for Note: ${escapeHtml(subject)}</h2>
-        <div id="existingRelationships" class="card" style="margin-bottom:16px;">
-          <h3>Existing Contact Relationships</h3>
-          <div id="existingRelGrid"></div>
-        </div>
-        <h3 style="margin-top:20px;">Detected Relationships in Note</h3>
-        <table class="notes-table">
-          <thead>
-            <tr>
-              <th>Raw Name</th>
-              <th>Relationship Type</th>
-              <th>Relationship Role</th>
-              <th>Contact ID</th>
-              <th>Contact Name</th>
-              <th>Contact Type</th>
-              <th>Contact Email</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody id="relationshipsGrid"></tbody>
-        </table>
-        <button id="btnSavePromotions" class="primary"
-                style="margin-top:12px; background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
-          Save Promotions
-        </button>
-      </section>
-    `;
-
-    const grid = document.getElementById("relationshipsGrid");
-    grid.innerHTML = rows.map(r => `
-      <tr data-relid="${r.id}">
-        <td>${escapeHtml(r.raw_name || "")}</td>
-        <td><input type="text" value="${escapeHtml(r.relationship_type || "")}" class="rel-type"/></td>
-        <td><input type="text" value="${escapeHtml(r.relationship_role || "")}" class="rel-role"/></td>
-        <td>${escapeHtml(r.contact_id || "")}</td>
-        <td>${escapeHtml(r.contact_name || "")}</td>
-        <td>${escapeHtml(r.contact_type || "")}</td>
-        <td>${escapeHtml(r.contact_email || "")}</td>
-        <td>
-          ${
-            r.contact_id
-              ? `<input type="checkbox" class="promote-checkbox"/>`
-              : `<button class="get-id-btn">Get Contact ID</button>`
-          }
-        </td>
-      </tr>
-    `).join("");
-
-    // Wire up Save Promotions
+    // --- Step 5: Save Promotions handler ---
     document.getElementById("btnSavePromotions").addEventListener("click", async () => {
       const promoteRows = [...grid.querySelectorAll("tr")].filter(r => r.querySelector(".promote-checkbox")?.checked);
 
@@ -640,13 +644,8 @@ async function renderRelationships(container, portalState) {
           continue;
         }
 
-        // --- Step 1: PATCH notes_relationships ---
-        const patchPayload = {
-          relationship_type: type,
-          relationship_role: role,
-          contact_id: contactId
-        };
-
+        // Step 1: PATCH notes_relationships
+        const patchPayload = { relationship_type: type, relationship_role: role, contact_id: contactId };
         try {
           const patchRes = await fetch(
             `https://notes-history-module.dennis-e64.workers.dev/notes_relationships?id=eq.${relId}`,
@@ -667,14 +666,14 @@ async function renderRelationships(container, portalState) {
           continue;
         }
 
-        // --- Step 2: POST contact_relationships ---
+        // Step 2: POST contact_relationships
         const insertPayload = {
           project: portalState.project,
           source_contact_id: portalState.clientId,
           related_contact_id: contactId,
           relationship_role: role,
           relationship_type: type,
-          notes: "", // ✅ schema has notes, not email
+          notes: "", // schema has notes, not email
           created_at: new Date().toISOString()
         };
 
