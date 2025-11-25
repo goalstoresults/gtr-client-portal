@@ -465,44 +465,59 @@ window.attachClientToNote = attachClientToNote;
 
 /* Relationships (GET /note_relationships) */
 // Frontend helper: attach a contact to a relationship row
-async function attachRelationshipContact(relId, contactId, name, type, email, portalState) {
-  const row = document.querySelector(`tr[data-relid="${relId}"]`);
-  const roleVal = row?.querySelector(".rel-role")?.value.trim() || "";
-  const typeVal = row?.querySelector(".rel-type")?.value.trim() || "";
-
-  const payload = {
-    contact_id: contactId,
-    contact_name: name,
-    contact_type: type,
-    contact_email: email,
-    relationship_role: roleVal,
-    relationship_type: typeVal
-  };
-
-  const endpoint = `https://notes-history-module.dennis-e64.workers.dev/notes_relationships?id=eq.${relId}`;
+// Attach a relationship contact from the "Detected Relationships" table
+async function attachRelationshipContact(row, project, noteId) {
   try {
-    const res = await fetch(endpoint, {
-      method: "PATCH",
+    // Grab values from the row
+    const rawName = row.querySelector(".rel-raw")?.textContent.trim();
+    const typeVal = row.querySelector(".rel-type")?.value.trim();
+    const roleVal = row.querySelector(".rel-role")?.value.trim();
+
+    // ✅ Validation: both dropdowns must have valid values
+    if (!typeVal || typeVal === "Select" || !roleVal || roleVal === "Select") {
+      alert("❌ Please select both Relationship Type and Role before getting Contact ID.");
+      return;
+    }
+
+    // Build payload for backend
+    const payload = {
+      project,
+      note_id: noteId,
+      raw_name: rawName,
+      relationship_type: typeVal,
+      relationship_role: roleVal
+    };
+
+    console.log("📤 attachRelationshipContact payload:", JSON.stringify(payload, null, 2));
+
+    // Call your Worker endpoint
+    const res = await fetch(`/api/relationships_bulk`, {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ project, rows: [payload] })
     });
 
-    const raw = await res.text();
-    console.log("[AttachContact] Response status:", res.status, "raw:", raw);
+    const data = await res.json();
+    console.log("📥 attachRelationshipContact response:", data);
 
-    if (res.ok) {
-      alert("✅ Relationship updated");
-      renderRelationships(document.getElementById("notesContent"), portalState);
-    } else {
-      alert("❌ Failed to update relationship");
+    if (!data.success) {
+      alert("❌ Failed to attach relationship: " + (data.error || "Unknown error"));
+      return;
     }
-  } catch (err) {
-    console.error("[AttachContact] Error:", err);
-    alert("Network error while updating relationship");
-  }
-}   // ← this closing brace is missing in your file
-  
 
+    // ✅ Update the row with returned contact info
+    const rel = data.relationships[0];
+    row.querySelector(".rel-contact-id").textContent = rel.related_contact_id || "";
+    row.querySelector(".rel-contact-name").textContent = rel.related_name || "";
+    row.querySelector(".rel-contact-type").textContent = rel.related_type || "";
+    row.querySelector(".rel-contact-email").textContent = rel.related_email || "";
+
+    alert("✅ Contact ID attached successfully.");
+  } catch (err) {
+    console.error("attachRelationshipContact error:", err);
+    alert("❌ Error attaching relationship: " + err.message);
+  }
+}
 
 // 🔧 Make it globally accessible for inline onclick
 window.attachRelationshipContact = attachRelationshipContact;
@@ -541,12 +556,16 @@ async function renderRelationships(container, portalState) {
       .sort((a, b) => a.sort_order - b.sort_order);
 
     function buildDropdown(options, selectedValue) {
-      return `<select>${options.map(opt => `
-        <option value="${escapeHtml(opt.value)}"
-                ${opt.value === selectedValue ? "selected" : ""}>
-          ${escapeHtml(opt.value)}
-        </option>`).join("")}</select>`;
+      return `<select>
+        <option value="Select">-- Select --</option>
+        ${options.map(opt => `
+          <option value="${escapeHtml(opt.value)}"
+                  ${opt.value === selectedValue ? "selected" : ""}>
+            ${escapeHtml(opt.value)}
+          </option>`).join("")}
+      </select>`;
     }
+
 
     // --- Step 3: Build base UI ---
     container.innerHTML = `
