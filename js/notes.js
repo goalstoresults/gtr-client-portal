@@ -522,7 +522,8 @@ async function renderRelationships(container, portalState) {
 
   container.innerHTML = `
     <section class="card">
-     <h2>Relationships for Note: subject goes here</h2>
+     <h2>Relationships for Note: ${escapeHtml(data.note?.subject || "(no subject)")}</h2>
+
       <div id="existingRelationships" class="card" style="margin-bottom:16px;">
         <h3>Existing Contact Relationships</h3>
         <div id="existingRelGrid"></div>
