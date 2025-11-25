@@ -657,14 +657,6 @@ async function renderRelationships(noteId) {
   });
 }
 
-      alert("✅ Promotions attempted.");
-      renderRelationships(container, portalState); // refresh
-    });
-  } catch (err) {
-    console.error(err);
-    container.innerHTML = `<p>Error loading relationships: ${err.message}</p>`;
-  }
-}
 
 
 /* -------------------------
