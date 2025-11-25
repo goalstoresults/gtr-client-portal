@@ -171,6 +171,7 @@ function renderAdd(container, portalState) {
 }
 
 /* Review (GET /note_review) */
+/* Review (GET /note_review) */
 async function renderReview(container, portalState, noteId) {
   console.log("[Review] Called with noteId:", noteId);
 
@@ -192,6 +193,11 @@ async function renderReview(container, portalState, noteId) {
 
     const note = data.note;
     const relationships = data.relationships || [];
+
+    // ✅ Hydrate clientId if note already has a client
+    if (note.client_id) {
+      portalState.clientId = note.client_id;
+    }
 
     container.innerHTML = `
       <section class="card">
@@ -310,7 +316,6 @@ async function renderReview(container, portalState, noteId) {
         const container = document.getElementById("notesContent");
         if (container) {
           await renderHistory(container, portalState);
-          // Switch tab highlight back to History
           document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
           document.querySelector('#notes-subtabs button[data-subtab="history"]')?.classList.add("active");
         }
@@ -324,8 +329,11 @@ async function renderReview(container, portalState, noteId) {
     const relBtn = document.getElementById("btnRelationships");
     if (relBtn) {
       relBtn.addEventListener("click", () => {
+        // Switch tab highlight to Relationships
         document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
         document.querySelector('#notes-subtabs button[data-subtab="relationships"]')?.classList.add("active");
+
+        // Render Relationships tab
         renderRelationships(container, portalState);
       });
     }
@@ -366,15 +374,15 @@ async function renderReview(container, portalState, noteId) {
           return;
         }
         const rows = await resp.json();
-        const container = document.getElementById("clientSearchResults");
-        container.innerHTML = rows.length > 0
+        const resultsDiv = document.getElementById("clientSearchResults");
+        resultsDiv.innerHTML = rows.length > 0
           ? rows.map(r => {
               const fullName = `${r.first_name || ""} ${r.last_name || ""}`.trim();
               const typeLabel = (r.contact_type || "contact").toLowerCase();
               const emailSafe = r.email || "";
               return `
                 <div style="padding:8px; border-bottom:1px solid #eee; cursor:pointer;"
-                onclick="attachClientToNote('${r.contact_id}', '${fullName}', '${typeLabel}', '${emailSafe}', { selectedNoteId: '${portalState.selectedNoteId}', project: '${portalState.project}' })">
+                     onclick="attachClientToNote('${r.contact_id}', '${fullName}', '${typeLabel}', '${emailSafe}', { selectedNoteId: '${portalState.selectedNoteId}', project: '${portalState.project}' })">
                   <strong>${fullName}</strong>
                   <span style="background:#eef; color:#336; padding:2px 6px; border-radius:12px; font-size:0.75em; margin-left:6px;">
                     ${typeLabel}
@@ -391,10 +399,15 @@ async function renderReview(container, portalState, noteId) {
     });
   } catch (err) {
     container.innerHTML = `<p>Error loading note review: ${err.message}</p>`;
+    console.error(err);
   }
 }
 
 
+
+
+      
+/* Add Client to Note */
 /* Add Client to Note */
 async function attachClientToNote(contactId, contactName, contactType, contactEmail, portalState) {
   try {
@@ -428,6 +441,9 @@ async function attachClientToNote(contactId, contactName, contactType, contactEm
 
     alert("✅ Client attached to note.");
 
+    // ✅ Set clientId so Relationships tab can use it
+    portalState.clientId = contactId;
+
     // 🔄 Refresh Note Review so the updated client info shows immediately
     const container = document.getElementById("notesContent");
     if (container) {
@@ -438,7 +454,6 @@ async function attachClientToNote(contactId, contactName, contactType, contactEm
     console.error(err);
   }
 }
-
 
 // 🔧 Make it globally accessible for inline onclick
 window.attachClientToNote = attachClientToNote;
