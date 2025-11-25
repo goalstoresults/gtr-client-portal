@@ -513,7 +513,7 @@ async function renderRelationships(container, portalState) {
   const noteId = portalState.selectedNoteId;
   const project = portalState.project;
   // ✅ Get subject from note
-  //const subject = data.note?.subject || "(no subject)";
+  // const subject = data.note?.subject || "(no subject)";
 
   if (!noteId) {
     container.innerHTML = `<p>Select a note from History to view relationships.</p>`;
