@@ -512,53 +512,52 @@ window.attachRelationshipContact = attachRelationshipContact;
 async function renderRelationships(container, portalState) {
   const noteId = portalState.selectedNoteId;
   const project = portalState.project;
-  // ✅ Get subject from note
-  // const subject = data.note?.subject || "(no subject)";
 
   if (!noteId) {
     container.innerHTML = `<p>Select a note from History to view relationships.</p>`;
     return;
   }
 
-  container.innerHTML = `
-    <section class="card">
-     <h2>Relationships for Note: ${escapeHtml(data.note?.subject || "(no subject)")}</h2>
-
-      <div id="existingRelationships" class="card" style="margin-bottom:16px;">
-        <h3>Existing Contact Relationships</h3>
-        <div id="existingRelGrid"></div>
-      </div>
-      <h3 style="margin-top:20px;">Detected Relationships in Note</h3>
-      <table class="notes-table">
-        <thead>
-          <tr>
-            <th>Raw Name</th>
-            <th>Relationship Type</th>
-            <th>Relationship Role</th>
-            <th>Contact ID</th>
-            <th>Contact Name</th>
-            <th>Contact Type</th>
-            <th>Contact Email</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody id="relationshipsGrid"></tbody>
-      </table>
-      <button id="btnSavePromotions" class="primary"
-              style="margin-top:12px; background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
-        Save Promotions
-      </button>
-    </section>
-  `;
-
-  // Load note relationships
   const reviewUrl = `https://notes-history-module.dennis-e64.workers.dev/note_review?project=${project}&id=${noteId}`;
   try {
     const res = await fetch(reviewUrl);
     const data = await res.json();
-    const rows = data.relationships || [];
-    const grid = document.getElementById("relationshipsGrid");
 
+    const subject = data.note?.subject || "(no subject)";
+    const rows = data.relationships || [];
+
+    // ✅ Build header with subject now that data exists
+    container.innerHTML = `
+      <section class="card">
+        <h2>Relationships for Note: ${escapeHtml(subject)}</h2>
+        <div id="existingRelationships" class="card" style="margin-bottom:16px;">
+          <h3>Existing Contact Relationships</h3>
+          <div id="existingRelGrid"></div>
+        </div>
+        <h3 style="margin-top:20px;">Detected Relationships in Note</h3>
+        <table class="notes-table">
+          <thead>
+            <tr>
+              <th>Raw Name</th>
+              <th>Relationship Type</th>
+              <th>Relationship Role</th>
+              <th>Contact ID</th>
+              <th>Contact Name</th>
+              <th>Contact Type</th>
+              <th>Contact Email</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="relationshipsGrid"></tbody>
+        </table>
+        <button id="btnSavePromotions" class="primary"
+                style="margin-top:12px; background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
+          Save Promotions
+        </button>
+      </section>
+    `;
+
+    const grid = document.getElementById("relationshipsGrid");
     grid.innerHTML = rows.map(r => `
       <tr data-relid="${r.id}">
         <td>${escapeHtml(r.raw_name || "")}</td>
@@ -578,193 +577,97 @@ async function renderRelationships(container, portalState) {
       </tr>
     `).join("");
 
-    // Wire up Get ID buttons
-    grid.querySelectorAll(".get-id-btn").forEach(btn => {
-      btn.addEventListener("click", e => {
-        const row = e.target.closest("tr");
-        const relId = row.dataset.relid;
-
-        const type = row.querySelector(".rel-type")?.value.trim();
-        const role = row.querySelector(".rel-role")?.value.trim();
-
-        if (!type || !role) {
-          alert("Relationship Type and Role cannot be blank.");
-          return;
-        }
-
-        // Render inline search form only if both fields are filled
-        row.querySelector("td:last-child").innerHTML = `
-          <div>
-            <input class="search-first" placeholder="First name"/>
-            <input class="search-last" placeholder="Last name"/>
-            <button class="do-search">Find</button>
-            <div class="search-results muted">Enter criteria and click Find.</div>
-          </div>
-        `;
-
-        // Wire up search
-        row.querySelector(".do-search").addEventListener("click", async () => {
-          const first = row.querySelector(".search-first").value.trim();
-          const last = row.querySelector(".search-last").value.trim();
-          if (!first && !last) {
-            alert("Enter at least a first or last name.");
-            return;
-          }
-
-          const filters = [];
-          if (first) filters.push(`first_name.ilike.*${first}*`);
-          if (last)  filters.push(`last_name.ilike.*${last}*`);
-
-          const query = filters.length > 1
-            ? `and=(${filters.join(",")})`
-            : filters[0];
-
-          const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${query}&select=contact_id,first_name,last_name,email,contact_type`;
-          console.log("[GetID] Search URL:", searchUrl);
-
-          try {
-            const resp = await fetch(searchUrl);
-            const contacts = await resp.json();
-
-            const resultsDiv = row.querySelector(".search-results");
-            resultsDiv.innerHTML = contacts.length > 0
-              ? contacts.map(c => `
-                  <div class="contact-result"
-                       data-relid="${relId}"
-                       data-contactid="${c.contact_id}"
-                       data-name="${c.first_name} ${c.last_name}"
-                       data-type="${c.contact_type}"
-                       data-email="${c.email}">
-                    <strong>${c.first_name} ${c.last_name}</strong> (${c.contact_type})<br/>
-                    <small>${c.email}</small>
-                  </div>
-                `).join("")
-              : "<div class='muted'>No contacts found.</div>";
-
-            // Attach click handlers to results
-            resultsDiv.querySelectorAll(".contact-result").forEach(el => {
-              el.addEventListener("click", () => {
-                attachRelationshipContact(
-                  el.dataset.relid,
-                  el.dataset.contactid,
-                  el.dataset.name,
-                  el.dataset.type,
-                  el.dataset.email,
-                  portalState // ✅ pass actual portalState
-                );
-              });
-            });
-          } catch (err) {
-            console.error("Search error:", err);
-            alert("Network error during search.");
-          }
-        });
-      });
-    });
-
     // Wire up Save Promotions
-document.getElementById("btnSavePromotions").addEventListener("click", async () => {
-  const promoteRows = [...grid.querySelectorAll("tr")].filter(r => r.querySelector(".promote-checkbox")?.checked);
+    document.getElementById("btnSavePromotions").addEventListener("click", async () => {
+      const promoteRows = [...grid.querySelectorAll("tr")].filter(r => r.querySelector(".promote-checkbox")?.checked);
 
-  if (promoteRows.length === 0) {
-    alert("No promotions selected.");
-    return;
-  }
+      if (promoteRows.length === 0) {
+        alert("No promotions selected.");
+        return;
+      }
 
-  for (const row of promoteRows) {
-    const relId = row.dataset.relid;
-    const contactId = row.querySelector("td:nth-child(4)").textContent.trim();
-    const role = row.querySelector(".rel-role").value.trim();
-    const type = row.querySelector(".rel-type").value.trim();
+      for (const row of promoteRows) {
+        const relId = row.dataset.relid;
+        const contactId = row.querySelector("td:nth-child(4)").textContent.trim();
+        const role = row.querySelector(".rel-role").value.trim();
+        const type = row.querySelector(".rel-type").value.trim();
 
-    // 🔥 Debug logs to confirm values
-    console.log("🔥 portalState.project:", portalState.project);
-    console.log("🔥 portalState.clientId:", portalState.clientId);
-    console.log("🔥 related_contact_id:", contactId);
-
-    if (!contactId) {
-      alert("❌ Cannot promote relationship without a Contact ID.");
-      continue;
-    }
-    if (!role || !type) {
-      alert("❌ Relationship Type and Role cannot be blank.");
-      continue;
-    }
-
-    // --- Step 1: PATCH notes_relationships ---
-    const patchPayload = {
-      relationship_type: type,
-      relationship_role: role,
-      contact_id: contactId
-    };
-
-    try {
-      const patchRes = await fetch(
-        `https://notes-history-module.dennis-e64.workers.dev/notes_relationships?id=eq.${relId}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(patchPayload)
+        if (!contactId) {
+          alert("❌ Cannot promote relationship without a Contact ID.");
+          continue;
         }
-      );
-      const patchText = await patchRes.text();
-      console.log("[SavePromotions] PATCH notes_relationships:", patchRes.status, patchText);
-      if (!patchRes.ok) {
-        alert(`❌ Failed to update note relationship: ${patchText}`);
-        continue;
+        if (!role || !type) {
+          alert("❌ Relationship Type and Role cannot be blank.");
+          continue;
+        }
+
+        // --- Step 1: PATCH notes_relationships ---
+        const patchPayload = {
+          relationship_type: type,
+          relationship_role: role,
+          contact_id: contactId
+        };
+
+        try {
+          const patchRes = await fetch(
+            `https://notes-history-module.dennis-e64.workers.dev/notes_relationships?id=eq.${relId}`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(patchPayload)
+            }
+          );
+          if (!patchRes.ok) {
+            const patchText = await patchRes.text();
+            alert(`❌ Failed to update note relationship: ${patchText}`);
+            continue;
+          }
+        } catch (err) {
+          console.error("PATCH error:", err);
+          alert("Network error while updating note relationship.");
+          continue;
+        }
+
+        // --- Step 2: POST contact_relationships ---
+        const insertPayload = {
+          project: portalState.project,
+          source_contact_id: portalState.clientId,
+          related_contact_id: contactId,
+          relationship_role: role,
+          relationship_type: type,
+          notes: "", // ✅ schema has notes, not email
+          created_at: new Date().toISOString()
+        };
+
+        console.log("[SavePromotions] Insert payload:", JSON.stringify(insertPayload, null, 2));
+
+        try {
+          const res = await fetch("https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(insertPayload)
+          });
+
+          const text = await res.text();
+          console.log("[SavePromotions] POST contact_relationships:", res.status, text);
+
+          if (!res.ok) {
+            alert(`❌ Failed to save promotion: ${text}`);
+          } else {
+            console.log("Promotion saved successfully");
+          }
+        } catch (err) {
+          console.error("Promotion error:", err);
+          alert("Network error while saving promotion.");
+        }
       }
-    } catch (err) {
-      console.error("PATCH error:", err);
-      alert("Network error while updating note relationship.");
-      continue;
-    }
 
-    // --- Step 2: POST contact_relationships ---
-    const insertPayload = {
-      project: portalState.project,
-      source_contact_id: portalState.clientId,
-      related_contact_id: contactId,
-      relationship_role: role,
-      relationship_type: type,
-      notes: "", // optional
-      created_at: new Date().toISOString()
-    };
-
-    console.log("[SavePromotions] Insert payload:", JSON.stringify(insertPayload, null, 2));
-
-    if (!insertPayload.project || !insertPayload.source_contact_id || !insertPayload.related_contact_id) {
-      console.error("[SavePromotions] Missing required fields →", insertPayload);
-      alert("❌ Missing required fields. Cannot save promotion.");
-      continue;
-    }
-
-    try {
-      const res = await fetch("https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(insertPayload)
-      });
-
-      const text = await res.text();
-      console.log("[SavePromotions] POST contact_relationships:", res.status, text);
-
-      if (!res.ok) {
-        alert(`❌ Failed to save promotion: ${text}`);
-      } else {
-        console.log("Promotion saved successfully");
-      }
-    } catch (err) {
-      console.error("Promotion error:", err);
-      alert("Network error while saving promotion.");
-    }
-  }
-
-  alert("✅ Promotions attempted.");
-  renderRelationships(container, portalState); // refresh
-});
+      alert("✅ Promotions attempted.");
+      renderRelationships(container, portalState); // refresh
+    });
   } catch (err) {
     console.error(err);
-    document.getElementById("relationshipsGrid").innerHTML = "<tr><td colspan='8'>Error loading relationships.</td></tr>";
+    container.innerHTML = `<p>Error loading relationships: ${err.message}</p>`;
   }
 }
 
