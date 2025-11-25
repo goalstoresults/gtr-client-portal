@@ -493,6 +493,7 @@ window.attachRelationshipContact = attachRelationshipContact;
 
 
 /* Relationships (GET /note_relationships) */
+/* Relationships (GET /note_relationships) */
 async function renderRelationships(container, portalState) {
   const noteId = portalState.selectedNoteId;
   const project = portalState.project;
@@ -646,27 +647,55 @@ async function renderRelationships(container, portalState) {
     // Wire up Save Promotions
     document.getElementById("btnSavePromotions").addEventListener("click", async () => {
       const promoteRows = [...grid.querySelectorAll("tr")].filter(r => r.querySelector(".promote-checkbox")?.checked);
+
+      if (promoteRows.length === 0) {
+        alert("No promotions selected.");
+        return;
+      }
+
       for (const row of promoteRows) {
         const contactId = row.querySelector("td:nth-child(4)").textContent.trim();
         const role = row.querySelector(".rel-role").value.trim();
         const type = row.querySelector(".rel-type").value.trim();
 
-        if (!contactId) continue;
+        if (!contactId) {
+          alert("❌ Cannot promote relationship without a Contact ID.");
+          continue;
+        }
+        if (!role || !type) {
+          alert("❌ Relationship Type and Role cannot be blank.");
+          continue;
+        }
 
         const payload = {
+          project: portalState.project,
           client_id: portalState.clientId,
           related_contact_id: contactId,
           relationship_role: role,
-          relationship_type: type
+          relationship_type: type,
+          created_at: new Date().toISOString()
         };
 
         const endpoint = `https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships`;
-        await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
+        try {
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+
+          if (!res.ok) {
+            const msg = await res.text().catch(() => "");
+            alert(`❌ Failed to save promotion: ${msg}`);
+          } else {
+            console.log("Promotion saved:", payload);
+          }
+        } catch (err) {
+          console.error("Promotion error:", err);
+          alert("Network error while saving promotion.");
+        }
       }
+
       alert("✅ Promotions saved.");
       renderRelationships(container, portalState); // refresh
     });
