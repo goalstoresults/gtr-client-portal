@@ -446,9 +446,7 @@ window.attachClientToNote = attachClientToNote;
 
 /* Relationships (GET /note_relationships) */
 // Frontend helper: attach a contact to a relationship row
-
 async function attachRelationshipContact(relId, contactId, name, type, email, portalState) {
-  // Grab the row so we can read current inputs
   const row = document.querySelector(`tr[data-relid="${relId}"]`);
   const roleVal = row?.querySelector(".rel-role")?.value.trim() || "";
   const typeVal = row?.querySelector(".rel-type")?.value.trim() || "";
@@ -463,36 +461,12 @@ async function attachRelationshipContact(relId, contactId, name, type, email, po
   };
 
   const endpoint = `https://notes-history-module.dennis-e64.workers.dev/notes_relationships?id=eq.${relId}`;
-  console.log("[AttachContact] PATCH endpoint:", endpoint);
-  console.log("[AttachContact] Payload:", payload);
 
-  try {
-    const res = await fetch(endpoint, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-
-    const raw = await res.text();
-    console.log("[AttachContact] Response status:", res.status, "raw:", raw);
-
-    if (res.ok) {
-      alert("✅ Relationship updated");
-      renderRelationships(document.getElementById("notesContent"), portalState); // refresh tab
-    } else {
-      alert("❌ Failed to update relationship");
-    }
-  } catch (err) {
-    console.error("[AttachContact] Error:", err);
-    alert("Network error while updating relationship");
-  }
-}
 
 // 🔧 Make it globally accessible for inline onclick
 window.attachRelationshipContact = attachRelationshipContact;
 
 
-/* Relationships (GET /note_relationships) */
 /* Relationships (GET /note_relationships) */
 async function renderRelationships(container, portalState) {
   const noteId = portalState.selectedNoteId;
@@ -673,8 +647,11 @@ async function renderRelationships(container, portalState) {
           related_contact_id: contactId,
           relationship_role: role,
           relationship_type: type,
+          related_email: row.querySelector("td:nth-child(7)")?.textContent.trim() || null,
           created_at: new Date().toISOString()
         };
+
+        console.log("[SavePromotion] Payload:", payload);
 
         const endpoint = `https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships`;
         try {
