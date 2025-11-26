@@ -628,15 +628,15 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
     const row = e.target.closest("tr");
     const relId = row.dataset.relid;
 
-    // --- Validation commented out ---
-    /*
+    // --- Validation ---
+    
     const type = row.querySelector(".rel-type")?.value.trim();
     const role = row.querySelector(".rel-role")?.value.trim();
     if (!type || !role) {
       alert("Relationship Type and Role cannot be blank.");
       return;
     }
-    */
+    
 
     // ✅ Always render the inline search form
     row.querySelector("td:last-child").innerHTML = `
