@@ -1,4 +1,4 @@
-// js/notes.js v1.1.7
+// js/notes.js v1.3.0
 // Notes module with full Worker URLs (notes-history-module.dennis-e64.workers.dev)
 
 console.log("[Notes.js] loaded");
