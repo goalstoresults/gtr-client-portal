@@ -470,8 +470,8 @@ async function attachRelationshipContact(row, project, noteId) {
   try {
     // Grab values from the row
     const rawName = row.querySelector(".rel-raw")?.textContent.trim();
-    const typeVal = row.querySelector(".rel-type select")?.value.trim();
-    const roleVal = row.querySelector(".rel-role select")?.value.trim();
+    const typeVal = row.querySelector(".rel-type")?.value.trim();
+    const roleVal = row.querySelector(".rel-role")?.value.trim();
 
     // ✅ Validation: both dropdowns must have valid values
     if (!typeVal || typeVal === "Select" || !roleVal || roleVal === "Select") {
@@ -490,15 +490,12 @@ async function attachRelationshipContact(row, project, noteId) {
 
     console.log("📤 attachRelationshipContact payload:", JSON.stringify(payload, null, 2));
 
-    // Call Worker endpoint to resolve relationship
-    const res = await fetch(
-      `https://notes-history-module.dennis-e64.workers.dev/note_relationships`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      }
-    );
+    // Call your Worker endpoint
+    const res = await fetch(`/api/relationships_bulk`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project, rows: [payload] })
+    });
 
     const data = await res.json();
     console.log("📥 attachRelationshipContact response:", data);
