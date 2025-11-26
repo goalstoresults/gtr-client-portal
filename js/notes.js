@@ -469,9 +469,10 @@ window.attachClientToNote = attachClientToNote;
 async function attachRelationshipContact(row, project, noteId) {
   try {
     // Grab values from the row
-    const rawName = row.querySelector(".rel-raw")?.textContent.trim();
-    const typeVal = row.querySelector(".rel-type")?.value.trim();
-    const roleVal = row.querySelector(".rel-role")?.value.trim();
+    const rawName = (row.querySelector(".rel-raw")?.textContent || "").trim();
+    const typeVal = (row.querySelector(".rel-type select")?.value || "").trim();
+    const roleVal = (row.querySelector(".rel-role select")?.value || "").trim();
+
 
     // ✅ Validation: both dropdowns must have valid values
     if (!typeVal || typeVal === "Select" || !roleVal || roleVal === "Select") {
