@@ -778,7 +778,19 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
         }
 
         // Step 1: PATCH notes_relationships
-        const patchPayload = { relationship_type: type, relationship_role: role, contact_id: contactId };
+        const contactName = row.querySelector(".rel-contact-name").textContent.trim();
+        const contactType = row.querySelector(".rel-contact-type").textContent.trim();
+        const contactEmail = row.querySelector(".rel-contact-email").textContent.trim();
+        
+        const patchPayload = {
+          relationship_type: type,
+          relationship_role: role,
+          contact_id: contactId,
+          contact_name: contactName,
+          contact_type: contactType,
+          contact_email: contactEmail
+        };
+
         try {
           const patchRes = await fetch(
             `https://notes-history-module.dennis-e64.workers.dev/notes_relationships?id=eq.${relId}`,
