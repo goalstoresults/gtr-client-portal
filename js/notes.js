@@ -687,19 +687,24 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
             `).join("")
           : "<div class='muted'>No contacts found.</div>";
 
-        // ✅ Attach click handlers to results
-        resultsDiv.querySelectorAll(".contact-result").forEach(el => {
-          el.addEventListener("click", () => {
-            attachRelationshipContact(
-              el.dataset.relid,
-              el.dataset.contactid,
-              el.dataset.name,
-              el.dataset.type,
-              el.dataset.email,
-              portalState
-            );
+          // ✅ Attach click handlers to results
+          resultsDiv.querySelectorAll(".contact-result").forEach(el => {
+            el.addEventListener("click", () => {
+              const row = document.querySelector(`tr[data-relid="${el.dataset.relid}"]`);
+          
+              // Hydrate the row with selected contact info
+              row.querySelector(".rel-contact-id").textContent = el.dataset.contactid || "";
+              row.querySelector(".rel-contact-name").textContent = el.dataset.name || "";
+              row.querySelector(".rel-contact-type").textContent = el.dataset.type || "";
+              row.querySelector(".rel-contact-email").textContent = el.dataset.email || "";
+          
+              // Swap Action cell to promotion checkbox
+              row.querySelector("td:last-child").innerHTML = `<input type="checkbox" class="promote-checkbox"/>`;
+          
+              alert("✅ Contact populated into relationship row.");
+            });
           });
-        });
+        
       } catch (err) {
         console.error("Search error:", err);
         alert("Network error during search.");
