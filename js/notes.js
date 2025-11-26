@@ -604,23 +604,23 @@ async function renderRelationships(container, portalState) {
     // --- Step 4: Populate detected relationships with dropdowns ---
     const grid = document.getElementById("relationshipsGrid");
     grid.innerHTML = rows.map(r => `
-    <tr data-relid="${r.id}">
-      <td class="rel-raw">${escapeHtml(r.raw_name || "")}</td>
-      <td class="rel-type">${buildDropdown(types, r.relationship_type)}</td>
-      <td class="rel-role">${buildDropdown(roles, r.relationship_role)}</td>
-      <td class="rel-contact-id">${escapeHtml(r.contact_id || "")}</td>
-      <td class="rel-contact-name">${escapeHtml(r.contact_name || "")}</td>
-      <td class="rel-contact-type">${escapeHtml(r.contact_type || "")}</td>
-      <td class="rel-contact-email">${escapeHtml(r.contact_email || "")}</td>
-      <td>
-        ${
-          r.contact_id
-            ? `<input type="checkbox" class="promote-checkbox"/>`
-            : `<button class="get-id-btn">Get Contact ID</button>`
-        }
-      </td>
-    </tr>
-  `).join("");
+      <tr data-relid="${r.id}">
+        <td class="rel-raw">${escapeHtml(r.raw_name || "")}</td>
+        <td class="rel-type">${buildDropdown(types, r.relationship_type)}</td>
+        <td class="rel-role">${buildDropdown(roles, r.relationship_role)}</td>
+        <td class="rel-contact-id">${escapeHtml(r.contact_id || "")}</td>
+        <td class="rel-contact-name">${escapeHtml(r.contact_name || "")}</td>
+        <td class="rel-contact-type">${escapeHtml(r.contact_type || "")}</td>
+        <td class="rel-contact-email">${escapeHtml(r.contact_email || "")}</td>
+        <td>
+          ${
+            r.contact_id
+              ? `<input type="checkbox" class="promote-checkbox"/>`
+              : `<button class="get-id-btn">Get Contact ID</button>`
+          }
+        </td>
+      </tr>
+    `).join("");
 
     grid.querySelectorAll(".get-id-btn").forEach(btn => {
       btn.addEventListener("click", () => {
