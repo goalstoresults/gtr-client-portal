@@ -623,21 +623,35 @@ async function renderRelationships(container, portalState) {
       </tr>
     `).join("");
 
-    grid.querySelectorAll(".get-id-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const row = btn.closest("tr");
-        const typeVal = row.querySelector(".rel-type select")?.value.trim();
-        const roleVal = row.querySelector(".rel-role select")?.value.trim();
-    
-        if (!typeVal || typeVal === "Select" || !roleVal || roleVal === "Select") {
-          alert("❌ Please select both Relationship Type and Role before getting Contact ID.");
-          return;
-        }
-    
-        attachRelationshipContact(row, project, noteId);
-      });
-    });
+grid.querySelectorAll(".get-id-btn").forEach(btn => {
+  btn.addEventListener("click", e => {
+    const row = e.target.closest("tr");
+    const relId = row.dataset.relid;
 
+    // --- Validation removed for now ---
+    /*
+    const type = row.querySelector(".rel-type")?.value.trim();
+    const role = row.querySelector(".rel-role")?.value.trim();
+
+    if (!type || !role) {
+      alert("Relationship Type and Role cannot be blank.");
+      return;
+    }
+    */
+
+    // ✅ Always render the inline search form
+    row.querySelector("td:last-child").innerHTML = `
+      <div>
+        <input class="search-first" placeholder="First name"/>
+        <input class="search-last" placeholder="Last name"/>
+        <button class="do-search">Find</button>
+        <div class="search-results muted">Enter criteria and click Find.</div>
+      </div>
+    `;
+  });
+});
+
+    
     // --- Step 5: Populate existing contact relationships ---
     const relUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships?project=${project}&source_contact_id=${portalState.clientId}`;
     try {
