@@ -153,6 +153,10 @@ button {
 }
 .notes-table button:hover { background: #357ab8; }
 
+.contact-result {
+  cursor: pointer;
+}
+
 /* Status messages */
 .status {
   margin-top: 8px;
