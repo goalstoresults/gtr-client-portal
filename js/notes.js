@@ -490,12 +490,15 @@ async function attachRelationshipContact(row, project, noteId) {
 
     console.log("📤 attachRelationshipContact payload:", JSON.stringify(payload, null, 2));
 
-    // Call your Worker endpoint
-    const res = await fetch(`/api/relationships_bulk`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ project, rows: [payload] })
-    });
+    // Call Worker endpoint to resolve relationship
+    const res = await fetch(
+      `https://notes-history-module.dennis-e64.workers.dev/note_relationships`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }
+    );
 
     const data = await res.json();
     console.log("📥 attachRelationshipContact response:", data);
