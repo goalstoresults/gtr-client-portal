@@ -622,6 +622,22 @@ async function renderRelationships(container, portalState) {
       </tr>
     `).join("");
 
+    grid.querySelectorAll(".get-id-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const row = btn.closest("tr");
+        const typeVal = row.querySelector(".rel-type select")?.value.trim();
+        const roleVal = row.querySelector(".rel-role select")?.value.trim();
+    
+        if (!typeVal || typeVal === "Select" || !roleVal || roleVal === "Select") {
+          alert("❌ Please select both Relationship Type and Role before getting Contact ID.");
+          return;
+        }
+    
+        attachRelationshipContact(row, project, noteId);
+      });
+    });
+
+
     // --- Step 5: Populate existing contact relationships ---
     const relUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships?project=${project}&source_contact_id=${portalState.clientId}`;
     try {
