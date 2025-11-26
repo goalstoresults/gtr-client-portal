@@ -628,11 +628,10 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
     const row = e.target.closest("tr");
     const relId = row.dataset.relid;
 
-    // --- Validation removed for now ---
+    // --- Validation commented out ---
     /*
     const type = row.querySelector(".rel-type")?.value.trim();
     const role = row.querySelector(".rel-role")?.value.trim();
-
     if (!type || !role) {
       alert("Relationship Type and Role cannot be blank.");
       return;
@@ -648,8 +647,67 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
         <div class="search-results muted">Enter criteria and click Find.</div>
       </div>
     `;
+
+    // ✅ Wire up Find button click
+    row.querySelector(".do-search").addEventListener("click", async () => {
+      const first = row.querySelector(".search-first").value.trim();
+      const last = row.querySelector(".search-last").value.trim();
+      if (!first && !last) {
+        alert("Enter at least a first or last name.");
+        return;
+      }
+
+      const filters = [];
+      if (first) filters.push(`first_name.ilike.*${first}*`);
+      if (last)  filters.push(`last_name.ilike.*${last}*`);
+
+      const query = filters.length > 1
+        ? `and=(${filters.join(",")})`
+        : filters[0];
+
+      const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${query}&select=contact_id,first_name,last_name,email,contact_type`;
+      console.log("[GetID] Search URL:", searchUrl);
+
+      try {
+        const resp = await fetch(searchUrl);
+        const contacts = await resp.json();
+
+        const resultsDiv = row.querySelector(".search-results");
+        resultsDiv.innerHTML = contacts.length > 0
+          ? contacts.map(c => `
+              <div class="contact-result"
+                   data-relid="${relId}"
+                   data-contactid="${c.contact_id}"
+                   data-name="${c.first_name} ${c.last_name}"
+                   data-type="${c.contact_type}"
+                   data-email="${c.email}">
+                <strong>${c.first_name} ${c.last_name}</strong> (${c.contact_type})<br/>
+                <small>${c.email}</small>
+              </div>
+            `).join("")
+          : "<div class='muted'>No contacts found.</div>";
+
+        // ✅ Attach click handlers to results
+        resultsDiv.querySelectorAll(".contact-result").forEach(el => {
+          el.addEventListener("click", () => {
+            attachRelationshipContact(
+              el.dataset.relid,
+              el.dataset.contactid,
+              el.dataset.name,
+              el.dataset.type,
+              el.dataset.email,
+              portalState
+            );
+          });
+        });
+      } catch (err) {
+        console.error("Search error:", err);
+        alert("Network error during search.");
+      }
+    });
   });
 });
+
 
     
     // --- Step 5: Populate existing contact relationships ---
