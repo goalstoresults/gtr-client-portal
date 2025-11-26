@@ -625,8 +625,8 @@ async function renderRelationships(container, portalState) {
     grid.querySelectorAll(".get-id-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         const row = btn.closest("tr");
-        const typeVal = row.querySelector(".rel-type select")?.value.trim();
-        const roleVal = row.querySelector(".rel-role select")?.value.trim();
+        const typeVal = row.cells[1].querySelector("select")?.value.trim();
+        const roleVal = row.cells[2].querySelector("select")?.value.trim();
     
         if (!typeVal || typeVal === "Select" || !roleVal || roleVal === "Select") {
           alert("❌ Please select both Relationship Type and Role before getting Contact ID.");
