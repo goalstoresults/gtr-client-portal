@@ -541,6 +541,9 @@ async function renderRelationships(container, portalState) {
     const data = await res.json();
 
     const subject = data.note?.subject || "(no subject)";
+    const clientName = data.note?.contact_name || "(unknown)";
+    const clientEmail = data.note?.contact_email || "";
+
     const rows = data.relationships || [];
 
     // --- Step 2: Fetch lookups for dropdowns ---
