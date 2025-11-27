@@ -904,6 +904,28 @@ document.getElementById("btnSaveRelationships").addEventListener("click", async 
       console.error("Relationship error:", err);
       alert("Network error while saving relationship.");
     }
+    // Step 3: PATCH contacts table to update master contact_type
+    if (contactId && contactType) {
+      try {
+        const contactPatchRes = await fetch(
+          `https://client-portal-api.dennis-e64.workers.dev/api/contacts?contact_id=eq.${contactId}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contact_type: contactType })
+          }
+        );
+    
+        if (!contactPatchRes.ok) {
+          const errText = await contactPatchRes.text();
+          console.warn(`⚠️ Failed to update contact_type in contacts: ${errText}`);
+        } else {
+          console.log(`✅ Contact ${contactId} type updated to ${contactType}`);
+        }
+      } catch (err) {
+        console.error("Contact PATCH error:", err);
+      }
+    }
   }
 
   // ✅ Handle Review Complete checkbox
