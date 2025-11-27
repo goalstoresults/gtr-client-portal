@@ -889,9 +889,13 @@ document.getElementById("btnSaveRelationships").addEventListener("click", async 
     }
   }
 
-
   alert("✅ Relationships saved.");
-  renderRelationships(container, portalState); // refresh
+  
+  // Reset UI back to History view
+  await renderHistory(container, portalState);
+  document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
+  document.querySelector('#notes-subtabs button[data-subtab="history"]')?.classList.add("active");
+
 });
 
 } catch (err) {
