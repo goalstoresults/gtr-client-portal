@@ -16,18 +16,21 @@
   </header>
 
   <!-- Top-level tabs -->
-  <nav id="tabs" style="display:none;">
-    <button data-tab="notes">Notes</button>
-  </nav>
+  <nav id="tabs" style="display:none;"></nav>
 
   <div id="tab-content"></div>
 
   <footer style="margin-top:20px; text-align:center; color:#666;">
-    <small>Portal Version: 1.2.0</small>
+    <small>Portal Version: 1.3.0</small>
   </footer>
 
   <script type="module">
+    import { loadContactsTab } from "./js/contacts.js";
+    import { loadFinancialsTab } from "./js/financials.js";
     import { loadNotesTab } from "./js/notes.js";
+    import { loadTasksTab } from "./js/tasks.js";
+    import { loadLookupsTab } from "./js/lookups.js";
+    import { loadDashboardTab } from "./js/dashboard.js";
 
     const portalState = { project: "", contactId: "" };
     const portalTitle = document.getElementById("portal-title");
@@ -36,6 +39,15 @@
     const selectorRow = document.getElementById("project-selector-row");
     const tabs = document.getElementById("tabs");
     const tabContent = document.getElementById("tab-content");
+
+    const tabMap = {
+      "1": { label: "Contacts", loader: loadContactsTab },
+      "2": { label: "Financials", loader: loadFinancialsTab },
+      "3": { label: "Notes", loader: loadNotesTab },
+      "4": { label: "Tasks", loader: loadTasksTab },
+      "5": { label: "Lookups", loader: loadLookupsTab },
+      "6": { label: "Dashboard", loader: loadDashboardTab }
+    };
 
     async function loadProjects() {
       try {
@@ -51,7 +63,6 @@
         const paramWasProvided = !!projectParamRaw;
 
         if (!projectParam) {
-          // No param → show dropdown
           selectorRow.style.display = "block";
           projectSelector.innerHTML = projects
             .map(p => `<option value="${p.project}">${p.display_name}</option>`)
@@ -62,6 +73,8 @@
           portalTitle.textContent = defaultProject.display_name || "Client Portal";
           pageTitle.textContent = defaultProject.display_name || "Client Portal";
           projectSelector.value = defaultProject.project;
+
+          renderTabs(defaultProject.enabled_tabs || []);
           tabs.style.display = "block";
 
           projectSelector.addEventListener("change", () => {
@@ -73,7 +86,6 @@
           });
 
         } else {
-          // Param was provided → validate
           const match = projects.find(p => String(p.project).toLowerCase() === projectParam.toLowerCase());
           if (!match) {
             tabs.style.display = "none";
@@ -82,10 +94,11 @@
             return;
           }
 
-          // Valid param → lock project, hide dropdown
           portalState.project = match.project;
           portalTitle.textContent = match.display_name || "Client Portal";
           pageTitle.textContent = match.display_name || "Client Portal";
+
+          renderTabs(match.enabled_tabs || []);
           tabs.style.display = "block";
         }
 
@@ -98,21 +111,28 @@
       }
     }
 
-    async function loadTab(tab) {
-      // 🔵 Apply .active class to top-level tabs
+    function renderTabs(enabledTabs) {
+      tabs.innerHTML = enabledTabs
+        .map(tabId => tabMap[tabId] ? `<button data-tab="${tabId}">${tabMap[tabId].label}</button>` : "")
+        .join("");
+
+      tabs.querySelectorAll("button[data-tab]").forEach(btn => {
+        btn.addEventListener("click", () => loadTab(btn.dataset.tab));
+      });
+    }
+
+    async function loadTab(tabId) {
       document.querySelectorAll("#tabs button").forEach(btn =>
         btn.classList.remove("active")
       );
-      document.querySelector(`#tabs button[data-tab="${tab}"]`)?.classList.add("active");
+      document.querySelector(`#tabs button[data-tab="${tabId}"]`)?.classList.add("active");
 
-      if (tab === "notes") {
+      const tab = tabMap[tabId];
+      if (tab && typeof tab.loader === "function") {
         tabContent.innerHTML = "";
-        await loadNotesTab({ portalState, tabContent });
+        await tab.loader({ portalState, tabContent });
       }
     }
-
-    // Wire up Notes tab click
-    document.querySelector("#tabs button[data-tab='notes']").addEventListener("click", () => loadTab("notes"));
 
     window.addEventListener("DOMContentLoaded", async () => {
       await loadProjects();
@@ -120,4 +140,3 @@
   </script>
 </body>
 </html>
-
