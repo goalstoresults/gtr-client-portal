@@ -1,4 +1,6 @@
 // contacts.js
+
+// Existing initializer
 export function initContacts({ container, portalState }) {
   const btnFind = container.querySelector("#btnFindContacts");
   const resultsDiv = container.querySelector("#contactsResults");
@@ -77,3 +79,20 @@ export function initContacts({ container, portalState }) {
 window.openContact = async function (contactId) {
   alert(`Open contact ${contactId} — hook this into a detail view later.`);
 };
+
+// ✅ New tab loader wrapper
+export async function loadContactsTab({ portalState, tabContent }) {
+  tabContent.innerHTML = `
+    <section class="card">
+      <h2>Contacts</h2>
+      <div class="row">
+        <input id="filter-first" placeholder="First name" />
+        <input id="filter-last" placeholder="Last name" />
+        <input id="filter-email" placeholder="Email" />
+        <button id="btnFindContacts">Find</button>
+      </div>
+      <div id="contactsResults" style="margin-top:16px;"></div>
+    </section>
+  `;
+  initContacts({ container: tabContent, portalState });
+}
