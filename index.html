@@ -59,9 +59,6 @@
         const projectParamRaw = urlParams.get("project");
         let projectParam = projectParamRaw ? projectParamRaw.trim() : "";
 
-        const validIds = projects.map(p => String(p.project).toLowerCase());
-        const paramWasProvided = !!projectParamRaw;
-
         if (!projectParam) {
           selectorRow.style.display = "block";
           projectSelector.innerHTML = projects
@@ -74,7 +71,8 @@
           pageTitle.textContent = defaultProject.display_name || "Client Portal";
           projectSelector.value = defaultProject.project;
 
-          renderTabs(defaultProject.enabled_tabs || []);
+          const enabledTabs = normalizeTabs(defaultProject.enabled_tabs);
+          renderTabs(enabledTabs);
           tabs.style.display = "block";
 
           projectSelector.addEventListener("change", () => {
@@ -98,7 +96,8 @@
           portalTitle.textContent = match.display_name || "Client Portal";
           pageTitle.textContent = match.display_name || "Client Portal";
 
-          renderTabs(match.enabled_tabs || []);
+          const enabledTabs = normalizeTabs(match.enabled_tabs);
+          renderTabs(enabledTabs);
           tabs.style.display = "block";
         }
 
@@ -109,6 +108,14 @@
         tabContent.innerHTML =
           `<section class="card"><p>Unable to load projects. Please try again later.</p></section>`;
       }
+    }
+
+    function normalizeTabs(raw) {
+      if (Array.isArray(raw)) return raw;
+      if (typeof raw === "string") {
+        try { return JSON.parse(raw); } catch { return []; }
+      }
+      return [];
     }
 
     function renderTabs(enabledTabs) {
