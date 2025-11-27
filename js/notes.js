@@ -64,14 +64,20 @@ async function loadNotesSubtab(subtab, portalState) {
 /* History (GET /notes-history-module) */
 async function renderHistory(container, portalState) {
   try {
-    const now = new Date(), sevenDaysAgo = new Date(now.getTime() - 7*24*60*60*1000);
-    const params = new URLSearchParams({
+    // --- Build default query ---
+    let params = new URLSearchParams({
       project: portalState.project,
-      table: "notes_history",
-      start_date: sevenDaysAgo.toISOString(),
-      end_date: now.toISOString(),
-      needs_review: "true"
+      needs_review: "true",
+      order: "created_at.desc"
     });
+
+    // --- Check for user-entered filters ---
+    const fromDate = document.getElementById("filter-from")?.value;
+    const toDate   = document.getElementById("filter-to")?.value;
+
+    if (fromDate) params.append("created_at", `gte.${fromDate}`);
+    if (toDate)   params.append("created_at", `lte.${toDate}`);
+
     const url = `https://notes-history-module.dennis-e64.workers.dev?${params}`;
     const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
@@ -81,7 +87,17 @@ async function renderHistory(container, portalState) {
       return;
     }
 
-    container.innerHTML = `<h4>Notes History</h4>`;
+    // --- Build UI ---
+    container.innerHTML = `
+      <h4>Notes History (Total: ${data.notes.length})</h4>
+      <div style="margin-bottom:12px;">
+        <label>From: <input type="date" id="filter-from"></label>
+        <label style="margin-left:12px;">To: <input type="date" id="filter-to"></label>
+        <button id="btnApplyFilter" class="secondary" style="margin-left:12px;">Apply Filter</button>
+        <button id="btnClearFilter" class="secondary" style="margin-left:12px;">Clear Filter</button>
+      </div>
+    `;
+
     const table = document.createElement("table");
     table.className = "notes-table";
     table.innerHTML = `
@@ -117,29 +133,40 @@ async function renderHistory(container, portalState) {
     `;
     container.appendChild(table);
 
-    // Attach Review button handlers
+    // --- Attach Review button handlers ---
     table.querySelectorAll("button[data-note-id]").forEach(btn =>
       btn.addEventListener("click", () => {
         const noteId = btn.getAttribute("data-note-id");
         portalState.selectedNoteId = noteId;
         console.log("[History] Selected note ID:", noteId);
 
-        // Enable Review and Relationships tabs
         setSubtabEnabled("review", true);
         setSubtabEnabled("relationships", true);
 
-        // 🔧 Switch tab highlight to Review
         document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
         document.querySelector('#notes-subtabs button[data-subtab="review"]')?.classList.add("active");
 
-        // 🔄 Render Review content
         renderReview(container, portalState, noteId);
       })
     );
+
+    // --- Attach filter button handlers ---
+    document.getElementById("btnApplyFilter").addEventListener("click", () => {
+      renderHistory(container, portalState); // re-run with filters
+    });
+
+    document.getElementById("btnClearFilter").addEventListener("click", () => {
+      // Clear inputs and reload default view
+      document.getElementById("filter-from").value = "";
+      document.getElementById("filter-to").value = "";
+      renderHistory(container, portalState);
+    });
+
   } catch (err) {
     container.innerHTML = `<p>Error loading history: ${err.message}</p>`;
   }
 }
+
 
 
 /* Add (POST /notes-history-module) */
