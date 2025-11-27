@@ -728,51 +728,50 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
   });
 });
 
+// --- Step 5: Populate existing contact relationships ---
+const relUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships?project=${project}&source_contact_id=${portalState.clientId}`;
+try {
+  const relRes = await fetch(relUrl);
+  const relData = await relRes.json();
 
-    
-    // --- Step 5: Populate existing contact relationships ---
-    const relUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships?project=${project}&source_contact_id=${portalState.clientId}`;
-    try {
-      const relRes = await fetch(relUrl);
-      const relData = await relRes.json();
-
-      const existingGrid = document.getElementById("existingRelGrid");
-      if (Array.isArray(relData) && relData.length > 0) {
-        existingGrid.innerHTML = `
-        <table class="notes-table">
-          <thead>
-            <tr>
-              <th>Related Name</th>
-              <th>Relationship Type</th>
-              <th>Relationship Role</th>
-              <th>Created At</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${relData.map(r => {
-              const relatedName = r.contacts
-                ? `${r.contacts.first_name} ${r.contacts.last_name}`.trim()
-                : "(unknown)";
-              return `
-                <tr>
-                  <td>${escapeHtml(relatedName)}</td>
-                  <td>${escapeHtml(r.relationship_type || "")}</td>
-                  <td>${escapeHtml(r.relationship_role || "")}</td>
-                  <td>${escapeHtml(r.created_at || "")}</td>
-                </tr>
-              `;
-            }).join("")}
-          </tbody>
-        </table>
-        `;
-      } else {
-        existingGrid.innerHTML = "<p>No existing relationships found.</p>";
-      }
-    } catch (err) {
-      console.error("Existing relationships fetch error:", err);
-      document.getElementById("existingRelGrid").innerHTML = "<p>Error loading existing relationships.</p>";
-    }
+  const existingGrid = document.getElementById("existingRelGrid");
+  if (Array.isArray(relData) && relData.length > 0) {
+    existingGrid.innerHTML = `
+      <table class="notes-table">
+        <thead>
+          <tr>
+            <th>Related Name</th>
+            <th>Relationship Type</th>
+            <th>Relationship Role</th>
+            <th>Created At</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${relData.map(r => {
+            const relatedName = r.contacts
+              ? `${r.contacts.first_name} ${r.contacts.last_name}`.trim()
+              : "(unknown)";
+            return `
+              <tr>
+                <td>${escapeHtml(relatedName)}</td>
+                <td>${escapeHtml(r.relationship_type || "")}</td>
+                <td>${escapeHtml(r.relationship_role || "")}</td>
+                <td>${escapeHtml(r.created_at || "")}</td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    `;
+  } else {
+    existingGrid.innerHTML = "<p>No existing relationships found.</p>";
   }
+} catch (err) {
+  console.error("Existing relationships fetch error:", err);
+  document.getElementById("existingRelGrid").innerHTML = "<p>Error loading existing relationships.</p>";
+}
+
+
   
 // --- Step 6: Save Relationships handler ---
 document.getElementById("btnSaveRelationships").addEventListener("click", async () => {
