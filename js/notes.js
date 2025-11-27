@@ -67,16 +67,21 @@ async function renderHistory(container, portalState) {
     // --- Build query filters ---
     let filters = [`project=eq.${portalState.project}`];
 
-    const fromDate = document.getElementById("filter-from")?.value;
-    const toDate   = document.getElementById("filter-to")?.value;
-    const reviewOnly = document.getElementById("filter-review-only")?.checked ?? true;
+    // Grab filter inputs if they exist
+    const fromDateEl = document.getElementById("filter-from");
+    const toDateEl   = document.getElementById("filter-to");
+    const reviewOnlyEl = document.getElementById("filter-review-only");
 
-    // Default: Needs Review Only checked
+    const fromDate = fromDateEl ? fromDateEl.value : "";
+    const toDate   = toDateEl ? toDateEl.value : "";
+    const reviewOnly = reviewOnlyEl ? reviewOnlyEl.checked : true; // default true
+
     if (reviewOnly) filters.push("needs_review=eq.true");
-    if (fromDate) filters.push(`created_at=gte.${fromDate}`);
-    if (toDate)   filters.push(`created_at=lte.${toDate}`);
+    if (fromDate)   filters.push(`created_at=gte.${fromDate}`);
+    if (toDate)     filters.push(`created_at=lte.${toDate}`);
 
-    const url = `https://notes-history-module.dennis-e64.workers.dev?${filters.join("&")}&order=created_at.desc`;
+    // Always hit the notes_history endpoint
+    const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${filters.join("&")}&order=created_at.desc`;
     const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
 
