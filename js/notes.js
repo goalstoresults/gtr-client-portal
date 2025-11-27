@@ -70,7 +70,7 @@ async function renderHistory(container, portalState) {
       table: "notes_history",
       start_date: sevenDaysAgo.toISOString(),
       end_date: now.toISOString(),
-      needs_review: "true"
+      needs_review: "eq.true"
     });
     const url = `https://notes-history-module.dennis-e64.workers.dev?${params}`;
     const res = await fetch(url, { cache: "no-cache" });
