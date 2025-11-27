@@ -603,10 +603,17 @@ async function renderRelationships(container, portalState) {
           <tbody id="relationshipsGrid"></tbody>
         </table>
 
-        <button id="btnSavePromotions" class="primary"
-                style="margin-top:12px; background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
-          Save Promotions
-        </button>
+        <div style="margin-top:12px;">
+          <button id="btnSaveRelationships" class="primary"
+                  style="background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
+            Save Relationships
+          </button>
+          <label style="margin-left:12px;">
+            <input type="checkbox" id="chkReviewComplete" checked />
+            Review Complete
+          </label>
+        </div>
+
       </section>
     `;
 
@@ -766,106 +773,119 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
       document.getElementById("existingRelGrid").innerHTML = "<p>Error loading existing relationships.</p>";
     }
 
-    // --- Step 6: Save Promotions handler ---
-    document.getElementById("btnSavePromotions").addEventListener("click", async () => {
-      const promoteRows = [...grid.querySelectorAll("tr")].filter(r => r.querySelector(".promote-checkbox")?.checked);
+// --- Step 6: Save Relationships handler ---
+document.getElementById("btnSaveRelationships").addEventListener("click", async () => {
+  const promoteRows = [...grid.querySelectorAll("tr")].filter(r => r.querySelector(".promote-checkbox")?.checked);
 
-      if (promoteRows.length === 0) {
-        alert("No promotions selected.");
-        return;
-      }
-
-      for (const row of promoteRows) {
-        const relId = row.dataset.relid;
-        const contactId = row.querySelector("td:nth-child(4)").textContent.trim();
-        const type = row.querySelector("td:nth-child(2) select").value.trim();
-        const role = row.querySelector("td:nth-child(3) select").value.trim();
-
-        if (!contactId) {
-          alert("❌ Cannot promote relationship without a Contact ID.");
-          continue;
-        }
-        if (!role || !type) {
-          alert("❌ Relationship Type and Role cannot be blank.");
-          continue;
-        }
-
-        // Step 1: PATCH notes_relationships
-        const contactName = row.querySelector(".rel-contact-name").textContent.trim();
-        const contactType = row.querySelector(".rel-contact-type").textContent.trim();
-        const contactEmail = row.querySelector(".rel-contact-email").textContent.trim();
-        
-        const patchPayload = {
-          relationship_type: type,
-          relationship_role: role,
-          contact_id: contactId,
-          contact_name: contactName,
-          contact_type: contactType,
-          contact_email: contactEmail
-        };
-
-        try {
-          const patchRes = await fetch(
-            `https://notes-history-module.dennis-e64.workers.dev/notes_relationships?id=eq.${relId}`,
-            {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(patchPayload)
-            }
-          );
-          if (!patchRes.ok) {
-            const patchText = await patchRes.text();
-            alert(`❌ Failed to update note relationship: ${patchText}`);
-            continue;
-          }
-        } catch (err) {
-          console.error("PATCH error:", err);
-          alert("Network error while updating note relationship.");
-          continue;
-        }
-
-        // Step 2: POST contact_relationships
-        const insertPayload = {
-          project: portalState.project,
-          source_contact_id: portalState.clientId,
-          related_contact_id: contactId,
-          relationship_role: role,
-          relationship_type: type,
-          notes: "", // schema has notes, not email
-          created_at: new Date().toISOString()
-        };
-
-        console.log("[SavePromotions] Insert payload:", JSON.stringify(insertPayload, null, 2));
-
-        try {
-          const res = await fetch("https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(insertPayload)
-          });
-
-          const text = await res.text();
-          console.log("[SavePromotions] POST contact_relationships:", res.status, text);
-
-          if (!res.ok) {
-            alert(`❌ Failed to save promotion: ${text}`);
-          } else {
-            console.log("Promotion saved successfully");
-          }
-        } catch (err) {
-          console.error("Promotion error:", err);
-          alert("Network error while saving promotion.");
-        }
-      }
-
-      alert("✅ Promotions attempted.");
-      renderRelationships(container, portalState); // refresh
-    });
-  } catch (err) {
-    console.error(err);
-    container.innerHTML = `<p>Error loading relationships: ${err.message}</p>`;
+  if (promoteRows.length === 0) {
+    alert("No relationships selected.");
+    return;
   }
-}
+
+  for (const row of promoteRows) {
+    const relId = row.dataset.relid;
+    const contactId = row.querySelector("td:nth-child(4)").textContent.trim();
+    const type = row.querySelector("td:nth-child(2) select").value.trim();
+    const role = row.querySelector("td:nth-child(3) select").value.trim();
+
+    if (!contactId) {
+      alert("❌ Cannot save relationship without a Contact ID.");
+      continue;
+    }
+    if (!role || !type) {
+      alert("❌ Relationship Type and Role cannot be blank.");
+      continue;
+    }
+
+    // Step 1: PATCH notes_relationships
+    const contactName = row.querySelector(".rel-contact-name").textContent.trim();
+    const contactType = row.querySelector(".rel-contact-type").textContent.trim();
+    const contactEmail = row.querySelector(".rel-contact-email").textContent.trim();
+
+    const patchPayload = {
+      relationship_type: type,
+      relationship_role: role,
+      contact_id: contactId,
+      contact_name: contactName,
+      contact_type: contactType,
+      contact_email: contactEmail
+    };
+
+    try {
+      const patchRes = await fetch(
+        `https://notes-history-module.dennis-e64.workers.dev/notes_relationships?id=eq.${relId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patchPayload)
+        }
+      );
+      if (!patchRes.ok) {
+        const patchText = await patchRes.text();
+        alert(`❌ Failed to update note relationship: ${patchText}`);
+        continue;
+      }
+    } catch (err) {
+      console.error("PATCH error:", err);
+      alert("Network error while updating note relationship.");
+      continue;
+    }
+
+    // Step 2: POST contact_relationships
+    const insertPayload = {
+      project: portalState.project,
+      source_contact_id: portalState.clientId,
+      related_contact_id: contactId,
+      relationship_role: role,
+      relationship_type: type,
+      notes: "", // schema has notes, not email
+      created_at: new Date().toISOString()
+    };
+
+    console.log("[SaveRelationships] Insert payload:", JSON.stringify(insertPayload, null, 2));
+
+    try {
+      const res = await fetch("https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(insertPayload)
+      });
+
+      const text = await res.text();
+      console.log("[SaveRelationships] POST contact_relationships:", res.status, text);
+
+      if (!res.ok) {
+        alert(`❌ Failed to save relationship: ${text}`);
+      } else {
+        console.log("Relationship saved successfully");
+      }
+    } catch (err) {
+      console.error("Relationship error:", err);
+      alert("Network error while saving relationship.");
+    }
+  }
+
+  // ✅ Handle Review Complete checkbox
+  const reviewComplete = document.getElementById("chkReviewComplete").checked;
+  if (reviewComplete) {
+    try {
+      await fetch(
+        `https://notes-history-module.dennis-e64.workers.dev/notes_history?id=eq.${noteId}&project=eq.${project}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ needs_review: false })
+        }
+      );
+      console.log("Note marked as reviewed.");
+    } catch (err) {
+      console.error("Failed to update needs_review:", err);
+    }
+  }
+
+  alert("✅ Relationships saved.");
+  renderRelationships(container, portalState); // refresh
+});
 
 
 /* -------------------------
