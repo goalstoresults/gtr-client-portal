@@ -9,6 +9,9 @@
 <body>
   <header>
     <h1 id="portal-title">Client Portal</h1>
+    <!-- Debug display for enabled_tabs -->
+    <div id="enabled-tabs-display" style="margin-top:8px; color:#555; font-size:0.9em;"></div>
+
     <div id="project-selector-row" style="display:none;">
       <label for="project-selector">Project:</label>
       <select id="project-selector"></select>
@@ -21,7 +24,7 @@
   <div id="tab-content"></div>
 
   <footer style="margin-top:20px; text-align:center; color:#666;">
-    <small>Portal Version: 1.3.1</small>
+    <small>Portal Version: 1.3.2</small>
   </footer>
 
   <script type="module">
@@ -39,6 +42,7 @@
     const selectorRow = document.getElementById("project-selector-row");
     const tabs = document.getElementById("tabs");
     const tabContent = document.getElementById("tab-content");
+    const enabledTabsDisplay = document.getElementById("enabled-tabs-display");
 
     const tabMap = {
       "1": { label: "Contacts", loader: loadContactsTab },
@@ -71,7 +75,7 @@
           pageTitle.textContent = defaultProject.display_name || "Client Portal";
           projectSelector.value = defaultProject.project;
 
-          const enabledTabs = normalizeTabs(defaultProject.enabled_tabs);
+          const enabledTabs = showEnabledTabs(defaultProject.enabled_tabs);
           renderTabs(enabledTabs);
           tabs.style.display = "block";
 
@@ -96,7 +100,7 @@
           portalTitle.textContent = match.display_name || "Client Portal";
           pageTitle.textContent = match.display_name || "Client Portal";
 
-          const enabledTabs = normalizeTabs(match.enabled_tabs);
+          const enabledTabs = showEnabledTabs(match.enabled_tabs);
           renderTabs(enabledTabs);
           tabs.style.display = "block";
         }
@@ -116,6 +120,12 @@
         try { return JSON.parse(raw); } catch { return []; }
       }
       return [];
+    }
+
+    function showEnabledTabs(raw) {
+      const enabledTabs = normalizeTabs(raw);
+      enabledTabsDisplay.textContent = "Enabled tabs: " + JSON.stringify(enabledTabs);
+      return enabledTabs;
     }
 
     function renderTabs(enabledTabs) {
