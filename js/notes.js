@@ -64,21 +64,19 @@ async function loadNotesSubtab(subtab, portalState) {
 /* History (GET /notes-history-module) */
 async function renderHistory(container, portalState) {
   try {
-    // --- Build default query ---
-    let params = new URLSearchParams({
-      project: portalState.project,
-      needs_review: "true",
-      order: "created_at.desc"
-    });
+    // --- Build query filters ---
+    let filters = [`project=eq.${portalState.project}`];
 
-    // --- Check for user-entered filters ---
     const fromDate = document.getElementById("filter-from")?.value;
     const toDate   = document.getElementById("filter-to")?.value;
+    const reviewOnly = document.getElementById("filter-review-only")?.checked ?? true;
 
-    if (fromDate) params.append("created_at", `gte.${fromDate}`);
-    if (toDate)   params.append("created_at", `lte.${toDate}`);
+    // Default: Needs Review Only checked
+    if (reviewOnly) filters.push("needs_review=eq.true");
+    if (fromDate) filters.push(`created_at=gte.${fromDate}`);
+    if (toDate)   filters.push(`created_at=lte.${toDate}`);
 
-    const url = `https://notes-history-module.dennis-e64.workers.dev?${params}`;
+    const url = `https://notes-history-module.dennis-e64.workers.dev?${filters.join("&")}&order=created_at.desc`;
     const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
 
@@ -93,6 +91,10 @@ async function renderHistory(container, portalState) {
       <div style="margin-bottom:12px;">
         <label>From: <input type="date" id="filter-from"></label>
         <label style="margin-left:12px;">To: <input type="date" id="filter-to"></label>
+        <label style="margin-left:12px;">
+          <input type="checkbox" id="filter-review-only" checked>
+          Needs Review Only
+        </label>
         <button id="btnApplyFilter" class="secondary" style="margin-left:12px;">Apply Filter</button>
         <button id="btnClearFilter" class="secondary" style="margin-left:12px;">Clear Filter</button>
       </div>
@@ -156,9 +158,10 @@ async function renderHistory(container, portalState) {
     });
 
     document.getElementById("btnClearFilter").addEventListener("click", () => {
-      // Clear inputs and reload default view
+      // Clear inputs and reset checkbox
       document.getElementById("filter-from").value = "";
       document.getElementById("filter-to").value = "";
+      document.getElementById("filter-review-only").checked = true;
       renderHistory(container, portalState);
     });
 
@@ -166,7 +169,6 @@ async function renderHistory(container, portalState) {
     container.innerHTML = `<p>Error loading history: ${err.message}</p>`;
   }
 }
-
 
 
 /* Add (POST /notes-history-module) */
@@ -197,7 +199,6 @@ function renderAdd(container, portalState) {
   });
 }
 
-/* Review (GET /note_review) */
 /* Review (GET /note_review) */
 async function renderReview(container, portalState, noteId) {
   console.log("[Review] Called with noteId:", noteId);
