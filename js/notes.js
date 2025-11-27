@@ -676,15 +676,17 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
     const row = e.target.closest("tr");
     const relId = row.dataset.relid;
 
-    // --- Validation commented out ---
-    /*
-    const type = row.querySelector(".rel-type")?.value.trim();
-    const role = row.querySelector(".rel-role")?.value.trim();
-    if (!type || !role) {
-      alert("Relationship Type and Role cannot be blank.");
+    const typeSelect = row.querySelector(".rel-type select");
+    const roleSelect = row.querySelector(".rel-role select");
+    
+    const type = typeSelect?.value?.trim();
+    const role = roleSelect?.value?.trim();
+    
+    if (!type || type === "Select" || !role || role === "Select") {
+      alert("❌ Please select both Relationship Type and Role before searching for a contact.");
       return;
     }
-    */
+    
 
     // ✅ Always render the inline search form
     row.querySelector("td:last-child").innerHTML = `
