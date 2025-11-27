@@ -921,7 +921,6 @@ document.getElementById("btnSaveRelationships").addEventListener("click", async 
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            // If your API expects PostgREST preferences, include:
             "Prefer": "return=representation"
           },
           body: JSON.stringify(payload)
