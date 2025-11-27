@@ -887,6 +887,13 @@ document.getElementById("btnSaveRelationships").addEventListener("click", async 
   renderRelationships(container, portalState); // refresh
 });
 
+} catch (err) {
+  console.error("renderRelationships error:", err);
+  container.innerHTML = `<p>Error loading relationships: ${err.message}</p>`;
+}
+} // end of renderRelationships
+    
+    
 
 /* -------------------------
    Utils
