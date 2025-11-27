@@ -772,7 +772,8 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
       console.error("Existing relationships fetch error:", err);
       document.getElementById("existingRelGrid").innerHTML = "<p>Error loading existing relationships.</p>";
     }
-
+  }
+  
 // --- Step 6: Save Relationships handler ---
 document.getElementById("btnSaveRelationships").addEventListener("click", async () => {
   const promoteRows = [...grid.querySelectorAll("tr")].filter(r => r.querySelector(".promote-checkbox")?.checked);
