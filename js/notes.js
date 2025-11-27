@@ -659,7 +659,13 @@ async function renderRelationships(container, portalState) {
         <td class="rel-role">${buildDropdown(roles, r.relationship_role)}</td>
         <td class="rel-contact-id">${escapeHtml(r.contact_id || "")}</td>
         <td class="rel-contact-name">${escapeHtml(r.contact_name || "")}</td>
-        <td><input type="text" class="contact-type-input" value="${escapeHtml(r.contact_type || "")}" style="width:120px;"></td>
+        <td>
+          <input type="text"
+                 class="contact-type-input"
+                 value="${escapeHtml(r.contact_type || "")}"
+                 style="width:120px;"
+                 ${!r.contact_id ? "disabled" : ""}>
+        </td>
         <td class="rel-contact-email">${escapeHtml(r.contact_email || "")}</td>
         <td>
           ${
