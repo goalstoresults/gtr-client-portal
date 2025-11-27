@@ -870,11 +870,17 @@ document.getElementById("btnSaveRelationships").addEventListener("click", async 
   if (reviewComplete) {
     try {
       await fetch(
-        `https://notes-history-module.dennis-e64.workers.dev/notes_history?id=eq.${noteId}&project=eq.${project}`,
+        "https://notes-history-module.dennis-e64.workers.dev/notes_history",
         {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ needs_review: false })
+          headers: {
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+          },
+          body: JSON.stringify({
+            id: noteId,
+            updates: { needs_review: false }
+          })
         }
       );
       console.log("Note marked as reviewed.");
@@ -882,6 +888,7 @@ document.getElementById("btnSaveRelationships").addEventListener("click", async 
       console.error("Failed to update needs_review:", err);
     }
   }
+
 
   alert("✅ Relationships saved.");
   renderRelationships(container, portalState); // refresh
