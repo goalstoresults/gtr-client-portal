@@ -911,26 +911,18 @@ document.getElementById("btnSaveRelationships").addEventListener("click", async 
     // Step 3: PATCH contacts table to update master contact_type
     if (contactId && contactType) {
       try {
-        const url = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?contact_id=eq.${encodeURIComponent(contactId)}`;
-        const payload = { contact_type: contactType };
-    
-        console.log("[PATCH contacts] URL:", url);
-        console.log("[PATCH contacts] Payload:", payload);
-    
-        const contactPatchRes = await fetch(url, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "Prefer": "return=representation"
-          },
-          body: JSON.stringify(payload)
-        });
-    
-        const responseText = await contactPatchRes.text();
-        console.log("[PATCH contacts] Status:", contactPatchRes.status, responseText);
+        const contactPatchRes = await fetch(
+          `https://client-portal-api.dennis-e64.workers.dev/api/contacts?contact_id=eq.${contactId}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contact_type: contactType })
+          }
+        );
     
         if (!contactPatchRes.ok) {
-          console.warn(`⚠️ Failed to update contact_type in contacts: ${responseText}`);
+          const errText = await contactPatchRes.text();
+          console.warn(`⚠️ Failed to update contact_type in contacts: ${errText}`);
         } else {
           console.log(`✅ Contact ${contactId} type updated to ${contactType}`);
         }
@@ -938,7 +930,7 @@ document.getElementById("btnSaveRelationships").addEventListener("click", async 
         console.error("Contact PATCH error:", err);
       }
     }
-
+  }
 
   // ✅ Handle Review Complete checkbox
   const reviewComplete = document.getElementById("chkReviewComplete").checked;
