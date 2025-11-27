@@ -64,11 +64,15 @@ async function loadNotesSubtab(subtab, portalState) {
 /* History (GET /notes-history-module) */
 async function renderHistory(container, portalState) {
   try {
-    // --- Build default query ---
-    const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?project=eq.${portalState.project}&needs_review=eq.true&order=created_at.desc`;
-
-    console.log("[History] Fetching:", url);
-
+    const now = new Date(), sevenDaysAgo = new Date(now.getTime() - 7*24*60*60*1000);
+    const params = new URLSearchParams({
+      project: portalState.project,
+      table: "notes_history",
+      start_date: sevenDaysAgo.toISOString(),
+      end_date: now.toISOString(),
+      needs_review: "true"
+    });
+    const url = `https://notes-history-module.dennis-e64.workers.dev?${params}`;
     const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
 
@@ -77,9 +81,7 @@ async function renderHistory(container, portalState) {
       return;
     }
 
-    // --- Build UI ---
-    container.innerHTML = `<h4>Notes History (Total: ${data.notes.length})</h4>`;
-
+    container.innerHTML = `<h4>Notes History</h4>`;
     const table = document.createElement("table");
     table.className = "notes-table";
     table.innerHTML = `
@@ -115,23 +117,25 @@ async function renderHistory(container, portalState) {
     `;
     container.appendChild(table);
 
-    // --- Attach Review button handlers ---
+    // Attach Review button handlers
     table.querySelectorAll("button[data-note-id]").forEach(btn =>
       btn.addEventListener("click", () => {
         const noteId = btn.getAttribute("data-note-id");
         portalState.selectedNoteId = noteId;
         console.log("[History] Selected note ID:", noteId);
 
+        // Enable Review and Relationships tabs
         setSubtabEnabled("review", true);
         setSubtabEnabled("relationships", true);
 
+        // 🔧 Switch tab highlight to Review
         document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
         document.querySelector('#notes-subtabs button[data-subtab="review"]')?.classList.add("active");
 
+        // 🔄 Render Review content
         renderReview(container, portalState, noteId);
       })
     );
-
   } catch (err) {
     container.innerHTML = `<p>Error loading history: ${err.message}</p>`;
   }
@@ -166,6 +170,7 @@ function renderAdd(container, portalState) {
   });
 }
 
+/* Review (GET /note_review) */
 /* Review (GET /note_review) */
 async function renderReview(container, portalState, noteId) {
   console.log("[Review] Called with noteId:", noteId);
