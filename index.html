@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title id="page-title">Client Portal</title>
+  <title id="page-title"></title>
   <link rel="stylesheet" href="style.css" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 </head>
 <body>
   <header>
-    <h1 id="portal-title">Client Portal</h1>
+    <h1 id="portal-title"></h1>
     <div id="project-selector-row" style="display:none;">
       <label for="project-selector">Project:</label>
       <select id="project-selector"></select>
@@ -60,15 +60,15 @@
         let projectParam = projectParamRaw ? projectParamRaw.trim() : "";
 
         if (!projectParam) {
-          // No project param → show generic Client Portal and selector
+          // No project param → show blank title and selector
           selectorRow.style.display = "block";
           projectSelector.innerHTML = projects
             .map(p => `<option value="${p.project}">${p.display_name}</option>`)
             .join("");
 
           portalState.project = ""; // nothing selected yet
-          portalTitle.textContent = "Client Portal";
-          pageTitle.textContent = "Client Portal";
+          portalTitle.textContent = "";
+          pageTitle.textContent = "";
           tabs.style.display = "none";
 
           projectSelector.addEventListener("change", () => {
@@ -96,8 +96,8 @@
           }
 
           portalState.project = match.project;
-          portalTitle.textContent = match.display_name || "Client Portal";
-          pageTitle.textContent = match.display_name || "Client Portal";
+          portalTitle.textContent = match.display_name || "";
+          pageTitle.textContent = match.display_name || "";
 
           const enabledTabs = normalizeTabs(match.enabled_tabs);
           renderTabs(enabledTabs);
