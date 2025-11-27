@@ -751,7 +751,11 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
               // Hydrate the row with selected contact info
               row.querySelector(".rel-contact-id").textContent = el.dataset.contactid || "";
               row.querySelector(".rel-contact-name").textContent = el.dataset.name || "";
-              row.querySelector(".rel-contact-type").textContent = el.dataset.type || "";
+              const typeInput = row.querySelector(".contact-type-input");
+              if (typeInput) {
+                typeInput.value = el.dataset.type || "";
+                typeInput.disabled = false;
+              }
               row.querySelector(".rel-contact-email").textContent = el.dataset.email || "";
           
               // Swap Action cell to promotion checkbox
