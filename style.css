@@ -26,7 +26,7 @@ header h1 {
   gap: 8px;
 }
 
-/* Top-level tabs with improved definition */
+/* Top-level tabs with GTR gold styling */
 nav#tabs {
   display: flex;
   gap: 10px;
@@ -34,33 +34,33 @@ nav#tabs {
 }
 nav#tabs button {
   padding: 8px 16px;
-  background: #f0f0f0;
-  border: 1px solid #ccc;
+  background: #fef9e7; /* light gold base */
+  border: 1px solid #c9a227; /* sharp gold border */
   border-radius: 6px;
-  color: #333;
+  color: #444;
   cursor: pointer;
   transition: background 0.2s ease, box-shadow 0.2s ease;
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 nav#tabs button:hover {
-  background: #e0e0e0;
+  background: #fbe8b0; /* hover gold */
   box-shadow: 0 2px 4px rgba(0,0,0,0.08);
 }
 nav#tabs button.active {
-  background: #4a90e2;
+  background: #c9a227; /* solid gold active */
   color: #fff;
   font-weight: 600;
-  border-color: #4a90e2;
+  border-color: #c9a227;
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 nav#tabs button.disabled {
-  background: #f5f5f5;
+  background: #fdf6e3;
   color: #999;
   cursor: not-allowed;
-  border: 1px solid #ddd;
+  border: 1px solid #e0d8b0;
 }
 
-/* Notes subtabs styled as folder tabs */
+/* Notes subtabs styled as folder tabs (blue scheme) */
 nav#notes-subtabs {
   display: flex;
   gap: 4px;
