@@ -1,5 +1,5 @@
-// js/lookups.js v1.4.0
-// Lookup tab with inline editable rows, Save/Delete actions, Add Group inline form
+// js/lookups.js v1.5.0
+// Lookup tab with inline editable rows, Save/Delete actions, Add Group + Add Value inline forms
 
 console.log("[Lookups.js] loaded");
 
@@ -97,12 +97,12 @@ export async function loadLookupsTab({ portalState, tabContent }) {
               </td>
               <td>
                 <button class="saveNewGroupBtn" style="background:#2979ff;color:#fff;border:none;border-radius:4px;padding:6px 12px;">Save</button>
+                <button class="cancelNewGroupBtn" style="background:#999;color:#fff;border:none;border-radius:4px;padding:6px 12px;margin-left:6px;">Cancel</button>
               </td>
             </tr>
           </tbody>
         </table>
       `;
-      // 👇 Insert right under the Add Group button
       addGroupBtn.insertAdjacentElement("afterend", addRow);
 
       addRow.querySelector(".saveNewGroupBtn").addEventListener("click", async () => {
@@ -132,6 +132,10 @@ export async function loadLookupsTab({ portalState, tabContent }) {
         });
 
         loadLookupsTab({ portalState, tabContent });
+      });
+
+      addRow.querySelector(".cancelNewGroupBtn").addEventListener("click", () => {
+        addRow.remove();
       });
     });
 
@@ -166,24 +170,91 @@ export async function loadLookupsTab({ portalState, tabContent }) {
 
       if (e.target.classList.contains("addValueBtn")) {
         const type = e.target.dataset.type;
-        const val = prompt(`Enter new value for group "${type}":`);
-        if (!val) return;
+        const groupSection = e.target.closest(".lookup-group");
+        const tbody = groupSection.querySelector("tbody");
 
-        const lastRow = grouped[type][grouped[type].length - 1];
-        const nextSort = lastRow ? lastRow.sort_order + 10 : 10;
+        const lastRow = tbody.querySelector("tr:last-child");
+        const lastSort = lastRow ? parseInt(lastRow.querySelector(".sortInput")?.value || lastRow.querySelector("td:nth-child(2)")?.textContent, 10) : 0;
+        const nextSort = (isNaN(lastSort) ? 0 : lastSort) + 10;
 
-        await fetch("https://lookups-module.dennis-e64.workers.dev/lookups/addValue", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        const newRow = document.createElement("tr");
+        newRow.innerHTML = `
+          <td><input type="text" class="newValueInput" placeholder="New value"></td>
+          <td><input type="number" class="newSortInput" value="${nextSort}" style="width:70px;"></td>
+          <td>
+            <select class="newActiveDropdown">
+              <option value="true" selected>Yes</option>
+              <option value="false">No</option>
+            </select>
+          </td>
+          <td>
+            <button class="saveNewValueBtn" style="background:#2979ff;color:#fff;border:none;border-radius:4px;padding:6px 12px;">Save</button>
+            <button class="cancelNewValueBtn" style="background:#999;color:#fff;border:none;border-radius:4px;padding:6px 12px;margin-left:6px;">Cancel</button>
+          </td>
+        `;
+        tbody.appendChild(newRow);
+
+                newRow.querySelector(".saveNewValueBtn").addEventListener("click", async () => {
+          const value = newRow.querySelector(".newValueInput").value.trim();
+          const sort = parseInt(newRow.querySelector(".newSortInput").value, 10);
+          const active = newRow.querySelector(".newActiveDropdown").value === "true";
+
+          if (!value) {
+            alert("Please enter a value.");
+            return;
+          }
+
+          const payload = {
             lookup_type: type,
-            value: val,
-            sort_order: nextSort,
+            value,
+            sort_order: sort,
+            is_active: active,
             project: portalState.project,
             created_at: new Date().toISOString()
-          })
+          };
+
+          await fetch("https://lookups-module.dennis-e64.workers.dev/lookups/addValue", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+
+          // Refresh the tab to show the new row
+          loadLookupsTab({ portalState, tabContent });
         });
-        loadLookupsTab({ portalState, tabContent });
+
+        newRow.querySelector(".saveNewValueBtn").addEventListener("click", async () => {
+          const value = newRow.querySelector(".newValueInput").value.trim();
+          const sort = parseInt(newRow.querySelector(".newSortInput").value, 10);
+          const active = newRow.querySelector(".newActiveDropdown").value === "true";
+
+          if (!value) {
+            alert("Please enter a value.");
+            return;
+          }
+
+          const payload = {
+            lookup_type: type,
+            value,
+            sort_order: sort,
+            is_active: active,
+            project: portalState.project,
+            created_at: new Date().toISOString()
+          };
+
+          await fetch("https://lookups-module.dennis-e64.workers.dev/lookups/addValue", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+
+          // Refresh the tab to show the new row
+          loadLookupsTab({ portalState, tabContent });
+        });
+
+        newRow.querySelector(".cancelNewValueBtn").addEventListener("click", () => {
+          newRow.remove();
+        });
       }
     });
 
@@ -197,3 +268,4 @@ function escapeHtml(str) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[c])) || "";
 }
+
