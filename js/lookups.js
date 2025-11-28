@@ -33,7 +33,7 @@ export async function loadLookupsTab({ portalState, tabContent }) {
     groupsDiv.innerHTML = Object.keys(grouped).map(type => `
       <section class="lookup-group card" style="margin-bottom:24px;">
         <h3>${escapeHtml(type)}</h3>
-        <table class="portal-table striped">
+        <table class="notes-table">
           <thead>
             <tr>
               <th>Value</th>
