@@ -1,4 +1,4 @@
-// js/lookups.js v1.3.0
+// js/lookups.js v1.4.0
 // Lookup tab with inline editable rows, Save/Delete actions, Add Group inline form
 
 console.log("[Lookups.js] loaded");
@@ -70,7 +70,8 @@ export async function loadLookupsTab({ portalState, tabContent }) {
     `).join("");
 
     // --- Add Group inline form ---
-    tabContent.querySelector("#addGroupBtn").addEventListener("click", () => {
+    const addGroupBtn = tabContent.querySelector("#addGroupBtn");
+    addGroupBtn.addEventListener("click", () => {
       const addRow = document.createElement("div");
       addRow.innerHTML = `
         <table class="notes-table" style="margin-top:12px;">
@@ -101,7 +102,8 @@ export async function loadLookupsTab({ portalState, tabContent }) {
           </tbody>
         </table>
       `;
-      tabContent.querySelector("#lookupGroups").prepend(addRow);
+      // 👇 Insert right under the Add Group button
+      addGroupBtn.insertAdjacentElement("afterend", addRow);
 
       addRow.querySelector(".saveNewGroupBtn").addEventListener("click", async () => {
         const type = addRow.querySelector(".newTypeInput").value.trim();
