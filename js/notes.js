@@ -592,9 +592,13 @@ async function renderRelationships(container, portalState) {
       .filter(l => l.lookup_type === "relationship_type")
       .sort((a, b) => a.sort_order - b.sort_order);
 
-    function buildDropdown(options, selectedValue) {
-      return `<select>
-        <option value="Select">-- Select --</option>
+    const contactTypes = lookupData
+      .filter(l => l.lookup_type === "contact_type" && l.is_active)
+      .sort((a, b) => a.sort_order - b.sort_order);
+
+    function buildDropdown(options, selectedValue, className = "") {
+      return `<select class="${className}">
+        <option value="">-- Select --</option>
         ${options.map(opt => `
           <option value="${escapeHtml(opt.value)}"
                   ${opt.value === selectedValue ? "selected" : ""}>
@@ -650,32 +654,28 @@ async function renderRelationships(container, portalState) {
       </section>
     `;
 
-    // --- Step 4: Populate detected relationships with dropdowns ---
-    const grid = document.getElementById("relationshipsGrid");
-    grid.innerHTML = rows.map(r => `
-      <tr data-relid="${r.id}">
-        <td class="rel-raw">${escapeHtml(r.raw_name || "")}</td>
-        <td class="rel-type">${buildDropdown(types, r.relationship_type)}</td>
-        <td class="rel-role">${buildDropdown(roles, r.relationship_role)}</td>
-        <td class="rel-contact-id">${escapeHtml(r.contact_id || "")}</td>
-        <td class="rel-contact-name">${escapeHtml(r.contact_name || "")}</td>
-        <td>
-          <input type="text"
-                 class="contact-type-input"
-                 value="${escapeHtml(r.contact_type || "")}"
-                 style="width:120px;"
-                 ${!r.contact_id ? "disabled" : ""}>
-        </td>
-        <td class="rel-contact-email">${escapeHtml(r.contact_email || "")}</td>
-        <td>
-          ${
-            r.contact_id
-              ? `<input type="checkbox" class="promote-checkbox"/>`
-              : `<button class="get-id-btn">Get Contact ID</button>`
-          }
-        </td>
-      </tr>
-    `).join("");
+// --- Step 4: Populate detected relationships with dropdowns ---
+const grid = document.getElementById("relationshipsGrid");
+grid.innerHTML = rows.map(r => `
+  <tr data-relid="${r.id}">
+    <td class="rel-raw">${escapeHtml(r.raw_name || "")}</td>
+    <td class="rel-type">${buildDropdown(types, r.relationship_type, "rel-type-dropdown")}</td>
+    <td class="rel-role">${buildDropdown(roles, r.relationship_role, "rel-role-dropdown")}</td>
+    <td class="rel-contact-id">${escapeHtml(r.contact_id || "")}</td>
+    <td class="rel-contact-name">${escapeHtml(r.contact_name || "")}</td>
+    <td class="rel-contact-type">
+      ${buildDropdown(contactTypes, r.contact_type, "contact-type-dropdown")}
+    </td>
+    <td class="rel-contact-email">${escapeHtml(r.contact_email || "")}</td>
+    <td>
+      ${
+        r.contact_id
+          ? `<input type="checkbox" class="promote-checkbox"/>`
+          : `<button class="get-id-btn">Get Contact ID</button>`
+      }
+    </td>
+  </tr>
+`).join("");
 
 grid.querySelectorAll(".get-id-btn").forEach(btn => {
   btn.addEventListener("click", e => {
@@ -684,15 +684,15 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
 
     const typeSelect = row.querySelector(".rel-type select");
     const roleSelect = row.querySelector(".rel-role select");
-    
-    const type = typeSelect?.value?.trim();
-    const role = roleSelect?.value?.trim();
-    
-    if (!type || type === "Select" || !role || role === "Select") {
+
+    const type = typeSelect?.value?.trim() || "";
+    const role = roleSelect?.value?.trim() || "";
+
+    // Default dropdown value is "", not "Select"
+    if (!type || !role) {
       alert("❌ Please select both Relationship Type and Role before searching for a contact.");
       return;
     }
-    
 
     // ✅ Always render the inline search form
     row.querySelector("td:last-child").innerHTML = `
@@ -743,28 +743,29 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
             `).join("")
           : "<div class='muted'>No contacts found.</div>";
 
-          // ✅ Attach click handlers to results
-          resultsDiv.querySelectorAll(".contact-result").forEach(el => {
-            el.addEventListener("click", () => {
-              const row = document.querySelector(`tr[data-relid="${el.dataset.relid}"]`);
-          
-              // Hydrate the row with selected contact info
-              row.querySelector(".rel-contact-id").textContent = el.dataset.contactid || "";
-              row.querySelector(".rel-contact-name").textContent = el.dataset.name || "";
-              const typeInput = row.querySelector(".contact-type-input");
-              if (typeInput) {
-                typeInput.value = el.dataset.type || "";
-                typeInput.disabled = false;
-              }
-              row.querySelector(".rel-contact-email").textContent = el.dataset.email || "";
-          
-              // Swap Action cell to promotion checkbox
-              row.querySelector("td:last-child").innerHTML = `<input type="checkbox" class="promote-checkbox"/>`;
-          
-              alert("✅ Contact populated into relationship row.");
-            });
+        // ✅ Attach click handlers to results
+        resultsDiv.querySelectorAll(".contact-result").forEach(el => {
+          el.addEventListener("click", () => {
+            const row = document.querySelector(`tr[data-relid="${el.dataset.relid}"]`);
+
+            // Hydrate the row with selected contact info
+            row.querySelector(".rel-contact-id").textContent = el.dataset.contactid || "";
+            row.querySelector(".rel-contact-name").textContent = el.dataset.name || "";
+
+            const typeDropdown = row.querySelector(".contact-type-dropdown");
+            if (typeDropdown) {
+              typeDropdown.value = el.dataset.type || "";
+            }
+
+            row.querySelector(".rel-contact-email").textContent = el.dataset.email || "";
+
+            // Swap Action cell to promotion checkbox
+            row.querySelector("td:last-child").innerHTML = `<input type="checkbox" class="promote-checkbox"/>`;
+
+            alert("✅ Contact populated into relationship row.");
           });
-        
+        });
+
       } catch (err) {
         console.error("Search error:", err);
         alert("Network error during search.");
@@ -772,6 +773,7 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
     });
   });
 });
+
 
 // --- Step 5: Populate existing contact relationships ---
 const relUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships?project=${project}&source_contact_id=${portalState.clientId}`;
@@ -816,8 +818,6 @@ try {
   document.getElementById("existingRelGrid").innerHTML = "<p>Error loading existing relationships.</p>";
 }
 
-
-  
 // --- Step 6: Save Relationships handler ---
 document.getElementById("btnSaveRelationships").addEventListener("click", async () => {
   const promoteRows = [...grid.querySelectorAll("tr")].filter(r => r.querySelector(".promote-checkbox")?.checked);
@@ -844,7 +844,8 @@ document.getElementById("btnSaveRelationships").addEventListener("click", async 
 
     // Step 1: PATCH notes_relationships
     const contactName = row.querySelector(".rel-contact-name").textContent.trim();
-    const contactType = row.querySelector(".contact-type-input")?.value.trim() || "";
+    // 🔧 FIX: use dropdown instead of old input
+    const contactType = row.querySelector(".contact-type-dropdown")?.value || "";
     const contactEmail = row.querySelector(".rel-contact-email").textContent.trim();
 
     const patchPayload = {
@@ -972,7 +973,6 @@ document.getElementById("btnSaveRelationships").addEventListener("click", async 
   document.querySelector('#notes-subtabs button[data-subtab="history"]')?.classList.add("active");
 
 });
-
 } catch (err) {
   console.error("renderRelationships error:", err);
   container.innerHTML = `<p>Error loading relationships: ${err.message}</p>`;
