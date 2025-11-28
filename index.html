@@ -31,6 +31,8 @@
     import { loadTasksTab } from "./js/tasks.js";
     import { loadLookupsTab } from "./js/lookups.js";
     import { loadDashboardTab } from "./js/dashboard.js";
+    // 👇 NEW import
+    import { loadGroupsTab } from "./js/groups.js";
 
     const portalState = { project: "", contactId: "" };
     const portalTitle = document.getElementById("portal-title");
@@ -46,7 +48,9 @@
       "3": { label: "Notes", loader: loadNotesTab },
       "4": { label: "Tasks", loader: loadTasksTab },
       "5": { label: "Lookups", loader: loadLookupsTab },
-      "6": { label: "Dashboard", loader: loadDashboardTab }
+      "6": { label: "Dashboard", loader: loadDashboardTab },
+      // 👇 NEW entry
+      "7": { label: "Groups", loader: loadGroupsTab }
     };
 
     async function loadProjects() {
