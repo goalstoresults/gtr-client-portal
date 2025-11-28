@@ -2,16 +2,31 @@
 <section class="card">
   <h2>Contacts</h2>
 
-  <!-- Search filters -->
-  <div class="row" style="gap:12px; margin-bottom:12px;">
-    <input id="filter-first" placeholder="First name" />
-    <input id="filter-last" placeholder="Last name" />
-    <input id="filter-email" placeholder="Email" />
-    <button id="btnFindContacts" class="primary">Find</button>
-  </div>
+  <!-- Contacts subtabs -->
+  <nav class="subtabs" id="contacts-subtabs">
+    <button data-subtab="add">Add</button>
+    <button data-subtab="list" class="active">List</button>
+    <button data-subtab="details">Details</button>
+    <button data-subtab="relationships">Relationships</button>
+    <button data-subtab="notes">Notes</button>
+  </nav>
 
-  <!-- Results container -->
-  <div id="contactsResults" class="card muted">
-    Enter criteria and click Find.
+  <!-- Subtab content container -->
+  <div id="contactsContent">
+    <!-- Default view: List (your existing search UI) -->
+    <div id="contactsListView">
+      <!-- Search filters -->
+      <div class="row" style="gap:12px; margin-bottom:12px;">
+        <input id="filter-first" placeholder="First name" />
+        <input id="filter-last" placeholder="Last name" />
+        <input id="filter-email" placeholder="Email" />
+        <button id="btnFindContacts" class="primary">Find</button>
+      </div>
+
+      <!-- Results container -->
+      <div id="contactsResults" class="card muted">
+        Enter criteria and click Find.
+      </div>
+    </div>
   </div>
 </section>
