@@ -1,5 +1,5 @@
-// js/lookups.js v1.1.0
-// Lookup tab with portal styling and full Worker integration
+// js/lookups.js v1.2.0
+// Lookup tab with inline editable rows, Save/Delete actions, and portal styling
 
 console.log("[Lookups.js] loaded");
 
@@ -43,10 +43,14 @@ export async function loadLookupsTab({ portalState, tabContent }) {
             </tr>
           </thead>
           <tbody>
-            ${grouped[type].map((item, i) => `
-              <tr data-id="${item.id}" class="${i % 2 === 0 ? 'even' : 'odd'}">
-                <td>${escapeHtml(item.value)}</td>
-                <td>${item.sort_order}</td>
+            ${grouped[type].map(item => `
+              <tr data-id="${item.id}">
+                <td>
+                  <input type="text" class="valueInput" value="${escapeHtml(item.value)}" style="width:100%;">
+                </td>
+                <td>
+                  <input type="number" class="sortInput" value="${item.sort_order}" style="width:70px;">
+                </td>
                 <td>
                   <select class="activeDropdown">
                     <option value="true" ${item.is_active ? "selected" : ""}>Yes</option>
@@ -54,7 +58,7 @@ export async function loadLookupsTab({ portalState, tabContent }) {
                   </select>
                 </td>
                 <td>
-                  <button class="editBtn" style="background:#2979ff;color:#fff;border:none;border-radius:4px;padding:6px 12px;">Edit</button>
+                  <button class="saveBtn" style="background:#2979ff;color:#fff;border:none;border-radius:4px;padding:6px 12px;">Save</button>
                   <button class="deleteBtn" style="background:#e53935;color:#fff;border:none;border-radius:4px;padding:6px 12px;margin-left:6px;">Delete</button>
                 </td>
               </tr>
@@ -65,6 +69,7 @@ export async function loadLookupsTab({ portalState, tabContent }) {
       </section>
     `).join("");
 
+    // Add Group
     tabContent.querySelector("#addGroupBtn").addEventListener("click", async () => {
       const type = prompt("Enter new lookup group name:");
       if (!type) return;
@@ -76,18 +81,24 @@ export async function loadLookupsTab({ portalState, tabContent }) {
       loadLookupsTab({ portalState, tabContent });
     });
 
+    // Event delegation for Save/Delete/Add Value
     groupsDiv.addEventListener("click", async e => {
       const row = e.target.closest("tr");
       const id = row?.dataset?.id;
 
-      if (e.target.classList.contains("editBtn")) {
-        const newVal = prompt("Enter new value:");
-        if (!newVal) return;
+      if (e.target.classList.contains("saveBtn")) {
+        const value = row.querySelector(".valueInput").value.trim();
+        const sort = parseInt(row.querySelector(".sortInput").value, 10);
+        const active = row.querySelector(".activeDropdown").value === "true";
+
+        const updates = { value, sort_order: sort, is_active: active };
+
         await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups/edit/${id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ updates: { value: newVal } })
+          body: JSON.stringify({ updates })
         });
+
         loadLookupsTab({ portalState, tabContent });
       }
 
@@ -103,25 +114,22 @@ export async function loadLookupsTab({ portalState, tabContent }) {
         const type = e.target.dataset.type;
         const val = prompt(`Enter new value for group "${type}":`);
         if (!val) return;
+
+        // Auto-increment sort_order based on last row in group
+        const lastRow = grouped[type][grouped[type].length - 1];
+        const nextSort = lastRow ? lastRow.sort_order + 10 : 10;
+
         await fetch("https://lookups-module.dennis-e64.workers.dev/lookups/addValue", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ lookup_type: type, value: val, project: portalState.project })
+          body: JSON.stringify({
+            lookup_type: type,
+            value: val,
+            sort_order: nextSort,
+            project: portalState.project
+          })
         });
         loadLookupsTab({ portalState, tabContent });
-      }
-    });
-
-    groupsDiv.addEventListener("change", async e => {
-      if (e.target.classList.contains("activeDropdown")) {
-        const row = e.target.closest("tr");
-        const id = row?.dataset?.id;
-        const newVal = e.target.value === "true";
-        await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups/edit/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ updates: { is_active: newVal } })
-        });
       }
     });
 
