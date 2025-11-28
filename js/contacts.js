@@ -5,7 +5,6 @@
    ============================================================ */
 
 function loadContactsTab({ portalState, tabContent }) {
-  // Render the subtab navigation + placeholder content
   tabContent.innerHTML = `
     <nav class="subtabs" id="contacts-subtabs">
       <button data-subtab="add">Add</button>
@@ -22,10 +21,8 @@ function loadContactsTab({ portalState, tabContent }) {
   const content = tabContent.querySelector("#contactsContent");
   const buttons = tabContent.querySelectorAll("#contacts-subtabs button");
 
-  // Wire up subtab switching
   buttons.forEach(btn => {
-    btn.addEventListener("click", () => {
-      // Reset active state
+    btn.addEventListener("click", async () => {
       buttons.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
@@ -36,21 +33,37 @@ function loadContactsTab({ portalState, tabContent }) {
           content.innerHTML = `
             <section class="card">
               <h2>Add Contact</h2>
-              <form>
-                <label>Name:<br><input type="text" /></label><br><br>
-                <label>Email:<br><input type="email" /></label><br><br>
+              <form id="addContactForm">
+                <label>Name:<br><input type="text" name="name" required /></label><br><br>
+                <label>Email:<br><input type="email" name="email" required /></label><br><br>
                 <button type="submit">Save Contact</button>
               </form>
             </section>
           `;
+          const form = content.querySelector("#addContactForm");
+          form.addEventListener("submit", async e => {
+            e.preventDefault();
+            const data = Object.fromEntries(new FormData(form));
+            const res = await fetch("/contacts/add", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            content.innerHTML = `<section class="card"><p>${result.message}</p></section>`;
+          });
           break;
 
         case "list":
-          content.innerHTML = `
-            <section class="card">
-              <h2>Contact List</h2>
-              <p>(Placeholder for contact list table)</p>
-            </section>
+          content.innerHTML = `<section class="card"><h2>Contact List</h2><div id="contactTable"></div></section>`;
+          const tableDiv = content.querySelector("#contactTable");
+          const res = await fetch("/contacts/list");
+          const contacts = await res.json();
+          tableDiv.innerHTML = `
+            <table>
+              <tr><th>Name</th><th>Email</th></tr>
+              ${contacts.map(c => `<tr><td>${c.name}</td><td>${c.email}</td></tr>`).join("")}
+            </table>
           `;
           break;
 
@@ -91,3 +104,5 @@ function loadContactsTab({ portalState, tabContent }) {
     });
   });
 }
+
+export { loadContactsTab };
