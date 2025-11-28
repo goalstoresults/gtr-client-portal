@@ -1,120 +1,110 @@
-// js/lookups.js v1.0.0
-// Lookups module with full Worker URLs (lookups-module.dennis-e64.workers.dev)
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    const cors = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, Prefer"
+    };
 
-console.log("[Lookups.js] loaded");
-
-export async function loadLookupsTab({ portalState, tabContent }) {
-  tabContent.innerHTML = `
-    <section class="card">
-      <h2>Lookup Groups</h2>
-      <div id="lookupGroups">Loading...</div>
-      <button id="addGroupBtn" class="primary">+ Add Lookup Group</button>
-    </section>
-  `;
-
-  const groupsDiv = tabContent.querySelector("#lookupGroups");
-
-  try {
-    const url = `https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${portalState.project}`;
-    console.log("[Lookups] Fetching:", url);
-
-    const res = await fetch(url, { cache: "no-cache" });
-    const data = await res.json();
-
-    if (!res.ok || data.status !== "ok" || !Array.isArray(data.lookups)) {
-      groupsDiv.innerHTML = `<p>Error loading lookups: ${data.error || "Unknown error"}</p>`;
-      return;
+    if (request.method === "OPTIONS") {
+      return new Response("OK", { headers: cors });
     }
 
-    // Group by lookup_type
-    const grouped = {};
-    data.lookups.forEach(row => {
-      if (!grouped[row.lookup_type]) grouped[row.lookup_type] = [];
-      grouped[row.lookup_type].push(row);
-    });
-
-    // Render each group
-    groupsDiv.innerHTML = Object.keys(grouped).map(type => `
-      <section class="lookup-group card" style="margin-bottom:16px;">
-        <h3>${type}</h3>
-        <table class="lookups-table">
-          <thead>
-            <tr><th>Value</th><th>Sort</th><th>Active</th><th>Actions</th></tr>
-          </thead>
-          <tbody>
-            ${grouped[type].map(item => `
-              <tr data-id="${item.id}">
-                <td>${escapeHtml(item.value)}</td>
-                <td>${item.sort_order}</td>
-                <td>${item.is_active ? "Yes" : "No"}</td>
-                <td>
-                  <button class="editBtn secondary">Edit</button>
-                  <button class="deleteBtn danger">Delete</button>
-                </td>
-              </tr>
-            `).join("")}
-          </tbody>
-        </table>
-        <button class="addValueBtn primary" data-type="${type}">+ Add Value</button>
-      </section>
-    `).join("");
-
-    // Wire up Add Group button
-    tabContent.querySelector("#addGroupBtn").addEventListener("click", async () => {
-      const type = prompt("Enter new lookup group name:");
-      if (!type) return;
-      const addUrl = `https://lookups-module.dennis-e64.workers.dev/lookups/addGroup`;
-      const res = await fetch(addUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lookup_type: type, project: portalState.project })
+    // GET /lookups/list?project=...
+    if (url.pathname === "/lookups/list" && request.method === "GET") {
+      const project = url.searchParams.get("project");
+      const endpoint = `${env.SUPABASE_URL}/rest/v1/lookups?project=eq.${project}&order=lookup_type,sort_order`;
+      const res = await fetch(endpoint, {
+        headers: {
+          apikey: env.SUPABASE_SERVICE_ROLE,
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE}`,
+          "Content-Type": "application/json",
+          Prefer: "return=representation"
+        }
       });
-      await res.json();
-      loadLookupsTab({ portalState, tabContent }); // reload
-    });
-
-    // Event delegation for edit/delete/addValue
-    groupsDiv.addEventListener("click", async e => {
-      const row = e.target.closest("tr");
-      if (e.target.classList.contains("editBtn")) {
-        const newVal = prompt("Enter new value:");
-        if (!newVal) return;
-        const patchUrl = `https://lookups-module.dennis-e64.workers.dev/lookups/edit/${row.dataset.id}`;
-        await fetch(patchUrl, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ updates: { value: newVal } })
+      const text = await res.text();
+      try {
+        const data = JSON.parse(text);
+        return new Response(JSON.stringify({ status: "ok", lookups: data }), {
+          headers: { ...cors, "Content-Type": "application/json" }
         });
-        loadLookupsTab({ portalState, tabContent });
-      }
-      if (e.target.classList.contains("deleteBtn")) {
-        if (!confirm("Delete this lookup value?")) return;
-        const delUrl = `https://lookups-module.dennis-e64.workers.dev/lookups/delete/${row.dataset.id}`;
-        await fetch(delUrl, { method: "DELETE" });
-        loadLookupsTab({ portalState, tabContent });
-      }
-      if (e.target.classList.contains("addValueBtn")) {
-        const type = e.target.dataset.type;
-        const val = prompt(`Enter new value for group "${type}":`);
-        if (!val) return;
-        const addValUrl = `https://lookups-module.dennis-e64.workers.dev/lookups/addValue`;
-        await fetch(addValUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ lookup_type: type, value: val, project: portalState.project })
+      } catch {
+        return new Response(JSON.stringify({ status: "error", error: "Invalid JSON", details: text }), {
+          status: 500,
+          headers: { ...cors, "Content-Type": "application/json" }
         });
-        loadLookupsTab({ portalState, tabContent });
       }
-    });
+    }
 
-  } catch (err) {
-    groupsDiv.innerHTML = `<p>Error loading lookups: ${err.message}</p>`;
-  }
-}
+    // POST /lookups/addGroup
+    if (url.pathname === "/lookups/addGroup" && request.method === "POST") {
+      const body = await request.json();
+      const payload = {
+        lookup_type: body.lookup_type,
+        value: "",
+        sort_order: 0,
+        is_active: true,
+        project: body.project,
+        created_at: new Date().toISOString()
+      };
+      const endpoint = `${env.SUPABASE_URL}/rest/v1/lookups`;
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          apikey: env.SUPABASE_SERVICE_ROLE,
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE}`,
+          "Content-Type": "application/json",
+          Prefer: "return=representation"
+        },
+        body: JSON.stringify(payload)
+      });
+      return new Response(await res.text(), { headers: cors });
+    }
 
-// Simple HTML escape helper
-function escapeHtml(str) {
-  return str?.replace(/[&<>"']/g, c => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-  }[c])) || "";
-}
+    // POST /lookups/addValue
+    if (url.pathname === "/lookups/addValue" && request.method === "POST") {
+      const body = await request.json();
+      const payload = {
+        lookup_type: body.lookup_type,
+        value: body.value,
+        sort_order: 0,
+        is_active: true,
+        project: body.project,
+        created_at: new Date().toISOString()
+      };
+      const endpoint = `${env.SUPABASE_URL}/rest/v1/lookups`;
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          apikey: env.SUPABASE_SERVICE_ROLE,
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE}`,
+          "Content-Type": "application/json",
+          Prefer: "return=representation"
+        },
+        body: JSON.stringify(payload)
+      });
+      return new Response(await res.text(), { headers: cors });
+    }
+
+    // PATCH /lookups/edit/:id
+    if (url.pathname.startsWith("/lookups/edit/") && request.method === "PATCH") {
+      const id = url.pathname.split("/").pop();
+      const body = await request.json();
+      const endpoint = `${env.SUPABASE_URL}/rest/v1/lookups?id=eq.${id}`;
+      const res = await fetch(endpoint, {
+        method: "PATCH",
+        headers: {
+          apikey: env.SUPABASE_SERVICE_ROLE,
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE}`,
+          "Content-Type": "application/json",
+          Prefer: "return=representation"
+        },
+        body: JSON.stringify(body.updates)
+      });
+      return new Response(await res.text(), { headers: cors });
+    }
+
+    // DELETE /lookups/delete/:id
+    if (url.pathname.startsWith("/lookups/delete/") && request.method === "DELETE") {
+      const id = url
