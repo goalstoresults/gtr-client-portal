@@ -1,21 +1,15 @@
-// js/setup.js v0.6 
+// js/setup.js v0.7
 export async function loadSetupTab({ portalState, tabContent }) {
-  tabContent.innerHTML = `
-    <nav class="subtabs" id="setup-subtabs">
-      <button data-subtab="client">Client</button>
-      <button data-subtab="contact">Contact</button>
-      <button data-subtab="lookups">Lookups</button>
-    </nav>
-    <div id="setupContent">
-      <section class="card"><p>Select a subtab to begin.</p></section>
-    </div>
-  `;
+  // Load the partial shell
+  const res = await fetch("./components/setup.html", { cache: "no-cache" });
+  tabContent.innerHTML = await res.text();
 
   const subtabs = tabContent.querySelector("#setup-subtabs");
   const setupContent = tabContent.querySelector("#setupContent");
 
   subtabs.querySelectorAll("button[data-subtab]").forEach(btn => {
     btn.addEventListener("click", () => {
+      // Reset active state
       subtabs.querySelectorAll("button").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
