@@ -1,5 +1,4 @@
-// js/setup.js v1.0 — rollback baseline + Client subtab
-import { getProjectsConfig, getTabLookups, saveProjectConfig } from "./lookups-module.js";
+// js/setup.js v1.1 — Setup tab with Client subtab wired to lookups-module Worker
 
 export async function loadSetupTab({ portalState, tabContent }) {
   // Load the partial shell
@@ -72,8 +71,9 @@ async function renderClientSetup(container, portalState) {
   const select = container.querySelector("#clientSelect");
   const detailsDiv = container.querySelector("#clientDetails");
 
-  // Fetch configs
-  const configRows = await getProjectsConfig(); // [{ project, display_name, enabled_tabs }]
+  // Fetch configs directly from lookups-module Worker
+  const resConfig = await fetch("https://lookups-module.dennis-e64.workers.dev/api/projects_config", { cache: "no-cache" });
+  const configRows = await resConfig.json();
 
   // Populate dropdown
   configRows.forEach(row => {
@@ -95,8 +95,11 @@ async function renderClientSetup(container, portalState) {
       return;
     }
 
-    // Fetch tab lookups for this project
-    const tabLookups = await getTabLookups(selectedProject);
+    // Fetch tab lookups for this project from lookups-module Worker
+    const resTabs = await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${encodeURIComponent(selectedProject)}`, { cache: "no-cache" });
+    const tabData = await resTabs.json();
+    const tabLookups = Array.isArray(tabData.lookups) ? tabData.lookups.filter(l => l.lookup_type === "tab") : [];
+
     const enabled = selectedRow.enabled_tabs || [];
 
     detailsDiv.innerHTML = `
@@ -123,7 +126,7 @@ async function renderClientSetup(container, portalState) {
       `;
     }).join("");
 
-    // Save handler
+    // Save handler — PATCH back to lookups-module Worker
     detailsDiv.querySelector("#btnSaveConfig").addEventListener("click", async () => {
       const checkedTabs = [];
       grid.querySelectorAll("input[type=checkbox]").forEach(cb => {
@@ -137,9 +140,13 @@ async function renderClientSetup(container, portalState) {
       checkedTabs.sort((a, b) => a.sort - b.sort);
       const newEnabledTabs = checkedTabs.map(t => t.tab_id);
 
-      await saveProjectConfig(selectedRow.project, {
-        ...selectedRow,
-        enabled_tabs: newEnabledTabs
+      await fetch(`https://lookups-module.dennis-e64.workers.dev/api/projects_config?project=eq.${encodeURIComponent(selectedRow.project)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...selectedRow,
+          enabled_tabs: newEnabledTabs
+        })
       });
 
       alert("✅ Config saved.");
