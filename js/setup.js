@@ -2,7 +2,7 @@
 export async function loadSetupTab({ portalState, tabContent }) {
   tabContent.innerHTML = `
     <nav class="subtabs" id="setup-subtabs">
-      <button data-subtab="client" class="active">Client</button>
+      <button data-subtab="client">Client</button>
       <button data-subtab="contact">Contact</button>
       <button data-subtab="lookups">Lookups</button>
     </nav>
