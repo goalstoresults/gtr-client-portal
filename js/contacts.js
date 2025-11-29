@@ -1,33 +1,19 @@
-/* ============================================================
-   Contacts Module
-   - Provides subtabs: Add, List, Details, Relationships, Notes
-   - Uses generic nav.subtabs styling
-   ============================================================ */
-
-function loadContactsTab({ portalState, tabContent }) {
-  tabContent.innerHTML = `
-    <nav class="subtabs" id="contacts-subtabs">
-      <button data-subtab="add">Add</button>
-      <button data-subtab="list">List</button>
-      <button data-subtab="details">Details</button>
-      <button data-subtab="relationships">Relationships</button>
-      <button data-subtab="notes">Notes</button>
-    </nav>
-    <div id="contactsContent">
-      <section class="card"><p>Select a subtab to begin.</p></section>
-    </div>
-  `;
+// js/contacts.js v0.7
+export async function loadContactsTab({ portalState, tabContent }) {
+  // Load the partial shell
+  const res = await fetch("./components/contacts.html", { cache: "no-cache" });
+  tabContent.innerHTML = await res.text();
 
   const content = tabContent.querySelector("#contactsContent");
   const buttons = tabContent.querySelectorAll("#contacts-subtabs button");
 
   buttons.forEach(btn => {
     btn.addEventListener("click", async () => {
+      // Reset active state
       buttons.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
       const subtab = btn.dataset.subtab;
-
       switch (subtab) {
         case "add":
           content.innerHTML = `
@@ -55,10 +41,15 @@ function loadContactsTab({ portalState, tabContent }) {
           break;
 
         case "list":
-          content.innerHTML = `<section class="card"><h2>Contact List</h2><div id="contactTable"></div></section>`;
+          content.innerHTML = `
+            <section class="card">
+              <h2>Contact List</h2>
+              <div id="contactTable"></div>
+            </section>
+          `;
           const tableDiv = content.querySelector("#contactTable");
-          const res = await fetch("/contacts/list");
-          const contacts = await res.json();
+          const resList = await fetch("/contacts/list");
+          const contacts = await resList.json();
           tableDiv.innerHTML = `
             <table>
               <tr><th>Name</th><th>Email</th></tr>
@@ -104,5 +95,3 @@ function loadContactsTab({ portalState, tabContent }) {
     });
   });
 }
-
-export { loadContactsTab };
