@@ -1,7 +1,6 @@
-// js/setup.js v1.1 — Setup tab with Client subtab wired to lookups-module Worker
+// js/setup.js v1.2 — Setup tab with full tab list, sort order, and direct Worker calls
 
 export async function loadSetupTab({ portalState, tabContent }) {
-  // Load the partial shell
   const res = await fetch("./components/setup.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
 
@@ -10,7 +9,6 @@ export async function loadSetupTab({ portalState, tabContent }) {
 
   subtabs.querySelectorAll("button[data-subtab]").forEach(btn => {
     btn.addEventListener("click", () => {
-      // Reset active state
       subtabs.querySelectorAll("button").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
@@ -46,9 +44,6 @@ export async function loadSetupTab({ portalState, tabContent }) {
   });
 }
 
-/* -------------------------------
-   Client Setup Subtab
--------------------------------- */
 async function renderClientSetup(container, portalState) {
   container.innerHTML = `
     <section class="card">
@@ -71,11 +66,9 @@ async function renderClientSetup(container, portalState) {
   const select = container.querySelector("#clientSelect");
   const detailsDiv = container.querySelector("#clientDetails");
 
-  // Fetch configs directly from lookups-module Worker
   const resConfig = await fetch("https://lookups-module.dennis-e64.workers.dev/api/projects_config", { cache: "no-cache" });
   const configRows = await resConfig.json();
 
-  // Populate dropdown
   configRows.forEach(row => {
     const opt = document.createElement("option");
     opt.value = row.project;
@@ -84,7 +77,6 @@ async function renderClientSetup(container, portalState) {
     select.appendChild(opt);
   });
 
-  // Handle selection
   select.addEventListener("change", async () => {
     const selectedProject = select.value;
     portalState.setup_project_id = selectedProject;
@@ -95,12 +87,19 @@ async function renderClientSetup(container, portalState) {
       return;
     }
 
-    // Fetch tab lookups for this project from lookups-module Worker
-    const resTabs = await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${encodeURIComponent(selectedProject)}`, { cache: "no-cache" });
-    const tabData = await resTabs.json();
-    const tabLookups = Array.isArray(tabData.lookups) ? tabData.lookups.filter(l => l.lookup_type === "tab") : [];
-
     const enabled = selectedRow.enabled_tabs || [];
+
+    // Full tab list — matches portal tabMap
+    const allTabs = [
+      { tab_id: "1", description: "Contacts" },
+      { tab_id: "2", description: "Financials" },
+      { tab_id: "3", description: "Notes" },
+      { tab_id: "4", description: "Tasks" },
+      { tab_id: "5", description: "Lookups" },
+      { tab_id: "6", description: "Dashboard" },
+      { tab_id: "7", description: "Groups" },
+      { tab_id: "8", description: "Setup" }
+    ];
 
     detailsDiv.innerHTML = `
       <section class="card">
@@ -113,7 +112,7 @@ async function renderClientSetup(container, portalState) {
     `;
 
     const grid = detailsDiv.querySelector("#tabConfigGrid");
-    grid.innerHTML = tabLookups.map(tab => {
+    grid.innerHTML = allTabs.map(tab => {
       const checked = enabled.includes(tab.tab_id) ? "checked" : "";
       const sortIndex = enabled.indexOf(tab.tab_id);
       return `
@@ -126,7 +125,6 @@ async function renderClientSetup(container, portalState) {
       `;
     }).join("");
 
-    // Save handler — PATCH back to lookups-module Worker
     detailsDiv.querySelector("#btnSaveConfig").addEventListener("click", async () => {
       const checkedTabs = [];
       grid.querySelectorAll("input[type=checkbox]").forEach(cb => {
