@@ -1,26 +1,33 @@
-// js/setup.js v0.2
+// js/setup.js v0.5
 export async function loadSetupTab({ portalState, tabContent }) {
-  // Load the setup.html partial
-  const res = await fetch("./components/setup.html", { cache: "no-cache" });
-  const html = await res.text();
-  tabContent.innerHTML = html;
+  tabContent.innerHTML = `
+    <section class="card">
+      <nav class="subtabs" id="setup-subtabs">
+        <button data-subtab="client" class="active">Client</button>
+        <button data-subtab="contact">Contact</button>
+        <button data-subtab="lookups">Lookups</button>
+      </nav>
+      <div id="setupContent">
+        <section class="card"><p>Select a subtab to begin.</p></section>
+      </div>
+    </section>
+  `;
 
-  // Attach submenu handlers
-  const submenu = tabContent.querySelector("#setup-submenu");
+  const subtabs = tabContent.querySelector("#setup-subtabs");
   const setupContent = tabContent.querySelector("#setupContent");
 
-  submenu.querySelectorAll("button[data-sub]").forEach(btn => {
+  subtabs.querySelectorAll("button[data-subtab]").forEach(btn => {
     btn.addEventListener("click", () => {
-      const sub = btn.dataset.sub;
-      submenu.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+      subtabs.querySelectorAll("button").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
+      const sub = btn.dataset.subtab;
       if (sub === "client") {
-        setupContent.innerHTML = `<p><strong>Client Setup</strong>: Placeholder for project config (tabs, sort order).</p>`;
+        setupContent.innerHTML = `<section class="card"><p><strong>Client Setup</strong>: Placeholder for project config.</p></section>`;
       } else if (sub === "contact") {
-        setupContent.innerHTML = `<p><strong>Contact Setup</strong>: Placeholder for field visibility/labels.</p>`;
+        setupContent.innerHTML = `<section class="card"><p><strong>Contact Setup</strong>: Placeholder for field visibility/labels.</p></section>`;
       } else if (sub === "lookups") {
-        setupContent.innerHTML = `<p><strong>Lookups Setup</strong>: Placeholder for dropdown values.</p>`;
+        setupContent.innerHTML = `<section class="card"><p><strong>Lookups Setup</strong>: Placeholder for dropdown values.</p></section>`;
       }
     });
   });
