@@ -1,16 +1,14 @@
-// js/setup.js v0.5
+// js/setup.js v0.6 
 export async function loadSetupTab({ portalState, tabContent }) {
   tabContent.innerHTML = `
-    <section class="card">
-      <nav class="subtabs" id="setup-subtabs">
-        <button data-subtab="client" class="active">Client</button>
-        <button data-subtab="contact">Contact</button>
-        <button data-subtab="lookups">Lookups</button>
-      </nav>
-      <div id="setupContent">
-        <section class="card"><p>Select a subtab to begin.</p></section>
-      </div>
-    </section>
+    <nav class="subtabs" id="setup-subtabs">
+      <button data-subtab="client" class="active">Client</button>
+      <button data-subtab="contact">Contact</button>
+      <button data-subtab="lookups">Lookups</button>
+    </nav>
+    <div id="setupContent">
+      <section class="card"><p>Select a subtab to begin.</p></section>
+    </div>
   `;
 
   const subtabs = tabContent.querySelector("#setup-subtabs");
@@ -22,12 +20,37 @@ export async function loadSetupTab({ portalState, tabContent }) {
       btn.classList.add("active");
 
       const sub = btn.dataset.subtab;
-      if (sub === "client") {
-        setupContent.innerHTML = `<section class="card"><p><strong>Client Setup</strong>: Placeholder for project config.</p></section>`;
-      } else if (sub === "contact") {
-        setupContent.innerHTML = `<section class="card"><p><strong>Contact Setup</strong>: Placeholder for field visibility/labels.</p></section>`;
-      } else if (sub === "lookups") {
-        setupContent.innerHTML = `<section class="card"><p><strong>Lookups Setup</strong>: Placeholder for dropdown values.</p></section>`;
+      switch (sub) {
+        case "client":
+          setupContent.innerHTML = `
+            <section class="card">
+              <h2>Client Setup</h2>
+              <p>Placeholder for project config (tabs, sort order).</p>
+            </section>
+          `;
+          break;
+        case "contact":
+          setupContent.innerHTML = `
+            <section class="card">
+              <h2>Contact Setup</h2>
+              <p>Placeholder for field visibility/labels.</p>
+            </section>
+          `;
+          break;
+        case "lookups":
+          setupContent.innerHTML = `
+            <section class="card">
+              <h2>Lookups Setup</h2>
+              <p>Placeholder for dropdown values.</p>
+            </section>
+          `;
+          break;
+        default:
+          setupContent.innerHTML = `
+            <section class="card">
+              <p>Select a subtab to begin.</p>
+            </section>
+          `;
       }
     });
   });
