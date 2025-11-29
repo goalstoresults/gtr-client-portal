@@ -1,4 +1,4 @@
-// js/setup.js v1.0 — standardized with HTML partials
+// js/setup.js v1.1 — standardized with HTML partials
 import { getProjectsConfig, getTabLookups, saveProjectConfig } from "./lookups-module.js";
 
 export async function loadSetupTab({ portalState, tabContent }) {
@@ -14,8 +14,7 @@ export async function loadSetupTab({ portalState, tabContent }) {
       subtabs.querySelectorAll("button").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
-      const sub = btn.dataset.subtab;
-      switch (sub) {
+      switch (btn.dataset.subtab) {
         case "client":
           renderClientSetup(setupContent, portalState);
           break;
@@ -69,9 +68,8 @@ async function renderClientSetup(container, portalState) {
   const select = container.querySelector("#clientSelect");
   const detailsDiv = container.querySelector("#clientDetails");
 
-  // Fetch config + tab lookups
+  // Fetch config rows
   const configRows = await getProjectsConfig(); // [{ project, display_name, enabled_tabs }]
-  const tabLookups = await getTabLookups();     // [{ tab_id, description }]
 
   // Populate dropdown
   configRows.forEach(row => {
@@ -83,7 +81,7 @@ async function renderClientSetup(container, portalState) {
   });
 
   // Handle selection
-  select.addEventListener("change", () => {
+  select.addEventListener("change", async () => {
     const selectedProject = select.value;
     portalState.setup_project_id = selectedProject;
 
@@ -93,6 +91,8 @@ async function renderClientSetup(container, portalState) {
       return;
     }
 
+    // Fetch tab lookups for this project
+    const tabLookups = await getTabLookups(selectedProject);
     const enabled = selectedRow.enabled_tabs || [];
 
     detailsDiv.innerHTML = `
@@ -130,11 +130,9 @@ async function renderClientSetup(container, portalState) {
         }
       });
 
-      // Sort by sort order
       checkedTabs.sort((a, b) => a.sort - b.sort);
       const newEnabledTabs = checkedTabs.map(t => t.tab_id);
 
-      // Persist via lookups-module.js
       await saveProjectConfig(selectedRow.project, {
         ...selectedRow,
         enabled_tabs: newEnabledTabs
