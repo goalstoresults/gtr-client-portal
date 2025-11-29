@@ -1,5 +1,3 @@
-// js/setup.js v1.2 — Setup tab with full tab list, sort order, and direct Worker calls
-
 export async function loadSetupTab({ portalState, tabContent }) {
   const res = await fetch("./components/setup.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
@@ -89,7 +87,6 @@ async function renderClientSetup(container, portalState) {
 
     const enabled = selectedRow.enabled_tabs || [];
 
-    // Full tab list — matches portal tabMap
     const allTabs = [
       { tab_id: "1", description: "Contacts" },
       { tab_id: "2", description: "Financials" },
@@ -106,30 +103,43 @@ async function renderClientSetup(container, portalState) {
         <p><strong>Project:</strong> ${selectedRow.project}</p>
         <p><strong>Display Name:</strong> ${selectedRow.display_name}</p>
         <h3>Enabled Tabs</h3>
-        <div id="tabConfigGrid" class="card" style="margin-top:12px;"></div>
+        <table id="tabConfigGrid" class="striped" style="width:100%; margin-top:12px;">
+          <thead>
+            <tr>
+              <th style="width:80px;">Enabled</th>
+              <th>Tab Name</th>
+              <th style="width:100px;">Sort Order</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
         <button id="btnSaveConfig" class="primary" style="margin-top:12px;">Save Config</button>
       </section>
     `;
 
-    const grid = detailsDiv.querySelector("#tabConfigGrid");
-    grid.innerHTML = allTabs.map(tab => {
+    const gridBody = detailsDiv.querySelector("#tabConfigGrid tbody");
+    gridBody.innerHTML = allTabs.map((tab, i) => {
       const checked = enabled.includes(tab.tab_id) ? "checked" : "";
       const sortIndex = enabled.indexOf(tab.tab_id);
       return `
-        <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
-          <input type="checkbox" data-tabid="${tab.tab_id}" ${checked}>
-          <label>${tab.description}</label>
-          <input type="number" min="1" max="99" value="${sortIndex >= 0 ? sortIndex + 1 : ""}"
-                 style="width:60px;" data-sort="${tab.tab_id}">
-        </div>
+        <tr>
+          <td style="text-align:center;">
+            <input type="checkbox" data-tabid="${tab.tab_id}" ${checked}>
+          </td>
+          <td>${tab.description}</td>
+          <td>
+            <input type="number" min="1" max="99" value="${sortIndex >= 0 ? sortIndex + 1 : ""}"
+                   style="width:60px;" data-sort="${tab.tab_id}">
+          </td>
+        </tr>
       `;
     }).join("");
 
     detailsDiv.querySelector("#btnSaveConfig").addEventListener("click", async () => {
       const checkedTabs = [];
-      grid.querySelectorAll("input[type=checkbox]").forEach(cb => {
+      gridBody.querySelectorAll("input[type=checkbox]").forEach(cb => {
         if (cb.checked) {
-          const sortInput = grid.querySelector(`input[data-sort="${cb.dataset.tabid}"]`);
+          const sortInput = gridBody.querySelector(`input[data-sort="${cb.dataset.tabid}"]`);
           const sortVal = parseInt(sortInput.value, 10) || 99;
           checkedTabs.push({ tab_id: cb.dataset.tabid, sort: sortVal });
         }
