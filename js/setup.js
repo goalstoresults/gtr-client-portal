@@ -386,6 +386,96 @@ async function renderSetupLookups(tabContent, portalState) {
   }
 }
 
+async function renderContactSetup(container, portalState) {
+  if (!portalState.setup_project_id) {
+    container.innerHTML = `
+      <section class="card">
+        <p>Please select a project in the Client tab before configuring Contacts.</p>
+      </section>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <section class="card">
+      <h2>Contact Setup</h2>
+      <p>Enable fields for this project, customize labels, and set order.</p>
+      <table id="contactFieldsGrid" class="notes-table" style="width:100%; margin-top:12px;">
+        <thead>
+          <tr>
+            <th style="width:60px;">Enabled</th>
+            <th style="width:200px;">System Field</th>
+            <th style="width:200px;">Label</th>
+            <th style="width:100px;">Order</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <button id="btnSaveContactConfig" class="btn-primary" style="margin-top:12px;">Save Config</button>
+    </section>
+  `;
+
+  const gridBody = container.querySelector("#contactFieldsGrid tbody");
+
+  // Fetch existing config rows for this project
+  const url = `https://lookups-module.dennis-e64.workers.dev/contact_fields?project=${portalState.setup_project_id}`;
+  const res = await fetch(url, { cache: "no-cache" });
+  const data = await res.json();
+
+  const systemFields = [
+    "first_name","last_name","business_name","phone","email","contact_type",
+    "address_full","street_address","city","postal_code","state","title",
+    "website","additional_emails","additional_phones","additional_emails_2",
+    "additional_phones_2","contact_name","last_activity","last_appointment",
+    "loa_sent_date","loa_signed_date","onboarding_start_date","onboarding_completed_date"
+  ];
+
+  const configured = Array.isArray(data.rows) ? data.rows : [];
+
+  // Render rows: either existing config or blank for unused fields
+  gridBody.innerHTML = systemFields.map(field => {
+    const row = configured.find(r => r.field_key === field);
+    const enabled = !!row;
+    const label = row ? row.label : "";
+    const order = row ? row.sort_order : "";
+
+    return `
+      <tr data-field="${field}">
+        <td style="text-align:center;">
+          <input type="checkbox" class="enableCheckbox" ${enabled ? "checked" : ""}>
+        </td>
+        <td>${field}</td>
+        <td><input type="text" class="labelInput" value="${escapeHtml(label)}" style="width:100%;"></td>
+        <td><input type="number" class="orderInput" value="${order}" style="width:70px;"></td>
+      </tr>
+    `;
+  }).join("");
+
+  // Save handler
+  container.querySelector("#btnSaveContactConfig").addEventListener("click", async () => {
+    const rows = [];
+    gridBody.querySelectorAll("tr").forEach(tr => {
+      const field = tr.dataset.field;
+      const enabled = tr.querySelector(".enableCheckbox").checked;
+      if (enabled) {
+        const label = tr.querySelector(".labelInput").value.trim() || field;
+        const order = parseInt(tr.querySelector(".orderInput").value, 10) || 99;
+        rows.push({ field_key: field, label, sort_order: order });
+      }
+    });
+
+    await fetch("https://lookups-module.dennis-e64.workers.dev/contact_fields/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project: portalState.setup_project_id, fields: rows })
+    });
+
+    alert("Contact fields saved.");
+  });
+}
+
+
+
 // helper for safe HTML rendering
 function escapeHtml(str) {
   return str?.replace(/[&<>"']/g, c => ({
