@@ -197,7 +197,7 @@ async function renderSetupLookups(tabContent, portalState) {
   tabContent.innerHTML = `
     <section class="card">
       <div class="lookup-groups-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <h2 style="margin:0;">Lookup Groups</h2>
+      <h2 style="margin:0;">Lookup Groups for ${escapeHtml(portalState.display_name || portalState.setup_project_id)}</h2>
         <div>
           <button id="btnCloneLookups" class="btn-secondary" style="margin-right:8px;">Clone Group</button>
           <button id="addGroupBtn" class="btn-primary">+ Add Lookup Group</button>
@@ -533,7 +533,8 @@ async function renderContactSetup(container, portalState) {
   container.innerHTML = `
     <section class="card">
       <div style="display:flex; align-items:center; justify-content:space-between;">
-        <h2>Contact Setup</h2>
+      <h2>Contact Setup for ${escapeHtml(portalState.display_name || portalState.setup_project_id)}</h2>
+
         <div>
           <button id="btnDefaultMode" class="btn-secondary" style="margin-right:8px;">Default Mode</button>
           <button id="btnSaveContactConfig" class="btn-primary">Save Config</button>
