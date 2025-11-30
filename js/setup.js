@@ -312,7 +312,7 @@ async function renderSetupLookups(tabContent, portalState) {
           value,
           sort_order: sort,
           is_active: active,
-          project: portalState.project,
+          project: portalState.setup_project_id,   // <-- FIXED
           created_at: new Date().toISOString()
         };
 
