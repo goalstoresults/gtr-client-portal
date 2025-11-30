@@ -35,6 +35,7 @@ export async function loadSetupTab({ portalState, tabContent }) {
     });
   });
 }
+
 async function renderClientSetup(container, portalState) {
   container.innerHTML = `
     <section class="card">
@@ -92,6 +93,7 @@ async function renderClientSetup(container, portalState) {
       { tab_id: "7", description: "Groups" },
       { tab_id: "8", description: "Setup" }
     ];
+
     detailsDiv.innerHTML = `
       <section class="card">
         <p><strong>Project:</strong> ${selectedRow.project}</p>
@@ -127,22 +129,7 @@ async function renderClientSetup(container, portalState) {
         </tr>
       `;
     }).join("");
-    const gridBody = detailsDiv.querySelector("#tabConfigGrid tbody");
-    gridBody.innerHTML = allTabs.map(tab => {
-      const checked = enabled.includes(tab.tab_id) ? "checked" : "";
-      const sortIndex = enabled.indexOf(tab.tab_id);
-      return `
-        <tr>
-          <td style="text-align:center;">
-            <input type="checkbox" data-tabid="${tab.tab_id}" ${checked}>
-          </td>
-          <td>${tab.description}</td>
-          <td>
-            <input type="number" min="1" max="99" value="${sortIndex >= 0 ? sortIndex + 1 : ""}" style="width:80px;" data-sort="${tab.tab_id}">
-          </td>
-        </tr>
-      `;
-    }).join("");
+
     detailsDiv.querySelector("#btnSaveConfig").addEventListener("click", async () => {
       const checkedTabs = [];
       gridBody.querySelectorAll("input[type=checkbox]").forEach(cb => {
@@ -169,13 +156,9 @@ async function renderClientSetup(container, portalState) {
   // If a project is already selected, render its details
   if (select.value) select.dispatchEvent(new Event("change"));
 }
-      alert("Config saved.");
-    });
-  });
 
-  // If a project is already selected, render its details
-  if (select.value) select.dispatchEvent(new Event("change"));
-}    
+
+
 async function renderSetupLookups(tabContent, portalState) {
   tabContent.innerHTML = `
     <section class="card">
