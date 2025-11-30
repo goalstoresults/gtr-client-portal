@@ -436,12 +436,21 @@ async function renderContactSetup(container, portalState) {
 
   const configured = Array.isArray(data.rows) ? data.rows : [];
 
-  // Render rows: either existing config or blank for unused fields
+  // Helper: convert snake_case to Title Case for placeholder
+  function toTitleCase(field) {
+    return field
+      .split("_")
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  }
+
+  // Render rows
   gridBody.innerHTML = systemFields.map(field => {
     const row = configured.find(r => r.field_key === field);
     const enabled = !!row;
     const label = row ? row.label : "";
     const order = row ? row.sort_order : "";
+    const placeholder = toTitleCase(field);
 
     return `
       <tr data-field="${field}">
@@ -449,7 +458,12 @@ async function renderContactSetup(container, portalState) {
           <input type="checkbox" class="enableCheckbox" ${enabled ? "checked" : ""}>
         </td>
         <td>${field}</td>
-        <td><input type="text" class="labelInput" value="${escapeHtml(label)}" style="width:100%;"></td>
+        <td>
+          <input type="text" class="labelInput" 
+                 value="${escapeHtml(label)}" 
+                 placeholder="${placeholder}" 
+                 style="width:100%;">
+        </td>
         <td><input type="number" class="orderInput" value="${order}" style="width:70px;"></td>
       </tr>
     `;
@@ -462,7 +476,8 @@ async function renderContactSetup(container, portalState) {
       const field = tr.dataset.field;
       const enabled = tr.querySelector(".enableCheckbox").checked;
       if (enabled) {
-        const label = tr.querySelector(".labelInput").value.trim() || field;
+        const labelInput = tr.querySelector(".labelInput");
+        const label = labelInput.value.trim() || labelInput.placeholder;
         const order = parseInt(tr.querySelector(".orderInput").value, 10) || 99;
         rows.push({ field_key: field, label, sort_order: order });
       }
@@ -477,6 +492,7 @@ async function renderContactSetup(container, portalState) {
     alert("Contact fields saved.");
   });
 }
+
 
 
 
