@@ -172,7 +172,7 @@ async function renderClientSetup(container, portalState) {
       await fetch(`https://lookups-module.dennis-e64.workers.dev/api/projects_config?project=eq.${encodeURIComponent(selectedRow.project)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...selectedRow, enabled_tabs: newEnabledTabs })
+        body: JSON.stringify({ enabled_tabs: newEnabledTabs })
       });
 
       alert("Config saved.");
