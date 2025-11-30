@@ -187,16 +187,36 @@ button {
   font-weight: 600;
 }
 .notes-table tr:nth-child(even) { background: #fafafa; }
+
+/* Default button style inside notes-table (baseline) */
 .notes-table button {
   padding: 4px 8px;
   font-size: 0.9em;
-  border: 1px solid #4a90e2;
-  background: #4a90e2;
-  color: #fff;
   border-radius: 3px;
   cursor: pointer;
 }
-.notes-table button:hover { background: #357ab8; }
+
+/* Scoped overrides so variants win inside notes-table */
+.notes-table button.btn-primary {
+  background: #2979ff;
+  color: #fff;
+  border: none;
+}
+.notes-table button.btn-primary:hover { background: #1c5fd6; }
+
+.notes-table button.btn-danger {
+  background: #e53935;
+  color: #fff;
+  border: none;
+}
+.notes-table button.btn-danger:hover { background: #c62828; }
+
+.notes-table button.btn-secondary {
+  background: #999;
+  color: #fff;
+  border: none;
+}
+.notes-table button.btn-secondary:hover { background: #777; }
 
 .contact-result {
   cursor: pointer;
