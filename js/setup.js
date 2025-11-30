@@ -10,8 +10,7 @@ export async function loadSetupTab({ portalState, tabContent }) {
       subtabs.querySelectorAll("button").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
-      const sub = btn.dataset.subtab;
-      switch (sub) {
+      switch (btn.dataset.subtab) {
         case "client":
           renderClientSetup(setupContent, portalState);
           break;
@@ -24,12 +23,7 @@ export async function loadSetupTab({ portalState, tabContent }) {
           `;
           break;
         case "lookups":
-          setupContent.innerHTML = `
-            <section class="card">
-              <h2>Lookups Setup</h2>
-              <p>Placeholder for dropdown values.</p>
-            </section>
-          `;
+          renderSetupLookups(setupContent, portalState);
           break;
         default:
           setupContent.innerHTML = `
@@ -42,122 +36,227 @@ export async function loadSetupTab({ portalState, tabContent }) {
   });
 }
 
-async function renderClientSetup(container, portalState) {
-  container.innerHTML = `
+/* -------------------------------
+   Setup → Lookups subtab
+   (copied from top-level lookups.js)
+-------------------------------- */
+async function renderSetupLookups(tabContent, portalState) {
+  tabContent.innerHTML = `
     <section class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h2>Select Client</h2>
-        <button id="btnAddClient" class="primary">Add Client</button>
-      </div>
-
-      <div style="margin-top:16px;">
-        <label><strong>Client:</strong></label>
-        <select id="clientSelect" style="margin-left:12px;">
-          <option value="">---Select---</option>
-        </select>
-      </div>
-
-      <div id="clientDetails" style="margin-top:24px;"></div>
+      <h2>Lookup Groups</h2>
+      <div id="lookupGroups">Loading...</div>
+      <button id="addGroupBtn" class="primary">+ Add Lookup Group</button>
     </section>
   `;
 
-  const select = container.querySelector("#clientSelect");
-  const detailsDiv = container.querySelector("#clientDetails");
+  const groupsDiv = tabContent.querySelector("#lookupGroups");
 
-  const resConfig = await fetch("https://lookups-module.dennis-e64.workers.dev/api/projects_config", { cache: "no-cache" });
-  const configRows = await resConfig.json();
+  try {
+    const url = `https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${portalState.project}`;
+    const res = await fetch(url, { cache: "no-cache" });
+    const data = await res.json();
 
-  configRows.forEach(row => {
-    const opt = document.createElement("option");
-    opt.value = row.project;
-    opt.textContent = row.display_name;
-    if (row.project === portalState.setup_project_id) opt.selected = true;
-    select.appendChild(opt);
-  });
-
-  select.addEventListener("change", async () => {
-    const selectedProject = select.value;
-    portalState.setup_project_id = selectedProject;
-
-    const selectedRow = configRows.find(r => r.project === selectedProject);
-    if (!selectedRow) {
-      detailsDiv.innerHTML = "";
+    if (!res.ok || data.status !== "ok" || !Array.isArray(data.lookups)) {
+      groupsDiv.innerHTML = `<p>Error loading lookups: ${data.error || "Unknown error"}</p>`;
       return;
     }
 
-    const enabled = selectedRow.enabled_tabs || [];
+    const grouped = {};
+    data.lookups.forEach(row => {
+      if (!grouped[row.lookup_type]) grouped[row.lookup_type] = [];
+      grouped[row.lookup_type].push(row);
+    });
 
-    const allTabs = [
-      { tab_id: "1", description: "Contacts" },
-      { tab_id: "2", description: "Financials" },
-      { tab_id: "3", description: "Notes" },
-      { tab_id: "4", description: "Tasks" },
-      { tab_id: "5", description: "Lookups" },
-      { tab_id: "6", description: "Dashboard" },
-      { tab_id: "7", description: "Groups" },
-      { tab_id: "8", description: "Setup" }
-    ];
-
-    detailsDiv.innerHTML = `
-      <section class="card">
-        <p><strong>Project:</strong> ${selectedRow.project}</p>
-        <p><strong>Display Name:</strong> ${selectedRow.display_name}</p>
-        <h3>Enabled Tabs</h3>
-        <table id="tabConfigGrid" class="striped" style="width:100%; margin-top:12px;">
+    groupsDiv.innerHTML = Object.keys(grouped).map(type => `
+      <section class="lookup-group card" style="margin-bottom:24px;">
+        <h3>${escapeHtml(type)}</h3>
+        <table class="notes-table">
           <thead>
             <tr>
-              <th style="width:80px;">Enabled</th>
-              <th>Tab Name</th>
-              <th style="width:100px;">Sort Order</th>
+              <th>Value</th>
+              <th>Sort</th>
+              <th>Active</th>
+              <th>Actions</th>
             </tr>
           </thead>
-          <tbody></tbody>
+          <tbody>
+            ${grouped[type].map(item => `
+              <tr data-id="${item.id}">
+                <td><input type="text" class="valueInput" value="${escapeHtml(item.value)}" style="width:100%;"></td>
+                <td><input type="number" class="sortInput" value="${item.sort_order}" style="width:70px;"></td>
+                <td>
+                  <select class="activeDropdown">
+                    <option value="true" ${item.is_active ? "selected" : ""}>Yes</option>
+                    <option value="false" ${!item.is_active ? "selected" : ""}>No</option>
+                  </select>
+                </td>
+                <td>
+                  <button class="saveBtn primary">Save</button>
+                  <button class="deleteBtn danger">Delete</button>
+                </td>
+              </tr>
+            `).join("")}
+          </tbody>
         </table>
-        <button id="btnSaveConfig" class="primary" style="margin-top:12px;">Save Config</button>
+        <button class="addValueBtn primary" data-type="${type}" style="margin-top:8px;">+ Add Value</button>
       </section>
-    `;
+    `).join("");
 
-    const gridBody = detailsDiv.querySelector("#tabConfigGrid tbody");
-    gridBody.innerHTML = allTabs.map((tab, i) => {
-      const checked = enabled.includes(tab.tab_id) ? "checked" : "";
-      const sortIndex = enabled.indexOf(tab.tab_id);
-      return `
-        <tr>
-          <td style="text-align:center;">
-            <input type="checkbox" data-tabid="${tab.tab_id}" ${checked}>
-          </td>
-          <td>${tab.description}</td>
-          <td>
-            <input type="number" min="1" max="99" value="${sortIndex >= 0 ? sortIndex + 1 : ""}"
-                   style="width:60px;" data-sort="${tab.tab_id}">
-          </td>
-        </tr>
+    // Add Group inline form
+    const addGroupBtn = tabContent.querySelector("#addGroupBtn");
+    addGroupBtn.addEventListener("click", () => {
+      const addRow = document.createElement("div");
+      addRow.innerHTML = `
+        <table class="notes-table" style="margin-top:12px;">
+          <thead>
+            <tr>
+              <th>Lookup Type</th>
+              <th>Value</th>
+              <th>Sort</th>
+              <th>Active</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><input type="text" class="newTypeInput" placeholder="Group name"></td>
+              <td><input type="text" class="newValueInput" placeholder="First value"></td>
+              <td><input type="number" class="newSortInput" value="10" style="width:70px;"></td>
+              <td>
+                <select class="newActiveDropdown">
+                  <option value="true" selected>Yes</option>
+                  <option value="false">No</option>
+                </select>
+              </td>
+              <td>
+                <button class="saveNewGroupBtn primary">Save</button>
+                <button class="cancelNewGroupBtn">Cancel</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       `;
-    }).join("");
+      addGroupBtn.insertAdjacentElement("afterend", addRow);
 
-    detailsDiv.querySelector("#btnSaveConfig").addEventListener("click", async () => {
-      const checkedTabs = [];
-      gridBody.querySelectorAll("input[type=checkbox]").forEach(cb => {
-        if (cb.checked) {
-          const sortInput = gridBody.querySelector(`input[data-sort="${cb.dataset.tabid}"]`);
-          const sortVal = parseInt(sortInput.value, 10) || 99;
-          checkedTabs.push({ tab_id: cb.dataset.tabid, sort: sortVal });
+      addRow.querySelector(".saveNewGroupBtn").addEventListener("click", async () => {
+        const type = addRow.querySelector(".newTypeInput").value.trim();
+        const value = addRow.querySelector(".newValueInput").value.trim();
+        const sort = parseInt(addRow.querySelector(".newSortInput").value, 10);
+        const active = addRow.querySelector(".newActiveDropdown").value === "true";
+
+        if (!type || !value) {
+          alert("Please enter both a group name and a value.");
+          return;
         }
+
+        const payload = {
+          lookup_type: type,
+          value,
+          sort_order: sort,
+          is_active: active,
+          project: portalState.project,
+          created_at: new Date().toISOString()
+        };
+
+        await fetch("https://lookups-module.dennis-e64.workers.dev/lookups/addGroup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        renderSetupLookups(tabContent, portalState);
       });
 
-      checkedTabs.sort((a, b) => a.sort - b.sort);
-      const newEnabledTabs = checkedTabs.map(t => t.tab_id);
-
-      await fetch(`https://lookups-module.dennis-e64.workers.dev/api/projects_config?project=eq.${encodeURIComponent(selectedRow.project)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...selectedRow,
-          enabled_tabs: newEnabledTabs
-        })
+      addRow.querySelector(".cancelNewGroupBtn").addEventListener("click", () => {
+        addRow.remove();
       });
-
-      alert("✅ Config saved.");
     });
+
+    // Event delegation for Save/Delete/Add Value
+    groupsDiv.addEventListener("click", async e => {
+      const row = e.target.closest("tr");
+      const id = row?.dataset?.id;
+
+      if (e.target.classList.contains("saveBtn")) {
+        const value = row.querySelector(".valueInput").value.trim();
+        const sort = parseInt(row.querySelector(".sortInput").value, 10);
+        const active = row.querySelector(".activeDropdown").value === "true";
+
+        const updates = { value, sort_order: sort, is_active: active };
+
+        await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups/edit/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ updates })
+        });
+
+        renderSetupLookups(tabContent, portalState);
+      }
+
+      if (e.target.classList.contains("deleteBtn")) {
+        if (!confirm("Delete this lookup value?")) return;
+        await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups/delete/${id}`, {
+          method: "DELETE"
+        });
+        renderSetupLookups(tabContent, portalState);
+      }
+
+      if (e.target.classList.contains("addValueBtn")) {
+        const type = e.target.dataset.type;
+        const groupSection = e.target.closest(".lookup-group");
+        const tbody = groupSection.querySelector("tbody");
+
+        const lastRow = tbody.querySelector("tr:last-child");
+        const lastSort = lastRow ? parseInt(lastRow.querySelector(".sortInput")?.value || lastRow.querySelector("td:nth-child(2)")?.textContent, 10) : 0;
+        const nextSort = (isNaN(lastSort) ? 0 : lastSort) + 10;
+
+
+        const newRow = document.createElement("tr");
+        newRow.innerHTML = `
+          <td><input type="text" class="newValueInput" placeholder="New value"></td>
+          <td><input type="number" class="newSortInput" value="${nextSort}" style="width:70px;"></td>
+          <td>
+            <select class="newActiveDropdown">
+              <option value="true" selected>Yes</option>
+              <option value="false">No</option>
+            </select>
+          </td>
+          <td>
+            <button class="saveNewValueBtn" style="background:#2979ff;color:#fff;border:none;border-radius:4px;padding:6px 12px;">Save</button>
+            <button class="cancelNewValueBtn" style="background:#999;color:#fff;border:none;border-radius:4px;padding:6px 12px;margin-left:6px;">Cancel</button>
+          </td>
+        `;
+        tbody.appendChild(newRow);
+
+newRow.querySelector(".saveNewValueBtn").addEventListener("click", async () => {
+  const value = newRow.querySelector(".newValueInput").value.trim();
+  const sort = parseInt(newRow.querySelector(".newSortInput").value, 10);
+  const active = newRow.querySelector(".newActiveDropdown").value === "true";
+
+  if (!value) {
+    alert("Please enter a value.");
+    return;
+  }
+
+  const payload = {
+    lookup_type: type,
+    value,
+    sort_order: sort,
+    is_active: active,
+    project: portalState.project,
+    created_at: new Date().toISOString()
+  };
+
+  await fetch("https://lookups-module.dennis-e64.workers.dev/lookups/addValue", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
   });
-}
+
+  // Refresh the tab to show the new row
+  renderSetupLookups(tabContent, portalState);
+});
+
+newRow.querySelector(".cancelNewValueBtn").addEventListener("click", () => {
+  newRow.remove();
+});
