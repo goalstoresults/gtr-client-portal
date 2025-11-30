@@ -155,6 +155,15 @@ async function renderClientSetup(container, portalState) {
 
 
 async function renderSetupLookups(tabContent, portalState) {
+  if (!portalState.setup_project_id) {
+    tabContent.innerHTML = `
+      <section class="card">
+        <p>Please select a project in the Client tab before configuring Lookups.</p>
+      </section>
+    `;
+    return;
+  }
+
   tabContent.innerHTML = `
     <section class="card">
       <h2>Lookup Groups</h2>
@@ -166,7 +175,7 @@ async function renderSetupLookups(tabContent, portalState) {
   const groupsDiv = tabContent.querySelector("#lookupGroups");
 
   try {
-    const url = `https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${portalState.project}`;
+    const url = `https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${portalState.setup_project_id}`;
     const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
 
