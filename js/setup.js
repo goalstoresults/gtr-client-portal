@@ -35,17 +35,12 @@ export async function loadSetupTab({ portalState, tabContent }) {
     });
   });
 }
-
-/* -------------------------------
-   Setup → Lookups subtab
-   (copied from top-level lookups.js)
--------------------------------- */
 async function renderSetupLookups(tabContent, portalState) {
   tabContent.innerHTML = `
     <section class="card">
       <h2>Lookup Groups</h2>
       <div id="lookupGroups">Loading...</div>
-      <button id="addGroupBtn" class="primary">+ Add Lookup Group</button>
+      <button id="addGroupBtn" class="btn-primary">+ Add Lookup Group</button>
     </section>
   `;
 
@@ -91,17 +86,16 @@ async function renderSetupLookups(tabContent, portalState) {
                   </select>
                 </td>
                 <td>
-                  <button class="saveBtn primary">Save</button>
-                  <button class="deleteBtn danger">Delete</button>
+                  <button class="saveBtn btn-primary">Save</button>
+                  <button class="deleteBtn btn-danger">Delete</button>
                 </td>
               </tr>
             `).join("")}
           </tbody>
         </table>
-        <button class="addValueBtn primary" data-type="${type}" style="margin-top:8px;">+ Add Value</button>
+        <button class="addValueBtn btn-primary" data-type="${type}" style="margin-top:8px;">+ Add Value</button>
       </section>
     `).join("");
-
     // Add Group inline form
     const addGroupBtn = tabContent.querySelector("#addGroupBtn");
     addGroupBtn.addEventListener("click", () => {
@@ -129,8 +123,8 @@ async function renderSetupLookups(tabContent, portalState) {
                 </select>
               </td>
               <td>
-                <button class="saveNewGroupBtn primary">Save</button>
-                <button class="cancelNewGroupBtn">Cancel</button>
+                <button class="saveNewGroupBtn btn-primary">Save</button>
+                <button class="cancelNewGroupBtn btn-secondary">Cancel</button>
               </td>
             </tr>
           </tbody>
@@ -210,7 +204,6 @@ async function renderSetupLookups(tabContent, portalState) {
         const lastSort = lastRow ? parseInt(lastRow.querySelector(".sortInput")?.value || lastRow.querySelector("td:nth-child(2)")?.textContent, 10) : 0;
         const nextSort = (isNaN(lastSort) ? 0 : lastSort) + 10;
 
-
         const newRow = document.createElement("tr");
         newRow.innerHTML = `
           <td><input type="text" class="newValueInput" placeholder="New value"></td>
@@ -222,49 +215,46 @@ async function renderSetupLookups(tabContent, portalState) {
             </select>
           </td>
           <td>
-            <button class="saveNewValueBtn" style="background:#2979ff;color:#fff;border:none;border-radius:4px;padding:6px 12px;">Save</button>
-            <button class="cancelNewValueBtn" style="background:#999;color:#fff;border:none;border-radius:4px;padding:6px 12px;margin-left:6px;">Cancel</button>
+            <button class="saveNewValueBtn btn-primary">Save</button>
+            <button class="cancelNewValueBtn btn-secondary">Cancel</button>
           </td>
-        `;
-        tbody.appendChild(newRow);
+      `;
+      tbody.appendChild(newRow);
 
-        newRow.querySelector(".saveNewValueBtn").addEventListener("click", async () => {
-          const value = newRow.querySelector(".newValueInput").value.trim();
-          const sort = parseInt(newRow.querySelector(".newSortInput").value, 10);
-          const active = newRow.querySelector(".newActiveDropdown").value === "true";
-        
-          if (!value) {
-            alert("Please enter a value.");
-            return;
-          }
-        
-          const payload = {
-            lookup_type: type,
-            value,
-            sort_order: sort,
-            is_active: active,
-            project: portalState.project,
-            created_at: new Date().toISOString()
-          };
-        
-          await fetch("https://lookups-module.dennis-e64.workers.dev/lookups/addValue", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          });
-        
-          // Refresh the tab to show the new row
-          renderSetupLookups(tabContent, portalState);
-        });
-        
-        newRow.querySelector(".cancelNewValueBtn").addEventListener("click", () => {
-          newRow.remove();
+      newRow.querySelector(".saveNewValueBtn").addEventListener("click", async () => {
+        const value = newRow.querySelector(".newValueInput").value.trim();
+        const sort = parseInt(newRow.querySelector(".newSortInput").value, 10);
+        const active = newRow.querySelector(".newActiveDropdown").value === "true";
+
+        if (!value) {
+          alert("Please enter a value.");
+          return;
+        }
+
+        const payload = {
+          lookup_type: type,
+          value,
+          sort_order: sort,
+          is_active: active,
+          project: portalState.project,
+          created_at: new Date().toISOString()
+        };
+
+        await fetch("https://lookups-module.dennis-e64.workers.dev/lookups/addValue", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
         });
 
+        // Refresh the tab to show the new row
+        renderSetupLookups(tabContent, portalState);
+      });
 
-        // end of addValueBtn handler
-      }
-    });
+      newRow.querySelector(".cancelNewValueBtn").addEventListener("click", () => {
+        newRow.remove();
+      });
+    }
+  });
 
   } catch (err) {
     groupsDiv.innerHTML = `<p>Error loading lookups: ${err.message}</p>`;
@@ -280,4 +270,4 @@ function escapeHtml(str) {
     '"': "&quot;",
     "'": "&#39;"
   }[c])) || "";
-}        
+}
