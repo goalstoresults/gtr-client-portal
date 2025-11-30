@@ -360,7 +360,7 @@ async function renderSetupLookups(tabContent, portalState) {
             <button class="saveNewValueBtn btn-primary">Save</button>
             <button class="cancelNewValueBtn btn-secondary">Cancel</button>
           </td>
-        `;
+        `;   // <-- this backtick was missing
         tbody.appendChild(newRow);
 
         newRow.querySelector(".saveNewValueBtn").addEventListener("click", async () => {
@@ -388,6 +388,7 @@ async function renderSetupLookups(tabContent, portalState) {
             body: JSON.stringify(payload)
           });
 
+          // Refresh the tab to show the new row
           renderSetupLookups(tabContent, portalState);
         });
 
