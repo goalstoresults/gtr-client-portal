@@ -402,7 +402,13 @@ async function renderContactSetup(container, portalState) {
 
   container.innerHTML = `
     <section class="card">
+    <div style="display:flex; align-items:center; justify-content:space-between;">
       <h2>Contact Setup</h2>
+      <div>
+        <button id="btnDefaultMode" class="btn-secondary" style="margin-right:8px;">Default Mode</button>
+        <button id="btnSaveContactConfig" class="btn-primary">Save Config</button>
+      </div>
+    </div>
       <p>Enable fields for this project, customize labels, and set order.</p>
       <table id="contactFieldsGrid" class="notes-table" style="width:100%; margin-top:12px;">
         <thead>
@@ -415,7 +421,6 @@ async function renderContactSetup(container, portalState) {
         </thead>
         <tbody></tbody>
       </table>
-      <button id="btnSaveContactConfig" class="btn-primary" style="margin-top:12px;">Save Config</button>
     </section>
   `;
 
@@ -468,6 +473,22 @@ async function renderContactSetup(container, portalState) {
       </tr>
     `;
   }).join("");
+
+  // Default Mode handler goes here
+  container.querySelector("#btnDefaultMode").addEventListener("click", () => {
+    const rows = gridBody.querySelectorAll("tr");
+    rows.forEach((tr, idx) => {
+      const checkbox = tr.querySelector(".enableCheckbox");
+      const labelInput = tr.querySelector(".labelInput");
+      const orderInput = tr.querySelector(".orderInput");
+  
+      checkbox.checked = true;
+      if (!labelInput.value.trim()) {
+        labelInput.value = labelInput.placeholder;
+      }
+      orderInput.value = idx + 1;
+    });
+  });
 
   // Save handler
   container.querySelector("#btnSaveContactConfig").addEventListener("click", async () => {
