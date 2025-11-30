@@ -35,6 +35,147 @@ export async function loadSetupTab({ portalState, tabContent }) {
     });
   });
 }
+async function renderClientSetup(container, portalState) {
+  container.innerHTML = `
+    <section class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2>Select Client</h2>
+        <button id="btnAddClient" class="btn-primary">Add Client</button>
+      </div>
+
+      <div style="margin-top:16px;">
+        <label><strong>Client:</strong></label>
+        <select id="clientSelect" style="margin-left:12px;">
+          <option value="">---Select---</option>
+        </select>
+      </div>
+
+      <div id="clientDetails" style="margin-top:24px;"></div>
+    </section>
+  `;
+
+  const select = container.querySelector("#clientSelect");
+  const detailsDiv = container.querySelector("#clientDetails");
+
+  const resConfig = await fetch("https://lookups-module.dennis-e64.workers.dev/api/projects_config", { cache: "no-cache" });
+  const configRows = await resConfig.json();
+
+  // Populate dropdown
+  configRows.forEach(row => {
+    const opt = document.createElement("option");
+    opt.value = row.project;
+    opt.textContent = row.display_name;
+    if (row.project === portalState.setup_project_id) opt.selected = true;
+    select.appendChild(opt);
+  });
+
+  select.addEventListener("change", () => {
+    const selectedProject = select.value;
+    portalState.setup_project_id = selectedProject;
+
+    const selectedRow = configRows.find(r => r.project === selectedProject);
+    if (!selectedRow) {
+      detailsDiv.innerHTML = "";
+      return;
+    }
+
+    const enabled = selectedRow.enabled_tabs || [];
+
+    // Master tab list
+    const allTabs = [
+      { tab_id: "1", description: "Contacts" },
+      { tab_id: "2", description: "Financials" },
+      { tab_id: "3", description: "Notes" },
+      { tab_id: "4", description: "Tasks" },
+      { tab_id: "5", description: "Lookups" },
+      { tab_id: "6", description: "Dashboard" },
+      { tab_id: "7", description: "Groups" },
+      { tab_id: "8", description: "Setup" }
+    ];
+    detailsDiv.innerHTML = `
+      <section class="card">
+        <p><strong>Project:</strong> ${selectedRow.project}</p>
+        <p><strong>Display Name:</strong> ${selectedRow.display_name}</p>
+        <h3>Enabled Tabs</h3>
+        <table id="tabConfigGrid" class="notes-table" style="width:100%; margin-top:12px;">
+          <thead>
+            <tr>
+              <th style="width:80px;">Enabled</th>
+              <th>Tab Name</th>
+              <th style="width:120px;">Sort Order</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <button id="btnSaveConfig" class="btn-primary" style="margin-top:12px;">Save Config</button>
+      </section>
+    `;
+
+    const gridBody = detailsDiv.querySelector("#tabConfigGrid tbody");
+    gridBody.innerHTML = allTabs.map(tab => {
+      const checked = enabled.includes(tab.tab_id) ? "checked" : "";
+      const sortIndex = enabled.indexOf(tab.tab_id);
+      return `
+        <tr>
+          <td style="text-align:center;">
+            <input type="checkbox" data-tabid="${tab.tab_id}" ${checked}>
+          </td>
+          <td>${tab.description}</td>
+          <td>
+            <input type="number" min="1" max="99" value="${sortIndex >= 0 ? sortIndex + 1 : ""}" style="width:80px;" data-sort="${tab.tab_id}">
+          </td>
+        </tr>
+      `;
+    }).join("");
+    const gridBody = detailsDiv.querySelector("#tabConfigGrid tbody");
+    gridBody.innerHTML = allTabs.map(tab => {
+      const checked = enabled.includes(tab.tab_id) ? "checked" : "";
+      const sortIndex = enabled.indexOf(tab.tab_id);
+      return `
+        <tr>
+          <td style="text-align:center;">
+            <input type="checkbox" data-tabid="${tab.tab_id}" ${checked}>
+          </td>
+          <td>${tab.description}</td>
+          <td>
+            <input type="number" min="1" max="99" value="${sortIndex >= 0 ? sortIndex + 1 : ""}" style="width:80px;" data-sort="${tab.tab_id}">
+          </td>
+        </tr>
+      `;
+    }).join("");
+    detailsDiv.querySelector("#btnSaveConfig").addEventListener("click", async () => {
+      const checkedTabs = [];
+      gridBody.querySelectorAll("input[type=checkbox]").forEach(cb => {
+        if (cb.checked) {
+          const sortInput = gridBody.querySelector(`input[data-sort="${cb.dataset.tabid}"]`);
+          const sortVal = parseInt(sortInput.value, 10);
+          checkedTabs.push({ tab_id: cb.dataset.tabid, sort: Number.isFinite(sortVal) ? sortVal : 99 });
+        }
+      });
+
+      checkedTabs.sort((a, b) => a.sort - b.sort);
+      const newEnabledTabs = checkedTabs.map(t => t.tab_id);
+
+      await fetch(`https://lookups-module.dennis-e64.workers.dev/api/projects_config?project=eq.${encodeURIComponent(selectedRow.project)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...selectedRow, enabled_tabs: newEnabledTabs })
+      });
+
+      alert("Config saved.");
+    });
+  });
+
+  // If a project is already selected, render its details
+  if (select.value) select.dispatchEvent(new Event("change"));
+}
+      alert("Config saved.");
+    });
+  });
+
+  // If a project is already selected, render its details
+  if (select.value) select.dispatchEvent(new Event("change"));
+}    
 async function renderSetupLookups(tabContent, portalState) {
   tabContent.innerHTML = `
     <section class="card">
@@ -96,6 +237,7 @@ async function renderSetupLookups(tabContent, portalState) {
         <button class="addValueBtn btn-primary" data-type="${type}" style="margin-top:8px;">+ Add Value</button>
       </section>
     `).join("");
+
     // Add Group inline form
     const addGroupBtn = tabContent.querySelector("#addGroupBtn");
     addGroupBtn.addEventListener("click", () => {
@@ -218,43 +360,42 @@ async function renderSetupLookups(tabContent, portalState) {
             <button class="saveNewValueBtn btn-primary">Save</button>
             <button class="cancelNewValueBtn btn-secondary">Cancel</button>
           </td>
-      `;
-      tbody.appendChild(newRow);
+        `;
+        tbody.appendChild(newRow);
 
-      newRow.querySelector(".saveNewValueBtn").addEventListener("click", async () => {
-        const value = newRow.querySelector(".newValueInput").value.trim();
-        const sort = parseInt(newRow.querySelector(".newSortInput").value, 10);
-        const active = newRow.querySelector(".newActiveDropdown").value === "true";
+        newRow.querySelector(".saveNewValueBtn").addEventListener("click", async () => {
+          const value = newRow.querySelector(".newValueInput").value.trim();
+          const sort = parseInt(newRow.querySelector(".newSortInput").value, 10);
+          const active = newRow.querySelector(".newActiveDropdown").value === "true";
 
-        if (!value) {
-          alert("Please enter a value.");
-          return;
-        }
+          if (!value) {
+            alert("Please enter a value.");
+            return;
+          }
 
-        const payload = {
-          lookup_type: type,
-          value,
-          sort_order: sort,
-          is_active: active,
-          project: portalState.project,
-          created_at: new Date().toISOString()
-        };
+          const payload = {
+            lookup_type: type,
+            value,
+            sort_order: sort,
+            is_active: active,
+            project: portalState.project,
+            created_at: new Date().toISOString()
+          };
 
-        await fetch("https://lookups-module.dennis-e64.workers.dev/lookups/addValue", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+          await fetch("https://lookups-module.dennis-e64.workers.dev/lookups/addValue", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+
+          renderSetupLookups(tabContent, portalState);
         });
 
-        // Refresh the tab to show the new row
-        renderSetupLookups(tabContent, portalState);
-      });
-
-      newRow.querySelector(".cancelNewValueBtn").addEventListener("click", () => {
-        newRow.remove();
-      });
-    }
-  });
+        newRow.querySelector(".cancelNewValueBtn").addEventListener("click", () => {
+          newRow.remove();
+        });
+      }
+    });
 
   } catch (err) {
     groupsDiv.innerHTML = `<p>Error loading lookups: ${err.message}</p>`;
