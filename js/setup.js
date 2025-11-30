@@ -64,6 +64,37 @@ async function renderClientSetup(container, portalState) {
     if (row.project === portalState.setup_project_id) opt.selected = true;
     select.appendChild(opt);
   });
+  
+  // Add Client button handler
+  container.querySelector("#btnAddClient").addEventListener("click", async () => {
+    const projectId = prompt("Enter new project ID (short code):");
+    if (!projectId) return;
+  
+    const displayName = prompt("Enter display name for client:");
+    if (!displayName) return;
+  
+    const payload = {
+      project: projectId,
+      display_name: displayName,
+      created_at: new Date().toISOString(),
+      enabled_tabs: [] // start empty, admin will configure later
+    };
+  
+    const res = await fetch("https://lookups-module.dennis-e64.workers.dev/api/projects_config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  
+    if (res.ok) {
+      alert("Client added.");
+      // Refresh the Client tab so dropdown updates
+      renderClientSetup(container, portalState);
+    } else {
+      const text = await res.text();
+      alert("Error adding client: " + text);
+    }
+  });
 
   select.addEventListener("change", () => {
     const selectedProject = select.value;
