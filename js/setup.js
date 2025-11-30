@@ -401,8 +401,8 @@ async function renderSetupLookups(tabContent, portalState) {
                 project: portalState.setup_project_id,
                 created_at: new Date().toISOString()
               }));
-    
-            await fetch("https://lookups-module.dennis-e64.workers.dev/rest/v1/lookups", {
+
+            await fetch("https://lookups-module.dennis-e64.workers.dev/lookups/addValue", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload)
