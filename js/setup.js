@@ -523,16 +523,23 @@ async function renderContactSetup(container, portalState) {
     return;
   }
 
+  // Fetch project lookup groups (for dropdown options)
+  const resLookups = await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${portalState.setup_project_id}`, { cache: "no-cache" });
+  const lookupsData = await resLookups.json();
+  const lookupGroups = Array.isArray(lookupsData.lookups)
+    ? [...new Set(lookupsData.lookups.map(l => l.lookup_type))].sort()
+    : [];
+
   container.innerHTML = `
     <section class="card">
-    <div style="display:flex; align-items:center; justify-content:space-between;">
-      <h2>Contact Setup</h2>
-      <div>
-        <button id="btnDefaultMode" class="btn-secondary" style="margin-right:8px;">Default Mode</button>
-        <button id="btnSaveContactConfig" class="btn-primary">Save Config</button>
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <h2>Contact Setup</h2>
+        <div>
+          <button id="btnDefaultMode" class="btn-secondary" style="margin-right:8px;">Default Mode</button>
+          <button id="btnSaveContactConfig" class="btn-primary">Save Config</button>
+        </div>
       </div>
-    </div>
-      <p>Enable fields for this project, customize labels, and set order.</p>
+      <p>Enable fields for this project, customize labels, set order, and bind lookup groups.</p>
       <table id="contactFieldsGrid" class="notes-table" style="width:100%; margin-top:12px;">
         <thead>
           <tr>
@@ -540,6 +547,7 @@ async function renderContactSetup(container, portalState) {
             <th style="width:200px;">System Field</th>
             <th style="width:200px;">Label</th>
             <th style="width:100px;">Order</th>
+            <th style="width:180px;">Lookup Type</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -549,38 +557,37 @@ async function renderContactSetup(container, portalState) {
 
   const gridBody = container.querySelector("#contactFieldsGrid tbody");
 
-  // Fetch existing config rows for this project
+  // Fetch existing config rows for this project (includes lookup_type after your schema change)
   const url = `https://lookups-module.dennis-e64.workers.dev/contact_fields?project=${portalState.setup_project_id}`;
   const res = await fetch(url, { cache: "no-cache" });
   const data = await res.json();
-
-  const systemFields = [
-  "first_name","last_name","business_name","phone","email","contact_type",
-  "address_full","street_address","city","postal_code","state","title",
-  "website","additional_emails","additional_phones","additional_emails_2",
-  "additional_phones_2","contact_name","last_activity","last_appointment",
-  "loa_sent_date","loa_signed_date","onboarding_start_date","onboarding_completed_date",
-  "last_payment_date","last_payment_amount","no_referred_clients",
-  "occupation_type","group_id"
-  ];
-
   const configured = Array.isArray(data.rows) ? data.rows : [];
 
-  // Helper: convert snake_case to Title Case for placeholder
+  const systemFields = [
+    "first_name","last_name","business_name","phone","email","contact_type",
+    "address_full","street_address","city","postal_code","state","title",
+    "website","additional_emails","additional_phones","additional_emails_2",
+    "additional_phones_2","contact_name","last_activity","last_appointment",
+    "loa_sent_date","loa_signed_date","onboarding_start_date","onboarding_completed_date",
+    "last_payment_date","last_payment_amount","no_referred_clients",
+    "occupation_type","group_id"
+  ];
+
   function toTitleCase(field) {
-    return field
-      .split("_")
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(" ");
+    return field.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   }
 
-  // Render rows
   gridBody.innerHTML = systemFields.map(field => {
     const row = configured.find(r => r.field_key === field);
     const enabled = !!row;
     const label = row ? row.label : "";
     const order = row ? row.sort_order : "";
+    const boundLookup = row ? (row.lookup_type || "") : "";
     const placeholder = toTitleCase(field);
+
+    const options = [`<option value="">-- none --</option>`]
+      .concat(lookupGroups.map(g => `<option value="${g}" ${boundLookup === g ? "selected" : ""}>${g}</option>`))
+      .join("");
 
     return `
       <tr data-field="${field}">
@@ -589,24 +596,29 @@ async function renderContactSetup(container, portalState) {
         </td>
         <td>${field}</td>
         <td>
-          <input type="text" class="labelInput" 
-                 value="${escapeHtml(label)}" 
-                 placeholder="${placeholder}" 
+          <input type="text" class="labelInput"
+                 value="${escapeHtml(label)}"
+                 placeholder="${placeholder}"
                  style="width:100%;">
         </td>
         <td><input type="number" class="orderInput" value="${order}" style="width:70px;"></td>
+        <td>
+          <select class="lookupTypeSelect" style="width:100%;">
+            ${options}
+          </select>
+        </td>
       </tr>
     `;
   }).join("");
 
-  // Default Mode handler goes here
+  // Default Mode
   container.querySelector("#btnDefaultMode").addEventListener("click", () => {
     const rows = gridBody.querySelectorAll("tr");
     rows.forEach((tr, idx) => {
       const checkbox = tr.querySelector(".enableCheckbox");
       const labelInput = tr.querySelector(".labelInput");
       const orderInput = tr.querySelector(".orderInput");
-  
+
       checkbox.checked = true;
       if (!labelInput.value.trim()) {
         labelInput.value = labelInput.placeholder;
@@ -615,7 +627,7 @@ async function renderContactSetup(container, portalState) {
     });
   });
 
-  // Save handler
+  // Save
   container.querySelector("#btnSaveContactConfig").addEventListener("click", async () => {
     const rows = [];
     gridBody.querySelectorAll("tr").forEach(tr => {
@@ -625,7 +637,8 @@ async function renderContactSetup(container, portalState) {
         const labelInput = tr.querySelector(".labelInput");
         const label = labelInput.value.trim() || labelInput.placeholder;
         const order = parseInt(tr.querySelector(".orderInput").value, 10) || 99;
-        rows.push({ field_key: field, label, sort_order: order });
+        const lookupType = tr.querySelector(".lookupTypeSelect").value || null;
+        rows.push({ field_key: field, label, sort_order: order, lookup_type: lookupType });
       }
     });
 
@@ -638,6 +651,7 @@ async function renderContactSetup(container, portalState) {
     alert("Contact fields saved.");
   });
 }
+
 
 
 
