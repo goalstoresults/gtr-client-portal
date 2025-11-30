@@ -228,35 +228,56 @@ async function renderSetupLookups(tabContent, portalState) {
         `;
         tbody.appendChild(newRow);
 
-newRow.querySelector(".saveNewValueBtn").addEventListener("click", async () => {
-  const value = newRow.querySelector(".newValueInput").value.trim();
-  const sort = parseInt(newRow.querySelector(".newSortInput").value, 10);
-  const active = newRow.querySelector(".newActiveDropdown").value === "true";
+        newRow.querySelector(".saveNewValueBtn").addEventListener("click", async () => {
+          const value = newRow.querySelector(".newValueInput").value.trim();
+          const sort = parseInt(newRow.querySelector(".newSortInput").value, 10);
+          const active = newRow.querySelector(".newActiveDropdown").value === "true";
+        
+          if (!value) {
+            alert("Please enter a value.");
+            return;
+          }
+        
+          const payload = {
+            lookup_type: type,
+            value,
+            sort_order: sort,
+            is_active: active,
+            project: portalState.project,
+            created_at: new Date().toISOString()
+          };
+        
+          await fetch("https://lookups-module.dennis-e64.workers.dev/lookups/addValue", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+        
+          // Refresh the tab to show the new row
+          renderSetupLookups(tabContent, portalState);
+        });
+        
+        newRow.querySelector(".cancelNewValueBtn").addEventListener("click", () => {
+          newRow.remove();
+        });
 
-  if (!value) {
-    alert("Please enter a value.");
-    return;
+
+        // end of addValueBtn handler
+      }
+    });
+
+  } catch (err) {
+    groupsDiv.innerHTML = `<p>Error loading lookups: ${err.message}</p>`;
   }
+}
 
-  const payload = {
-    lookup_type: type,
-    value,
-    sort_order: sort,
-    is_active: active,
-    project: portalState.project,
-    created_at: new Date().toISOString()
-  };
-
-  await fetch("https://lookups-module.dennis-e64.workers.dev/lookups/addValue", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-
-  // Refresh the tab to show the new row
-  renderSetupLookups(tabContent, portalState);
-});
-
-newRow.querySelector(".cancelNewValueBtn").addEventListener("click", () => {
-  newRow.remove();
-});
+// helper for safe HTML rendering
+function escapeHtml(str) {
+  return str?.replace(/[&<>"']/g, c => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  }[c])) || "";
+}        
