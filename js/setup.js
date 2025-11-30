@@ -168,8 +168,7 @@ async function renderClientSetup(container, portalState) {
 
       checkedTabs.sort((a, b) => a.sort - b.sort);
       const newEnabledTabs = checkedTabs.map(t => t.tab_id);
-
-      await fetch(`https://lookups-module.dennis-e64.workers.dev/api/projects_config?project=eq.${encodeURIComponent(selectedRow.project)}`, {
+      await fetch(`https://lookups-module.dennis-e64.workers.dev/api/projects_config?project=${encodeURIComponent(selectedRow.project)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled_tabs: newEnabledTabs })
