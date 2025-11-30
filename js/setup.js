@@ -463,11 +463,13 @@ async function renderContactSetup(container, portalState) {
   const data = await res.json();
 
   const systemFields = [
-    "first_name","last_name","business_name","phone","email","contact_type",
-    "address_full","street_address","city","postal_code","state","title",
-    "website","additional_emails","additional_phones","additional_emails_2",
-    "additional_phones_2","contact_name","last_activity","last_appointment",
-    "loa_sent_date","loa_signed_date","onboarding_start_date","onboarding_completed_date"
+  "first_name","last_name","business_name","phone","email","contact_type",
+  "address_full","street_address","city","postal_code","state","title",
+  "website","additional_emails","additional_phones","additional_emails_2",
+  "additional_phones_2","contact_name","last_activity","last_appointment",
+  "loa_sent_date","loa_signed_date","onboarding_start_date","onboarding_completed_date",
+  "last_payment_date","last_payment_amount","no_referred_clients",
+  "occupation_type","group_id"
   ];
 
   const configured = Array.isArray(data.rows) ? data.rows : [];
