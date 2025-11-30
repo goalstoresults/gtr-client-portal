@@ -156,7 +156,7 @@ async function renderClientSetup(container, portalState) {
       `;
     }).join("");
 
-      detailsDiv.querySelector("#btnSaveConfig").addEventListener("click", async () => {
+    detailsDiv.querySelector("#btnSaveConfig").addEventListener("click", async () => {
       const checkedTabs = [];
       gridBody.querySelectorAll("input[type=checkbox]").forEach(cb => {
         if (cb.checked) {
@@ -165,18 +165,19 @@ async function renderClientSetup(container, portalState) {
           checkedTabs.push({ tab_id: cb.dataset.tabid, sort: Number.isFinite(sortVal) ? sortVal : 99 });
         }
       });
-  
+
       checkedTabs.sort((a, b) => a.sort - b.sort);
       const newEnabledTabs = checkedTabs.map(t => t.tab_id);
-    
+
       await fetch(`https://lookups-module.dennis-e64.workers.dev/api/projects_config?project=eq.${encodeURIComponent(selectedRow.project)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled_tabs: newEnabledTabs })
+        body: JSON.stringify({ ...selectedRow, enabled_tabs: newEnabledTabs })
       });
-    
+
       alert("Config saved.");
     });
+  });
 
   // If a project is already selected, render its details
   if (select.value) select.dispatchEvent(new Event("change"));
