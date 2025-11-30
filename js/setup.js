@@ -15,13 +15,8 @@ export async function loadSetupTab({ portalState, tabContent }) {
           renderClientSetup(setupContent, portalState);
           break;
         case "contact":
-          setupContent.innerHTML = `
-            <section class="card">
-              <h2>Contact Setup</h2>
-              <p>Placeholder for field visibility/labels.</p>
-            </section>
-          `;
-          break;
+          renderContactSetup(setupContent, portalState);
+          break;  
         case "lookups":
           renderSetupLookups(setupContent, portalState);
           break;
