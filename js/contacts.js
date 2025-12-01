@@ -121,7 +121,7 @@ async function renderContactList(container, portalState) {
   });
 }
 
-// 🔧 Dynamic Add Contact Form
+// 🔧 Dynamic Add Contact Form with collapsible sections
 async function renderAddContactForm(container, portalState) {
   const projectId = portalState.project;
   if (!projectId) {
@@ -156,19 +156,23 @@ async function renderAddContactForm(container, portalState) {
     return acc;
   }, {});
 
-  // Render each section
+  // Render each section as collapsible <details>
   for (const [section, sectionFields] of Object.entries(grouped)) {
-    const sectionHeader = document.createElement("h3");
-    sectionHeader.textContent = section;
-    sectionHeader.className = "section-title";
-    form.appendChild(sectionHeader);
+    const details = document.createElement("details");
+    details.className = "notes-section";
+    details.open = true; // expand by default, remove if you want collapsed
+
+    const summary = document.createElement("summary");
+    summary.textContent = section;
+    summary.className = "section-title";
+    details.appendChild(summary);
 
     for (const f of sectionFields) {
       const wrapper = document.createElement("div");
       wrapper.className = "notes-row";
 
       const label = document.createElement("label");
-      // ✅ fixed (CSS will add the colon)
+      // no colon here — CSS ::after will add it
       label.textContent = f.label || f.field_key;
       label.className = "notes-label";
 
@@ -209,8 +213,10 @@ async function renderAddContactForm(container, portalState) {
 
       wrapper.appendChild(label);
       wrapper.appendChild(input);
-      form.appendChild(wrapper);
+      details.appendChild(wrapper);
     }
+
+    form.appendChild(details);
   }
 
   // Add Save button
@@ -252,6 +258,7 @@ async function renderAddContactForm(container, portalState) {
     }
   });
 }
+
 
 
 
