@@ -717,7 +717,7 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
         // Capture portalState in closure
         addContactLink.addEventListener("click", ev => {
           ev.preventDefault();
-          goToAddContact(window.portalState); // portalState is passed into renderRelationships
+          goToContactsAdd(); 
         });
       
         searchContainer.appendChild(addContactLink);
@@ -1005,6 +1005,23 @@ function goToAddContact(state) {
   renderPortal();
 }
 window.goToAddContact = goToAddContact;
+
+// Force navigation into Contacts/Add from Notes
+function gotoContactsAdd() {
+  if (!window.portalState) {
+    console.error("portalState not available globally");
+    return;
+  }
+  window.portalState.tab = "contacts";
+  window.portalState.subtab = "add";
+  if (typeof renderPortal === "function") {
+    renderPortal();
+  } else {
+    console.error("renderPortal not available globally");
+  }
+}
+window.gotoContactsAdd = gotoContactsAdd;
+
 
 
 /* -------------------------
