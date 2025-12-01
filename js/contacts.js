@@ -168,7 +168,8 @@ async function renderAddContactForm(container, portalState) {
       wrapper.className = "notes-row";
 
       const label = document.createElement("label");
-      label.textContent = f.label || f.field_key;
+      // Explicit colon in text
+      label.textContent = `${f.label || f.field_key}:`;
       label.className = "notes-label";
 
       let input;
@@ -179,10 +180,18 @@ async function renderAddContactForm(container, portalState) {
         input.name = f.field_key;
         input.className = "form-control";
 
-        // Call your contacts Worker (no apikey header)
         fetch(`https://contacts-module.dennis-e64.workers.dev/lookups?group=${f.lookup_type}`)
           .then(r => r.json())
           .then(values => {
+            if (!Array.isArray(values)) {
+              console.warn("Lookup fetch failed:", values);
+              return;
+            }
+            const placeholder = document.createElement("option");
+            placeholder.value = "";
+            placeholder.textContent = "-- Select --";
+            input.appendChild(placeholder);
+
             values.forEach(v => {
               const opt = document.createElement("option");
               opt.value = v.value;
@@ -243,6 +252,7 @@ async function renderAddContactForm(container, portalState) {
     }
   });
 }
+
 
 
 
