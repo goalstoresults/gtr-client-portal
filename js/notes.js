@@ -702,7 +702,7 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
         <button class="do-search">Find</button>
         <div class="search-results muted">Enter criteria and click Find.</div>
         <div style="margin-top:8px;">
-          <button type="button" class="btn-secondary" onclick="goToAddContact()">+ Add Contact</button>
+          <button type="button" class="btn-secondary" onclick="goToAddContact(portalState)">+ Add Contact</button>
         </div>
       </div>
     `;
@@ -982,6 +982,7 @@ document.getElementById("btnSaveRelationships").addEventListener("click", async 
 }
 } // end of renderRelationships
     
+
 // 🔧 Navigate from Notes to Contacts/Add
 function goToAddContact() {
   portalState.tab = "contacts";
