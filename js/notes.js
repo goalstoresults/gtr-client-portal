@@ -703,21 +703,23 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
       </div>
     `;
 
-    // ✅ Create and append "+ Add Contact" link
-    const addContactLink = document.createElement("a");
-    addContactLink.href = "#";
-    addContactLink.textContent = "+ Add Contact";
-    addContactLink.className = "notes-link";
-    addContactLink.style.marginLeft = "12px";
-    addContactLink.addEventListener("click", ev => {
-      ev.preventDefault();
-      goToAddContact(portalState); // portalState is in scope
-    });
-
-    // Append after the search form
+        // ✅ Create and append "+ Add Contact" link
     const searchContainer = row.querySelector(".inline-search");
-    searchContainer.appendChild(addContactLink);
+    if (searchContainer) {
+      const addContactLink = document.createElement("a");
+      addContactLink.href = "#";
+      addContactLink.textContent = "+ Add Contact";
+      addContactLink.className = "notes-link";
+      addContactLink.style.marginLeft = "12px";
 
+      // ✅ Capture portalState in closure
+      addContactLink.addEventListener("click", ev => {
+        ev.preventDefault();
+        goToAddContact(portalState); // this portalState is from outer scope
+      });
+
+      searchContainer.appendChild(addContactLink);
+    }
 
     // ✅ Wire up Find button click
     row.querySelector(".do-search").addEventListener("click", async () => {
