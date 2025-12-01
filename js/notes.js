@@ -746,8 +746,13 @@ row.querySelector(".do-search").addEventListener("click", async () => {
 
   try {
     const resp = await fetch(searchUrl);
-    const contacts = await resp.json();
+    if (!resp.ok) {
+      const msg = await resp.text().catch(() => "");
+      alert(`Search failed (${resp.status}). ${msg}`);
+      return;
+    }
 
+    const contacts = await resp.json();
     const resultsDiv = row.querySelector(".search-results");
     resultsDiv.innerHTML = contacts.length > 0
       ? contacts.map(c => `
@@ -766,25 +771,30 @@ row.querySelector(".do-search").addEventListener("click", async () => {
     // ✅ Attach click handlers to results
     resultsDiv.querySelectorAll(".contact-result").forEach(el => {
       el.addEventListener("click", () => {
-        const row = document.querySelector(`tr[data-relid="${el.dataset.relid}"]`);
+        const targetRow = document.querySelector(`tr[data-relid="${el.dataset.relid}"]`);
 
         // Hydrate the row with selected contact info
-        row.querySelector(".rel-contact-id").textContent = el.dataset.contactid || "";
-        row.querySelector(".rel-contact-name").textContent = el.dataset.name || "";
+        targetRow.querySelector(".rel-contact-id").textContent = el.dataset.contactid || "";
+        targetRow.querySelector(".rel-contact-name").textContent = el.dataset.name || "";
 
-        const typeDropdown = row.querySelector(".contact-type-dropdown");
+        const typeDropdown = targetRow.querySelector(".contact-type-dropdown");
         if (typeDropdown) {
           typeDropdown.value = el.dataset.type || "";
         }
 
-        row.querySelector(".rel-contact-email").textContent = el.dataset.email || "";
+        targetRow.querySelector(".rel-contact-email").textContent = el.dataset.email || "";
 
         // Swap Action cell to promotion checkbox
-        row.querySelector("td:last-child").innerHTML = `<input type="checkbox" class="promote-checkbox"/>`;
+        targetRow.querySelector("td:last-child").innerHTML = `<input type="checkbox" class="promote-checkbox"/>`;
 
         alert("✅ Contact populated into relationship row.");
       });
     });
+  } catch (err) {
+    alert("Network error searching contacts");
+    console.error(err);
+  }
+});
   } catch (err) {
     alert("Network error searching contacts");
     console.error(err);
