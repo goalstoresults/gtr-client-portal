@@ -706,21 +706,21 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
     `;
 
       // ✅ Create and append "+ Add Contact 2" link
-      const searchContainer = row.querySelector(".inline-search");
-      if (searchContainer) {
-        const addContactLink = document.createElement("a");
-        addContactLink.href = "#";
-        addContactLink.textContent = "+ Add Contact 4";
-        addContactLink.className = "notes-link";
-        addContactLink.style.marginLeft = "12px";
+      // const searchContainer = row.querySelector(".inline-search");
+      // if (searchContainer) {
+      //   const addContactLink = document.createElement("a");
+      //   addContactLink.href = "#";
+      //   addContactLink.textContent = "+ Add Contact 4";
+      //   addContactLink.className = "notes-link";
+      //   addContactLink.style.marginLeft = "12px";
       
         // Capture portalState in closure
-        addContactLink.addEventListener("click", ev => {
-          ev.preventDefault();
-          openQuickAddContactModal(row, project);
-        });
+       //  addContactLink.addEventListener("click", ev => {
+       //    ev.preventDefault();
+       //    openQuickAddContactModal(row, project);
+       //  });
       
-        searchContainer.appendChild(addContactLink);
+       //  searchContainer.appendChild(addContactLink);
       }
 
     // ✅ Wire up Find button click
@@ -1010,6 +1010,7 @@ function buildDropdown(options, selectedValue, className = "") {
   </select>`;
 }
 
+//  this is a popup feautre to add a contact quickly...its not working correctly so we took it out for now...DR 12-1-25
 function openQuickAddContactModal(row, project) {
   const modal = document.createElement("div");
   modal.className = "notes-modal";
