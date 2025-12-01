@@ -129,6 +129,7 @@ async function renderAddContactForm(container, portalState) {
     return;
   }
 
+  // Fetch configured fields for this project
   const res = await fetch(
     `https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${projectId}`,
     { cache: "no-cache" }
@@ -137,24 +138,88 @@ async function renderAddContactForm(container, portalState) {
   const fields = Array.isArray(data.rows) ? data.rows : [];
   fields.sort((a, b) => a.sort_order - b.sort_order);
 
+  // Base container
   container.innerHTML = `
     <section class="card">
       <h2>Add Contact for ${escapeHtml(portalState.display_name || projectId)}</h2>
-      <form id="addContactForm" class="notes-form">
-        ${fields.map(f => `
-          <div class="form-row" style="margin-bottom:12px;">
-            <label style="display:block; font-weight:bold; margin-bottom:4px;">
-              ${escapeHtml(f.label || f.field_key)}
-            </label>
-            <input type="text" name="${f.field_key}" style="width:100%;" />
-          </div>
-        `).join("")}
-        <button type="submit" class="btn-primary">Save Contact</button>
-      </form>
+      <form id="addContactForm" class="notes-form"></form>
     </section>
   `;
 
   const form = container.querySelector("#addContactForm");
+
+  // Group fields by section
+  const grouped = fields.reduce((acc, f) => {
+    const section = f.section || "General";
+    if (!acc[section]) acc[section] = [];
+    acc[section].push(f);
+    return acc;
+  }, {});
+
+  // Render each section
+  for (const [section, sectionFields] of Object.entries(grouped)) {
+    const sectionHeader = document.createElement("h3");
+    sectionHeader.textContent = section;
+    sectionHeader.className = "section-title";
+    sectionHeader.style.marginTop = "24px";
+    sectionHeader.style.fontSize = "1.2em";
+    sectionHeader.style.fontWeight = "bold";
+    form.appendChild(sectionHeader);
+
+    for (const f of sectionFields) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "form-row";
+      wrapper.style.marginBottom = "12px";
+
+      const label = document.createElement("label");
+      label.textContent = f.label || f.field_key;
+      label.style.display = "block";
+      label.style.fontWeight = "bold";
+      label.style.marginBottom = "4px";
+
+      let input;
+
+      if (f.lookup_type) {
+        // Render dropdown bound to lookup group
+        input = document.createElement("select");
+        input.name = f.field_key;
+        input.style.width = "100%";
+
+        // Fetch lookup values
+        fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?group=eq.${f.lookup_type}`, {
+          headers: { apikey: "your-supabase-key" }
+        })
+          .then(r => r.json())
+          .then(values => {
+            values.forEach(v => {
+              const opt = document.createElement("option");
+              opt.value = v.value;
+              opt.textContent = v.label || v.value;
+              input.appendChild(opt);
+            });
+          });
+      } else {
+        // Default text input
+        input = document.createElement("input");
+        input.type = "text";
+        input.name = f.field_key;
+        input.style.width = "100%";
+      }
+
+      wrapper.appendChild(label);
+      wrapper.appendChild(input);
+      form.appendChild(wrapper);
+    }
+  }
+
+  // Add Save button
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "submit";
+  saveBtn.className = "btn-primary";
+  saveBtn.textContent = "Save Contact";
+  form.appendChild(saveBtn);
+
+  // Handle form submission
   form.addEventListener("submit", async e => {
     e.preventDefault();
     const formData = new FormData(form);
@@ -188,6 +253,9 @@ async function renderAddContactForm(container, portalState) {
     }
   });
 }
+
+
+
 
 // 🔧 Dynamic Details Form (like Add, but prefilled)
 async function renderContactDetails(container, portalState, contactId) {
