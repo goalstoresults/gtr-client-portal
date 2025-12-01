@@ -8,6 +8,7 @@ export async function loadNotesTab({ portalState, tabContent }) {
   initNotes(portalState);
 }
 
+
 async function loadPartial(url, tabContent) {
   try {
     const res = await fetch(url, { cache: "no-cache" });
