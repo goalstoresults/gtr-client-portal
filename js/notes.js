@@ -378,7 +378,6 @@ async function renderReview(container, portalState, noteId) {
       });
     }
 
-    // Find client handler (name-only search)
 document.getElementById("btnFindClient").addEventListener("click", async () => {
   const first = document.getElementById("filter-first").value.trim();
   const last = document.getElementById("filter-last").value.trim();
@@ -395,7 +394,6 @@ document.getElementById("btnFindClient").addEventListener("click", async () => {
   const params = new URLSearchParams();
   const selectCols = "contact_id,first_name,last_name,email,contact_type";
 
-  // ✅ Correct filter syntax
   const filters = [`project=eq.${portalState.project}`];
   if (first) filters.push(`first_name=ilike.*${first}*`);
   if (last)  filters.push(`last_name=ilike.*${last}*`);
@@ -403,7 +401,8 @@ document.getElementById("btnFindClient").addEventListener("click", async () => {
   if (filters.length > 1) {
     params.set("and", `(${filters.join(",")})`);
   } else {
-    params.set(filters[0].split("=")[0], filters[0].split("=")[1]);
+    const [key, value] = filters[0].split("=");
+    params.set(key, value);
   }
 
   const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${params.toString()}&select=${encodeURIComponent(selectCols)}`;
@@ -440,6 +439,7 @@ document.getElementById("btnFindClient").addEventListener("click", async () => {
     console.error(err);
   }
 });
+
 
   } catch (err) {
     container.innerHTML = `<p>Error loading note review: ${err.message}</p>`;
