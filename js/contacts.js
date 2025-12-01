@@ -1,4 +1,4 @@
-// js/contacts.js v1.1
+// js/contacts.js v1.2
 export async function loadContactsTab({ portalState, tabContent }) {
   const res = await fetch("./components/contacts.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
@@ -120,10 +120,15 @@ async function renderAddContactForm(container, portalState) {
       payload[f.field_key] = formData.get(f.field_key);
     });
 
-    // 🔑 Generate contact_id here
+    // 🔑 Generate contact_id
     payload.contact_id = crypto.randomUUID();
     payload.project = projectId;
     payload.created_at = new Date().toISOString();
+
+    // 📝 Calculate name from first + last
+    const first = formData.get("first_name") || "";
+    const last = formData.get("last_name") || "";
+    payload.name = `${first} ${last}`.trim();
 
     try {
       const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
