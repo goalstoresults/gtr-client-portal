@@ -1,3 +1,4 @@
+// js/contacts.js v1.0
 export async function loadContactsTab({ portalState, tabContent }) {
   const res = await fetch("./components/contacts.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
@@ -19,12 +20,14 @@ export async function loadContactsTab({ portalState, tabContent }) {
         case "list":
           content.innerHTML = `
             <section class="card">
-              <h2>Contact List for ${escapeHtml(portalState.display_name || portalState.setup_project_id)}</h2>
+              <h2>Contact List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
               <div id="contactTable">Loading...</div>
             </section>
           `;
           const tableDiv = content.querySelector("#contactTable");
-          const resList = await fetch(`https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.setup_project_id}`);
+          const resList = await fetch(
+            `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}`
+          );
           const contacts = await resList.json();
           tableDiv.innerHTML = `
             <table class="notes-table">
@@ -76,14 +79,23 @@ export async function loadContactsTab({ portalState, tabContent }) {
 
 // 🔧 Dynamic Add Contact Form
 async function renderAddContactForm(container, portalState) {
-  const res = await fetch(`https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${portalState.setup_project_id}`, { cache: "no-cache" });
+  const projectId = portalState.project;
+  if (!projectId) {
+    container.innerHTML = `<section class="card"><p>No project selected.</p></section>`;
+    return;
+  }
+
+  const res = await fetch(
+    `https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${projectId}`,
+    { cache: "no-cache" }
+  );
   const data = await res.json();
   const fields = Array.isArray(data.rows) ? data.rows : [];
   fields.sort((a, b) => a.sort_order - b.sort_order);
 
   container.innerHTML = `
     <section class="card">
-      <h2>Add Contact for ${escapeHtml(portalState.display_name || portalState.setup_project_id)}</h2>
+      <h2>Add Contact for ${escapeHtml(portalState.display_name || projectId)}</h2>
       <form id="addContactForm" class="notes-form">
         ${fields.map(f => `
           <div class="form-row" style="margin-bottom:12px;">
@@ -106,7 +118,7 @@ async function renderAddContactForm(container, portalState) {
     fields.forEach(f => {
       payload[f.field_key] = formData.get(f.field_key);
     });
-    payload.project = portalState.setup_project_id;
+    payload.project = projectId;
     payload.created_at = new Date().toISOString();
 
     const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
