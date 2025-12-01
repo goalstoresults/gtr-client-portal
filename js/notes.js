@@ -710,7 +710,7 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
       if (searchContainer) {
         const addContactLink = document.createElement("a");
         addContactLink.href = "#";
-        addContactLink.textContent = "+ Add Contact 3";
+        addContactLink.textContent = "+ Add Contact 4";
         addContactLink.className = "notes-link";
         addContactLink.style.marginLeft = "12px";
       
@@ -1040,10 +1040,10 @@ function openQuickAddContactModal(row, project) {
 
   // Save creates contact
   modal.querySelector(".qc-save").addEventListener("click", async () => {
-    const first = modal.querySelector(".qc-first").value.trim();
-    const last  = modal.querySelector(".qc-last").value.trim();
-    const email = modal.querySelector(".qc-email").value.trim();
-    const type  = modal.querySelector(".qc-type").value.trim();
+    const first  = modal.querySelector(".qc-first").value.trim();
+    const last   = modal.querySelector(".qc-last").value.trim();
+    const email  = modal.querySelector(".qc-email").value.trim();
+    const type   = modal.querySelector(".qc-type").value.trim();
     const status = modal.querySelector(".qc-status");
 
     if (!first || !last) {
@@ -1061,22 +1061,17 @@ function openQuickAddContactModal(row, project) {
     };
 
     try {
-        const resp = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            project,
-            first_name: first,
-            last_name: last,
-            email: email || null,
-            contact_type: type || null
-          })
-        });
+      const resp = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
       const text = await resp.text();
       let created = null;
       try { created = JSON.parse(text); } catch {}
 
+      // Supabase proxy may return an array or a single object
       const contactId =
         (Array.isArray(created) && created[0]?.contact_id) ||
         created?.contact_id ||
@@ -1108,7 +1103,6 @@ function openQuickAddContactModal(row, project) {
 }
 
 window.openQuickAddContactModal = openQuickAddContactModal;
-
 
 
 
