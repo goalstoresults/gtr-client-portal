@@ -717,7 +717,7 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
         // Capture portalState in closure
         addContactLink.addEventListener("click", ev => {
           ev.preventDefault();
-          openQuickAddContactModal(row, project); 
+          openQuickAddContactModal(row, project); // popup modal for new contact 
         });
       
         searchContainer.appendChild(addContactLink);
