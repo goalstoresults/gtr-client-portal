@@ -723,67 +723,74 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
         searchContainer.appendChild(addContactLink);
       }
 
-    // ✅ Wire up Find button click
-    row.querySelector(".do-search").addEventListener("click", async () => {
-      const first = row.querySelector(".search-first").value.trim();
-      const last = row.querySelector(".search-last").value.trim();
-      if (!first && !last) {
-        alert("Enter at least a first or last name.");
-        return;
-      }
+// ✅ Wire up Find button click
+row.querySelector(".do-search").addEventListener("click", async () => {
+  const first = row.querySelector(".search-first").value.trim();
+  const last = row.querySelector(".search-last").value.trim();
+  if (!first && !last) {
+    alert("Enter at least a first or last name.");
+    return;
+  }
 
-      const filters = [];
-      if (first) filters.push(`first_name.ilike.*${first}*`);
-      if (last)  filters.push(`last_name.ilike.*${last}*`);
+  // ✅ Always include project filter, using dot notation
+  const filters = [`project.eq.${project}`];
+  if (first) filters.push(`first_name.ilike.*${first}*`);
+  if (last)  filters.push(`last_name.ilike.*${last}*`);
 
-      const query = filters.length > 1
-        ? `and=(${filters.join(",")})`
-        : filters[0];
+  const query = filters.length > 1
+    ? `and=(${filters.join(",")})`
+    : filters[0];
 
-      const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${query}&select=contact_id,first_name,last_name,email,contact_type`;
-      console.log("[GetID] Search URL:", searchUrl);
+  const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${query}&select=contact_id,first_name,last_name,email,contact_type`;
+  console.log("[GetID] Search URL:", searchUrl);
 
-      try {
-        const resp = await fetch(searchUrl);
-        const contacts = await resp.json();
+  try {
+    const resp = await fetch(searchUrl);
+    const contacts = await resp.json();
 
-        const resultsDiv = row.querySelector(".search-results");
-        resultsDiv.innerHTML = contacts.length > 0
-          ? contacts.map(c => `
-              <div class="contact-result"
-                   data-relid="${relId}"
-                   data-contactid="${c.contact_id}"
-                   data-name="${c.first_name} ${c.last_name}"
-                   data-type="${c.contact_type}"
-                   data-email="${c.email}">
-                <strong>${c.first_name} ${c.last_name}</strong> (${c.contact_type})<br/>
-                <small>${c.email}</small>
-              </div>
-            `).join("")
-          : "<div class='muted'>No contacts found.</div>";
+    const resultsDiv = row.querySelector(".search-results");
+    resultsDiv.innerHTML = contacts.length > 0
+      ? contacts.map(c => `
+          <div class="contact-result"
+               data-relid="${relId}"
+               data-contactid="${c.contact_id}"
+               data-name="${c.first_name} ${c.last_name}"
+               data-type="${c.contact_type}"
+               data-email="${c.email}">
+            <strong>${c.first_name} ${c.last_name}</strong> (${c.contact_type})<br/>
+            <small>${c.email}</small>
+          </div>
+        `).join("")
+      : "<div class='muted'>No contacts found.</div>";
 
-        // ✅ Attach click handlers to results
-        resultsDiv.querySelectorAll(".contact-result").forEach(el => {
-          el.addEventListener("click", () => {
-            const row = document.querySelector(`tr[data-relid="${el.dataset.relid}"]`);
+    // ✅ Attach click handlers to results
+    resultsDiv.querySelectorAll(".contact-result").forEach(el => {
+      el.addEventListener("click", () => {
+        const row = document.querySelector(`tr[data-relid="${el.dataset.relid}"]`);
 
-            // Hydrate the row with selected contact info
-            row.querySelector(".rel-contact-id").textContent = el.dataset.contactid || "";
-            row.querySelector(".rel-contact-name").textContent = el.dataset.name || "";
+        // Hydrate the row with selected contact info
+        row.querySelector(".rel-contact-id").textContent = el.dataset.contactid || "";
+        row.querySelector(".rel-contact-name").textContent = el.dataset.name || "";
 
-            const typeDropdown = row.querySelector(".contact-type-dropdown");
-            if (typeDropdown) {
-              typeDropdown.value = el.dataset.type || "";
-            }
+        const typeDropdown = row.querySelector(".contact-type-dropdown");
+        if (typeDropdown) {
+          typeDropdown.value = el.dataset.type || "";
+        }
 
-            row.querySelector(".rel-contact-email").textContent = el.dataset.email || "";
+        row.querySelector(".rel-contact-email").textContent = el.dataset.email || "";
 
-            // Swap Action cell to promotion checkbox
-            row.querySelector("td:last-child").innerHTML = `<input type="checkbox" class="promote-checkbox"/>`;
+        // Swap Action cell to promotion checkbox
+        row.querySelector("td:last-child").innerHTML = `<input type="checkbox" class="promote-checkbox"/>`;
 
-            alert("✅ Contact populated into relationship row.");
-          });
-        });
+        alert("✅ Contact populated into relationship row.");
+      });
+    });
+  } catch (err) {
+    alert("Network error searching contacts");
+    console.error(err);
+  }
+});
+
 
       } catch (err) {
         console.error("Search error:", err);
