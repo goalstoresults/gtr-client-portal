@@ -1,4 +1,4 @@
-// js/contacts.js v1.2
+// js/contacts.js v1.4
 export async function loadContactsTab({ portalState, tabContent }) {
   const res = await fetch("./components/contacts.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
@@ -18,32 +18,14 @@ export async function loadContactsTab({ portalState, tabContent }) {
           break;
 
         case "list":
-          content.innerHTML = `
-            <section class="card">
-              <h2>Contact List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
-              <div id="contactTable">Loading...</div>
-            </section>
-          `;
-          const tableDiv = content.querySelector("#contactTable");
-          const resList = await fetch(
-            `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}`
-          );
-          const contacts = await resList.json();
-          tableDiv.innerHTML = `
-            <table class="notes-table">
-              <thead><tr><th>Name</th><th>Email</th></tr></thead>
-              <tbody>
-                ${contacts.map(c => `<tr><td>${escapeHtml(c.name || "")}</td><td>${escapeHtml(c.email || "")}</td></tr>`).join("")}
-              </tbody>
-            </table>
-          `;
+          await renderContactList(content, portalState);
           break;
 
         case "details":
           content.innerHTML = `
             <section class="card">
               <h2>Contact Details</h2>
-              <p>(Placeholder for detailed contact view)</p>
+              <p>Select a contact from the list to view details.</p>
             </section>
           `;
           break;
@@ -73,6 +55,60 @@ export async function loadContactsTab({ portalState, tabContent }) {
             </section>
           `;
       }
+    });
+  });
+}
+
+// 🔧 Contact List with Select/Delete
+async function renderContactList(container, portalState) {
+  container.innerHTML = `
+    <section class="card">
+      <h2>Contact List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
+      <div id="contactTable">Loading...</div>
+    </section>
+  `;
+  const tableDiv = container.querySelector("#contactTable");
+  const resList = await fetch(
+    `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}`
+  );
+  const contacts = await resList.json();
+
+  tableDiv.innerHTML = `
+    <table class="notes-table">
+      <thead><tr><th>Name</th><th>Email</th><th>Actions</th></tr></thead>
+      <tbody>
+        ${contacts.map(c => `
+          <tr>
+            <td>${escapeHtml(c.contact_name || "")}</td>
+            <td>${escapeHtml(c.email || "")}</td>
+            <td>
+              <button class="btn-primary btn-select" data-id="${c.contact_id}">Select</button>
+              <button class="btn-danger btn-delete" data-id="${c.contact_id}">Delete</button>
+            </td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `;
+
+  // Wire Select/Delete
+  tableDiv.querySelectorAll(".btn-select").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const contactId = btn.dataset.id;
+      await renderContactDetails(container, portalState, contactId);
+    });
+  });
+
+  tableDiv.querySelectorAll(".btn-delete").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const contactId = btn.dataset.id;
+      if (!confirm("Delete this contact?")) return;
+      await fetch(`https://contacts-module.dennis-e64.workers.dev/contacts/delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contact_id: contactId, project: portalState.project })
+      });
+      await renderContactList(container, portalState); // refresh list
     });
   });
 }
@@ -125,10 +161,10 @@ async function renderAddContactForm(container, portalState) {
     payload.project = projectId;
     payload.created_at = new Date().toISOString();
 
-    // 📝 Calculate name from first + last
+    // 📝 Calculate contact_name from first + last
     const first = formData.get("first_name") || "";
     const last = formData.get("last_name") || "";
-    payload.name = `${first} ${last}`.trim();
+    payload.contact_name = `${first} ${last}`.trim();
 
     try {
       const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
@@ -143,6 +179,40 @@ async function renderAddContactForm(container, portalState) {
       container.innerHTML = `<section class="card"><p>Error saving contact: ${escapeHtml(err.message)}</p></section>`;
     }
   });
+}
+
+// 🔧 Dynamic Details Form (like Add, but prefilled)
+async function renderContactDetails(container, portalState, contactId) {
+  const projectId = portalState.project;
+  const res = await fetch(
+    `https://contacts-module.dennis-e64.workers.dev/contacts/details?contact_id=${contactId}&project=${projectId}`,
+    { cache: "no-cache" }
+  );
+  const contact = await res.json();
+
+  const resFields = await fetch(
+    `https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${projectId}`,
+    { cache: "no-cache" }
+  );
+  const data = await resFields.json();
+  const fields = Array.isArray(data.rows) ? data.rows : [];
+  fields.sort((a, b) => a.sort_order - b.sort_order);
+
+  container.innerHTML = `
+    <section class="card">
+      <h2>Contact Details</h2>
+      <form id="detailsForm" class="notes-form">
+        ${fields.map(f => `
+          <div class="form-row" style="margin-bottom:12px;">
+            <label style="display:block; font-weight:bold; margin-bottom:4px;">
+              ${escapeHtml(f.label || f.field_key)}
+            </label>
+            <input type="text" name="${f.field_key}" style="width:100%;" value="${escapeHtml(contact[f.field_key] || "")}" />
+          </div>
+        `).join("")}
+      </form>
+    </section>
+  `;
 }
 
 // helper
