@@ -30,8 +30,6 @@ function setActiveSubtab(tabId) {
 }
 
 function initNotes(portalState) {
-  // ✅ Expose a stable reference for cross-tab navigation
-  window.portalState = portalState;
   
   const container = document.getElementById("notesContent");
   if (container) container.innerHTML = `<p>Select a subtab to begin.</p>`;
@@ -690,38 +688,21 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
     const type = typeSelect?.value?.trim() || "";
     const role = roleSelect?.value?.trim() || "";
 
+    // Default dropdown value is "", not "Select"
     if (!type || !role) {
       alert("❌ Please select both Relationship Type and Role before searching for a contact.");
       return;
     }
 
-    // ✅ Render search form HTML
+    // ✅ Always render the inline search form
     row.querySelector("td:last-child").innerHTML = `
-      <div class="inline-search">
+      <div>
         <input class="search-first" placeholder="First name"/>
         <input class="search-last" placeholder="Last name"/>
         <button class="do-search">Find</button>
         <div class="search-results muted">Enter criteria and click Find.</div>
       </div>
     `;
-
-      // ✅ Create and append "+ Add Contact" link
-      const searchContainer = row.querySelector(".inline-search");
-      if (searchContainer) {
-        const addContactLink = document.createElement("a");
-        addContactLink.href = "#";
-        addContactLink.textContent = "+ Add Contact";
-        addContactLink.className = "notes-link";
-        addContactLink.style.marginLeft = "12px";
-      
-        // Capture portalState in closure
-        addContactLink.addEventListener("click", ev => {
-          ev.preventDefault();
-          goToAddContact(window.portalState); // portalState is passed into renderRelationships
-        });
-      
-        searchContainer.appendChild(addContactLink);
-      }
 
     // ✅ Wire up Find button click
     row.querySelector(".do-search").addEventListener("click", async () => {
@@ -998,14 +979,7 @@ document.getElementById("btnSaveRelationships").addEventListener("click", async 
 }
 } // end of renderRelationships
     
-// 🔧 Navigate from Notes to Contacts/Add
-function goToAddContact(state) {
-  state.tab = "contacts";
-  state.subtab = "add";
-  renderPortal();
-}
-window.goToAddContact = goToAddContact;
-
+    
 
 /* -------------------------
    Utils
