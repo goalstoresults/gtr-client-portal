@@ -732,7 +732,7 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
         return;
       }
 
-      const filters = [`project=${project}`];
+      const filters = [`project=eq.${project}`];
       if (first) filters.push(`first_name=ilike.*${first}*`);
       if (last)  filters.push(`last_name=ilike.*${last}*`);
       
