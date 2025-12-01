@@ -391,16 +391,16 @@ document.getElementById("btnFindClient").addEventListener("click", async () => {
     return;
   }
 
-  const filters = [`project=eq.${portalState.project}`];
-  if (first) filters.push(`first_name=ilike.*${first}*`);
-  if (last)  filters.push(`last_name=ilike.*${last}*`);
+  const filters = [`project.eq.${portalState.project}`];
+  if (first) filters.push(`first_name.ilike.*${first}*`);
+  if (last)  filters.push(`last_name.ilike.*${last}*`);
 
   const filterClause = filters.length > 1
     ? `and=(${filters.join(",")})`
     : filters[0];
 
   const selectCols = "contact_id,first_name,last_name,email,contact_type";
-  const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${filterClause}&select=${encodeURIComponent(selectCols)}`;
+  const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${filterClause}&select=${selectCols}`;
   console.log("[SetClient] Searching contacts:", searchUrl);
 
   try {
