@@ -259,44 +259,154 @@ async function renderAddContactForm(container, portalState) {
   });
 }
 
-
-
-
-
-
-// 🔧 Dynamic Details Form (like Add, but prefilled)
+// 🔧 Render Contact Details
 async function renderContactDetails(container, portalState, contactId) {
   const projectId = portalState.project;
+  if (!projectId || !contactId) {
+    container.innerHTML = `<section class="card"><p>Missing project or contact ID.</p></section>`;
+    return;
+  }
+
+  // Fetch contact details (Worker expects /contacts/details/:id)
   const res = await fetch(
-    `https://contacts-module.dennis-e64.workers.dev/contacts/details?contact_id=${contactId}&project=${projectId}`,
+    `https://contacts-module.dennis-e64.workers.dev/contacts/details/${contactId}`,
     { cache: "no-cache" }
   );
-  const contact = await res.json();
+  const data = await res.json();
 
-  const resFields = await fetch(
+  // Supabase proxy returns an array
+  const contact = Array.isArray(data) ? data[0] : data;
+  if (!contact) {
+    container.innerHTML = `<section class="card"><p>Contact not found.</p></section>`;
+    return;
+  }
+
+  // Fetch configured fields for this project
+  const fieldsRes = await fetch(
     `https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${projectId}`,
     { cache: "no-cache" }
   );
-  const data = await resFields.json();
-  const fields = Array.isArray(data.rows) ? data.rows : [];
+  const fieldsData = await fieldsRes.json();
+  const fields = Array.isArray(fieldsData.rows) ? fieldsData.rows : [];
   fields.sort((a, b) => a.sort_order - b.sort_order);
 
+  // Base container
   container.innerHTML = `
     <section class="card">
-      <h2>Contact Details</h2>
-      <form id="detailsForm" class="notes-form">
-        ${fields.map(f => `
-          <div class="form-row" style="margin-bottom:12px;">
-            <label style="display:block; font-weight:bold; margin-bottom:4px;">
-              ${escapeHtml(f.label || f.field_key)}
-            </label>
-            <input type="text" name="${f.field_key}" style="width:100%;" value="${escapeHtml(contact[f.field_key] || "")}" />
-          </div>
-        `).join("")}
-      </form>
+      <h2>Contact Details for ${escapeHtml(contact.contact_name || contactId)}</h2>
+      <form id="editContactForm" class="notes-form"></form>
     </section>
   `;
+
+  const form = container.querySelector("#editContactForm");
+
+  // Group fields by section
+  const grouped = fields.reduce((acc, f) => {
+    const section = f.section || "General";
+    if (!acc[section]) acc[section] = [];
+    acc[section].push(f);
+    return acc;
+  }, {});
+
+  // Render each section
+  for (const [section, sectionFields] of Object.entries(grouped)) {
+    const sectionHeader = document.createElement("h3");
+    sectionHeader.textContent = section;
+    sectionHeader.className = "section-title";
+    form.appendChild(sectionHeader);
+
+    for (const f of sectionFields) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "notes-row";
+
+      const label = document.createElement("label");
+      label.textContent = f.label || f.field_key; // colon handled by CSS
+      label.className = "notes-label";
+
+      let input;
+
+      if (f.lookup_type) {
+        input = document.createElement("select");
+        input.name = f.field_key;
+        input.className = "form-control";
+
+        fetch(`https://contacts-module.dennis-e64.workers.dev/lookups?group=${f.lookup_type}`)
+          .then(r => r.json())
+          .then(values => {
+            if (!Array.isArray(values)) {
+              console.warn("Lookup fetch failed:", values);
+              return;
+            }
+            const placeholder = document.createElement("option");
+            placeholder.value = "";
+            placeholder.textContent = "-- Select --";
+            input.appendChild(placeholder);
+
+            values.forEach(v => {
+              const opt = document.createElement("option");
+              opt.value = v.value;
+              opt.textContent = v.label || v.value;
+              if (contact[f.field_key] === v.value) {
+                opt.selected = true;
+              }
+              input.appendChild(opt);
+            });
+          });
+      } else {
+        input = document.createElement("input");
+        input.type = "text";
+        input.name = f.field_key;
+        input.className = "form-control";
+        input.value = contact[f.field_key] || "";
+      }
+
+      wrapper.appendChild(label);
+      wrapper.appendChild(input);
+      form.appendChild(wrapper);
+    }
+  }
+
+  // Save button
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "submit";
+  saveBtn.className = "btn-primary";
+  saveBtn.textContent = "Save Changes";
+  form.appendChild(saveBtn);
+
+  // Handle form submission
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const formData = new FormData(form);
+    const updates = {};
+
+    fields.forEach(f => {
+      updates[f.field_key] = formData.get(f.field_key);
+    });
+    updates.updated_at = new Date().toISOString();
+
+    try {
+      const res = await fetch(
+        `https://contacts-module.dennis-e64.workers.dev/contacts/edit/${contactId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updates)
+        }
+      );
+
+      const result = await res.json();
+      container.innerHTML = `<section class="card"><p>${escapeHtml(result.message || "Contact updated.")}</p></section>`;
+    } catch (err) {
+      container.innerHTML = `<section class="card"><p>Error updating contact: ${escapeHtml(err.message)}</p></section>`;
+    }
+  });
 }
+
+
+
+
+
+
 
 // helper
 function escapeHtml(str) {
