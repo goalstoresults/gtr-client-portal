@@ -717,7 +717,7 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
         // Capture portalState in closure
         addContactLink.addEventListener("click", ev => {
           ev.preventDefault();
-          openQuickAddContactModal(row, project); // popup modal for new contact 
+          openContactSearchModal(row, project);
         });
       
         searchContainer.appendChild(addContactLink);
@@ -1010,93 +1010,95 @@ function buildDropdown(options, selectedValue, className = "") {
   </select>`;
 }
 
-
-
-function openQuickAddContactModal(row, project) {
+function openContactSearchModal(row, project) {
   const modal = document.createElement("div");
   modal.className = "notes-modal";
 
   modal.innerHTML = `
     <div class="notes-modal-card">
-      <h4 style="margin:0 0 8px;">Quick add contact</h4>
+      <h4 style="margin:0 0 8px;">Search for contact</h4>
       <div class="row" style="gap:8px; margin-bottom:8px;">
-        <input class="qc-first" placeholder="First name" />
-        <input class="qc-last" placeholder="Last name" />
-      </div>
-      <div class="row" style="gap:8px; margin-bottom:8px;">
-        <input class="qc-email" placeholder="Email" />
-        ${buildDropdown(window.lookupContactTypes || [], "", "qc-type")}
-      </div>
-      <div class="muted" style="margin-bottom:8px;">
-        Project: ${escapeHtml(project)}
+        <input class="search-first" placeholder="First name" />
+        <input class="search-last" placeholder="Last name" />
       </div>
       <div style="display:flex; gap:8px; justify-content:flex-end;">
-        <button class="qc-cancel secondary">Cancel</button>
-        <button class="qc-save primary">Save</button>
+        <button class="search-cancel secondary">Cancel</button>
+        <button class="search-do primary">Find</button>
       </div>
-      <div class="qc-status muted" style="margin-top:8px;"></div>
+      <div class="search-results muted" style="margin-top:8px;">Enter criteria and click Find.</div>
     </div>
   `;
 
   document.body.appendChild(modal);
 
-  modal.querySelector(".qc-cancel").addEventListener("click", () => modal.remove());
+  modal.querySelector(".search-cancel").addEventListener("click", () => modal.remove());
 
-  modal.querySelector(".qc-save").addEventListener("click", async () => {
-    const first = modal.querySelector(".qc-first").value.trim();
-    const last  = modal.querySelector(".qc-last").value.trim();
-    const email = modal.querySelector(".qc-email").value.trim();
-    const type  = modal.querySelector(".qc-type")?.value?.trim() || "";
-    const status = modal.querySelector(".qc-status");
+  modal.querySelector(".search-do").addEventListener("click", async () => {
+    const first = modal.querySelector(".search-first").value.trim();
+    const last  = modal.querySelector(".search-last").value.trim();
+    const resultsDiv = modal.querySelector(".search-results");
 
-    if (!first || !last) {
-      status.textContent = "First and last name are required.";
+    if (!first && !last) {
+      resultsDiv.textContent = "Enter at least a first or last name.";
       return;
     }
 
-    const payload = {
-      project,
-      first_name: first,
-      last_name: last,
-      email: email || null,
-      contact_type: type || null,
-      created_at: new Date().toISOString()
-    };
+    const filters = [];
+    if (first) filters.push(`first_name.ilike.*${first}*`);
+    if (last)  filters.push(`last_name.ilike.*${last}*`);
+
+    const query = filters.length > 1
+      ? `and=(${filters.join(",")})`
+      : filters[0];
+
+    const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${query}&select=contact_id,first_name,last_name,email,contact_type`;
+    console.log("[ModalSearch] URL:", searchUrl);
 
     try {
-      const resp = await fetch("https://client-portal-api.dennis-e64.workers.dev/api/contacts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+      const resp = await fetch(searchUrl);
+      const contacts = await resp.json();
+
+      resultsDiv.innerHTML = contacts.length > 0
+        ? contacts.map(c => `
+            <div class="contact-result"
+                 style="padding:8px; border-bottom:1px solid #eee; cursor:pointer;"
+                 data-contactid="${c.contact_id}"
+                 data-name="${c.first_name} ${c.last_name}"
+                 data-type="${c.contact_type}"
+                 data-email="${c.email}">
+              <strong>${c.first_name} ${c.last_name}</strong> (${c.contact_type})<br/>
+              <small>${c.email}</small>
+            </div>
+          `).join("")
+        : "<div class='muted'>No contacts found.</div>";
+
+      resultsDiv.querySelectorAll(".contact-result").forEach(el => {
+        el.addEventListener("click", () => {
+          const contactId = el.dataset.contactid;
+          const name = el.dataset.name;
+          const type = el.dataset.type;
+          const email = el.dataset.email;
+
+          row.querySelector(".rel-contact-id").textContent = contactId;
+          row.querySelector(".rel-contact-name").textContent = name;
+          row.querySelector(".contact-type-dropdown").value = type || "";
+          row.querySelector(".rel-contact-email").textContent = email || "";
+          row.querySelector("td:last-child").innerHTML = `<input type="checkbox" class="promote-checkbox"/>`;
+
+          modal.remove();
+          alert("✅ Contact selected and populated.");
+        });
       });
-
-      const text = await resp.text();
-      let created = null;
-      try { created = JSON.parse(text); } catch {}
-
-      const contactId = (Array.isArray(created) && created[0]?.contact_id) || created?.contact_id || null;
-      if (!contactId) {
-        status.textContent = "Contact saved, but ID not returned.";
-        return;
-      }
-
-      const fullName = `${first} ${last}`.trim();
-      row.querySelector(".rel-contact-id").textContent = contactId;
-      row.querySelector(".rel-contact-name").textContent = fullName;
-      row.querySelector(".contact-type-dropdown").value = type || "";
-      row.querySelector(".rel-contact-email").textContent = email || "";
-      row.querySelector("td:last-child").innerHTML = `<input type="checkbox" class="promote-checkbox"/>`;
-
-      modal.remove();
-      alert("✅ Contact created and populated.");
     } catch (err) {
-      status.textContent = "Network error creating contact.";
+      resultsDiv.textContent = "Network error searching contacts.";
       console.error(err);
     }
   });
 }
 
-window.openQuickAddContactModal = openQuickAddContactModal;
+window.openContactSearchModal = openContactSearchModal;
+
+
 
 
 
