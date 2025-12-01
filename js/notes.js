@@ -706,22 +706,22 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
     `;
 
       // ✅ Create and append "+ Add Contact 2" link
-      // const searchContainer = row.querySelector(".inline-search");
-      // if (searchContainer) {
-      //   const addContactLink = document.createElement("a");
-      //   addContactLink.href = "#";
-      //   addContactLink.textContent = "+ Add Contact 4";
-      //   addContactLink.className = "notes-link";
-      //   addContactLink.style.marginLeft = "12px";
+      const searchContainer = row.querySelector(".inline-search");
+      if (searchContainer) {
+        const addContactLink = document.createElement("a");
+        addContactLink.href = "#";
+        addContactLink.textContent = "+ Add Contact 2";
+        addContactLink.className = "notes-link";
+        addContactLink.style.marginLeft = "12px";
       
         // Capture portalState in closure
-       //  addContactLink.addEventListener("click", ev => {
-       //    ev.preventDefault();
-       //    openQuickAddContactModal(row, project);
-       //  });
+        addContactLink.addEventListener("click", ev => {
+          ev.preventDefault();
+          openQuickAddContactModal(row, project);
+        });
       
-       //  searchContainer.appendChild(addContactLink);
-      //  }
+        searchContainer.appendChild(addContactLink);
+      }
 
     // ✅ Wire up Find button click
     row.querySelector(".do-search").addEventListener("click", async () => {
@@ -732,14 +732,14 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
         return;
       }
 
-      const filters = [`project=eq.${project}`];
-      if (first) filters.push(`first_name=ilike.*${first}*`);
-      if (last)  filters.push(`last_name=ilike.*${last}*`);
-      
+      const filters = [];
+      if (first) filters.push(`first_name.ilike.*${first}*`);
+      if (last)  filters.push(`last_name.ilike.*${last}*`);
+
       const query = filters.length > 1
         ? `and=(${filters.join(",")})`
         : filters[0];
-      
+
       const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${query}&select=contact_id,first_name,last_name,email,contact_type`;
       console.log("[GetID] Search URL:", searchUrl);
 
@@ -1010,7 +1010,6 @@ function buildDropdown(options, selectedValue, className = "") {
   </select>`;
 }
 
-//  this is a popup feautre to add a contact quickly...its not working correctly so we took it out for now...DR 12-1-25
 function openQuickAddContactModal(row, project) {
   const modal = document.createElement("div");
   modal.className = "notes-modal";
@@ -1060,8 +1059,7 @@ function openQuickAddContactModal(row, project) {
       contact_type: type || null,
       created_at: new Date().toISOString()
     };
-    console.log("QuickAdd POST payload:", payload);
-
+    
     try {
       const resp = await fetch("https://client-portal-api.dennis-e64.workers.dev/api/contacts", {
         method: "POST",
