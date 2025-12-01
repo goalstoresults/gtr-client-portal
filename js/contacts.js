@@ -105,7 +105,7 @@ async function renderContactList(container, portalState) {
   const from  = document.getElementById("filter-from")?.value;
   const to    = document.getElementById("filter-to")?.value;
 
-  // Build filters with dot notation
+  // Build filters with dot notation for Supabase
   const filters = [`project.eq.${portalState.project}`];
   if (first) filters.push(`first_name.ilike.*${first}*`);
   if (last)  filters.push(`last_name.ilike.*${last}*`);
@@ -120,8 +120,8 @@ async function renderContactList(container, portalState) {
   const hasFilters = first || last || from || to;
   const limit = hasFilters ? 500 : 100;
 
-  // Fetch with limit and sort newest first
-  const url = `https://contacts-module.dennis-e64.workers.dev/contacts/list?${query}&order=created_at.desc&limit=${limit}`;
+  // ✅ Explicitly include project as top-level param
+  const url = `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}&${query}&order=created_at.desc&limit=${limit}`;
   console.log("[Contacts] Fetching:", url);
 
   const resList = await fetch(url);
@@ -170,10 +170,9 @@ async function renderContactList(container, portalState) {
     btn.addEventListener("click", async () => {
       const contactId = btn.dataset.id;
       if (!confirm("Delete this contact?")) return;
-      await fetch(`https://contacts-module.dennis-e64.workers.dev/contacts/delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contact_id: contactId, project: portalState.project })
+      await fetch(`https://contacts-module.dennis-e64.workers.dev/contacts/delete/${contactId}?project=${portalState.project}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" }
       });
       await renderContactList(container, portalState); // refresh list
     });
