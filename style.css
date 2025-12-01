@@ -275,7 +275,7 @@ button {
 .notes-label {
   display: block;
   font-weight: bold;
-  margin-bottom: 6px;
+  margin-bottom: 6px; /* space between label and field */
   position: relative;
 }
 
@@ -287,10 +287,25 @@ button {
 /* Input and select styling */
 .form-control {
   width: 100%;
-  max-width: 480px; /* Optional cap for readability */
+  max-width: 480px; /* optional cap for readability */
   padding: 6px 8px;
   border: 1px solid #ccc;
   border-radius: 4px;
   font: inherit;
   box-sizing: border-box;
+}
+
+/* Collapsible section styling */
+.notes-section {
+  margin-bottom: 20px;
+  border: 1px solid #ddd;
+  padding: 12px;
+  border-radius: 4px;
+  background: #fafafa;
+}
+
+.notes-section summary {
+  font-weight: bold;
+  cursor: pointer;
+  margin-bottom: 8px;
 }
