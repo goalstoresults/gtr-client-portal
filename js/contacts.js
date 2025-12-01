@@ -79,7 +79,7 @@ export async function loadContactsTab({ portalState, tabContent }) {
   }
 }
 
-// 🔧 Contact List with filters, search, sort, Select/Delete
+// 🔧 Contact List with default view, filters, search, sort, Select/Delete
 async function renderContactList(container, portalState) {
   // Build filter bar UI
   container.innerHTML = `
@@ -116,15 +116,20 @@ async function renderContactList(container, portalState) {
     ? `and=(${filters.join(",")})`
     : filters[0];
 
-  // Fetch with default sort by created_at desc
-  const url = `https://contacts-module.dennis-e64.workers.dev/contacts/list?${query}&order=created_at.desc`;
+  // Decide limit based on filters
+  const hasFilters = first || last || from || to;
+  const limit = hasFilters ? 500 : 100;
+
+  // Fetch with limit and sort newest first
+  const url = `https://contacts-module.dennis-e64.workers.dev/contacts/list?${query}&order=created_at.desc&limit=${limit}`;
   console.log("[Contacts] Fetching:", url);
 
   const resList = await fetch(url);
   const contacts = await resList.json();
 
-  // Render table
+  // Render table with count in header
   tableDiv.innerHTML = `
+    <h4>Showing ${Array.isArray(contacts) ? contacts.length : 0} ${hasFilters ? "filtered" : "recent"} contacts (Newest first)</h4>
     <table class="notes-table">
       <thead><tr><th>Name</th><th>Email</th><th>Actions</th></tr></thead>
       <tbody>
