@@ -1,5 +1,7 @@
 // js/contacts.js v1.5
+// 🔧 Load Contacts Tab with subtab switching
 export async function loadContactsTab({ portalState, tabContent }) {
+  // Load base HTML template
   const res = await fetch("./components/contacts.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
 
@@ -8,6 +10,7 @@ export async function loadContactsTab({ portalState, tabContent }) {
 
   buttons.forEach(btn => {
     btn.addEventListener("click", async () => {
+      // Reset active state
       buttons.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
@@ -18,6 +21,11 @@ export async function loadContactsTab({ portalState, tabContent }) {
           break;
 
         case "list":
+          // ✅ Always reset filters when switching to List
+          document.getElementById("filter-first")?.value = "";
+          document.getElementById("filter-last")?.value = "";
+          document.getElementById("filter-from")?.value = "";
+          document.getElementById("filter-to")?.value = "";
           await renderContactList(content, portalState);
           break;
 
@@ -57,36 +65,77 @@ export async function loadContactsTab({ portalState, tabContent }) {
       }
     });
   });
+
+  // ✅ Default to List view when tab first loads
+  const defaultBtn = tabContent.querySelector('#contacts-subtabs button[data-subtab="list"]');
+  if (defaultBtn) {
+    defaultBtn.classList.add("active");
+    await renderContactList(content, portalState);
+  }
 }
 
-// 🔧 Contact List with Select/Delete
+// 🔧 Contact List with filters, search, sort, Select/Delete
 async function renderContactList(container, portalState) {
+  // Build filter bar UI
   container.innerHTML = `
     <section class="card">
       <h2>Contact List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
+      <div id="contactsFilters" style="margin-bottom:12px;">
+        <label>First: <input type="text" id="filter-first" /></label>
+        <label style="margin-left:12px;">Last: <input type="text" id="filter-last" /></label>
+        <label style="margin-left:12px;">From: <input type="date" id="filter-from" /></label>
+        <label style="margin-left:12px;">To: <input type="date" id="filter-to" /></label>
+        <button id="btnApplyContactsFilter" class="secondary" style="margin-left:12px;">Apply Filter</button>
+        <button id="btnClearContactsFilter" class="secondary" style="margin-left:12px;">Clear Filter</button>
+      </div>
       <div id="contactTable">Loading...</div>
     </section>
   `;
+
   const tableDiv = container.querySelector("#contactTable");
-  const resList = await fetch(
-    `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}`
-  );
+
+  // Collect filter values
+  const first = document.getElementById("filter-first")?.value.trim();
+  const last  = document.getElementById("filter-last")?.value.trim();
+  const from  = document.getElementById("filter-from")?.value;
+  const to    = document.getElementById("filter-to")?.value;
+
+  // Build filters with dot notation
+  const filters = [`project.eq.${portalState.project}`];
+  if (first) filters.push(`first_name.ilike.*${first}*`);
+  if (last)  filters.push(`last_name.ilike.*${last}*`);
+  if (from)  filters.push(`created_at.gte.${from}`);
+  if (to)    filters.push(`created_at.lte.${to}`);
+
+  const query = filters.length > 1
+    ? `and=(${filters.join(",")})`
+    : filters[0];
+
+  // Fetch with default sort by created_at desc
+  const url = `https://contacts-module.dennis-e64.workers.dev/contacts/list?${query}&order=created_at.desc`;
+  console.log("[Contacts] Fetching:", url);
+
+  const resList = await fetch(url);
   const contacts = await resList.json();
 
+  // Render table
   tableDiv.innerHTML = `
     <table class="notes-table">
       <thead><tr><th>Name</th><th>Email</th><th>Actions</th></tr></thead>
       <tbody>
-        ${contacts.map(c => `
-          <tr>
-            <td>${escapeHtml(c.contact_name || "")}</td>
-            <td>${escapeHtml(c.email || "")}</td>
-            <td>
-              <button class="btn-primary btn-select" data-id="${c.contact_id}">Select</button>
-              <button class="btn-danger btn-delete" data-id="${c.contact_id}">Delete</button>
-            </td>
-          </tr>
-        `).join("")}
+        ${Array.isArray(contacts) && contacts.length > 0
+          ? contacts.map(c => `
+              <tr>
+                <td>${escapeHtml(c.contact_name || "")}</td>
+                <td>${escapeHtml(c.email || "")}</td>
+                <td>
+                  <button class="btn-primary btn-select" data-id="${c.contact_id}">Select</button>
+                  <button class="btn-danger btn-delete" data-id="${c.contact_id}">Delete</button>
+                </td>
+              </tr>
+            `).join("")
+          : `<tr><td colspan="3">(no contacts found)</td></tr>`
+        }
       </tbody>
     </table>
   `;
@@ -119,9 +168,23 @@ async function renderContactList(container, portalState) {
       await renderContactList(container, portalState); // refresh list
     });
   });
+
+  // Wire filter buttons
+  document.getElementById("btnApplyContactsFilter").addEventListener("click", () => {
+    renderContactList(container, portalState);
+  });
+
+  document.getElementById("btnClearContactsFilter").addEventListener("click", () => {
+    document.getElementById("filter-first").value = "";
+    document.getElementById("filter-last").value = "";
+    document.getElementById("filter-from").value = "";
+    document.getElementById("filter-to").value = "";
+    renderContactList(container, portalState);
+  });
 }
 
-// 🔧 Dynamic Add Contact Form with collapsible sections
+
+// 🔧 Dynamic Add Contact Form with collapsible sections + defaults
 async function renderAddContactForm(container, portalState) {
   const projectId = portalState.project;
   if (!projectId) {
@@ -160,7 +223,7 @@ async function renderAddContactForm(container, portalState) {
   for (const [section, sectionFields] of Object.entries(grouped)) {
     const details = document.createElement("details");
     details.className = "notes-section";
-    details.open = true; // expand by default, remove if you want collapsed
+    details.open = true; // expand by default
 
     const summary = document.createElement("summary");
     summary.textContent = section;
@@ -172,14 +235,13 @@ async function renderAddContactForm(container, portalState) {
       wrapper.className = "notes-row";
 
       const label = document.createElement("label");
-      // no colon here — CSS ::after will add it
       label.textContent = f.label || f.field_key;
       label.className = "notes-label";
 
       let input;
 
       if (f.lookup_type) {
-        // Render dropdown bound to lookup group
+        // Dropdown bound to lookup group
         input = document.createElement("select");
         input.name = f.field_key;
         input.className = "form-control";
@@ -240,9 +302,15 @@ async function renderAddContactForm(container, portalState) {
     payload.project = projectId;
     payload.created_at = new Date().toISOString();
 
+    // Build contact_name consistently
     const first = formData.get("first_name") || "";
     const last = formData.get("last_name") || "";
     payload.contact_name = `${first} ${last}`.trim();
+
+    // Default active flag
+    if (!("is_active" in payload)) {
+      payload.is_active = true;
+    }
 
     try {
       const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
@@ -259,7 +327,8 @@ async function renderAddContactForm(container, portalState) {
   });
 }
 
-// 🔧 Render Contact Details
+
+// 🔧 Render Contact Details with editable fields + audit info
 async function renderContactDetails(container, portalState, contactId) {
   const projectId = portalState.project;
   if (!projectId || !contactId) {
@@ -295,6 +364,11 @@ async function renderContactDetails(container, portalState, contactId) {
     <section class="card">
       <h2>Contact Details for ${escapeHtml(contact.contact_name || contactId)}</h2>
       <form id="editContactForm" class="notes-form"></form>
+      <div class="audit-info" style="margin-top:12px; font-size:0.9em; color:#666;">
+        <p><strong>Created:</strong> ${escapeHtml(contact.created_at || "")}</p>
+        <p><strong>Updated:</strong> ${escapeHtml(contact.updated_at || "—")}</p>
+        <p><strong>Status:</strong> ${contact.is_active ? "Active" : "Inactive"}</p>
+      </div>
     </section>
   `;
 
@@ -320,7 +394,7 @@ async function renderContactDetails(container, portalState, contactId) {
       wrapper.className = "notes-row";
 
       const label = document.createElement("label");
-      label.textContent = f.label || f.field_key; // colon handled by CSS
+      label.textContent = f.label || f.field_key;
       label.className = "notes-label";
 
       let input;
