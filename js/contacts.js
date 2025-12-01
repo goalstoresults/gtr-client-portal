@@ -103,3 +103,13 @@ async function saveContact(project) {
 // Example usage:
 // renderAddContact("gtr");
 // document.getElementById("saveBtn").onclick = () => saveContact("gtr");
+
+// Example usage:
+// Call this when the Add Contact tab loads
+renderAddContact("gtr");
+
+// Wire up the Save button
+document.getElementById("saveBtn").onclick = () => saveContact("gtr");
+
+// Export functions if you’re using modules
+export { renderAddContact, saveContact };
