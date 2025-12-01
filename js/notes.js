@@ -732,14 +732,14 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
         return;
       }
 
-      const filters = [];
-      if (first) filters.push(`first_name.ilike.*${first}*`);
-      if (last)  filters.push(`last_name.ilike.*${last}*`);
-
+      const filters = [`project=eq.${project}`];
+      if (first) filters.push(`first_name=ilike.*${first}*`);
+      if (last)  filters.push(`last_name=ilike.*${last}*`);
+      
       const query = filters.length > 1
         ? `and=(${filters.join(",")})`
         : filters[0];
-
+      
       const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${query}&select=contact_id,first_name,last_name,email,contact_type`;
       console.log("[GetID] Search URL:", searchUrl);
 
