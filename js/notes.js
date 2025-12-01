@@ -703,23 +703,23 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
       </div>
     `;
 
-        // ✅ Create and append "+ Add Contact" link
-    const searchContainer = row.querySelector(".inline-search");
-    if (searchContainer) {
-      const addContactLink = document.createElement("a");
-      addContactLink.href = "#";
-      addContactLink.textContent = "+ Add Contact";
-      addContactLink.className = "notes-link";
-      addContactLink.style.marginLeft = "12px";
-
-      // ✅ Capture portalState in closure
-      addContactLink.addEventListener("click", ev => {
-        ev.preventDefault();
-        goToAddContact(portalState); // this portalState is from outer scope
-      });
-
-      searchContainer.appendChild(addContactLink);
-    }
+      // ✅ Create and append "+ Add Contact" link
+      const searchContainer = row.querySelector(".inline-search");
+      if (searchContainer) {
+        const addContactLink = document.createElement("a");
+        addContactLink.href = "#";
+        addContactLink.textContent = "+ Add Contact";
+        addContactLink.className = "notes-link";
+        addContactLink.style.marginLeft = "12px";
+      
+        // Capture portalState in closure
+        addContactLink.addEventListener("click", ev => {
+          ev.preventDefault();
+          goToAddContact(portalState); // portalState is passed into renderRelationships
+        });
+      
+        searchContainer.appendChild(addContactLink);
+      }
 
     // ✅ Wire up Find button click
     row.querySelector(".do-search").addEventListener("click", async () => {
@@ -996,17 +996,14 @@ document.getElementById("btnSaveRelationships").addEventListener("click", async 
 }
 } // end of renderRelationships
     
-
 // 🔧 Navigate from Notes to Contacts/Add
-function goToAddContact() {
-  portalState.tab = "contacts";
-  portalState.subtab = "add";
-  renderPortal(); // your top-level render function that re-renders tabs
+function goToAddContact(state) {
+  state.tab = "contacts";
+  state.subtab = "add";
+  renderPortal();
 }
-
-// Make globally accessible if you want inline onclick
 window.goToAddContact = goToAddContact;
-    
+
 
 /* -------------------------
    Utils
