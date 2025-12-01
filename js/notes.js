@@ -997,7 +997,21 @@ document.getElementById("btnSaveRelationships").addEventListener("click", async 
   container.innerHTML = `<p>Error loading relationships: ${err.message}</p>`;
 }
 } // end of renderRelationships
-    
+
+
+function buildDropdown(options, selectedValue, className = "") {
+  return `<select class="${className}">
+    <option value="">-- Select --</option>
+    ${options.map(opt => `
+      <option value="${escapeHtml(opt.value)}"
+              ${opt.value === selectedValue ? "selected" : ""}>
+        ${escapeHtml(opt.value)}
+      </option>`).join("")}
+  </select>`;
+}
+
+
+
 function openQuickAddContactModal(row, project) {
   const modal = document.createElement("div");
   modal.className = "notes-modal";
