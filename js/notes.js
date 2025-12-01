@@ -688,43 +688,33 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
     const type = typeSelect?.value?.trim() || "";
     const role = roleSelect?.value?.trim() || "";
 
+    // Default dropdown value is "", not "Select"
     if (!type || !role) {
       alert("❌ Please select both Relationship Type and Role before searching for a contact.");
       return;
     }
 
-    // ✅ Render search form HTML
+    // ✅ Always render the inline search form
     row.querySelector("td:last-child").innerHTML = `
-      <div class="inline-search">
+      <div>
         <input class="search-first" placeholder="First name"/>
         <input class="search-last" placeholder="Last name"/>
         <button class="do-search">Find</button>
         <div class="search-results muted">Enter criteria and click Find.</div>
+          const addContactLink = document.createElement("a");
+          addContactLink.href = "#";
+          addContactLink.textContent = "+ Add Contact";
+          addContactLink.className = "notes-link"; // style it like a link
+          addContactLink.style.marginLeft = "12px";
+          addContactLink.addEventListener("click", e => {
+            e.preventDefault();
+            goToAddContact(portalState);
+          });
+          
+          document.getElementById("setClientForm").appendChild(addContactLink);
+
       </div>
     `;
-
-    // ✅ Create and append "+ Add Contact" link
-    const addContactLink = document.createElement("a");
-    addContactLink.href = "#";
-    addContactLink.textContent = "+ Add Contact";
-    addContactLink.className = "notes-link";
-    addContactLink.style.marginLeft = "12px";
-    addContactLink.addEventListener("click", ev => {
-      ev.preventDefault();
-      goToAddContact(portalState); // portalState is in scope
-    });
-
-    // Append after the search form
-    const searchContainer = row.querySelector(".inline-search");
-    searchContainer.appendChild(addContactLink);
-
-    // ✅ Wire up Find button
-    row.querySelector(".do-search").addEventListener("click", async () => {
-      // your search logic here...
-    });
-  });
-});
-
 
     // ✅ Wire up Find button click
     row.querySelector(".do-search").addEventListener("click", async () => {
