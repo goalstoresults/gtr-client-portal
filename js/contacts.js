@@ -21,11 +21,16 @@ export async function loadContactsTab({ portalState, tabContent }) {
           break;
 
         case "list":
-          // ✅ Always reset filters when switching to List
-          document.getElementById("filter-first")?.value = "";
-          document.getElementById("filter-last")?.value = "";
-          document.getElementById("filter-from")?.value = "";
-          document.getElementById("filter-to")?.value = "";
+          // ✅ Reset filters safely (no optional chaining on assignment)
+          const fFirst = document.getElementById("filter-first");
+          const fLast  = document.getElementById("filter-last");
+          const fFrom  = document.getElementById("filter-from");
+          const fTo    = document.getElementById("filter-to");
+          if (fFirst) fFirst.value = "";
+          if (fLast)  fLast.value  = "";
+          if (fFrom)  fFrom.value  = "";
+          if (fTo)    fTo.value    = "";
+
           await renderContactList(content, portalState);
           break;
 
@@ -65,6 +70,14 @@ export async function loadContactsTab({ portalState, tabContent }) {
       }
     });
   });
+
+  // ✅ Default to List view when tab first loads
+  const defaultBtn = tabContent.querySelector('#contacts-subtabs button[data-subtab="list"]');
+  if (defaultBtn) {
+    defaultBtn.classList.add("active");
+    await renderContactList(content, portalState);
+  }
+}
 
   // ✅ Default to List view when tab first loads
   const defaultBtn = tabContent.querySelector('#contacts-subtabs button[data-subtab="list"]');
