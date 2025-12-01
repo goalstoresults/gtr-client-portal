@@ -295,7 +295,9 @@ async function renderSetupLookups(tabContent, portalState) {
           </tbody>
         </table>
       `;
-      addGroupBtn.insertAdjacentElement("afterend", addRow);
+      const headerDiv = tabContent.querySelector(".lookup-groups-header");
+      headerDiv.insertAdjacentElement("afterend", addRow);
+
 
       addRow.querySelector(".saveNewGroupBtn").addEventListener("click", async () => {
         const type = addRow.querySelector(".newTypeInput").value.trim();
