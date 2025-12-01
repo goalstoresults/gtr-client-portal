@@ -168,8 +168,8 @@ async function renderAddContactForm(container, portalState) {
       wrapper.className = "notes-row";
 
       const label = document.createElement("label");
-      // Explicit colon in text
-      label.textContent = `${f.label || f.field_key}:`;
+      // ✅ fixed (CSS will add the colon)
+      label.textContent = f.label || f.field_key;
       label.className = "notes-label";
 
       let input;
