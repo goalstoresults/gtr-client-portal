@@ -1,4 +1,4 @@
-// js/contacts.js v1.0
+// js/contacts.js v1.1
 export async function loadContactsTab({ portalState, tabContent }) {
   const res = await fetch("./components/contacts.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
@@ -115,20 +115,28 @@ async function renderAddContactForm(container, portalState) {
     e.preventDefault();
     const formData = new FormData(form);
     const payload = {};
+
     fields.forEach(f => {
       payload[f.field_key] = formData.get(f.field_key);
     });
+
+    // 🔑 Generate contact_id here
+    payload.contact_id = crypto.randomUUID();
     payload.project = projectId;
     payload.created_at = new Date().toISOString();
 
-    const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    try {
+      const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
-    const result = await res.json();
-    container.innerHTML = `<section class="card"><p>${result.message || "Contact saved."}</p></section>`;
+      const result = await res.json();
+      container.innerHTML = `<section class="card"><p>${escapeHtml(result.message || "Contact saved.")}</p></section>`;
+    } catch (err) {
+      container.innerHTML = `<section class="card"><p>Error saving contact: ${escapeHtml(err.message)}</p></section>`;
+    }
   });
 }
 
