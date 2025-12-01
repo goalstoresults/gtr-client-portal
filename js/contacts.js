@@ -1,4 +1,3 @@
-// js/contacts.js v0.8
 export async function loadContactsTab({ portalState, tabContent }) {
   const res = await fetch("./components/contacts.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
@@ -14,31 +13,7 @@ export async function loadContactsTab({ portalState, tabContent }) {
       const subtab = btn.dataset.subtab;
       switch (subtab) {
         case "add":
-          content.innerHTML = `
-            <section class="card">
-              <h2>Add Contact for ${escapeHtml(portalState.display_name || portalState.setup_project_id)}</h2>
-              <form id="addContactForm">
-                <label>Name:<br><input type="text" name="name" required /></label><br><br>
-                <label>Email:<br><input type="email" name="email" required /></label><br><br>
-                <button type="submit" class="btn-primary">Save Contact</button>
-              </form>
-            </section>
-          `;
-          const form = content.querySelector("#addContactForm");
-          form.addEventListener("submit", async e => {
-            e.preventDefault();
-            const data = Object.fromEntries(new FormData(form));
-            data.project = portalState.setup_project_id;
-            data.created_at = new Date().toISOString();
-
-            const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(data)
-            });
-            const result = await res.json();
-            content.innerHTML = `<section class="card"><p>${result.message}</p></section>`;
-          });
+          await renderAddContactForm(content, portalState);
           break;
 
         case "list":
@@ -55,7 +30,7 @@ export async function loadContactsTab({ portalState, tabContent }) {
             <table class="notes-table">
               <thead><tr><th>Name</th><th>Email</th></tr></thead>
               <tbody>
-                ${contacts.map(c => `<tr><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.email)}</td></tr>`).join("")}
+                ${contacts.map(c => `<tr><td>${escapeHtml(c.name || "")}</td><td>${escapeHtml(c.email || "")}</td></tr>`).join("")}
               </tbody>
             </table>
           `;
@@ -99,10 +74,55 @@ export async function loadContactsTab({ portalState, tabContent }) {
   });
 }
 
+// 🔧 Dynamic Add Contact Form
+async function renderAddContactForm(container, portalState) {
+  const res = await fetch(`https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${portalState.setup_project_id}`, { cache: "no-cache" });
+  const data = await res.json();
+  const fields = Array.isArray(data.rows) ? data.rows : [];
+  fields.sort((a, b) => a.sort_order - b.sort_order);
+
+  container.innerHTML = `
+    <section class="card">
+      <h2>Add Contact for ${escapeHtml(portalState.display_name || portalState.setup_project_id)}</h2>
+      <form id="addContactForm" class="notes-form">
+        ${fields.map(f => `
+          <div class="form-row" style="margin-bottom:12px;">
+            <label style="display:block; font-weight:bold; margin-bottom:4px;">
+              ${escapeHtml(f.label || f.field_key)}
+            </label>
+            <input type="text" name="${f.field_key}" style="width:100%;" />
+          </div>
+        `).join("")}
+        <button type="submit" class="btn-primary">Save Contact</button>
+      </form>
+    </section>
+  `;
+
+  const form = container.querySelector("#addContactForm");
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const formData = new FormData(form);
+    const payload = {};
+    fields.forEach(f => {
+      payload[f.field_key] = formData.get(f.field_key);
+    });
+    payload.project = portalState.setup_project_id;
+    payload.created_at = new Date().toISOString();
+
+    const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await res.json();
+    container.innerHTML = `<section class="card"><p>${result.message || "Contact saved."}</p></section>`;
+  });
+}
+
 // helper
 function escapeHtml(str) {
   return str?.replace(/[&<>"']/g, c => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[c])) || "";
 }
-
