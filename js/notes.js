@@ -705,7 +705,7 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
       </div>
     `;
 
-      // ✅ Create and append "+ Add Contact" link
+      // ✅ Create and append "+ Add Contact 2" link
       const searchContainer = row.querySelector(".inline-search");
       if (searchContainer) {
         const addContactLink = document.createElement("a");
@@ -1059,9 +1059,9 @@ function openQuickAddContactModal(row, project) {
       contact_type: type || null,
       created_at: new Date().toISOString()
     };
-
+    
     try {
-      const resp = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/quickadd", {
+      const resp = await fetch("https://client-portal-api.dennis-e64.workers.dev/api/contacts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
