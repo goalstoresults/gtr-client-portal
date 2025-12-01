@@ -263,3 +263,34 @@ button {
   cursor: pointer;
 }
 .btn-secondary:hover { background: #777; }
+
+/* === Contact Form Enhancements === */
+
+/* Space between each field row */
+.notes-row {
+  margin-bottom: 16px; /* more breathing room */
+}
+
+/* Label styling */
+.notes-label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 6px; /* space between label and field */
+  position: relative;
+}
+
+/* Add colon automatically after labels */
+.notes-label::after {
+  content: ":";
+  margin-left: 2px;
+}
+
+/* Inputs and selects consistent look */
+.form-control {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font: inherit;
+}
+
