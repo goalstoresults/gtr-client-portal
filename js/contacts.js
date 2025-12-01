@@ -1,6 +1,5 @@
-// js/contacts.js v0.7
+// js/contacts.js v0.8
 export async function loadContactsTab({ portalState, tabContent }) {
-  // Load the partial shell
   const res = await fetch("./components/contacts.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
 
@@ -9,7 +8,6 @@ export async function loadContactsTab({ portalState, tabContent }) {
 
   buttons.forEach(btn => {
     btn.addEventListener("click", async () => {
-      // Reset active state
       buttons.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
@@ -18,11 +16,11 @@ export async function loadContactsTab({ portalState, tabContent }) {
         case "add":
           content.innerHTML = `
             <section class="card">
-              <h2>Add Contact</h2>
+              <h2>Add Contact for ${escapeHtml(portalState.display_name || portalState.setup_project_id)}</h2>
               <form id="addContactForm">
                 <label>Name:<br><input type="text" name="name" required /></label><br><br>
                 <label>Email:<br><input type="email" name="email" required /></label><br><br>
-                <button type="submit">Save Contact</button>
+                <button type="submit" class="btn-primary">Save Contact</button>
               </form>
             </section>
           `;
@@ -30,7 +28,10 @@ export async function loadContactsTab({ portalState, tabContent }) {
           form.addEventListener("submit", async e => {
             e.preventDefault();
             const data = Object.fromEntries(new FormData(form));
-            const res = await fetch("/contacts/add", {
+            data.project = portalState.setup_project_id;
+            data.created_at = new Date().toISOString();
+
+            const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(data)
@@ -43,17 +44,19 @@ export async function loadContactsTab({ portalState, tabContent }) {
         case "list":
           content.innerHTML = `
             <section class="card">
-              <h2>Contact List</h2>
-              <div id="contactTable"></div>
+              <h2>Contact List for ${escapeHtml(portalState.display_name || portalState.setup_project_id)}</h2>
+              <div id="contactTable">Loading...</div>
             </section>
           `;
           const tableDiv = content.querySelector("#contactTable");
-          const resList = await fetch("/contacts/list");
+          const resList = await fetch(`https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.setup_project_id}`);
           const contacts = await resList.json();
           tableDiv.innerHTML = `
-            <table>
-              <tr><th>Name</th><th>Email</th></tr>
-              ${contacts.map(c => `<tr><td>${c.name}</td><td>${c.email}</td></tr>`).join("")}
+            <table class="notes-table">
+              <thead><tr><th>Name</th><th>Email</th></tr></thead>
+              <tbody>
+                ${contacts.map(c => `<tr><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.email)}</td></tr>`).join("")}
+              </tbody>
             </table>
           `;
           break;
@@ -95,3 +98,11 @@ export async function loadContactsTab({ portalState, tabContent }) {
     });
   });
 }
+
+// helper
+function escapeHtml(str) {
+  return str?.replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c])) || "";
+}
+
