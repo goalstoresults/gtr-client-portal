@@ -721,7 +721,7 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
        //  });
       
        //  searchContainer.appendChild(addContactLink);
-      }
+      //  }
 
     // ✅ Wire up Find button click
     row.querySelector(".do-search").addEventListener("click", async () => {
