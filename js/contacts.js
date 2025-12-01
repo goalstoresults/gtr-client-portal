@@ -1,4 +1,4 @@
-// js/contacts.js v1.4
+// js/contacts.js v1.5
 export async function loadContactsTab({ portalState, tabContent }) {
   const res = await fetch("./components/contacts.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
@@ -95,7 +95,15 @@ async function renderContactList(container, portalState) {
   tableDiv.querySelectorAll(".btn-select").forEach(btn => {
     btn.addEventListener("click", async () => {
       const contactId = btn.dataset.id;
-      await renderContactDetails(container, portalState, contactId);
+
+      // 🔑 Switch to Details tab
+      const buttons = document.querySelectorAll("#contacts-subtabs button");
+      buttons.forEach(b => b.classList.remove("active"));
+      const detailsBtn = document.querySelector('#contacts-subtabs button[data-subtab="details"]');
+      if (detailsBtn) detailsBtn.classList.add("active");
+
+      const content = document.querySelector("#contactsContent");
+      await renderContactDetails(content, portalState, contactId);
     });
   });
 
