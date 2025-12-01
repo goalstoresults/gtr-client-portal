@@ -710,7 +710,7 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
       if (searchContainer) {
         const addContactLink = document.createElement("a");
         addContactLink.href = "#";
-        addContactLink.textContent = "+ Add Contact 4";
+        addContactLink.textContent = "+ Add Contact 2";
         addContactLink.className = "notes-link";
         addContactLink.style.marginLeft = "12px";
       
@@ -1061,7 +1061,7 @@ function openQuickAddContactModal(row, project) {
     };
 
     try {
-      const resp = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
+      const resp = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/quickadd", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
