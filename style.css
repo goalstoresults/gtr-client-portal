@@ -320,3 +320,20 @@ button {
   text-decoration: none;
 }
 
+.notes-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.notes-modal-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  width: 360px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.2);
+}
