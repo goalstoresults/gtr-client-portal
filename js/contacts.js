@@ -79,14 +79,6 @@ export async function loadContactsTab({ portalState, tabContent }) {
   }
 }
 
-  // ✅ Default to List view when tab first loads
-  const defaultBtn = tabContent.querySelector('#contacts-subtabs button[data-subtab="list"]');
-  if (defaultBtn) {
-    defaultBtn.classList.add("active");
-    await renderContactList(content, portalState);
-  }
-}
-
 // 🔧 Contact List with filters, search, sort, Select/Delete
 async function renderContactList(container, portalState) {
   // Build filter bar UI
