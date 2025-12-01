@@ -655,7 +655,7 @@ async function renderContactSetup(container, portalState) {
         const label = labelInput.value.trim() || labelInput.placeholder;
         const order = parseInt(tr.querySelector(".orderInput").value, 10) || 99;
         const lookupType = tr.querySelector(".lookupTypeSelect").value || null;
-        const section = tr.querySelector(".sectionSelect").value || null;
+        const section = tr.querySelector(".sectionSelect").value || null; // 🔑 capture section
         rows.push({ field_key: field, label, sort_order: order, lookup_type: lookupType, section });
       }
     });
@@ -669,6 +669,7 @@ async function renderContactSetup(container, portalState) {
     alert("Contact fields saved with sections.");
   });
 }
+
 
 
 
