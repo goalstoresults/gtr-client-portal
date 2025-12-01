@@ -706,22 +706,22 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
     `;
 
       // ✅ Create and append "+ Add Contact 2" link
-      const searchContainer = row.querySelector(".inline-search");
-      if (searchContainer) {
-        const addContactLink = document.createElement("a");
-        addContactLink.href = "#";
-        addContactLink.textContent = "+ Add Contact 2";
-        addContactLink.className = "notes-link";
-        addContactLink.style.marginLeft = "12px";
+      // const searchContainer = row.querySelector(".inline-search");
+      // if (searchContainer) {
+      //   const addContactLink = document.createElement("a");
+      //  addContactLink.href = "#";
+      //  addContactLink.textContent = "+ Add Contact 2";
+      //  addContactLink.className = "notes-link";
+      //  addContactLink.style.marginLeft = "12px";
       
         // Capture portalState in closure
-        addContactLink.addEventListener("click", ev => {
-          ev.preventDefault();
-          openQuickAddContactModal(row, project);
-        });
+       // addContactLink.addEventListener("click", ev => {
+       //   ev.preventDefault();
+       //   openQuickAddContactModal(row, project);
+       //   });
       
-        searchContainer.appendChild(addContactLink);
-      }
+       // searchContainer.appendChild(addContactLink);
+      //  }
 
       // ✅ Wire up Find button click
       row.querySelector(".do-search").addEventListener("click", async () => {
