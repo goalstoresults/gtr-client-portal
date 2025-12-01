@@ -701,9 +701,18 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
         <input class="search-last" placeholder="Last name"/>
         <button class="do-search">Find</button>
         <div class="search-results muted">Enter criteria and click Find.</div>
-        <div style="margin-top:8px;">
-          <button type="button" class="btn-secondary" onclick="goToAddContact(portalState)">+ Add Contact</button>
-        </div>
+          const addContactLink = document.createElement("a");
+          addContactLink.href = "#";
+          addContactLink.textContent = "+ Add Contact";
+          addContactLink.className = "notes-link"; // style it like a link
+          addContactLink.style.marginLeft = "12px";
+          addContactLink.addEventListener("click", e => {
+            e.preventDefault();
+            goToAddContact(portalState);
+          });
+          
+          document.getElementById("setClientForm").appendChild(addContactLink);
+
       </div>
     `;
 
