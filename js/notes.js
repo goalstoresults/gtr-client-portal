@@ -30,6 +30,8 @@ function setActiveSubtab(tabId) {
 }
 
 function initNotes(portalState) {
+  // ✅ Expose a stable reference for cross-tab navigation
+  window.portalState = portalState;
   
   const container = document.getElementById("notesContent");
   if (container) container.innerHTML = `<p>Select a subtab to begin.</p>`;
@@ -715,7 +717,7 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
         // Capture portalState in closure
         addContactLink.addEventListener("click", ev => {
           ev.preventDefault();
-          goToAddContact(portalState); // portalState is passed into renderRelationships
+          goToAddContact(window.portalState); // portalState is passed into renderRelationships
         });
       
         searchContainer.appendChild(addContactLink);
