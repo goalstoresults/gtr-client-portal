@@ -8,7 +8,6 @@ export async function loadNotesTab({ portalState, tabContent }) {
   initNotes(portalState);
 }
 
-
 async function loadPartial(url, tabContent) {
   try {
     const res = await fetch(url, { cache: "no-cache" });
@@ -706,19 +705,19 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
       </div>
     `;
 
-      // ✅ Create and append "+ Add Contact 2" link
+      // ✅ Create and append "+ Add Contact" link
       const searchContainer = row.querySelector(".inline-search");
       if (searchContainer) {
         const addContactLink = document.createElement("a");
         addContactLink.href = "#";
-        addContactLink.textContent = "+ Add Contact 2";
+        addContactLink.textContent = "+ Add Contact";
         addContactLink.className = "notes-link";
         addContactLink.style.marginLeft = "12px";
       
         // Capture portalState in closure
         addContactLink.addEventListener("click", ev => {
           ev.preventDefault();
-          openQuickAddContactModal(row, project);
+          goToAddContact(window.portalState); // portalState is passed into renderRelationships
         });
       
         searchContainer.appendChild(addContactLink);
@@ -998,114 +997,14 @@ document.getElementById("btnSaveRelationships").addEventListener("click", async 
   container.innerHTML = `<p>Error loading relationships: ${err.message}</p>`;
 }
 } // end of renderRelationships
-
-
-function buildDropdown(options, selectedValue, className = "") {
-  return `<select class="${className}">
-    <option value="">-- Select --</option>
-    ${options.map(opt => `
-      <option value="${escapeHtml(opt.value)}"
-              ${opt.value === selectedValue ? "selected" : ""}>
-        ${escapeHtml(opt.value)}
-      </option>`).join("")}
-  </select>`;
-}
-
-function openQuickAddContactModal(row, project) {
-  const modal = document.createElement("div");
-  modal.className = "notes-modal";
-
-  modal.innerHTML = `
-    <div class="notes-modal-card">
-      <h4 style="margin:0 0 8px;">Quick Add Contact</h4>
-      <div class="row" style="gap:8px; margin-bottom:8px;">
-        <input class="qc-first" placeholder="First name" />
-        <input class="qc-last" placeholder="Last name" />
-      </div>
-      <div class="row" style="gap:8px; margin-bottom:8px;">
-        <input class="qc-email" placeholder="Email" />
-        <input class="qc-type" placeholder="Contact type" />
-      </div>
-      <div style="display:flex; gap:8px; justify-content:flex-end;">
-        <button class="qc-cancel secondary">Cancel</button>
-        <button class="qc-save primary">Save</button>
-      </div>
-      <div class="qc-status muted" style="margin-top:8px;"></div>
-    </div>
-  `;
-
-  document.body.appendChild(modal);
-
-  // Cancel closes modal
-  modal.querySelector(".qc-cancel").addEventListener("click", () => modal.remove());
-
-  // Save creates contact
-  modal.querySelector(".qc-save").addEventListener("click", async () => {
-    const first  = modal.querySelector(".qc-first").value.trim();
-    const last   = modal.querySelector(".qc-last").value.trim();
-    const email  = modal.querySelector(".qc-email").value.trim();
-    const type   = modal.querySelector(".qc-type").value.trim();
-    const status = modal.querySelector(".qc-status");
-
-    if (!first || !last) {
-      status.textContent = "First and last name are required.";
-      return;
-    }
-
-    const payload = {
-      project,
-      first_name: first,
-      last_name: last,
-      email: email || null,
-      contact_type: type || null,
-      created_at: new Date().toISOString()
-    };
     
-    try {
-      const resp = await fetch("https://client-portal-api.dennis-e64.workers.dev/api/contacts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      const text = await resp.text();
-      let created = null;
-      try { created = JSON.parse(text); } catch {}
-
-      // Supabase proxy may return an array or a single object
-      const contactId =
-        (Array.isArray(created) && created[0]?.contact_id) ||
-        created?.contact_id ||
-        null;
-
-      if (!contactId) {
-        status.textContent = "Contact saved, but ID not returned.";
-        return;
-      }
-
-      // Hydrate relationship row
-      const fullName = `${first} ${last}`.trim();
-      row.querySelector(".rel-contact-id").textContent = contactId;
-      row.querySelector(".rel-contact-name").textContent = fullName;
-      row.querySelector(".rel-contact-email").textContent = email || "";
-      const typeDropdown = row.querySelector(".contact-type-dropdown");
-      if (typeDropdown) typeDropdown.value = type || "";
-
-      // Replace Action cell with promote checkbox
-      row.querySelector("td:last-child").innerHTML = `<input type="checkbox" class="promote-checkbox"/>`;
-
-      modal.remove();
-      alert("✅ Contact created and populated into the relationship row.");
-    } catch (err) {
-      status.textContent = "Network error creating contact.";
-      console.error(err);
-    }
-  });
+// 🔧 Navigate from Notes to Contacts/Add
+function goToAddContact(state) {
+  state.tab = "contacts";
+  state.subtab = "add";
+  renderPortal();
 }
-
-window.openQuickAddContactModal = openQuickAddContactModal;
-
-
+window.goToAddContact = goToAddContact;
 
 
 /* -------------------------
