@@ -268,29 +268,29 @@ button {
 
 /* Space between each field row */
 .notes-row {
-  margin-bottom: 16px; /* more breathing room */
+  margin-bottom: 16px;
 }
 
-/* Label styling */
+/* Label styling with colon */
 .notes-label {
   display: block;
   font-weight: bold;
-  margin-bottom: 6px; /* space between label and field */
+  margin-bottom: 6px;
   position: relative;
 }
 
-/* Add colon automatically after labels */
 .notes-label::after {
   content: ":";
   margin-left: 2px;
 }
 
-/* Inputs and selects consistent look */
+/* Input and select styling */
 .form-control {
   width: 100%;
+  max-width: 480px; /* Optional cap for readability */
   padding: 6px 8px;
   border: 1px solid #ccc;
   border-radius: 4px;
   font: inherit;
+  box-sizing: border-box;
 }
-
