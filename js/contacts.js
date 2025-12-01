@@ -161,21 +161,15 @@ async function renderAddContactForm(container, portalState) {
     const sectionHeader = document.createElement("h3");
     sectionHeader.textContent = section;
     sectionHeader.className = "section-title";
-    sectionHeader.style.marginTop = "24px";
-    sectionHeader.style.fontSize = "1.2em";
-    sectionHeader.style.fontWeight = "bold";
     form.appendChild(sectionHeader);
 
     for (const f of sectionFields) {
       const wrapper = document.createElement("div");
-      wrapper.className = "form-row";
-      wrapper.style.marginBottom = "12px";
+      wrapper.className = "notes-row";
 
       const label = document.createElement("label");
       label.textContent = f.label || f.field_key;
-      label.style.display = "block";
-      label.style.fontWeight = "bold";
-      label.style.marginBottom = "4px";
+      label.className = "notes-label";
 
       let input;
 
@@ -183,12 +177,10 @@ async function renderAddContactForm(container, portalState) {
         // Render dropdown bound to lookup group
         input = document.createElement("select");
         input.name = f.field_key;
-        input.style.width = "100%";
+        input.className = "form-control";
 
-        // Fetch lookup values
-        fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?group=eq.${f.lookup_type}`, {
-          headers: { apikey: "your-supabase-key" }
-        })
+        // Call your contacts Worker (no apikey header)
+        fetch(`https://contacts-module.dennis-e64.workers.dev/lookups?group=${f.lookup_type}`)
           .then(r => r.json())
           .then(values => {
             values.forEach(v => {
@@ -203,7 +195,7 @@ async function renderAddContactForm(container, portalState) {
         input = document.createElement("input");
         input.type = "text";
         input.name = f.field_key;
-        input.style.width = "100%";
+        input.className = "form-control";
       }
 
       wrapper.appendChild(label);
@@ -229,12 +221,10 @@ async function renderAddContactForm(container, portalState) {
       payload[f.field_key] = formData.get(f.field_key);
     });
 
-    // 🔑 Generate contact_id
     payload.contact_id = crypto.randomUUID();
     payload.project = projectId;
     payload.created_at = new Date().toISOString();
 
-    // 📝 Calculate contact_name from first + last
     const first = formData.get("first_name") || "";
     const last = formData.get("last_name") || "";
     payload.contact_name = `${first} ${last}`.trim();
