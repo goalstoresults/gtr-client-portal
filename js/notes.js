@@ -717,7 +717,7 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
         // Capture portalState in closure
         addContactLink.addEventListener("click", ev => {
           ev.preventDefault();
-          goToContactsAdd(); 
+          openQuickAddContactModal(row, project); 
         });
       
         searchContainer.appendChild(addContactLink);
@@ -998,29 +998,91 @@ document.getElementById("btnSaveRelationships").addEventListener("click", async 
 }
 } // end of renderRelationships
     
-// 🔧 Navigate from Notes to Contacts/Add
-function goToAddContact(state) {
-  state.tab = "contacts";
-  state.subtab = "add";
-  renderPortal();
-}
-window.goToAddContact = goToAddContact;
+function openQuickAddContactModal(row, project) {
+  const modal = document.createElement("div");
+  modal.className = "notes-modal";
 
-// Force navigation into Contacts/Add from Notes
-function gotoContactsAdd() {
-  if (!window.portalState) {
-    console.error("portalState not available globally");
-    return;
-  }
-  window.portalState.tab = "contacts";
-  window.portalState.subtab = "add";
-  if (typeof renderPortal === "function") {
-    renderPortal();
-  } else {
-    console.error("renderPortal not available globally");
-  }
+  modal.innerHTML = `
+    <div class="notes-modal-card">
+      <h4 style="margin:0 0 8px;">Quick add contact</h4>
+      <div class="row" style="gap:8px; margin-bottom:8px;">
+        <input class="qc-first" placeholder="First name" />
+        <input class="qc-last" placeholder="Last name" />
+      </div>
+      <div class="row" style="gap:8px; margin-bottom:8px;">
+        <input class="qc-email" placeholder="Email" />
+        ${buildDropdown(window.lookupContactTypes || [], "", "qc-type")}
+      </div>
+      <div class="muted" style="margin-bottom:8px;">
+        Project: ${escapeHtml(project)}
+      </div>
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button class="qc-cancel secondary">Cancel</button>
+        <button class="qc-save primary">Save</button>
+      </div>
+      <div class="qc-status muted" style="margin-top:8px;"></div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  modal.querySelector(".qc-cancel").addEventListener("click", () => modal.remove());
+
+  modal.querySelector(".qc-save").addEventListener("click", async () => {
+    const first = modal.querySelector(".qc-first").value.trim();
+    const last  = modal.querySelector(".qc-last").value.trim();
+    const email = modal.querySelector(".qc-email").value.trim();
+    const type  = modal.querySelector(".qc-type")?.value?.trim() || "";
+    const status = modal.querySelector(".qc-status");
+
+    if (!first || !last) {
+      status.textContent = "First and last name are required.";
+      return;
+    }
+
+    const payload = {
+      project,
+      first_name: first,
+      last_name: last,
+      email: email || null,
+      contact_type: type || null,
+      created_at: new Date().toISOString()
+    };
+
+    try {
+      const resp = await fetch("https://client-portal-api.dennis-e64.workers.dev/api/contacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const text = await resp.text();
+      let created = null;
+      try { created = JSON.parse(text); } catch {}
+
+      const contactId = (Array.isArray(created) && created[0]?.contact_id) || created?.contact_id || null;
+      if (!contactId) {
+        status.textContent = "Contact saved, but ID not returned.";
+        return;
+      }
+
+      const fullName = `${first} ${last}`.trim();
+      row.querySelector(".rel-contact-id").textContent = contactId;
+      row.querySelector(".rel-contact-name").textContent = fullName;
+      row.querySelector(".contact-type-dropdown").value = type || "";
+      row.querySelector(".rel-contact-email").textContent = email || "";
+      row.querySelector("td:last-child").innerHTML = `<input type="checkbox" class="promote-checkbox"/>`;
+
+      modal.remove();
+      alert("✅ Contact created and populated.");
+    } catch (err) {
+      status.textContent = "Network error creating contact.";
+      console.error(err);
+    }
+  });
 }
-window.gotoContactsAdd = gotoContactsAdd;
+
+window.openQuickAddContactModal = openQuickAddContactModal;
 
 
 
