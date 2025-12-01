@@ -524,23 +524,30 @@ async function renderContactSetup(container, portalState) {
   }
 
   // Fetch project lookup groups (for dropdown options)
-  const resLookups = await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${portalState.setup_project_id}`, { cache: "no-cache" });
+  const resLookups = await fetch(
+    `https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${portalState.setup_project_id}`,
+    { cache: "no-cache" }
+  );
   const lookupsData = await resLookups.json();
   const lookupGroups = Array.isArray(lookupsData.lookups)
     ? [...new Set(lookupsData.lookups.map(l => l.lookup_type))].sort()
     : [];
 
+  // Fetch section lookup values
+  const sectionValues = lookupsData.lookups
+    .filter(l => l.lookup_type === "section")
+    .map(l => l.value);
+
   container.innerHTML = `
     <section class="card">
       <div style="display:flex; align-items:center; justify-content:space-between;">
-      <h2>Contact Setup for ${escapeHtml(portalState.display_name || portalState.setup_project_id)}</h2>
-
+        <h2>Contact Setup for ${escapeHtml(portalState.display_name || portalState.setup_project_id)}</h2>
         <div>
           <button id="btnDefaultMode" class="btn-secondary" style="margin-right:8px;">Default Mode</button>
           <button id="btnSaveContactConfig" class="btn-primary">Save Config</button>
         </div>
       </div>
-      <p>Enable fields for this project, customize labels, set order, and bind lookup groups.</p>
+      <p>Enable fields for this project, customize labels, set order, bind lookup groups, and assign sections.</p>
       <table id="contactFieldsGrid" class="notes-table" style="width:100%; margin-top:12px;">
         <thead>
           <tr>
@@ -549,6 +556,7 @@ async function renderContactSetup(container, portalState) {
             <th style="width:200px;">Label</th>
             <th style="width:100px;">Order</th>
             <th style="width:180px;">Lookup Type</th>
+            <th style="width:160px;">Section</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -558,7 +566,7 @@ async function renderContactSetup(container, portalState) {
 
   const gridBody = container.querySelector("#contactFieldsGrid tbody");
 
-  // Fetch existing config rows for this project (includes lookup_type after your schema change)
+  // Fetch existing config rows for this project
   const url = `https://lookups-module.dennis-e64.workers.dev/contact_fields?project=${portalState.setup_project_id}`;
   const res = await fetch(url, { cache: "no-cache" });
   const data = await res.json();
@@ -584,10 +592,15 @@ async function renderContactSetup(container, portalState) {
     const label = row ? row.label : "";
     const order = row ? row.sort_order : "";
     const boundLookup = row ? (row.lookup_type || "") : "";
+    const section = row ? (row.section || "") : "";
     const placeholder = toTitleCase(field);
 
-    const options = [`<option value="">-- none --</option>`]
+    const lookupOptions = [`<option value="">-- none --</option>`]
       .concat(lookupGroups.map(g => `<option value="${g}" ${boundLookup === g ? "selected" : ""}>${g}</option>`))
+      .join("");
+
+    const sectionOptions = [`<option value="">-- none --</option>`]
+      .concat(sectionValues.map(s => `<option value="${s}" ${section === s ? "selected" : ""}>${s}</option>`))
       .join("");
 
     return `
@@ -604,9 +617,10 @@ async function renderContactSetup(container, portalState) {
         </td>
         <td><input type="number" class="orderInput" value="${order}" style="width:70px;"></td>
         <td>
-          <select class="lookupTypeSelect" style="width:100%;">
-            ${options}
-          </select>
+          <select class="lookupTypeSelect" style="width:100%;">${lookupOptions}</select>
+        </td>
+        <td>
+          <select class="sectionSelect" style="width:100%;">${sectionOptions}</select>
         </td>
       </tr>
     `;
@@ -639,7 +653,8 @@ async function renderContactSetup(container, portalState) {
         const label = labelInput.value.trim() || labelInput.placeholder;
         const order = parseInt(tr.querySelector(".orderInput").value, 10) || 99;
         const lookupType = tr.querySelector(".lookupTypeSelect").value || null;
-        rows.push({ field_key: field, label, sort_order: order, lookup_type: lookupType });
+        const section = tr.querySelector(".sectionSelect").value || null;
+        rows.push({ field_key: field, label, sort_order: order, lookup_type: lookupType, section });
       }
     });
 
@@ -649,9 +664,10 @@ async function renderContactSetup(container, portalState) {
       body: JSON.stringify({ project: portalState.setup_project_id, fields: rows })
     });
 
-    alert("Contact fields saved.");
+    alert("Contact fields saved with sections.");
   });
 }
+
 
 
 
