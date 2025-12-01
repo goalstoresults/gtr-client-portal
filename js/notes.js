@@ -377,70 +377,62 @@ async function renderReview(container, portalState, noteId) {
       });
     }
 
-    // Find client handler (name-only search)
-    document.getElementById("btnFindClient").addEventListener("click", async () => {
-      const first = document.getElementById("filter-first").value.trim();
-      const last = document.getElementById("filter-last").value.trim();
+// Find client handler (name-only search)
+document.getElementById("btnFindClient").addEventListener("click", async () => {
+  const first = document.getElementById("filter-first").value.trim();
+  const last = document.getElementById("filter-last").value.trim();
 
-      if (!first && !last) { alert("Enter at least a first or last name."); return; }
-      if ((first && first.length < 3) || (last && last.length < 3)) {
-        alert("Names must be at least 3 characters."); return;
-      }
+  if (!first && !last) { alert("Enter at least a first or last name."); return; }
+  if ((first && first.length < 3) || (last && last.length < 3)) {
+    alert("Names must be at least 3 characters."); return;
+  }
 
-      const params = new URLSearchParams();
-      const selectCols = "contact_id,first_name,last_name,email,contact_type";
+  const selectCols = "contact_id,first_name,last_name,email,contact_type";
 
-      const filters = [`project.eq.${portalState.project}`];
-      if (first) filters.push(`first_name.ilike.*${first}*`);
-      if (last)  filters.push(`last_name.ilike.*${last}*`);
+  // 🔧 FIXED: enforce project and use = syntax
+  const filters = [`project=eq.${portalState.project}`];
+  if (first) filters.push(`first_name=ilike.*${first}*`);
+  if (last)  filters.push(`last_name=ilike.*${last}*`);
 
-      if (filters.length > 1) {
-        params.set("and", `(${filters.join(",")})`);
-      } else {
-        const [filter] = filters;
-        const [key, operator, value] = filter.split(".");
-        params.set(`${key}.${operator}`, value);
-      }
+  const query = filters.length > 1
+    ? `and=(${filters.join(",")})`
+    : filters[0];
 
-      const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${params.toString()}&select=${encodeURIComponent(selectCols)}`;
-      console.log("[SetClient] Searching contacts:", searchUrl);
+  const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${query}&select=${encodeURIComponent(selectCols)}`;
+  console.log("[SetClient] Searching contacts:", searchUrl);
 
-      try {
-        const resp = await fetch(searchUrl);
-        if (!resp.ok) {
-          const msg = await resp.text().catch(() => "");
-          alert(`Search failed (${resp.status}). ${msg}`);
-          return;
-        }
-        const rows = await resp.json();
-        const resultsDiv = document.getElementById("clientSearchResults");
-        resultsDiv.innerHTML = rows.length > 0
-          ? rows.map(r => {
-              const fullName = `${r.first_name || ""} ${r.last_name || ""}`.trim();
-              const typeLabel = (r.contact_type || "contact").toLowerCase();
-              const emailSafe = r.email || "";
-              return `
-                <div style="padding:8px; border-bottom:1px solid #eee; cursor:pointer;"
-                     onclick="attachClientToNote('${r.contact_id}', '${fullName}', '${typeLabel}', '${emailSafe}', { selectedNoteId: '${portalState.selectedNoteId}', project: '${portalState.project}' })">
-                  <strong>${fullName}</strong>
-                  <span style="background:#eef; color:#336; padding:2px 6px; border-radius:12px; font-size:0.75em; margin-left:6px;">
-                    ${typeLabel}
-                  </span><br/>
-                  <small>${emailSafe}</small>
-                </div>
-              `;
-            }).join("")
-          : "<div class='muted'>No contacts found.</div>";
-      } catch (err) {
-        alert("Network error searching contacts");
-        console.error(err);
-      }
-    });
+  try {
+    const resp = await fetch(searchUrl);
+    if (!resp.ok) {
+      const msg = await resp.text().catch(() => "");
+      alert(`Search failed (${resp.status}). ${msg}`);
+      return;
+    }
+    const rows = await resp.json();
+    const resultsDiv = document.getElementById("clientSearchResults");
+    resultsDiv.innerHTML = rows.length > 0
+      ? rows.map(r => {
+          const fullName = `${r.first_name || ""} ${r.last_name || ""}`.trim();
+          const typeLabel = (r.contact_type || "contact").toLowerCase();
+          const emailSafe = r.email || "";
+          return `
+            <div style="padding:8px; border-bottom:1px solid #eee; cursor:pointer;"
+                 onclick="attachClientToNote('${r.contact_id}', '${fullName}', '${typeLabel}', '${emailSafe}', { selectedNoteId: '${portalState.selectedNoteId}', project: '${portalState.project}' })">
+              <strong>${fullName}</strong>
+              <span style="background:#eef; color:#336; padding:2px 6px; border-radius:12px; font-size:0.75em; margin-left:6px;">
+                ${typeLabel}
+              </span><br/>
+              <small>${emailSafe}</small>
+            </div>
+          `;
+        }).join("")
+      : "<div class='muted'>No contacts found.</div>";
   } catch (err) {
-    container.innerHTML = `<p>Error loading note review: ${err.message}</p>`;
+    alert("Network error searching contacts");
     console.error(err);
   }
-}
+});
+
 
 
 
@@ -732,14 +724,14 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
         return;
       }
 
-      const filters = [];
-      if (first) filters.push(`first_name.ilike.*${first}*`);
-      if (last)  filters.push(`last_name.ilike.*${last}*`);
-
+      const filters = [`project=eq.${project}`];
+      if (first) filters.push(`first_name=ilike.*${first}*`);
+      if (last)  filters.push(`last_name=ilike.*${last}*`);
+      
       const query = filters.length > 1
         ? `and=(${filters.join(",")})`
         : filters[0];
-
+      
       const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${query}&select=contact_id,first_name,last_name,email,contact_type`;
       console.log("[GetID] Search URL:", searchUrl);
 
