@@ -382,30 +382,25 @@ document.getElementById("btnFindClient").addEventListener("click", async () => {
   const first = document.getElementById("filter-first").value.trim();
   const last = document.getElementById("filter-last").value.trim();
 
-  if (!first && !last) { 
-    alert("Enter at least a first or last name."); 
-    return; 
+  if (!first && !last) {
+    alert("Enter at least a first or last name.");
+    return;
   }
   if ((first && first.length < 3) || (last && last.length < 3)) {
-    alert("Names must be at least 3 characters."); 
-    return; 
+    alert("Names must be at least 3 characters.");
+    return;
   }
-
-  const params = new URLSearchParams();
-  const selectCols = "contact_id,first_name,last_name,email,contact_type";
 
   const filters = [`project=eq.${portalState.project}`];
   if (first) filters.push(`first_name=ilike.*${first}*`);
   if (last)  filters.push(`last_name=ilike.*${last}*`);
 
-  if (filters.length > 1) {
-    params.set("and", `(${filters.join(",")})`);
-  } else {
-    const [key, value] = filters[0].split("=");
-    params.set(key, value);
-  }
+  const filterClause = filters.length > 1
+    ? `and=(${filters.join(",")})`
+    : filters[0];
 
-  const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${params.toString()}&select=${encodeURIComponent(selectCols)}`;
+  const selectCols = "contact_id,first_name,last_name,email,contact_type";
+  const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${filterClause}&select=${encodeURIComponent(selectCols)}`;
   console.log("[SetClient] Searching contacts:", searchUrl);
 
   try {
