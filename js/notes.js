@@ -710,7 +710,7 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
       if (searchContainer) {
         const addContactLink = document.createElement("a");
         addContactLink.href = "#";
-        addContactLink.textContent = "+ Add Contact 2";
+        addContactLink.textContent = "+ Add Contact 3";
         addContactLink.className = "notes-link";
         addContactLink.style.marginLeft = "12px";
       
@@ -1061,11 +1061,17 @@ function openQuickAddContactModal(row, project) {
     };
 
     try {
-      const resp = await fetch("https://client-portal-api.dennis-e64.workers.dev/api/contacts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+        const resp = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project,
+            first_name: first,
+            last_name: last,
+            email: email || null,
+            contact_type: type || null
+          })
+        });
 
       const text = await resp.text();
       let created = null;
