@@ -1,4 +1,4 @@
-// js/groups.js v2.0
+// js/groups.js v3.0
 console.log("[Groups.js] loaded");
 
 export async function loadGroupsTab({ portalState, tabContent }) {
@@ -62,7 +62,7 @@ export async function loadGroupsTab({ portalState, tabContent }) {
 }
 
 // 🔧 Group List with filters, search, sort
-async function renderGroupList(container, portalState) {
+async function renderGroupList(container, portalState, options = {}) {
   container.innerHTML = `
     <section class="card">
       <h2>Groups for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
@@ -85,11 +85,12 @@ async function renderGroupList(container, portalState) {
 
   const hasFilters = name || from || to;
   const limit = hasFilters ? 500 : 100;
+  const order = options.order || "created_at.desc";
 
   // ✅ Build params cleanly
   const params = new URLSearchParams({
     project: portalState.project,
-    order: "created_at.desc",
+    order,
     limit: limit.toString()
   });
   if (name) params.set("group_name", name);
@@ -105,7 +106,31 @@ async function renderGroupList(container, portalState) {
   tableDiv.innerHTML = `
     <h4>Showing ${Array.isArray(groups) ? groups.length : 0} ${hasFilters ? "filtered" : "recent"} groups</h4>
     <table class="notes-table">
-      <thead><tr><th>Name</th><th>Total Amount</th><th>ROI</th><th>Actions</th></tr></thead>
+      <thead>
+        <tr>
+          <th>
+            Name
+            <button class="sort-btn" data-col="group_name" data-dir="asc">▲</button>
+            <button class="sort-btn" data-col="group_name" data-dir="desc">▼</button>
+          </th>
+          <th>
+            Total Amount
+            <button class="sort-btn" data-col="total_amount" data-dir="asc">▲</button>
+            <button class="sort-btn" data-col="total_amount" data-dir="desc">▼</button>
+          </th>
+          <th>
+            ROI
+            <button class="sort-btn" data-col="total_roi" data-dir="asc">▲</button>
+            <button class="sort-btn" data-col="total_roi" data-dir="desc">▼</button>
+          </th>
+          <th>
+            Created
+            <button class="sort-btn" data-col="created_at" data-dir="asc">▲</button>
+            <button class="sort-btn" data-col="created_at" data-dir="desc">▼</button>
+          </th>
+          <th>Actions</th>
+        </tr>
+      </thead>
       <tbody>
         ${Array.isArray(groups) && groups.length > 0
           ? groups.map(g => `
@@ -113,13 +138,14 @@ async function renderGroupList(container, portalState) {
                 <td>${escapeHtml(g.group_name || "")}</td>
                 <td>${escapeHtml(g.total_amount || "0.00")}</td>
                 <td>${escapeHtml(g.total_roi || "0.0000")}</td>
+                <td>${escapeHtml(g.created_at || "")}</td>
                 <td>
                   <button class="btn-primary btn-select" data-id="${g.group_id}">Select</button>
                   <button class="btn-danger btn-delete" data-id="${g.group_id}">Delete</button>
                 </td>
               </tr>
             `).join("")
-          : `<tr><td colspan="4">(no groups found)</td></tr>`
+          : `<tr><td colspan="5">(no groups found)</td></tr>`
         }
       </tbody>
     </table>
@@ -161,6 +187,15 @@ async function renderGroupList(container, portalState) {
     document.getElementById("filter-to").value = "";
     renderGroupList(container, portalState);
   });
+
+  // Wire sort buttons
+  tableDiv.querySelectorAll(".sort-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const col = btn.dataset.col;
+      const dir = btn.dataset.dir;
+      await renderGroupList(container, portalState, { order: `${col}.${dir}` });
+    });
+  });
 }
 
 // 🔧 Placeholder for Group Details
@@ -171,7 +206,3 @@ async function renderGroupDetails(container, portalState, groupId) {
 // helper
 function escapeHtml(str) {
   const s = String(str ?? "");
-  return s.replace(/[&<>"']/g, c => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-  }[c]));
-}
