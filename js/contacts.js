@@ -316,10 +316,6 @@ async function renderAddContactForm(container, portalState) {
     const last = formData.get("last_name") || "";
     payload.contact_name = `${first} ${last}`.trim();
 
-    // Default active flag
-    if (!("is_active" in payload)) {
-      payload.is_active = true;
-    }
 
     try {
       const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
