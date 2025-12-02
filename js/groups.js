@@ -137,7 +137,7 @@ async function renderGroupList(container, portalState, options = {}) {
                 <td class="amount">${formatCurrency(g.total_amount)}</td>
                 <td class="amount">${formatCurrency(g.total_referral_amount)}</td>
                 <td class="amount">${escapeHtml(g.total_roi || "0.0000")}</td>
-                <td>${escapeHtml(g.created_at || "")}</td>
+                <td>${formatDateTime(g.created_at)}</td>
                 <td>
                   <button class="btn-primary btn-select" data-id="${g.group_id}">Select</button>
                 </td>
@@ -227,11 +227,11 @@ async function renderGroupDetails(container, portalState, groupId) {
       </div>
       <div class="notes-row">
         <label class="notes-label">Date Started</label>
-        <input class="form-control" value="${escapeHtml(group.date_started || "")}" readonly />
+        <input class="form-control" value="${formatDateTime(group.date_started)}" readonly />
       </div>
       <div class="notes-row">
         <label class="notes-label">Created At</label>
-        <input class="form-control" value="${escapeHtml(group.created_at || "")}" readonly />
+        <input class="form-control" value="${formatDateTime(group.created_at)}" readonly />
       </div>
     </section>
   `;
@@ -308,6 +308,18 @@ async function renderGroupAdd(container, portalState) {
   });
 }
 
+function formatDateTime(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  return d.toLocaleString("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  });
+}
 
 
 // helpers
