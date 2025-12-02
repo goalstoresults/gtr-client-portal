@@ -205,53 +205,54 @@ async function renderGroupDetails(container, portalState, groupId) {
   console.log("[Groups] Fetching details:", url);
 
   const res = await fetch(url);
-  const group = await res.json();
+  const raw = await res.json();
 
-  if (!group || group.length === 0) {
+  // Defensive fallback: handle array or object
+  const group = Array.isArray(raw) ? raw[0] : raw;
+  if (!group || !group.group_id) {
     container.innerHTML = `<section class="card"><p>(Group not found)</p></section>`;
     return;
   }
-
-  const g = group[0]; // Supabase returns an array
 
   container.innerHTML = `
     <section class="card">
       <h3>Group Details</h3>
       <div class="notes-row">
         <label class="notes-label">Group ID</label>
-        <input class="form-control" value="${escapeHtml(g.group_id)}" readonly />
+        <input class="form-control" value="${escapeHtml(group.group_id)}" readonly />
       </div>
       <div class="notes-row">
         <label class="notes-label">Name</label>
-        <input class="form-control" value="${escapeHtml(g.group_name || "")}" />
+        <input class="form-control" value="${escapeHtml(group.group_name || "")}" />
       </div>
       <div class="notes-row">
         <label class="notes-label">Total Amount</label>
-        <input class="form-control amount" value="${formatCurrency(g.total_amount)}" />
+        <input class="form-control amount" value="${formatCurrency(group.total_amount)}" />
       </div>
       <div class="notes-row">
         <label class="notes-label">Total Referral Amount</label>
-        <input class="form-control amount" value="${formatCurrency(g.total_referral_amount)}" />
+        <input class="form-control amount" value="${formatCurrency(group.total_referral_amount)}" />
       </div>
       <div class="notes-row">
         <label class="notes-label">ROI</label>
-        <input class="form-control amount" value="${escapeHtml(g.total_roi || "0.0000")}" />
+        <input class="form-control amount" value="${escapeHtml(group.total_roi || "0.0000")}" />
       </div>
       <div class="notes-row">
         <label class="notes-label">Date Started</label>
-        <input class="form-control" value="${escapeHtml(g.date_started || "")}" />
+        <input class="form-control" value="${escapeHtml(group.date_started || "")}" />
       </div>
       <div class="notes-row">
         <label class="notes-label">Created At</label>
-        <input class="form-control" value="${escapeHtml(g.created_at || "")}" readonly />
+        <input class="form-control" value="${escapeHtml(group.created_at || "")}" readonly />
       </div>
       <div class="notes-row">
         <label class="notes-label">Project</label>
-        <input class="form-control" value="${escapeHtml(g.project || "")}" readonly />
+        <input class="form-control" value="${escapeHtml(group.project || "")}" readonly />
       </div>
     </section>
   `;
 }
+
 
 // helpers
 function escapeHtml(str) {
