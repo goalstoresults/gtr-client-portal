@@ -1,8 +1,7 @@
-// js/groups.js v3.0
+// js/groups.js v4.0
 console.log("[Groups.js] loaded");
 
 export async function loadGroupsTab({ portalState, tabContent }) {
-  // Base HTML template for Groups tab
   tabContent.innerHTML = `
     <section class="card">
       <h2>Groups</h2>
@@ -30,30 +29,25 @@ export async function loadGroupsTab({ portalState, tabContent }) {
         case "add":
           content.innerHTML = `<section class="card"><p>(Add Group form placeholder)</p></section>`;
           break;
-
         case "list":
           await renderGroupList(content, portalState);
           break;
-
         case "details":
           content.innerHTML = `<section class="card"><p>Select a group to view details.</p></section>`;
           break;
-
         case "members":
           content.innerHTML = `<section class="card"><p>(Members view placeholder)</p></section>`;
           break;
-
         case "roi":
           content.innerHTML = `<section class="card"><p>(ROI metrics placeholder)</p></section>`;
           break;
-
         default:
           content.innerHTML = `<section class="card"><p>Select a subtab to begin.</p></section>`;
       }
     });
   });
 
-  // ✅ Default to List view
+  // Default to List view
   const defaultBtn = tabContent.querySelector('#groups-subtabs button[data-subtab="list"]');
   if (defaultBtn) {
     defaultBtn.classList.add("active");
@@ -61,7 +55,7 @@ export async function loadGroupsTab({ portalState, tabContent }) {
   }
 }
 
-// 🔧 Group List with filters, search, sort
+// Group List with filters, search, sort
 async function renderGroupList(container, portalState, options = {}) {
   container.innerHTML = `
     <section class="card">
@@ -87,7 +81,6 @@ async function renderGroupList(container, portalState, options = {}) {
   const limit = hasFilters ? 500 : 100;
   const order = options.order || "created_at.desc";
 
-  // ✅ Build params cleanly
   const params = new URLSearchParams({
     project: portalState.project,
     order,
@@ -198,11 +191,66 @@ async function renderGroupList(container, portalState, options = {}) {
   });
 }
 
-// 🔧 Placeholder for Group Details
+// Group Details view
 async function renderGroupDetails(container, portalState, groupId) {
-  container.innerHTML = `<section class="card"><p>Details for group ${escapeHtml(groupId)} (placeholder)</p></section>`;
+  container.innerHTML = `<section class="card"><p>Loading group details...</p></section>`;
+
+  const url = `https://groups-module.dennis-e64.workers.dev/groups/details/${groupId}?project=${portalState.project}`;
+  console.log("[Groups] Fetching details:", url);
+
+  const res = await fetch(url);
+  const group = await res.json();
+
+  if (!group || group.length === 0) {
+    container.innerHTML = `<section class="card"><p>(Group not found)</p></section>`;
+    return;
+  }
+
+  const g = group[0]; // Supabase returns an array
+
+  container.innerHTML = `
+    <section class="card">
+      <h3>Group Details</h3>
+      <div class="notes-row">
+        <label class="notes-label">Group ID</label>
+        <input class="form-control" value="${escapeHtml(g.group_id)}" readonly />
+      </div>
+      <div class="notes-row">
+        <label class="notes-label">Name</label>
+        <input class="form-control" value="${escapeHtml(g.group_name || "")}" />
+      </div>
+      <div class="notes-row">
+        <label class="notes-label">Total Amount</label>
+        <input class="form-control" value="${escapeHtml(g.total_amount || "0.00")}" />
+      </div>
+      <div class="notes-row">
+        <label class="notes-label">Total Referral Amount</label>
+        <input class="form-control" value="${escapeHtml(g.total_referral_amount || "0.00")}" />
+      </div>
+      <div class="notes-row">
+        <label class="notes-label">ROI</label>
+        <input class="form-control" value="${escapeHtml(g.total_roi || "0.0000")}" />
+      </div>
+      <div class="notes-row">
+        <label class="notes-label">Date Started</label>
+        <input class="form-control" value="${escapeHtml(g.date_started || "")}" />
+      </div>
+      <div class="notes-row">
+        <label class="notes-label">Created At</label>
+        <input class="form-control" value="${escapeHtml(g.created_at || "")}" readonly />
+      </div>
+      <div class="notes-row">
+        <label class="notes-label">Project</label>
+        <input class="form-control" value="${escapeHtml(g.project || "")}" readonly />
+      </div>
+    </section>
+  `;
 }
 
 // helper
 function escapeHtml(str) {
   const s = String(str ?? "");
+  return s.replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
