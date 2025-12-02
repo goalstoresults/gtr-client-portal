@@ -1,18 +1,18 @@
-// js/groups.js v1.0
+// js/groups.js v2.0
 console.log("[Groups.js] loaded");
 
 export async function loadGroupsTab({ portalState, tabContent }) {
-  // Load base HTML template for Groups tab
+  // Base HTML template for Groups tab
   tabContent.innerHTML = `
     <section class="card">
       <h2>Groups</h2>
-      <div id="groups-subtabs" style="margin-bottom:12px;">
+      <nav id="groups-subtabs" class="subtabs" style="margin-bottom:12px;">
         <button data-subtab="add">Add</button>
         <button data-subtab="list">List</button>
         <button data-subtab="details">Details</button>
         <button data-subtab="members">Members</button>
         <button data-subtab="roi">ROI</button>
-      </div>
+      </nav>
       <div id="groupsContent"></div>
     </section>
   `;
@@ -70,8 +70,8 @@ async function renderGroupList(container, portalState) {
         <label>Name: <input type="text" id="filter-group-name" /></label>
         <label style="margin-left:12px;">From: <input type="date" id="filter-from" /></label>
         <label style="margin-left:12px;">To: <input type="date" id="filter-to" /></label>
-        <button id="btnApplyGroupsFilter" class="secondary" style="margin-left:12px;">Apply Filter</button>
-        <button id="btnClearGroupsFilter" class="secondary" style="margin-left:12px;">Clear Filter</button>
+        <button id="btnApplyGroupsFilter" class="btn-secondary" style="margin-left:12px;">Apply Filter</button>
+        <button id="btnClearGroupsFilter" class="btn-secondary" style="margin-left:12px;">Clear Filter</button>
       </div>
       <div id="groupTable">Loading...</div>
     </section>
@@ -83,19 +83,20 @@ async function renderGroupList(container, portalState) {
   const from = document.getElementById("filter-from")?.value;
   const to   = document.getElementById("filter-to")?.value;
 
-  const filters = [`project.eq.${portalState.project}`];
-  if (name) filters.push(`group_name.ilike.*${name}*`);
-  if (from) filters.push(`created_at.gte.${from}`);
-  if (to)   filters.push(`created_at.lte.${to}`);
-
-  const query = filters.length > 1
-    ? `and=(${filters.join(",")})`
-    : filters[0];
-
   const hasFilters = name || from || to;
   const limit = hasFilters ? 500 : 100;
 
-  const url = `https://groups-module.dennis-e64.workers.dev/groups/list?project=${portalState.project}&${query}&order=created_at.desc&limit=${limit}`;
+  // ✅ Build params cleanly
+  const params = new URLSearchParams({
+    project: portalState.project,
+    order: "created_at.desc",
+    limit: limit.toString()
+  });
+  if (name) params.set("group_name", name);
+  if (from) params.set("from", from);
+  if (to)   params.set("to", to);
+
+  const url = `https://groups-module.dennis-e64.workers.dev/groups/list?${params}`;
   console.log("[Groups] Fetching:", url);
 
   const res = await fetch(url);
