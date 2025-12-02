@@ -96,54 +96,61 @@ async function renderGroupList(container, portalState, options = {}) {
   const res = await fetch(url);
   const groups = await res.json();
 
-  tableDiv.innerHTML = `
-    <h4>Showing ${Array.isArray(groups) ? groups.length : 0} ${hasFilters ? "filtered" : "recent"} groups</h4>
-    <table class="notes-table">
-      <thead>
-        <tr>
-          <th>
-            Name
-            <button class="sort-btn" data-col="group_name" data-dir="asc">▲</button>
-            <button class="sort-btn" data-col="group_name" data-dir="desc">▼</button>
-          </th>
-          <th>
-            Total Amount
-            <button class="sort-btn" data-col="total_amount" data-dir="asc">▲</button>
-            <button class="sort-btn" data-col="total_amount" data-dir="desc">▼</button>
-          </th>
-          <th>
-            ROI
-            <button class="sort-btn" data-col="total_roi" data-dir="asc">▲</button>
-            <button class="sort-btn" data-col="total_roi" data-dir="desc">▼</button>
-          </th>
-          <th>
-            Created
-            <button class="sort-btn" data-col="created_at" data-dir="asc">▲</button>
-            <button class="sort-btn" data-col="created_at" data-dir="desc">▼</button>
-          </th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${Array.isArray(groups) && groups.length > 0
-          ? groups.map(g => `
-              <tr>
-                <td>${escapeHtml(g.group_name || "")}</td>
-                <td>${escapeHtml(g.total_amount || "0.00")}</td>
-                <td>${escapeHtml(g.total_roi || "0.0000")}</td>
-                <td>${escapeHtml(g.created_at || "")}</td>
-                <td>
-                  <button class="btn-primary btn-select" data-id="${g.group_id}">Select</button>
-                  <button class="btn-danger btn-delete" data-id="${g.group_id}">Delete</button>
-                </td>
-              </tr>
-            `).join("")
-          : `<tr><td colspan="5">(no groups found)</td></tr>`
-        }
-      </tbody>
-    </table>
-  `;
+tableDiv.innerHTML = `
+  <h4>Showing ${Array.isArray(groups) ? groups.length : 0} ${hasFilters ? "filtered" : "recent"} groups</h4>
+  <table class="notes-table">
+    <thead>
+      <tr>
+        <th>
+          Name
+          <button class="sort-btn" data-col="group_name" data-dir="asc">▲</button>
+          <button class="sort-btn" data-col="group_name" data-dir="desc">▼</button>
+        </th>
+        <th>
+          Total Amount
+          <button class="sort-btn" data-col="total_amount" data-dir="asc">▲</button>
+          <button class="sort-btn" data-col="total_amount" data-dir="desc">▼</button>
+        </th>
+        <th>
+          Total Referral Amount
+          <button class="sort-btn" data-col="total_referral_amount" data-dir="asc">▲</button>
+          <button class="sort-btn" data-col="total_referral_amount" data-dir="desc">▼</button>
+        </th>
+        <th>
+          ROI
+          <button class="sort-btn" data-col="total_roi" data-dir="asc">▲</button>
+          <button class="sort-btn" data-col="total_roi" data-dir="desc">▼</button>
+        </th>
+        <th>
+          Created
+          <button class="sort-btn" data-col="created_at" data-dir="asc">▲</button>
+          <button class="sort-btn" data-col="created_at" data-dir="desc">▼</button>
+        </th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${Array.isArray(groups) && groups.length > 0
+        ? groups.map(g => `
+            <tr>
+              <td>${escapeHtml(g.group_name || "")}</td>
+              <td>${escapeHtml(g.total_amount || "0.00")}</td>
+              <td>${escapeHtml(g.total_referral_amount || "0.00")}</td>
+              <td>${escapeHtml(g.total_roi || "0.0000")}</td>
+              <td>${escapeHtml(g.created_at || "")}</td>
+              <td>
+                <button class="btn-primary btn-select" data-id="${g.group_id}">Select</button>
+                <button class="btn-danger btn-delete" data-id="${g.group_id}">Delete</button>
+              </td>
+            </tr>
+          `).join("")
+        : `<tr><td colspan="6">(no groups found)</td></tr>`
+      }
+    </tbody>
+  </table>
+`;
 
+  
   // Wire Select/Delete
   tableDiv.querySelectorAll(".btn-select").forEach(btn => {
     btn.addEventListener("click", async () => {
