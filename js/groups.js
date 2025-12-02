@@ -1,4 +1,4 @@
-// js/groups.js v4.0
+// js/groups.js v5.0
 console.log("[Groups.js] loaded");
 
 export async function loadGroupsTab({ portalState, tabContent }) {
@@ -96,61 +96,60 @@ async function renderGroupList(container, portalState, options = {}) {
   const res = await fetch(url);
   const groups = await res.json();
 
-tableDiv.innerHTML = `
-  <h4>Showing ${Array.isArray(groups) ? groups.length : 0} ${hasFilters ? "filtered" : "recent"} groups</h4>
-  <table class="notes-table">
-    <thead>
-      <tr>
-        <th>
-          Name
-          <button class="sort-btn" data-col="group_name" data-dir="asc">▲</button>
-          <button class="sort-btn" data-col="group_name" data-dir="desc">▼</button>
-        </th>
-        <th>
-          Total Amount
-          <button class="sort-btn" data-col="total_amount" data-dir="asc">▲</button>
-          <button class="sort-btn" data-col="total_amount" data-dir="desc">▼</button>
-        </th>
-        <th>
-          Total Referral Amount
-          <button class="sort-btn" data-col="total_referral_amount" data-dir="asc">▲</button>
-          <button class="sort-btn" data-col="total_referral_amount" data-dir="desc">▼</button>
-        </th>
-        <th>
-          ROI
-          <button class="sort-btn" data-col="total_roi" data-dir="asc">▲</button>
-          <button class="sort-btn" data-col="total_roi" data-dir="desc">▼</button>
-        </th>
-        <th>
-          Created
-          <button class="sort-btn" data-col="created_at" data-dir="asc">▲</button>
-          <button class="sort-btn" data-col="created_at" data-dir="desc">▼</button>
-        </th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${Array.isArray(groups) && groups.length > 0
-        ? groups.map(g => `
-            <tr>
-              <td>${escapeHtml(g.group_name || "")}</td>
-              <td>${escapeHtml(g.total_amount || "0.00")}</td>
-              <td>${escapeHtml(g.total_referral_amount || "0.00")}</td>
-              <td>${escapeHtml(g.total_roi || "0.0000")}</td>
-              <td>${escapeHtml(g.created_at || "")}</td>
-              <td>
-                <button class="btn-primary btn-select" data-id="${g.group_id}">Select</button>
-                <button class="btn-danger btn-delete" data-id="${g.group_id}">Delete</button>
-              </td>
-            </tr>
-          `).join("")
-        : `<tr><td colspan="6">(no groups found)</td></tr>`
-      }
-    </tbody>
-  </table>
-`;
+  tableDiv.innerHTML = `
+    <h4>Showing ${Array.isArray(groups) ? groups.length : 0} ${hasFilters ? "filtered" : "recent"} groups</h4>
+    <table class="notes-table">
+      <thead>
+        <tr>
+          <th>
+            Name
+            <button class="sort-btn" data-col="group_name" data-dir="asc">▲</button>
+            <button class="sort-btn" data-col="group_name" data-dir="desc">▼</button>
+          </th>
+          <th class="amount">
+            Total Amount
+            <button class="sort-btn" data-col="total_amount" data-dir="asc">▲</button>
+            <button class="sort-btn" data-col="total_amount" data-dir="desc">▼</button>
+          </th>
+          <th class="amount">
+            Total Referral Amount
+            <button class="sort-btn" data-col="total_referral_amount" data-dir="asc">▲</button>
+            <button class="sort-btn" data-col="total_referral_amount" data-dir="desc">▼</button>
+          </th>
+          <th class="amount">
+            ROI
+            <button class="sort-btn" data-col="total_roi" data-dir="asc">▲</button>
+            <button class="sort-btn" data-col="total_roi" data-dir="desc">▼</button>
+          </th>
+          <th>
+            Created
+            <button class="sort-btn" data-col="created_at" data-dir="asc">▲</button>
+            <button class="sort-btn" data-col="created_at" data-dir="desc">▼</button>
+          </th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${Array.isArray(groups) && groups.length > 0
+          ? groups.map(g => `
+              <tr>
+                <td>${escapeHtml(g.group_name || "")}</td>
+                <td class="amount">${formatCurrency(g.total_amount)}</td>
+                <td class="amount">${formatCurrency(g.total_referral_amount)}</td>
+                <td class="amount">${escapeHtml(g.total_roi || "0.0000")}</td>
+                <td>${escapeHtml(g.created_at || "")}</td>
+                <td>
+                  <button class="btn-primary btn-select" data-id="${g.group_id}">Select</button>
+                  <button class="btn-danger btn-delete" data-id="${g.group_id}">Delete</button>
+                </td>
+              </tr>
+            `).join("")
+          : `<tr><td colspan="6">(no groups found)</td></tr>`
+        }
+      </tbody>
+    </table>
+  `;
 
-  
   // Wire Select/Delete
   tableDiv.querySelectorAll(".btn-select").forEach(btn => {
     btn.addEventListener("click", async () => {
@@ -228,15 +227,15 @@ async function renderGroupDetails(container, portalState, groupId) {
       </div>
       <div class="notes-row">
         <label class="notes-label">Total Amount</label>
-        <input class="form-control" value="${escapeHtml(g.total_amount || "0.00")}" />
+        <input class="form-control amount" value="${formatCurrency(g.total_amount)}" />
       </div>
       <div class="notes-row">
         <label class="notes-label">Total Referral Amount</label>
-        <input class="form-control" value="${escapeHtml(g.total_referral_amount || "0.00")}" />
+        <input class="form-control amount" value="${formatCurrency(g.total_referral_amount)}" />
       </div>
       <div class="notes-row">
         <label class="notes-label">ROI</label>
-        <input class="form-control" value="${escapeHtml(g.total_roi || "0.0000")}" />
+        <input class="form-control amount" value="${escapeHtml(g.total_roi || "0.0000")}" />
       </div>
       <div class="notes-row">
         <label class="notes-label">Date Started</label>
@@ -254,10 +253,16 @@ async function renderGroupDetails(container, portalState, groupId) {
   `;
 }
 
-// helper
+// helpers
 function escapeHtml(str) {
   const s = String(str ?? "");
   return s.replace(/[&<>"']/g, c => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[c]));
 }
+
+function formatCurrency(value) {
+  const num = Number(value) || 0;
+  return `$${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
