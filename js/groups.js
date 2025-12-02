@@ -27,7 +27,7 @@ export async function loadGroupsTab({ portalState, tabContent }) {
       const subtab = btn.dataset.subtab;
       switch (subtab) {
         case "add":
-          content.innerHTML = `<section class="card"><p>(Add Group form placeholder)</p></section>`;
+          await renderGroupAdd(content, portalState);
           break;
         case "list":
           await renderGroupList(content, portalState);
@@ -268,6 +268,47 @@ async function renderGroupDetails(container, portalState, groupId) {
     }
   });
 }
+
+async function renderGroupAdd(container, portalState) {
+  container.innerHTML = `
+    <section class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3>Add Group</h3>
+        <button id="btnSaveNewGroup" class="btn-primary">Save</button>
+      </div>
+      <div class="notes-row">
+        <label class="notes-label">Name</label>
+        <input id="newGroupName" class="form-control" placeholder="Enter group name" />
+      </div>
+    </section>
+  `;
+
+  document.getElementById("btnSaveNewGroup").addEventListener("click", async () => {
+    const name = document.getElementById("newGroupName").value.trim();
+    if (!name) {
+      alert("Group name cannot be empty");
+      return;
+    }
+
+    await fetch(`https://groups-module.dennis-e64.workers.dev/groups/add?project=${portalState.project}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ group_name: name })
+    });
+
+    alert("Group added");
+
+    // Switch back to List view
+    const listBtn = document.querySelector('#groups-subtabs button[data-subtab="list"]');
+    if (listBtn) {
+      listBtn.classList.add("active");
+      const content = document.querySelector("#groupsContent");
+      await renderGroupList(content, portalState);
+    }
+  });
+}
+
+
 
 // helpers
 function escapeHtml(str) {
