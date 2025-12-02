@@ -170,7 +170,8 @@ async function renderGroupDetails(container, portalState, groupId) {
 
 // helper
 function escapeHtml(str) {
-  return str?.replace(/[&<>"']/g, c => ({
+  const s = String(str ?? "");
+  return s.replace(/[&<>"']/g, c => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-  }[c])) || "";
+  }[c]));
 }
