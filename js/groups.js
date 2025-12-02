@@ -1,4 +1,4 @@
-// js/groups.js v5.0
+// js/groups.js v6.0
 console.log("[Groups.js] loaded");
 
 export async function loadGroupsTab({ portalState, tabContent }) {
@@ -140,7 +140,6 @@ async function renderGroupList(container, portalState, options = {}) {
                 <td>${escapeHtml(g.created_at || "")}</td>
                 <td>
                   <button class="btn-primary btn-select" data-id="${g.group_id}">Select</button>
-                  <button class="btn-danger btn-delete" data-id="${g.group_id}">Delete</button>
                 </td>
               </tr>
             `).join("")
@@ -150,7 +149,7 @@ async function renderGroupList(container, portalState, options = {}) {
     </table>
   `;
 
-  // Wire Select/Delete
+  // Wire Select
   tableDiv.querySelectorAll(".btn-select").forEach(btn => {
     btn.addEventListener("click", async () => {
       const groupId = btn.dataset.id;
@@ -161,18 +160,6 @@ async function renderGroupList(container, portalState, options = {}) {
 
       const content = document.querySelector("#groupsContent");
       await renderGroupDetails(content, portalState, groupId);
-    });
-  });
-
-  tableDiv.querySelectorAll(".btn-delete").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const groupId = btn.dataset.id;
-      if (!confirm("Delete this group?")) return;
-      await fetch(`https://groups-module.dennis-e64.workers.dev/groups/delete/${groupId}?project=${portalState.project}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" }
-      });
-      await renderGroupList(container, portalState);
     });
   });
 
@@ -207,7 +194,6 @@ async function renderGroupDetails(container, portalState, groupId) {
   const res = await fetch(url);
   const raw = await res.json();
 
-  // Defensive fallback: handle array or object
   const group = Array.isArray(raw) ? raw[0] : raw;
   if (!group || !group.group_id) {
     container.innerHTML = `<section class="card"><p>(Group not found)</p></section>`;
@@ -216,43 +202,72 @@ async function renderGroupDetails(container, portalState, groupId) {
 
   container.innerHTML = `
     <section class="card">
-      <h3>Group Details</h3>
-      <div class="notes-row">
-        <label class="notes-label">Group ID</label>
-        <input class="form-control" value="${escapeHtml(group.group_id)}" readonly />
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3>Group Details</h3>
+        <div>
+          <button id="btnSaveGroup" class="btn-primary">Save</button>
+          <button id="btnDeleteGroup" class="btn-danger">Delete</button>
+        </div>
       </div>
       <div class="notes-row">
         <label class="notes-label">Name</label>
-        <input class="form-control" value="${escapeHtml(group.group_name || "")}" />
+        <input id="groupNameInput" class="form-control" value="${escapeHtml(group.group_name || "")}" />
       </div>
       <div class="notes-row">
         <label class="notes-label">Total Amount</label>
-        <input class="form-control amount" value="${formatCurrency(group.total_amount)}" />
+        <input class="form-control amount" value="${formatCurrency(group.total_amount)}" readonly />
       </div>
       <div class="notes-row">
         <label class="notes-label">Total Referral Amount</label>
-        <input class="form-control amount" value="${formatCurrency(group.total_referral_amount)}" />
+        <input class="form-control amount" value="${formatCurrency(group.total_referral_amount)}" readonly />
       </div>
       <div class="notes-row">
         <label class="notes-label">ROI</label>
-        <input class="form-control amount" value="${escapeHtml(group.total_roi || "0.0000")}" />
+        <input class="form-control amount" value="${escapeHtml(group.total_roi || "0.0000")}" readonly />
       </div>
       <div class="notes-row">
         <label class="notes-label">Date Started</label>
-        <input class="form-control" value="${escapeHtml(group.date_started || "")}" />
+        <input class="form-control" value="${escapeHtml(group.date_started || "")}" readonly />
       </div>
       <div class="notes-row">
         <label class="notes-label">Created At</label>
         <input class="form-control" value="${escapeHtml(group.created_at || "")}" readonly />
       </div>
-      <div class="notes-row">
-        <label class="notes-label">Project</label>
-        <input class="form-control" value="${escapeHtml(group.project || "")}" readonly />
-      </div>
     </section>
   `;
-}
 
+  // Wire Save
+  document.getElementById("btnSaveGroup").addEventListener("click", async () => {
+    const newName = document.getElementById("groupNameInput").value.trim();
+    if (!newName) {
+      alert("Name cannot be empty");
+      return;
+    }
+    await fetch(`https://groups-module.dennis-e64.workers.dev/groups/update/${group.group_id}?project=${portalState.project}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ group_name: newName })
+    });
+    alert("Group name updated");
+  });
+
+  // Wire Delete
+  document.getElementById("btnDeleteGroup").addEventListener("click", async () => {
+    if (!confirm("Delete this group?")) return;
+    await fetch(`https://groups-module.dennis-e64.workers.dev/groups/delete/${group.group_id}?project=${portalState.project}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" }
+    });
+    alert("Group deleted");
+    // Return to list view
+    const listBtn = document.querySelector('#groups-subtabs button[data-subtab="list"]');
+    if (listBtn) {
+      listBtn.classList.add("active");
+      const content = document.querySelector("#groupsContent");
+      await renderGroupList(content, portalState);
+    }
+  });
+}
 
 // helpers
 function escapeHtml(str) {
@@ -266,4 +281,3 @@ function formatCurrency(value) {
   const num = Number(value) || 0;
   return `$${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
-
