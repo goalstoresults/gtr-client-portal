@@ -353,3 +353,9 @@ button {
   color: #000;
   text-decoration: underline;
 }
+
+/* Right-align numeric/currency columns */
+.notes-table td.amount,
+.notes-table th.amount {
+  text-align: right;
+}
