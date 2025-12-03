@@ -4,8 +4,7 @@ console.log("[Groups.js] loaded");
 export async function loadGroupsTab({ portalState, tabContent }) {
   tabContent.innerHTML = `
     <section class="card">
-      <h2>Groups v2</h2>
-      <nav id="groups-subtabs" class="subtabs" style="margin-bottom:12px;">
+       <nav id="groups-subtabs" class="subtabs" style="margin-bottom:12px;">
         <button data-subtab="add">Add</button>
         <button data-subtab="list">List</button>
         <button data-subtab="details">Details</button>
