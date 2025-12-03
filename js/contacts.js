@@ -255,7 +255,7 @@ async function renderAddContactForm(container, portalState) {
         input.name = f.field_key;
         input.className = "form-control";
 
-        fetch(`https://contacts-module.dennis-e64.workers.dev/lookups?lookup_type=${f.lookup_type}`)
+        fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=${f.lookup_type}&project=${projectId}`)
           .then(r => r.json())
           .then(values => {
             if (!Array.isArray(values)) {
