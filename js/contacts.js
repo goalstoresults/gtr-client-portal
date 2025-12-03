@@ -269,7 +269,7 @@ async function renderAddContactForm(container, portalState) {
 
             data.rows.forEach(g => {
               const opt = document.createElement("option");
-              opt.value = g.group_id;       // foreign key stored
+              opt.value = g.group_id;        // foreign key stored
               opt.textContent = g.group_name; // human-readable name shown
               input.appendChild(opt);
             });
