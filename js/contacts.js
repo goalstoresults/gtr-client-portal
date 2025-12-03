@@ -258,19 +258,28 @@ async function renderAddContactForm(container, portalState) {
         fetch(`https://groups-module.dennis-e64.workers.dev/groups/list?project=${projectId}`)
           .then(r => r.json())
           .then(data => {
-            if (!Array.isArray(data.rows)) {
-              console.warn("Groups fetch failed:", data);
+            console.log("✅ Groups response:", data);
+
+            const rows = Array.isArray(data.rows)
+              ? data.rows
+              : Array.isArray(data)
+              ? data
+              : [];
+
+            if (rows.length === 0) {
+              console.warn("Groups fetch returned no rows:", data);
               return;
             }
+
             const placeholder = document.createElement("option");
             placeholder.value = "";
             placeholder.textContent = "-- Select Group --";
             input.appendChild(placeholder);
 
-            data.rows.forEach(g => {
+            rows.forEach(g => {
               const opt = document.createElement("option");
-              opt.value = g.group_id;        // foreign key stored
-              opt.textContent = g.group_name; // human-readable name shown
+              opt.value = g.group_id;
+              opt.textContent = g.group_name;
               input.appendChild(opt);
             });
           });
@@ -287,6 +296,7 @@ async function renderAddContactForm(container, portalState) {
               console.warn("Lookup fetch failed:", values);
               return;
             }
+
             const placeholder = document.createElement("option");
             placeholder.value = "";
             placeholder.textContent = "-- Select --";
