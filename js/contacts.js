@@ -232,7 +232,7 @@ async function renderAddContactForm(container, portalState) {
   for (const [section, sectionFields] of Object.entries(grouped)) {
     const details = document.createElement("details");
     details.className = "notes-section";
-    details.open = true; // expand by default
+    details.open = true;
 
     const summary = document.createElement("summary");
     summary.textContent = section;
@@ -249,7 +249,32 @@ async function renderAddContactForm(container, portalState) {
 
       let input;
 
-      if (f.lookup_type) {
+      if (f.field_key === "group_id") {
+        // Special case: dropdown bound to groups table
+        input = document.createElement("select");
+        input.name = "group_id";
+        input.className = "form-control";
+
+        fetch(`https://groups-module.dennis-e64.workers.dev/groups/list?project=${projectId}`)
+          .then(r => r.json())
+          .then(data => {
+            if (!Array.isArray(data.rows)) {
+              console.warn("Groups fetch failed:", data);
+              return;
+            }
+            const placeholder = document.createElement("option");
+            placeholder.value = "";
+            placeholder.textContent = "-- Select Group --";
+            input.appendChild(placeholder);
+
+            data.rows.forEach(g => {
+              const opt = document.createElement("option");
+              opt.value = g.group_id;       // foreign key stored
+              opt.textContent = g.group_name; // human-readable name shown
+              input.appendChild(opt);
+            });
+          });
+      } else if (f.lookup_type) {
         // Dropdown bound to lookup group
         input = document.createElement("select");
         input.name = f.field_key;
@@ -315,7 +340,6 @@ async function renderAddContactForm(container, portalState) {
     const first = formData.get("first_name") || "";
     const last = formData.get("last_name") || "";
     payload.contact_name = `${first} ${last}`.trim();
-
 
     try {
       const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
@@ -403,7 +427,36 @@ async function renderContactDetails(container, portalState, contactId) {
 
       let input;
 
-      if (f.lookup_type) {
+      if (f.field_key === "group_id") {
+        // Special case: dropdown bound to groups table
+        input = document.createElement("select");
+        input.name = "group_id";
+        input.className = "form-control";
+
+        fetch(`https://groups-module.dennis-e64.workers.dev/groups/list?project=${projectId}`)
+          .then(r => r.json())
+          .then(data => {
+            if (!Array.isArray(data.rows)) {
+              console.warn("Groups fetch failed:", data);
+              return;
+            }
+            const placeholder = document.createElement("option");
+            placeholder.value = "";
+            placeholder.textContent = "-- Select Group --";
+            input.appendChild(placeholder);
+
+            data.rows.forEach(g => {
+              const opt = document.createElement("option");
+              opt.value = g.group_id;        // foreign key stored
+              opt.textContent = g.group_name; // human-readable name shown
+              if (contact.group_id === g.group_id) {
+                opt.selected = true;         // pre-select current value
+              }
+              input.appendChild(opt);
+            });
+          });
+      } else if (f.lookup_type) {
+        // Dropdown bound to lookup group
         input = document.createElement("select");
         input.name = f.field_key;
         input.className = "form-control";
@@ -431,6 +484,7 @@ async function renderContactDetails(container, portalState, contactId) {
             });
           });
       } else {
+        // Default text input
         input = document.createElement("input");
         input.type = "text";
         input.name = f.field_key;
@@ -479,10 +533,6 @@ async function renderContactDetails(container, portalState, contactId) {
     }
   });
 }
-
-
-
-
 
 
 
