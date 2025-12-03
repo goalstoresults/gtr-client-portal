@@ -255,7 +255,7 @@ async function renderAddContactForm(container, portalState) {
         input.name = f.field_key;
         input.className = "form-control";
 
-        fetch(`https://contacts-module.dennis-e64.workers.dev/lookups?group=${f.lookup_type}`)
+        fetch(`https://contacts-module.dennis-e64.workers.dev/lookups?lookup_type=${f.lookup_type}`)
           .then(r => r.json())
           .then(values => {
             if (!Array.isArray(values)) {
@@ -372,7 +372,6 @@ async function renderContactDetails(container, portalState, contactId) {
       <div class="audit-info" style="margin-top:12px; font-size:0.9em; color:#666;">
         <p><strong>Created:</strong> ${escapeHtml(contact.created_at || "")}</p>
         <p><strong>Updated:</strong> ${escapeHtml(contact.updated_at || "—")}</p>
-        <p><strong>Status:</strong> ${contact.is_active ? "Active" : "Inactive"}</p>
       </div>
     </section>
   `;
