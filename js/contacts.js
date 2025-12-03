@@ -271,6 +271,9 @@ async function renderAddContactForm(container, portalState) {
               return;
             }
 
+            // Sort alphabetically by group_name
+            rows.sort((a, b) => (a.group_name || "").localeCompare(b.group_name || ""));
+
             const placeholder = document.createElement("option");
             placeholder.value = "";
             placeholder.textContent = "-- Select Group --";
@@ -278,8 +281,8 @@ async function renderAddContactForm(container, portalState) {
 
             rows.forEach(g => {
               const opt = document.createElement("option");
-              opt.value = g.group_id;
-              opt.textContent = g.group_name;
+              opt.value = g.group_id;        // foreign key stored
+              opt.textContent = g.group_name; // human-readable name shown
               input.appendChild(opt);
             });
           });
@@ -296,6 +299,9 @@ async function renderAddContactForm(container, portalState) {
               console.warn("Lookup fetch failed:", values);
               return;
             }
+
+            // Sort alphabetically by label/value
+            values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
 
             const placeholder = document.createElement("option");
             placeholder.value = "";
@@ -381,8 +387,6 @@ async function renderContactDetails(container, portalState, contactId) {
     { cache: "no-cache" }
   );
   const data = await res.json();
-
-  // Supabase proxy returns an array
   const contact = Array.isArray(data) ? data[0] : data;
   if (!contact) {
     container.innerHTML = `<section class="card"><p>Contact not found.</p></section>`;
@@ -446,21 +450,33 @@ async function renderContactDetails(container, portalState, contactId) {
         fetch(`https://groups-module.dennis-e64.workers.dev/groups/list?project=${projectId}`)
           .then(r => r.json())
           .then(data => {
-            if (!Array.isArray(data.rows)) {
-              console.warn("Groups fetch failed:", data);
+            console.log("✅ Groups response:", data);
+
+            const rows = Array.isArray(data.rows)
+              ? data.rows
+              : Array.isArray(data)
+              ? data
+              : [];
+
+            if (rows.length === 0) {
+              console.warn("Groups fetch returned no rows:", data);
               return;
             }
+
+            // Sort alphabetically by group_name
+            rows.sort((a, b) => (a.group_name || "").localeCompare(b.group_name || ""));
+
             const placeholder = document.createElement("option");
             placeholder.value = "";
             placeholder.textContent = "-- Select Group --";
             input.appendChild(placeholder);
 
-            data.rows.forEach(g => {
+            rows.forEach(g => {
               const opt = document.createElement("option");
-              opt.value = g.group_id;        // foreign key stored
-              opt.textContent = g.group_name; // human-readable name shown
+              opt.value = g.group_id;
+              opt.textContent = g.group_name;
               if (contact.group_id === g.group_id) {
-                opt.selected = true;         // pre-select current value
+                opt.selected = true; // pre-select current value
               }
               input.appendChild(opt);
             });
@@ -478,6 +494,10 @@ async function renderContactDetails(container, portalState, contactId) {
               console.warn("Lookup fetch failed:", values);
               return;
             }
+
+            // Sort alphabetically by label/value
+            values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
+
             const placeholder = document.createElement("option");
             placeholder.value = "";
             placeholder.textContent = "-- Select --";
