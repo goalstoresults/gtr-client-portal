@@ -67,133 +67,128 @@ async function loadNotesSubtab(subtab, portalState) {
 /* History (GET /notes-history-module) */
 /* Notes History (GET /notes-history-module) */
 async function renderHistory(container, portalState, options = {}) {
-  container.innerHTML = `
-    <section class="card">
-      <h2>Notes History for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
-      <div id="notesFilters" style="margin-bottom:12px;">
+  try {
+    const reviewOnly = document.getElementById("filter-review-only")?.checked ?? true;
+    const order = options.order || "created_at.desc";
+    const limit = 500; // always 500
+
+    const params = new URLSearchParams({
+      project: portalState.project,
+      order,
+      limit: String(limit)
+    });
+    if (reviewOnly) params.set("needs_review", "true");
+
+    const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${params}`;
+    console.log("[Notes] Fetching:", url);
+
+    const res = await fetch(url, { cache: "no-cache" });
+    const data = await res.json();
+    const notes = Array.isArray(data) ? data : Array.isArray(data?.notes) ? data.notes : [];
+
+    // Filter UI
+    container.innerHTML = `
+      <h4>Notes History (Total: ${notes.length})</h4>
+      <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px;">
         <label>
-          <input type="checkbox" id="filter-review-only" checked>
+          <input type="checkbox" id="filter-review-only" ${reviewOnly ? "checked" : ""}>
           Needs Review Only
         </label>
-        <button id="btnApplyNotesFilter" class="btn-secondary" style="margin-left:12px;">Apply Filter</button>
-        <button id="btnClearNotesFilter" class="btn-secondary" style="margin-left:12px;">Clear Filter</button>
+        <button id="btnApplyFilter" class="secondary">Apply Filter</button>
+        <button id="btnClearFilter" class="secondary">Clear Filter</button>
       </div>
-      <div id="notesTable">Loading...</div>
-    </section>
-  `;
+      <div id="notesTable"></div>
+    `;
 
-  const tableDiv = container.querySelector("#notesTable");
+    const tableDiv = container.querySelector("#notesTable");
+    tableDiv.innerHTML = `
+      <table class="notes-table">
+        <thead>
+          <tr>
+            <th>
+              Created
+              <button class="sort-btn" data-col="created_at" data-dir="asc">▲</button>
+              <button class="sort-btn" data-col="created_at" data-dir="desc">▼</button>
+            </th>
+            <th>
+              Subject
+              <button class="sort-btn" data-col="subject" data-dir="asc">▲</button>
+              <button class="sort-btn" data-col="subject" data-dir="desc">▼</button>
+            </th>
+            <th>
+              From
+              <button class="sort-btn" data-col="from_name" data-dir="asc">▲</button>
+              <button class="sort-btn" data-col="from_name" data-dir="desc">▼</button>
+            </th>
+            <th>
+              Client
+              <button class="sort-btn" data-col="contact_name" data-dir="asc">▲</button>
+              <button class="sort-btn" data-col="contact_name" data-dir="desc">▼</button>
+            </th>
+            <th>
+              Needs Review
+              <button class="sort-btn" data-col="needs_review" data-dir="asc">▲</button>
+              <button class="sort-btn" data-col="needs_review" data-dir="desc">▼</button>
+            </th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${notes.length > 0
+            ? notes.map(n => `
+                <tr>
+                  <td>${formatDateTimeSafe(n.created_at)}</td>
+                  <td>${n.subject || ""}</td>
+                  <td>${n.from_name || ""}</td>
+                  <td>${n.contact_name || ""}</td>
+                  <td>${n.needs_review ? "Yes" : "No"}</td>
+                  <td><button class="btn-primary btn-review" data-id="${n.id}">Review</button></td>
+                </tr>
+              `).join("")
+            : `<tr><td colspan="6">(no notes found)</td></tr>`
+          }
+        </tbody>
+      </table>
+    `;
 
-  const reviewOnly = document.getElementById("filter-review-only")?.checked ?? true;
-  const order = options.order || "created_at.desc";
-
-  // Always default to 500
-  const limit = 500;
-
-  const params = new URLSearchParams({
-    project: portalState.project,
-    order,
-    limit: limit.toString()
-  });
-  if (reviewOnly) params.set("needs_review", "true");
-
-  const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${params}`;
-  console.log("[Notes] Fetching:", url);
-
-  const res = await fetch(url);
-  const notes = await res.json();
-
-  tableDiv.innerHTML = `
-    <h4>Showing ${Array.isArray(notes) ? notes.length : 0} notes</h4>
-    <table class="notes-table">
-      <thead>
-        <tr>
-          <th>
-            Created
-            <button class="sort-btn" data-col="created_at" data-dir="asc">▲</button>
-            <button class="sort-btn" data-col="created_at" data-dir="desc">▼</button>
-          </th>
-          <th>
-            Subject
-            <button class="sort-btn" data-col="subject" data-dir="asc">▲</button>
-            <button class="sort-btn" data-col="subject" data-dir="desc">▼</button>
-          </th>
-          <th>
-            From
-            <button class="sort-btn" data-col="from_name" data-dir="asc">▲</button>
-            <button class="sort-btn" data-col="from_name" data-dir="desc">▼</button>
-          </th>
-          <th>
-            Client
-            <button class="sort-btn" data-col="contact_name" data-dir="asc">▲</button>
-            <button class="sort-btn" data-col="contact_name" data-dir="desc">▼</button>
-          </th>
-          <th>
-            Needs Review
-            <button class="sort-btn" data-col="needs_review" data-dir="asc">▲</button>
-            <button class="sort-btn" data-col="needs_review" data-dir="desc">▼</button>
-          </th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${Array.isArray(notes) && notes.length > 0
-          ? notes.map(n => `
-              <tr>
-                <td>${formatDateTime(n.created_at)}</td>
-                <td>${escapeHtml(n.subject || "")}</td>
-                <td>${escapeHtml(n.from_name || "")}</td>
-                <td>${escapeHtml(n.contact_name || "")}</td>
-                <td>${n.needs_review ? "Yes" : "No"}</td>
-                <td><button class="btn-primary btn-review" data-id="${n.id}">Review</button></td>
-              </tr>
-            `).join("")
-          : `<tr><td colspan="6">(no notes found)</td></tr>`
-        }
-      </tbody>
-    </table>
-  `;
-
-  // Wire Review buttons
-  tableDiv.querySelectorAll(".btn-review").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const noteId = btn.dataset.id;
-      portalState.selectedNoteId = noteId;
-      setSubtabEnabled("review", true);
-      setSubtabEnabled("relationships", true);
-      document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
-      document.querySelector('#notes-subtabs button[data-subtab="review"]')?.classList.add("active");
-      renderReview(container, portalState, noteId);
+    // Wire Review buttons
+    tableDiv.querySelectorAll(".btn-review").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const noteId = btn.dataset.id;
+        portalState.selectedNoteId = noteId;
+        setSubtabEnabled("review", true);
+        setSubtabEnabled("relationships", true);
+        document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
+        document.querySelector('#notes-subtabs button[data-subtab="review"]')?.classList.add("active");
+        renderReview(container, portalState, noteId);
+      });
     });
-  });
 
-  // Wire filter buttons
-  document.getElementById("btnApplyNotesFilter").addEventListener("click", () => {
-    renderHistory(container, portalState);
-  });
-  document.getElementById("btnClearNotesFilter").addEventListener("click", () => {
-    document.getElementById("filter-review-only").checked = true;
-    renderHistory(container, portalState);
-  });
-
-  // Wire sort buttons (Groups‑style)
-  tableDiv.querySelectorAll(".sort-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const col = btn.dataset.col;
-      const dir = btn.dataset.dir;
-      renderHistory(container, portalState, { order: `${col}.${dir}` });
+    // Wire filter buttons
+    document.getElementById("btnApplyFilter").addEventListener("click", () => {
+      renderHistory(container, portalState);
     });
-  });
+    document.getElementById("btnClearFilter").addEventListener("click", () => {
+      document.getElementById("filter-review-only").checked = true;
+      renderHistory(container, portalState);
+    });
+
+    // Wire sort buttons (Groups-style)
+    tableDiv.querySelectorAll(".sort-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const col = btn.dataset.col;
+        const dir = btn.dataset.dir;
+        renderHistory(container, portalState, { order: `${col}.${dir}` });
+      });
+    });
+
+  } catch (err) {
+    container.innerHTML = `<h4>Notes History</h4><p>Error loading history: ${err.message}</p>`;
+  }
 }
 
-// helpers
-function escapeHtml(str) {
-  const s = String(str ?? "");
-  return s.replace(/[&<>"']/g, c => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-  }[c]));
-}
-function formatDateTime(value) {
+// Helper
+function formatDateTimeSafe(value) {
   if (!value) return "";
   const d = new Date(value);
   return d.toLocaleString("en-US", {
