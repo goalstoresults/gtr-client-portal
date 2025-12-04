@@ -68,15 +68,16 @@ async function loadNotesSubtab(subtab, portalState) {
 /* History (GET /notes-history-module) */
 async function renderHistory(container, portalState, useFilters = false) {
   try {
-    // --- Pull current filter values ---
+    // --- Current filter values ---
     const first = document.getElementById("filter-first")?.value.trim();
     const last  = document.getElementById("filter-last")?.value.trim();
     const reviewOnly = document.getElementById("filter-review-only")?.checked ?? true;
 
-    // --- Build query string ---
+    // --- Always start with default project query ---
     let query = `project=eq.${portalState.project}`;
     if (reviewOnly) query += `&needs_review=eq.true`;
 
+    // --- Only add filters if Apply was clicked ---
     if (useFilters) {
       if (first && first.length >= 3) query += `&first_name=ilike.*${first}*`;
       if (last  && last.length  >= 3) query += `&last_name=ilike.*${last}*`;
@@ -88,22 +89,19 @@ async function renderHistory(container, portalState, useFilters = false) {
     const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
 
-    // --- Build filter UI (always shown) ---
+    // --- Filter bar (always shown, one line) ---
     container.innerHTML = `
       <h4>Notes History ${Array.isArray(data.notes) ? `(Total: ${data.notes.length})` : ""}</h4>
       <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px;">
-        <label>First: <input type="text" id="filter-first" class="form-control" value="${first || ""}"></label>
-        <label>Last: <input type="text" id="filter-last" class="form-control" value="${last || ""}"></label>
-        <label>
-          <input type="checkbox" id="filter-review-only" ${reviewOnly ? "checked" : ""}>
-          Needs Review Only
-        </label>
+        <label>First: <input type="text" id="filter-first" value="${first || ""}"></label>
+        <label>Last: <input type="text" id="filter-last" value="${last || ""}"></label>
+        <label><input type="checkbox" id="filter-review-only" ${reviewOnly ? "checked" : ""}> Needs Review Only</label>
         <button id="btnApplyFilter" class="secondary">Apply Filter</button>
         <button id="btnClearFilter" class="secondary">Clear Filter</button>
       </div>
     `;
 
-    // --- Show table or "No notes found" ---
+    // --- Results table ---
     if (!res.ok || data.status !== "ok" || !Array.isArray(data.notes) || data.notes.length === 0) {
       container.innerHTML += `<p>No notes found.</p>`;
     } else {
@@ -125,7 +123,7 @@ async function renderHistory(container, portalState, useFilters = false) {
             const created = n.created_at ? new Date(n.created_at).toLocaleString() : "(no date)";
             const subject = n.subject || "(no subject)";
             const from = n.from_name || "(unknown)";
-            const client = `${n.first_name || ""} ${n.last_name || ""}`.trim() || "(unknown)";
+            const client = n.contact_name || "(unknown)";
             const needsReview = n.needs_review ? "Yes" : "No";
             return `
               <tr>
@@ -142,25 +140,21 @@ async function renderHistory(container, portalState, useFilters = false) {
       `;
       container.appendChild(table);
 
-      // Attach Review button handlers
+      // Review button handlers
       table.querySelectorAll("button[data-note-id]").forEach(btn =>
         btn.addEventListener("click", () => {
           const noteId = btn.getAttribute("data-note-id");
           portalState.selectedNoteId = noteId;
-          console.log("[History] Selected note ID:", noteId);
-
           setSubtabEnabled("review", true);
           setSubtabEnabled("relationships", true);
-
           document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
           document.querySelector('#notes-subtabs button[data-subtab="review"]')?.classList.add("active");
-
           renderReview(container, portalState, noteId);
         })
       );
     }
 
-    // --- Attach filter button handlers ---
+    // --- Filter buttons ---
     document.getElementById("btnApplyFilter").addEventListener("click", () => {
       renderHistory(container, portalState, true); // run with filters
     });
@@ -172,10 +166,7 @@ async function renderHistory(container, portalState, useFilters = false) {
     });
 
   } catch (err) {
-    container.innerHTML = `
-      <h4>Notes History</h4>
-      <p>Error loading history: ${err.message}</p>
-    `;
+    container.innerHTML = `<h4>Notes History</h4><p>Error: ${err.message}</p>`;
   }
 }
 
