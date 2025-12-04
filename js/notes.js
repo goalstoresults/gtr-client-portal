@@ -65,43 +65,42 @@ async function loadNotesSubtab(subtab, portalState) {
 }
 
 /* History (GET /notes-history-module) */
-/* History (GET /notes-history-module) */
-async function renderHistory(container, portalState, useFilters = false) {
+async function renderHistory(container, portalState) {
   try {
-    // --- Current filter values ---
-    const first = document.getElementById("filter-first")?.value.trim();
-    const last  = document.getElementById("filter-last")?.value.trim();
+    // --- Build query params ---
+    const fromDate = document.getElementById("filter-from")?.value;
+    const toDate   = document.getElementById("filter-to")?.value;
     const reviewOnly = document.getElementById("filter-review-only")?.checked ?? true;
 
-    // --- Always start with default project query ---
-    let query = `project=eq.${portalState.project}`;
-    if (reviewOnly) query += `&needs_review=eq.true`;
+    const params = new URLSearchParams({
+      project: portalState.project,
+      reviewOnly: reviewOnly ? "true" : "false"
+    });
+    if (fromDate) params.append("from", fromDate);
+    if (toDate)   params.append("to", toDate);
 
-    // --- Only add filters if Apply was clicked ---
-    if (useFilters) {
-      if (first && first.length >= 3) query += `&first_name=ilike.*${first}*`;
-      if (last  && last.length  >= 3) query += `&last_name=ilike.*${last}*`;
-    }
-
-    const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${query}&order=created_at.desc`;
+    const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${params.toString()}`;
     console.log("[History] Fetching:", url);
 
     const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
 
-    // --- Filter bar (always shown, one line) ---
+    // --- Build filter UI first ---
     container.innerHTML = `
       <h4>Notes History ${Array.isArray(data.notes) ? `(Total: ${data.notes.length})` : ""}</h4>
-      <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px;">
-        <label>First: <input type="text" id="filter-first" value="${first || ""}"></label>
-        <label>Last: <input type="text" id="filter-last" value="${last || ""}"></label>
-        <label><input type="checkbox" id="filter-review-only" ${reviewOnly ? "checked" : ""}> Needs Review Only</label>
-        <button id="btnApplyFilter" class="secondary">Apply Filter</button>
-        <button id="btnClearFilter" class="secondary">Clear Filter</button>
+      <div style="margin-bottom:12px;">
+        <label>From: <input type="date" id="filter-from" value="${fromDate || ""}"></label>
+        <label style="margin-left:12px;">To: <input type="date" id="filter-to" value="${toDate || ""}"></label>
+        <label style="margin-left:12px;">
+          <input type="checkbox" id="filter-review-only" ${reviewOnly ? "checked" : ""}>
+          Needs Review Only
+        </label>
+        <button id="btnApplyFilter" class="secondary" style="margin-left:12px;">Apply Filter</button>
+        <button id="btnClearFilter" class="secondary" style="margin-left:12px;">Clear Filter</button>
       </div>
     `;
 
-    // --- Results table ---
+    // --- Show table or "No notes found" ---
     if (!res.ok || data.status !== "ok" || !Array.isArray(data.notes) || data.notes.length === 0) {
       container.innerHTML += `<p>No notes found.</p>`;
     } else {
@@ -140,37 +139,42 @@ async function renderHistory(container, portalState, useFilters = false) {
       `;
       container.appendChild(table);
 
-      // Review button handlers
+      // Attach Review button handlers
       table.querySelectorAll("button[data-note-id]").forEach(btn =>
         btn.addEventListener("click", () => {
           const noteId = btn.getAttribute("data-note-id");
           portalState.selectedNoteId = noteId;
+          console.log("[History] Selected note ID:", noteId);
+
           setSubtabEnabled("review", true);
           setSubtabEnabled("relationships", true);
+
           document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
           document.querySelector('#notes-subtabs button[data-subtab="review"]')?.classList.add("active");
+
           renderReview(container, portalState, noteId);
         })
       );
     }
 
-    // --- Filter buttons ---
+    // --- Attach filter button handlers (always present) ---
     document.getElementById("btnApplyFilter").addEventListener("click", () => {
-      renderHistory(container, portalState, true); // run with filters
+      renderHistory(container, portalState);
     });
     document.getElementById("btnClearFilter").addEventListener("click", () => {
-      document.getElementById("filter-first").value = "";
-      document.getElementById("filter-last").value = "";
+      document.getElementById("filter-from").value = "";
+      document.getElementById("filter-to").value = "";
       document.getElementById("filter-review-only").checked = true;
-      renderHistory(container, portalState, false); // reset to default
+      renderHistory(container, portalState);
     });
 
   } catch (err) {
-    container.innerHTML = `<h4>Notes History</h4><p>Error: ${err.message}</p>`;
+    container.innerHTML = `
+      <h4>Notes History</h4>
+      <p>Error loading history: ${err.message}</p>
+    `;
   }
 }
-
-
 
 
 
