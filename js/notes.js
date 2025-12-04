@@ -70,7 +70,7 @@ async function renderHistory(container, portalState) {
   try {
     const reviewOnly = document.getElementById("filter-review-only")?.checked ?? true;
 
-    // --- Worker call unchanged (baseline) ---
+    // Worker call unchanged
     const params = new URLSearchParams({
       project: portalState.project,
       reviewOnly: reviewOnly ? "true" : "false"
@@ -81,7 +81,7 @@ async function renderHistory(container, portalState) {
     const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
 
-    // --- Filter UI ---
+    // Filter UI
     container.innerHTML = `
       <h4>Notes History ${Array.isArray(data.notes) ? `(Total: ${data.notes.length})` : ""}</h4>
       <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px;">
@@ -97,12 +97,12 @@ async function renderHistory(container, portalState) {
     if (!res.ok || data.status !== "ok" || !Array.isArray(data.notes) || data.notes.length === 0) {
       container.innerHTML += `<p>No notes found.</p>`;
     } else {
-      // --- Track sort state ---
+      // Track sort state
       if (!portalState.notesSort) {
         portalState.notesSort = { column: "created_at", direction: "desc" };
       }
 
-      // --- Sort helper ---
+      // Sort helper
       function sortNotes(notes, column, direction) {
         return [...notes].sort((a, b) => {
           let va = a[column] || "";
@@ -122,17 +122,25 @@ async function renderHistory(container, portalState) {
 
       const sortedNotes = sortNotes(data.notes, portalState.notesSort.column, portalState.notesSort.direction);
 
-      // --- Build table with sort arrows on all columns ---
+      // Helper to render arrow for any column
+      function arrow(col) {
+        if (portalState.notesSort.column === col) {
+          return portalState.notesSort.direction === "asc" ? "▲" : "▼";
+        }
+        return "";
+      }
+
+      // Build table
       const table = document.createElement("table");
       table.className = "notes-table";
       table.innerHTML = `
         <thead>
           <tr>
-            <th data-col="created_at">Created ${portalState.notesSort.column==="created_at" ? (portalState.notesSort.direction==="asc"?"▲":"▼"):""}</th>
-            <th data-col="subject">Subject ${portalState.notesSort.column==="subject" ? (portalState.notesSort.direction==="asc"?"▲":"▼"):""}</th>
-            <th data-col="from_name">From ${portalState.notesSort.column==="from_name" ? (portalState.notesSort.direction==="asc"?"▲":"▼"):""}</th>
-            <th data-col="contact_name">Client ${portalState.notesSort.column==="contact_name" ? (portalState.notesSort.direction==="asc"?"▲":"▼"):""}</th>
-            <th data-col="needs_review">Needs Review ${portalState.notesSort.column==="needs_review" ? (portalState.notesSort.direction==="asc"?"▲":"▼"):""}</th>
+            <th data-col="created_at">Created ${arrow("created_at")}</th>
+            <th data-col="subject">Subject ${arrow("subject")}</th>
+            <th data-col="from_name">From ${arrow("from_name")}</th>
+            <th data-col="contact_name">Client ${arrow("contact_name")}</th>
+            <th data-col="needs_review">Needs Review ${arrow("needs_review")}</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -158,7 +166,7 @@ async function renderHistory(container, portalState) {
       `;
       container.appendChild(table);
 
-      // --- Wire sort clicks for ALL sortable columns ---
+      // Wire sort clicks for ALL headers
       table.querySelectorAll("th[data-col]").forEach(th => {
         th.style.cursor = "pointer";
         th.addEventListener("click", () => {
@@ -173,7 +181,7 @@ async function renderHistory(container, portalState) {
         });
       });
 
-      // --- Wire Review buttons ---
+      // Wire Review buttons
       table.querySelectorAll("button[data-note-id]").forEach(btn =>
         btn.addEventListener("click", () => {
           const noteId = btn.getAttribute("data-note-id");
@@ -187,7 +195,7 @@ async function renderHistory(container, portalState) {
       );
     }
 
-    // --- Filter buttons (baseline) ---
+    // Filter buttons
     document.getElementById("btnApplyFilter").addEventListener("click", () => {
       renderHistory(container, portalState);
     });
