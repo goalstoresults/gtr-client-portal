@@ -65,148 +65,141 @@ async function loadNotesSubtab(subtab, portalState) {
 }
 
 /* History (GET /notes-history-module) */
-/* History (GET /notes-history-module) */
-async function renderHistory(container, portalState) {
-  try {
-    const reviewOnly = document.getElementById("filter-review-only")?.checked ?? true;
-
-    // Worker call unchanged
-    const params = new URLSearchParams({
-      project: portalState.project,
-      reviewOnly: reviewOnly ? "true" : "false"
-    });
-    const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${params.toString()}`;
-    console.log("[History] Fetching:", url);
-
-    const res = await fetch(url, { cache: "no-cache" });
-    const data = await res.json();
-
-    // Filter UI
-    container.innerHTML = `
-      <h4>Notes History ${Array.isArray(data.notes) ? `(Total: ${data.notes.length})` : ""}</h4>
-      <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px;">
+/* Notes History (GET /notes-history-module) */
+async function renderHistory(container, portalState, options = {}) {
+  container.innerHTML = `
+    <section class="card">
+      <h2>Notes History for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
+      <div id="notesFilters" style="margin-bottom:12px;">
         <label>
-          <input type="checkbox" id="filter-review-only" ${reviewOnly ? "checked" : ""}>
+          <input type="checkbox" id="filter-review-only" checked>
           Needs Review Only
         </label>
-        <button id="btnApplyFilter" class="secondary">Apply Filter</button>
-        <button id="btnClearFilter" class="secondary">Clear Filter</button>
+        <button id="btnApplyNotesFilter" class="btn-secondary" style="margin-left:12px;">Apply Filter</button>
+        <button id="btnClearNotesFilter" class="btn-secondary" style="margin-left:12px;">Clear Filter</button>
       </div>
-    `;
+      <div id="notesTable">Loading...</div>
+    </section>
+  `;
 
-    if (!res.ok || data.status !== "ok" || !Array.isArray(data.notes) || data.notes.length === 0) {
-      container.innerHTML += `<p>No notes found.</p>`;
-    } else {
-      // Track sort state
-      if (!portalState.notesSort) {
-        portalState.notesSort = { column: "created_at", direction: "desc" };
-      }
+  const tableDiv = container.querySelector("#notesTable");
 
-      // Sort helper
-      function sortNotes(notes, column, direction) {
-        return [...notes].sort((a, b) => {
-          let va = a[column] || "";
-          let vb = b[column] || "";
-          if (column === "created_at") {
-            va = new Date(va);
-            vb = new Date(vb);
-          } else {
-            va = va.toString().toLowerCase();
-            vb = vb.toString().toLowerCase();
-          }
-          if (va < vb) return direction === "asc" ? -1 : 1;
-          if (va > vb) return direction === "asc" ? 1 : -1;
-          return 0;
-        });
-      }
+  const reviewOnly = document.getElementById("filter-review-only")?.checked ?? true;
+  const order = options.order || "created_at.desc";
 
-      const sortedNotes = sortNotes(data.notes, portalState.notesSort.column, portalState.notesSort.direction);
+  // Always default to 500
+  const limit = 500;
 
-      // Helper to render arrow for any column
-      function arrow(col) {
-        if (portalState.notesSort.column === col) {
-          return portalState.notesSort.direction === "asc" ? "▲" : "▼";
-        }
-        return "";
-      }
+  const params = new URLSearchParams({
+    project: portalState.project,
+    order,
+    limit: limit.toString()
+  });
+  if (reviewOnly) params.set("needs_review", "true");
 
-      // Build table
-      const table = document.createElement("table");
-      table.className = "notes-table";
-      table.innerHTML = `
-        <thead>
-          <tr>
-            <th data-col="created_at">Created ${arrow("created_at")}</th>
-            <th data-col="subject">Subject ${arrow("subject")}</th>
-            <th data-col="from_name">From ${arrow("from_name")}</th>
-            <th data-col="contact_name">Client ${arrow("contact_name")}</th>
-            <th data-col="needs_review">Needs Review ${arrow("needs_review")}</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${sortedNotes.map(n => {
-            const created = n.created_at ? new Date(n.created_at).toLocaleString() : "(no date)";
-            const subject = n.subject || "(no subject)";
-            const from = n.from_name || "(unknown)";
-            const client = n.contact_name || "(unknown)";
-            const needsReview = n.needs_review ? "Yes" : "No";
-            return `
+  const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${params}`;
+  console.log("[Notes] Fetching:", url);
+
+  const res = await fetch(url);
+  const notes = await res.json();
+
+  tableDiv.innerHTML = `
+    <h4>Showing ${Array.isArray(notes) ? notes.length : 0} notes</h4>
+    <table class="notes-table">
+      <thead>
+        <tr>
+          <th>
+            Created
+            <button class="sort-btn" data-col="created_at" data-dir="asc">▲</button>
+            <button class="sort-btn" data-col="created_at" data-dir="desc">▼</button>
+          </th>
+          <th>
+            Subject
+            <button class="sort-btn" data-col="subject" data-dir="asc">▲</button>
+            <button class="sort-btn" data-col="subject" data-dir="desc">▼</button>
+          </th>
+          <th>
+            From
+            <button class="sort-btn" data-col="from_name" data-dir="asc">▲</button>
+            <button class="sort-btn" data-col="from_name" data-dir="desc">▼</button>
+          </th>
+          <th>
+            Client
+            <button class="sort-btn" data-col="contact_name" data-dir="asc">▲</button>
+            <button class="sort-btn" data-col="contact_name" data-dir="desc">▼</button>
+          </th>
+          <th>
+            Needs Review
+            <button class="sort-btn" data-col="needs_review" data-dir="asc">▲</button>
+            <button class="sort-btn" data-col="needs_review" data-dir="desc">▼</button>
+          </th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${Array.isArray(notes) && notes.length > 0
+          ? notes.map(n => `
               <tr>
-                <td>${escapeHtml(created)}</td>
-                <td>${escapeHtml(subject)}</td>
-                <td>${escapeHtml(from)}</td>
-                <td>${escapeHtml(client)}</td>
-                <td>${escapeHtml(needsReview)}</td>
-                <td><button data-note-id="${n.id||""}" class="secondary">Review</button></td>
+                <td>${formatDateTime(n.created_at)}</td>
+                <td>${escapeHtml(n.subject || "")}</td>
+                <td>${escapeHtml(n.from_name || "")}</td>
+                <td>${escapeHtml(n.contact_name || "")}</td>
+                <td>${n.needs_review ? "Yes" : "No"}</td>
+                <td><button class="btn-primary btn-review" data-id="${n.id}">Review</button></td>
               </tr>
-            `;
-          }).join("")}
-        </tbody>
-      `;
-      container.appendChild(table);
+            `).join("")
+          : `<tr><td colspan="6">(no notes found)</td></tr>`
+        }
+      </tbody>
+    </table>
+  `;
 
-      // Wire sort clicks for ALL headers
-      table.querySelectorAll("th[data-col]").forEach(th => {
-        th.style.cursor = "pointer";
-        th.addEventListener("click", () => {
-          const col = th.getAttribute("data-col");
-          if (portalState.notesSort.column === col) {
-            portalState.notesSort.direction = portalState.notesSort.direction === "asc" ? "desc" : "asc";
-          } else {
-            portalState.notesSort.column = col;
-            portalState.notesSort.direction = "asc";
-          }
-          renderHistory(container, portalState); // re-render with new sort
-        });
-      });
-
-      // Wire Review buttons
-      table.querySelectorAll("button[data-note-id]").forEach(btn =>
-        btn.addEventListener("click", () => {
-          const noteId = btn.getAttribute("data-note-id");
-          portalState.selectedNoteId = noteId;
-          setSubtabEnabled("review", true);
-          setSubtabEnabled("relationships", true);
-          document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
-          document.querySelector('#notes-subtabs button[data-subtab="review"]')?.classList.add("active");
-          renderReview(container, portalState, noteId);
-        })
-      );
-    }
-
-    // Filter buttons
-    document.getElementById("btnApplyFilter").addEventListener("click", () => {
-      renderHistory(container, portalState);
+  // Wire Review buttons
+  tableDiv.querySelectorAll(".btn-review").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const noteId = btn.dataset.id;
+      portalState.selectedNoteId = noteId;
+      setSubtabEnabled("review", true);
+      setSubtabEnabled("relationships", true);
+      document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
+      document.querySelector('#notes-subtabs button[data-subtab="review"]')?.classList.add("active");
+      renderReview(container, portalState, noteId);
     });
-    document.getElementById("btnClearFilter").addEventListener("click", () => {
-      document.getElementById("filter-review-only").checked = true;
-      renderHistory(container, portalState);
-    });
+  });
 
-  } catch (err) {
-    container.innerHTML = `<h4>Notes History</h4><p>Error loading history: ${err.message}</p>`;
-  }
+  // Wire filter buttons
+  document.getElementById("btnApplyNotesFilter").addEventListener("click", () => {
+    renderHistory(container, portalState);
+  });
+  document.getElementById("btnClearNotesFilter").addEventListener("click", () => {
+    document.getElementById("filter-review-only").checked = true;
+    renderHistory(container, portalState);
+  });
+
+  // Wire sort buttons (Groups‑style)
+  tableDiv.querySelectorAll(".sort-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const col = btn.dataset.col;
+      const dir = btn.dataset.dir;
+      renderHistory(container, portalState, { order: `${col}.${dir}` });
+    });
+  });
+}
+
+// helpers
+function escapeHtml(str) {
+  const s = String(str ?? "");
+  return s.replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+function formatDateTime(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  return d.toLocaleString("en-US", {
+    month: "2-digit", day: "2-digit", year: "numeric",
+    hour: "numeric", minute: "2-digit", hour12: true
+  });
 }
 
 
