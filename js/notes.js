@@ -65,38 +65,47 @@ async function loadNotesSubtab(subtab, portalState) {
 }
 
 /* History (GET /notes-history-module) */
+/* History (GET /notes-history-module) */
 async function renderHistory(container, portalState) {
   try {
-    // --- Build query params ---
-    const fromDate = document.getElementById("filter-from")?.value;
-    const toDate   = document.getElementById("filter-to")?.value;
+    // --- Pull current filter values ---
+    const first = document.getElementById("filter-first")?.value.trim();
+    const last  = document.getElementById("filter-last")?.value.trim();
     const reviewOnly = document.getElementById("filter-review-only")?.checked ?? true;
 
-    const params = new URLSearchParams({
-      project: portalState.project,
-      reviewOnly: reviewOnly ? "true" : "false"
-    });
-    if (fromDate) params.append("from", fromDate);
-    if (toDate)   params.append("to", toDate);
+    // --- Build query filters ---
+    const filters = [`project.eq.${portalState.project}`];
+    if (first && first.length >= 3) filters.push(`first_name.ilike.*${first}*`);
+    if (last  && last.length  >= 3) filters.push(`last_name.ilike.*${last}*`);
+    if (reviewOnly) filters.push(`needs_review.eq.true`);
 
-    const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${params.toString()}`;
+    let query = "";
+    if (filters.length > 1) {
+      query = `and=(${filters.join(",")})`;
+    } else if (filters.length === 1) {
+      query = filters[0];
+    } else {
+      query = `project.eq.${portalState.project}`; // fallback to default list
+    }
+
+    const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${query}&order=created_at.desc`;
     console.log("[History] Fetching:", url);
 
     const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
 
-    // --- Build filter UI first ---
+    // --- Build filter UI (single line) ---
     container.innerHTML = `
       <h4>Notes History ${Array.isArray(data.notes) ? `(Total: ${data.notes.length})` : ""}</h4>
-      <div style="margin-bottom:12px;">
-        <label>From: <input type="date" id="filter-from" value="${fromDate || ""}"></label>
-        <label style="margin-left:12px;">To: <input type="date" id="filter-to" value="${toDate || ""}"></label>
-        <label style="margin-left:12px;">
+      <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px;">
+        <label>First: <input type="text" id="filter-first" class="form-control" value="${first || ""}"></label>
+        <label>Last: <input type="text" id="filter-last" class="form-control" value="${last || ""}"></label>
+        <label>
           <input type="checkbox" id="filter-review-only" ${reviewOnly ? "checked" : ""}>
           Needs Review Only
         </label>
-        <button id="btnApplyFilter" class="secondary" style="margin-left:12px;">Apply Filter</button>
-        <button id="btnClearFilter" class="secondary" style="margin-left:12px;">Clear Filter</button>
+        <button id="btnApplyFilter" class="secondary">Apply Filter</button>
+        <button id="btnClearFilter" class="secondary">Clear Filter</button>
       </div>
     `;
 
@@ -122,7 +131,7 @@ async function renderHistory(container, portalState) {
             const created = n.created_at ? new Date(n.created_at).toLocaleString() : "(no date)";
             const subject = n.subject || "(no subject)";
             const from = n.from_name || "(unknown)";
-            const client = n.contact_name || "(unknown)";
+            const client = `${n.first_name || ""} ${n.last_name || ""}`.trim() || "(unknown)";
             const needsReview = n.needs_review ? "Yes" : "No";
             return `
               <tr>
@@ -157,13 +166,13 @@ async function renderHistory(container, portalState) {
       );
     }
 
-    // --- Attach filter button handlers (always present) ---
+    // --- Attach filter button handlers ---
     document.getElementById("btnApplyFilter").addEventListener("click", () => {
       renderHistory(container, portalState);
     });
     document.getElementById("btnClearFilter").addEventListener("click", () => {
-      document.getElementById("filter-from").value = "";
-      document.getElementById("filter-to").value = "";
+      document.getElementById("filter-first").value = "";
+      document.getElementById("filter-last").value = "";
       document.getElementById("filter-review-only").checked = true;
       renderHistory(container, portalState);
     });
@@ -175,6 +184,7 @@ async function renderHistory(container, portalState) {
     `;
   }
 }
+
 
 
 
