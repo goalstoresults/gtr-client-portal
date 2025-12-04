@@ -65,60 +65,78 @@ async function loadNotesSubtab(subtab, portalState) {
 }
 
 /* History (GET /notes-history-module) */
-async function renderHistory(container, portalState) {
+/* History (GET /notes-history-module) */
+async function renderHistory(container, portalState, useFilters = false) {
   try {
-    // --- Build query params ---
-    const fromDate = document.getElementById("filter-from")?.value;
-    const toDate   = document.getElementById("filter-to")?.value;
     const reviewOnly = document.getElementById("filter-review-only")?.checked ?? true;
 
-    const params = new URLSearchParams({
-      project: portalState.project,
-      reviewOnly: reviewOnly ? "true" : "false"
-    });
-    if (fromDate) params.append("from", fromDate);
-    if (toDate)   params.append("to", toDate);
+    // --- Always fetch default list from Worker ---
+    let query = `project=eq.${portalState.project}`;
+    if (reviewOnly) query += `&needs_review=eq.true`;
 
-    const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${params.toString()}`;
+    const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${query}&order=created_at.desc`;
     console.log("[History] Fetching:", url);
 
     const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
 
-    // --- Build filter UI first ---
+    // --- Build filter UI (just Needs Review for now) ---
     container.innerHTML = `
       <h4>Notes History ${Array.isArray(data.notes) ? `(Total: ${data.notes.length})` : ""}</h4>
-      <div style="margin-bottom:12px;">
-        <label>From: <input type="date" id="filter-from" value="${fromDate || ""}"></label>
-        <label style="margin-left:12px;">To: <input type="date" id="filter-to" value="${toDate || ""}"></label>
-        <label style="margin-left:12px;">
+      <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px;">
+        <label>
           <input type="checkbox" id="filter-review-only" ${reviewOnly ? "checked" : ""}>
           Needs Review Only
         </label>
-        <button id="btnApplyFilter" class="secondary" style="margin-left:12px;">Apply Filter</button>
-        <button id="btnClearFilter" class="secondary" style="margin-left:12px;">Clear Filter</button>
+        <button id="btnApplyFilter" class="secondary">Apply Filter</button>
+        <button id="btnClearFilter" class="secondary">Clear Filter</button>
       </div>
     `;
 
-    // --- Show table or "No notes found" ---
     if (!res.ok || data.status !== "ok" || !Array.isArray(data.notes) || data.notes.length === 0) {
       container.innerHTML += `<p>No notes found.</p>`;
     } else {
+      // --- Track sort state ---
+      if (!portalState.notesSort) {
+        portalState.notesSort = { column: "created_at", direction: "desc" };
+      }
+
+      // --- Sort helper ---
+      function sortNotes(notes, column, direction) {
+        return [...notes].sort((a, b) => {
+          let va = a[column] || "";
+          let vb = b[column] || "";
+          if (column === "created_at") {
+            va = new Date(va);
+            vb = new Date(vb);
+          } else {
+            va = va.toString().toLowerCase();
+            vb = vb.toString().toLowerCase();
+          }
+          if (va < vb) return direction === "asc" ? -1 : 1;
+          if (va > vb) return direction === "asc" ? 1 : -1;
+          return 0;
+        });
+      }
+
+      const sortedNotes = sortNotes(data.notes, portalState.notesSort.column, portalState.notesSort.direction);
+
+      // --- Build table with sort arrows ---
       const table = document.createElement("table");
       table.className = "notes-table";
       table.innerHTML = `
         <thead>
           <tr>
-            <th>Created</th>
-            <th>Subject</th>
-            <th>From</th>
-            <th>Client</th>
-            <th>Needs Review</th>
+            <th data-col="created_at">Created ${portalState.notesSort.column==="created_at" ? (portalState.notesSort.direction==="asc"?"▲":"▼"):""}</th>
+            <th data-col="subject">Subject ${portalState.notesSort.column==="subject" ? (portalState.notesSort.direction==="asc"?"▲":"▼"):""}</th>
+            <th data-col="from_name">From ${portalState.notesSort.column==="from_name" ? (portalState.notesSort.direction==="asc"?"▲":"▼"):""}</th>
+            <th data-col="contact_name">Client ${portalState.notesSort.column==="contact_name" ? (portalState.notesSort.direction==="asc"?"▲":"▼"):""}</th>
+            <th data-col="needs_review">Needs Review ${portalState.notesSort.column==="needs_review" ? (portalState.notesSort.direction==="asc"?"▲":"▼"):""}</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          ${data.notes.map(n => {
+          ${sortedNotes.map(n => {
             const created = n.created_at ? new Date(n.created_at).toLocaleString() : "(no date)";
             const subject = n.subject || "(no subject)";
             const from = n.from_name || "(unknown)";
@@ -139,40 +157,46 @@ async function renderHistory(container, portalState) {
       `;
       container.appendChild(table);
 
-      // Attach Review button handlers
+      // --- Wire sort clicks ---
+      table.querySelectorAll("th[data-col]").forEach(th => {
+        th.style.cursor = "pointer";
+        th.addEventListener("click", () => {
+          const col = th.getAttribute("data-col");
+          if (portalState.notesSort.column === col) {
+            portalState.notesSort.direction = portalState.notesSort.direction === "asc" ? "desc" : "asc";
+          } else {
+            portalState.notesSort.column = col;
+            portalState.notesSort.direction = "asc";
+          }
+          renderHistory(container, portalState, useFilters); // re-render with new sort
+        });
+      });
+
+      // --- Wire Review buttons ---
       table.querySelectorAll("button[data-note-id]").forEach(btn =>
         btn.addEventListener("click", () => {
           const noteId = btn.getAttribute("data-note-id");
           portalState.selectedNoteId = noteId;
-          console.log("[History] Selected note ID:", noteId);
-
           setSubtabEnabled("review", true);
           setSubtabEnabled("relationships", true);
-
           document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
           document.querySelector('#notes-subtabs button[data-subtab="review"]')?.classList.add("active");
-
           renderReview(container, portalState, noteId);
         })
       );
     }
 
-    // --- Attach filter button handlers (always present) ---
+    // --- Filter buttons (still just Needs Review toggle for now) ---
     document.getElementById("btnApplyFilter").addEventListener("click", () => {
-      renderHistory(container, portalState);
+      renderHistory(container, portalState, true);
     });
     document.getElementById("btnClearFilter").addEventListener("click", () => {
-      document.getElementById("filter-from").value = "";
-      document.getElementById("filter-to").value = "";
       document.getElementById("filter-review-only").checked = true;
-      renderHistory(container, portalState);
+      renderHistory(container, portalState, false);
     });
 
   } catch (err) {
-    container.innerHTML = `
-      <h4>Notes History</h4>
-      <p>Error loading history: ${err.message}</p>
-    `;
+    container.innerHTML = `<h4>Notes History</h4><p>Error loading history: ${err.message}</p>`;
   }
 }
 
