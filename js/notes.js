@@ -67,30 +67,33 @@ async function loadNotesSubtab(subtab, portalState) {
 /* History (GET /notes-history-module) */
 async function renderHistory(container, portalState) {
   try {
-    // --- Build query params ---
-    const fromDate = document.getElementById("filter-from")?.value;
-    const toDate   = document.getElementById("filter-to")?.value;
+    // --- Pull current filter values ---
+    const first = document.getElementById("filter-first")?.value.trim();
+    const last  = document.getElementById("filter-last")?.value.trim();
     const reviewOnly = document.getElementById("filter-review-only")?.checked ?? true;
 
-    const params = new URLSearchParams({
-      project: portalState.project,
-      reviewOnly: reviewOnly ? "true" : "false"
-    });
-    if (fromDate) params.append("from", fromDate);
-    if (toDate)   params.append("to", toDate);
+    // --- Build query filters ---
+    const filters = [`project.eq.${portalState.project}`];
+    if (first && first.length >= 3) filters.push(`from_name.ilike.*${first}*`);
+    if (last  && last.length  >= 3) filters.push(`contact_name.ilike.*${last}*`);
+    if (reviewOnly) filters.push(`needs_review.eq.true`);
 
-    const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${params.toString()}`;
+    const query = filters.length > 1
+      ? `and=(${filters.join(",")})`
+      : filters[0];
+
+    const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${query}`;
     console.log("[History] Fetching:", url);
 
     const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
 
-    // --- Build filter UI first ---
+    // --- Build filter UI ---
     container.innerHTML = `
       <h4>Notes History ${Array.isArray(data.notes) ? `(Total: ${data.notes.length})` : ""}</h4>
       <div style="margin-bottom:12px;">
-        <label>From: <input type="date" id="filter-from" value="${fromDate || ""}"></label>
-        <label style="margin-left:12px;">To: <input type="date" id="filter-to" value="${toDate || ""}"></label>
+        <label><span class="notes-label">First:</span> <input type="text" id="filter-first" class="form-control" value="${first || ""}" /></label>
+        <label style="margin-left:12px;"><span class="notes-label">Last:</span> <input type="text" id="filter-last" class="form-control" value="${last || ""}" /></label>
         <label style="margin-left:12px;">
           <input type="checkbox" id="filter-review-only" ${reviewOnly ? "checked" : ""}>
           Needs Review Only
@@ -100,7 +103,7 @@ async function renderHistory(container, portalState) {
       </div>
     `;
 
-    // --- Show table or "No notes found" ---
+    // --- Show table or fallback ---
     if (!res.ok || data.status !== "ok" || !Array.isArray(data.notes) || data.notes.length === 0) {
       container.innerHTML += `<p>No notes found.</p>`;
     } else {
@@ -139,31 +142,27 @@ async function renderHistory(container, portalState) {
       `;
       container.appendChild(table);
 
-      // Attach Review button handlers
+      // Wire Review buttons
       table.querySelectorAll("button[data-note-id]").forEach(btn =>
         btn.addEventListener("click", () => {
           const noteId = btn.getAttribute("data-note-id");
           portalState.selectedNoteId = noteId;
-          console.log("[History] Selected note ID:", noteId);
-
           setSubtabEnabled("review", true);
           setSubtabEnabled("relationships", true);
-
           document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
           document.querySelector('#notes-subtabs button[data-subtab="review"]')?.classList.add("active");
-
           renderReview(container, portalState, noteId);
         })
       );
     }
 
-    // --- Attach filter button handlers (always present) ---
+    // Wire filter buttons
     document.getElementById("btnApplyFilter").addEventListener("click", () => {
       renderHistory(container, portalState);
     });
     document.getElementById("btnClearFilter").addEventListener("click", () => {
-      document.getElementById("filter-from").value = "";
-      document.getElementById("filter-to").value = "";
+      document.getElementById("filter-first").value = "";
+      document.getElementById("filter-last").value = "";
       document.getElementById("filter-review-only").checked = true;
       renderHistory(container, portalState);
     });
