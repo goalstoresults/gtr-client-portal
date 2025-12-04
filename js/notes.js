@@ -68,8 +68,7 @@ async function loadNotesSubtab(subtab, portalState) {
 async function renderHistory(container, portalState) {
   try {
     const reviewOnly = document.getElementById("filter-review-only")?.checked ?? true;
-    const firstName = document.getElementById("filter-first-name")?.value.trim() || "";
-    const lastName  = document.getElementById("filter-last-name")?.value.trim() || "";
+    const name = document.getElementById("filter-name")?.value.trim() || "";
 
     // Worker call unchanged, always limit 500
     const params = new URLSearchParams({
@@ -78,8 +77,7 @@ async function renderHistory(container, portalState) {
       limit: "500"
     });
     if (reviewOnly) params.set("needs_review", "true");
-    if (firstName) params.set("first_name", firstName);
-    if (lastName)  params.set("last_name", lastName);
+    if (name) params.set("from_name", name);
 
     const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${params.toString()}`;
     console.log("[History] Fetching:", url);
@@ -121,8 +119,7 @@ async function renderHistory(container, portalState) {
           <input type="checkbox" id="filter-review-only" ${reviewOnly ? "checked" : ""}>
           Needs Review Only
         </label>
-        <label>First Name: <input type="text" id="filter-first-name" value="${firstName}"></label>
-        <label>Last Name: <input type="text" id="filter-last-name" value="${lastName}"></label>
+        <label>Name: <input type="text" id="filter-name" value="${name}"></label>
         <button id="btnApplyFilter" class="secondary">Apply Filter</button>
         <button id="btnClearFilter" class="secondary">Clear Filter</button>
       </div>
@@ -194,8 +191,7 @@ async function renderHistory(container, portalState) {
     });
     document.getElementById("btnClearFilter").addEventListener("click", () => {
       document.getElementById("filter-review-only").checked = true;
-      document.getElementById("filter-first-name").value = "";
-      document.getElementById("filter-last-name").value = "";
+      document.getElementById("filter-name").value = "";
       renderHistory(container, portalState);
     });
 
