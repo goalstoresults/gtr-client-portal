@@ -77,14 +77,19 @@ async function renderHistory(container, portalState) {
       limit: "500"
     });
     if (reviewOnly) params.set("needs_review", "true");
-    if (name) params.set("from_name", name);
 
     const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${params.toString()}`;
     console.log("[History] Fetching:", url);
 
     const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
-    const notes = Array.isArray(data?.notes) ? data.notes : [];
+    let notes = Array.isArray(data?.notes) ? data.notes : [];
+
+    // Apply client-side Name filter (wildcard substring match)
+    if (name) {
+      const term = name.toLowerCase();
+      notes = notes.filter(n => (n.from_name || "").toLowerCase().includes(term));
+    }
 
     // Track sort state
     if (!portalState.notesSort) {
@@ -219,8 +224,6 @@ function formatDateTimeSafe(value) {
     hour: "numeric", minute: "2-digit", hour12: true
   });
 }
-
-
 
 
 
