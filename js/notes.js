@@ -70,7 +70,7 @@ async function renderHistory(container, portalState) {
   try {
     const reviewOnly = document.getElementById("filter-review-only")?.checked ?? true;
 
-    // --- Worker call unchanged ---
+    // --- Worker call unchanged (baseline) ---
     const params = new URLSearchParams({
       project: portalState.project,
       reviewOnly: reviewOnly ? "true" : "false"
@@ -81,7 +81,7 @@ async function renderHistory(container, portalState) {
     const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
 
-    // --- Filter UI (just Needs Review toggle) ---
+    // --- Filter UI ---
     container.innerHTML = `
       <h4>Notes History ${Array.isArray(data.notes) ? `(Total: ${data.notes.length})` : ""}</h4>
       <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px;">
@@ -122,7 +122,7 @@ async function renderHistory(container, portalState) {
 
       const sortedNotes = sortNotes(data.notes, portalState.notesSort.column, portalState.notesSort.direction);
 
-      // --- Build table with sort arrows ---
+      // --- Build table with sort arrows on all columns ---
       const table = document.createElement("table");
       table.className = "notes-table";
       table.innerHTML = `
@@ -158,7 +158,7 @@ async function renderHistory(container, portalState) {
       `;
       container.appendChild(table);
 
-      // --- Wire sort clicks ---
+      // --- Wire sort clicks for ALL sortable columns ---
       table.querySelectorAll("th[data-col]").forEach(th => {
         th.style.cursor = "pointer";
         th.addEventListener("click", () => {
@@ -187,7 +187,7 @@ async function renderHistory(container, portalState) {
       );
     }
 
-    // --- Filter buttons (still just Needs Review toggle) ---
+    // --- Filter buttons (baseline) ---
     document.getElementById("btnApplyFilter").addEventListener("click", () => {
       renderHistory(container, portalState);
     });
@@ -200,6 +200,7 @@ async function renderHistory(container, portalState) {
     container.innerHTML = `<h4>Notes History</h4><p>Error loading history: ${err.message}</p>`;
   }
 }
+
 
 
 
