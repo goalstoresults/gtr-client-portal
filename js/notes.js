@@ -66,21 +66,22 @@ async function loadNotesSubtab(subtab, portalState) {
 
 /* History (GET /notes-history-module) */
 /* History (GET /notes-history-module) */
-async function renderHistory(container, portalState, useFilters = false) {
+async function renderHistory(container, portalState) {
   try {
     const reviewOnly = document.getElementById("filter-review-only")?.checked ?? true;
 
-    // --- Always fetch default list from Worker ---
-    let query = `project=eq.${portalState.project}`;
-    if (reviewOnly) query += `&needs_review=eq.true`;
-
-    const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${query}&order=created_at.desc`;
+    // --- Worker call unchanged ---
+    const params = new URLSearchParams({
+      project: portalState.project,
+      reviewOnly: reviewOnly ? "true" : "false"
+    });
+    const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${params.toString()}`;
     console.log("[History] Fetching:", url);
 
     const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
 
-    // --- Build filter UI (just Needs Review for now) ---
+    // --- Filter UI (just Needs Review toggle) ---
     container.innerHTML = `
       <h4>Notes History ${Array.isArray(data.notes) ? `(Total: ${data.notes.length})` : ""}</h4>
       <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px;">
@@ -168,7 +169,7 @@ async function renderHistory(container, portalState, useFilters = false) {
             portalState.notesSort.column = col;
             portalState.notesSort.direction = "asc";
           }
-          renderHistory(container, portalState, useFilters); // re-render with new sort
+          renderHistory(container, portalState); // re-render with new sort
         });
       });
 
@@ -186,13 +187,13 @@ async function renderHistory(container, portalState, useFilters = false) {
       );
     }
 
-    // --- Filter buttons (still just Needs Review toggle for now) ---
+    // --- Filter buttons (still just Needs Review toggle) ---
     document.getElementById("btnApplyFilter").addEventListener("click", () => {
-      renderHistory(container, portalState, true);
+      renderHistory(container, portalState);
     });
     document.getElementById("btnClearFilter").addEventListener("click", () => {
       document.getElementById("filter-review-only").checked = true;
-      renderHistory(container, portalState, false);
+      renderHistory(container, portalState);
     });
 
   } catch (err) {
