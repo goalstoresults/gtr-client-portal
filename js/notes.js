@@ -74,13 +74,18 @@ async function renderHistory(container, portalState) {
 
     // --- Build query filters ---
     const filters = [`project.eq.${portalState.project}`];
-    if (first && first.length >= 3) filters.push(`from_name.ilike.*${first}*`);
-    if (last  && last.length  >= 3) filters.push(`contact_name.ilike.*${last}*`);
+    if (first && first.length >= 3) filters.push(`first_name.ilike.*${first}*`);
+    if (last  && last.length  >= 3) filters.push(`last_name.ilike.*${last}*`);
     if (reviewOnly) filters.push(`needs_review.eq.true`);
 
-    const query = filters.length > 1
-      ? `and=(${filters.join(",")})`
-      : filters[0];
+    let query = "";
+    if (filters.length > 1) {
+      query = `and=(${filters.join(",")})`;
+    } else if (filters.length === 1) {
+      query = filters[0];
+    } else {
+      query = `project.eq.${portalState.project}`; // fallback
+    }
 
     const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${query}`;
     console.log("[History] Fetching:", url);
@@ -88,18 +93,22 @@ async function renderHistory(container, portalState) {
     const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
 
-    // --- Build filter UI ---
+    // --- Build filter UI (single line) ---
     container.innerHTML = `
       <h4>Notes History ${Array.isArray(data.notes) ? `(Total: ${data.notes.length})` : ""}</h4>
-      <div style="margin-bottom:12px;">
-        <label><span class="notes-label">First:</span> <input type="text" id="filter-first" class="form-control" value="${first || ""}" /></label>
-        <label style="margin-left:12px;"><span class="notes-label">Last:</span> <input type="text" id="filter-last" class="form-control" value="${last || ""}" /></label>
+      <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px;">
+        <label><span class="notes-label">First:</span> 
+          <input type="text" id="filter-first" class="form-control" value="${first || ""}" />
+        </label>
+        <label><span class="notes-label">Last:</span> 
+          <input type="text" id="filter-last" class="form-control" value="${last || ""}" />
+        </label>
         <label style="margin-left:12px;">
           <input type="checkbox" id="filter-review-only" ${reviewOnly ? "checked" : ""}>
           Needs Review Only
         </label>
-        <button id="btnApplyFilter" class="secondary" style="margin-left:12px;">Apply Filter</button>
-        <button id="btnClearFilter" class="secondary" style="margin-left:12px;">Clear Filter</button>
+        <button id="btnApplyFilter" class="secondary">Apply Filter</button>
+        <button id="btnClearFilter" class="secondary">Clear Filter</button>
       </div>
     `;
 
@@ -125,7 +134,7 @@ async function renderHistory(container, portalState) {
             const created = n.created_at ? new Date(n.created_at).toLocaleString() : "(no date)";
             const subject = n.subject || "(no subject)";
             const from = n.from_name || "(unknown)";
-            const client = n.contact_name || "(unknown)";
+            const client = n.last_name || "(unknown)"; // show client last name if available
             const needsReview = n.needs_review ? "Yes" : "No";
             return `
               <tr>
