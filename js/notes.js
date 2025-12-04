@@ -68,6 +68,8 @@ async function loadNotesSubtab(subtab, portalState) {
 async function renderHistory(container, portalState) {
   try {
     const reviewOnly = document.getElementById("filter-review-only")?.checked ?? true;
+    const firstName = document.getElementById("filter-first-name")?.value.trim() || "";
+    const lastName  = document.getElementById("filter-last-name")?.value.trim() || "";
 
     // Worker call unchanged, always limit 500
     const params = new URLSearchParams({
@@ -75,6 +77,10 @@ async function renderHistory(container, portalState) {
       reviewOnly: reviewOnly ? "true" : "false",
       limit: "500"
     });
+    if (reviewOnly) params.set("needs_review", "true");
+    if (firstName) params.set("first_name", firstName);
+    if (lastName)  params.set("last_name", lastName);
+
     const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${params.toString()}`;
     console.log("[History] Fetching:", url);
 
@@ -110,11 +116,13 @@ async function renderHistory(container, portalState) {
     // Build UI
     container.innerHTML = `
       <h4>Notes History (Total: ${sortedNotes.length})</h4>
-      <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px;">
+      <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
         <label>
           <input type="checkbox" id="filter-review-only" ${reviewOnly ? "checked" : ""}>
           Needs Review Only
         </label>
+        <label>First Name: <input type="text" id="filter-first-name" value="${firstName}"></label>
+        <label>Last Name: <input type="text" id="filter-last-name" value="${lastName}"></label>
         <button id="btnApplyFilter" class="secondary">Apply Filter</button>
         <button id="btnClearFilter" class="secondary">Clear Filter</button>
       </div>
@@ -186,6 +194,8 @@ async function renderHistory(container, portalState) {
     });
     document.getElementById("btnClearFilter").addEventListener("click", () => {
       document.getElementById("filter-review-only").checked = true;
+      document.getElementById("filter-first-name").value = "";
+      document.getElementById("filter-last-name").value = "";
       renderHistory(container, portalState);
     });
 
