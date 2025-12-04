@@ -66,26 +66,20 @@ async function loadNotesSubtab(subtab, portalState) {
 
 /* History (GET /notes-history-module) */
 /* History (GET /notes-history-module) */
-async function renderHistory(container, portalState) {
+async function renderHistory(container, portalState, useFilters = false) {
   try {
     // --- Pull current filter values ---
     const first = document.getElementById("filter-first")?.value.trim();
     const last  = document.getElementById("filter-last")?.value.trim();
     const reviewOnly = document.getElementById("filter-review-only")?.checked ?? true;
 
-    // --- Build query filters ---
-    const filters = [`project.eq.${portalState.project}`];
-    if (first && first.length >= 3) filters.push(`first_name.ilike.*${first}*`);
-    if (last  && last.length  >= 3) filters.push(`last_name.ilike.*${last}*`);
-    if (reviewOnly) filters.push(`needs_review.eq.true`);
+    // --- Build query string ---
+    let query = `project=eq.${portalState.project}`;
+    if (reviewOnly) query += `&needs_review=eq.true`;
 
-    let query = "";
-    if (filters.length > 1) {
-      query = `and=(${filters.join(",")})`;
-    } else if (filters.length === 1) {
-      query = filters[0];
-    } else {
-      query = `project.eq.${portalState.project}`; // fallback to default list
+    if (useFilters) {
+      if (first && first.length >= 3) query += `&first_name=ilike.*${first}*`;
+      if (last  && last.length  >= 3) query += `&last_name=ilike.*${last}*`;
     }
 
     const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${query}&order=created_at.desc`;
@@ -94,7 +88,7 @@ async function renderHistory(container, portalState) {
     const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
 
-    // --- Build filter UI (single line) ---
+    // --- Build filter UI (always shown) ---
     container.innerHTML = `
       <h4>Notes History ${Array.isArray(data.notes) ? `(Total: ${data.notes.length})` : ""}</h4>
       <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px;">
@@ -168,13 +162,13 @@ async function renderHistory(container, portalState) {
 
     // --- Attach filter button handlers ---
     document.getElementById("btnApplyFilter").addEventListener("click", () => {
-      renderHistory(container, portalState);
+      renderHistory(container, portalState, true); // run with filters
     });
     document.getElementById("btnClearFilter").addEventListener("click", () => {
       document.getElementById("filter-first").value = "";
       document.getElementById("filter-last").value = "";
       document.getElementById("filter-review-only").checked = true;
-      renderHistory(container, portalState);
+      renderHistory(container, portalState, false); // reset to default
     });
 
   } catch (err) {
@@ -184,6 +178,7 @@ async function renderHistory(container, portalState) {
     `;
   }
 }
+
 
 
 
