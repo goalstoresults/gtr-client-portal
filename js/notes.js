@@ -64,31 +64,52 @@ async function loadNotesSubtab(subtab, portalState) {
   container.innerHTML = `<p>Unknown subtab</p>`;
 }
 
-/* History (GET /notes-history-module) */
 /* Notes History (GET /notes-history-module) */
-async function renderHistory(container, portalState, options = {}) {
+async function renderHistory(container, portalState) {
   try {
     const reviewOnly = document.getElementById("filter-review-only")?.checked ?? true;
-    const order = options.order || "created_at.desc";
-    const limit = 500; // always 500
 
+    // Worker call unchanged, always limit 500
     const params = new URLSearchParams({
       project: portalState.project,
-      order,
-      limit: String(limit)
+      reviewOnly: reviewOnly ? "true" : "false",
+      limit: "500"
     });
-    if (reviewOnly) params.set("needs_review", "true");
-
-    const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${params}`;
-    console.log("[Notes] Fetching:", url);
+    const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${params.toString()}`;
+    console.log("[History] Fetching:", url);
 
     const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
-    const notes = Array.isArray(data) ? data : Array.isArray(data?.notes) ? data.notes : [];
+    const notes = Array.isArray(data?.notes) ? data.notes : [];
 
-    // Filter UI
+    // Track sort state
+    if (!portalState.notesSort) {
+      portalState.notesSort = { column: "created_at", direction: "desc" };
+    }
+
+    // Sort helper
+    function sortNotes(notes, column, direction) {
+      return [...notes].sort((a, b) => {
+        let va = a[column] || "";
+        let vb = b[column] || "";
+        if (column === "created_at") {
+          va = new Date(va);
+          vb = new Date(vb);
+        } else {
+          va = va.toString().toLowerCase();
+          vb = vb.toString().toLowerCase();
+        }
+        if (va < vb) return direction === "asc" ? -1 : 1;
+        if (va > vb) return direction === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+
+    const sortedNotes = sortNotes(notes, portalState.notesSort.column, portalState.notesSort.direction);
+
+    // Build UI
     container.innerHTML = `
-      <h4>Notes History (Total: ${notes.length})</h4>
+      <h4>Notes History (Total: ${sortedNotes.length})</h4>
       <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px;">
         <label>
           <input type="checkbox" id="filter-review-only" ${reviewOnly ? "checked" : ""}>
@@ -97,11 +118,6 @@ async function renderHistory(container, portalState, options = {}) {
         <button id="btnApplyFilter" class="secondary">Apply Filter</button>
         <button id="btnClearFilter" class="secondary">Clear Filter</button>
       </div>
-      <div id="notesTable"></div>
-    `;
-
-    const tableDiv = container.querySelector("#notesTable");
-    tableDiv.innerHTML = `
       <table class="notes-table">
         <thead>
           <tr>
@@ -134,8 +150,8 @@ async function renderHistory(container, portalState, options = {}) {
           </tr>
         </thead>
         <tbody>
-          ${notes.length > 0
-            ? notes.map(n => `
+          ${sortedNotes.length > 0
+            ? sortedNotes.map(n => `
                 <tr>
                   <td>${formatDateTimeSafe(n.created_at)}</td>
                   <td>${n.subject || ""}</td>
@@ -152,7 +168,7 @@ async function renderHistory(container, portalState, options = {}) {
     `;
 
     // Wire Review buttons
-    tableDiv.querySelectorAll(".btn-review").forEach(btn => {
+    container.querySelectorAll(".btn-review").forEach(btn => {
       btn.addEventListener("click", () => {
         const noteId = btn.dataset.id;
         portalState.selectedNoteId = noteId;
@@ -173,12 +189,13 @@ async function renderHistory(container, portalState, options = {}) {
       renderHistory(container, portalState);
     });
 
-    // Wire sort buttons (Groups-style)
-    tableDiv.querySelectorAll(".sort-btn").forEach(btn => {
+    // Wire sort buttons (client-side)
+    container.querySelectorAll(".sort-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         const col = btn.dataset.col;
         const dir = btn.dataset.dir;
-        renderHistory(container, portalState, { order: `${col}.${dir}` });
+        portalState.notesSort = { column: col, direction: dir };
+        renderHistory(container, portalState); // re-render with new sort
       });
     });
 
@@ -196,6 +213,7 @@ function formatDateTimeSafe(value) {
     hour: "numeric", minute: "2-digit", hour12: true
   });
 }
+
 
 
 
