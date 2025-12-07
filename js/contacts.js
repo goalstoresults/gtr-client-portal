@@ -221,7 +221,6 @@ async function renderContactList(container, portalState) {
                   <td>${escapeHtml(c.contact_type || "")}</td>
                   <td>
                     <button class="btn-primary btn-select" data-id="${c.contact_id}">Select</button>
-                    <button class="btn-danger btn-delete" data-id="${c.contact_id}">Delete</button>
                   </td>
                 </tr>
               `).join("")
@@ -469,8 +468,7 @@ async function renderAddContactForm(container, portalState) {
   });
 }
 
-
-// 🔧 Render Contact Details with editable fields + audit info
+// 🔧 Render Contact Details with search_name header + Delete button
 async function renderContactDetails(container, portalState, contactId) {
   const projectId = portalState.project;
   if (!projectId || !contactId) {
@@ -478,7 +476,7 @@ async function renderContactDetails(container, portalState, contactId) {
     return;
   }
 
-  // Fetch contact details (Worker expects /contacts/details/:id)
+  // Fetch contact details
   const res = await fetch(
     `https://contacts-module.dennis-e64.workers.dev/contacts/details/${contactId}`,
     { cache: "no-cache" }
@@ -490,7 +488,7 @@ async function renderContactDetails(container, portalState, contactId) {
     return;
   }
 
-  // Fetch configured fields for this project
+  // Fetch configured fields
   const fieldsRes = await fetch(
     `https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${projectId}`,
     { cache: "no-cache" }
@@ -499,10 +497,16 @@ async function renderContactDetails(container, portalState, contactId) {
   const fields = Array.isArray(fieldsData.rows) ? fieldsData.rows : [];
   fields.sort((a, b) => a.sort_order - b.sort_order);
 
+  // Header value: prefer search_name, fallback to contact_id
+  const headerName = contact.search_name || contact.contact_id;
+
   // Base container
   container.innerHTML = `
     <section class="card">
-      <h2>Contact Details for ${escapeHtml(contact.contact_name || contactId)}</h2>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2>Contact Details for ${escapeHtml(headerName)}</h2>
+        <button id="btnDeleteContact" class="btn-danger">Delete</button>
+      </div>
       <form id="editContactForm" class="notes-form"></form>
       <div class="audit-info" style="margin-top:12px; font-size:0.9em; color:#666;">
         <p><strong>Created:</strong> ${escapeHtml(contact.created_at || "")}</p>
@@ -539,7 +543,6 @@ async function renderContactDetails(container, portalState, contactId) {
       let input;
 
       if (f.field_key === "group_id") {
-        // Special case: dropdown bound to groups table
         input = document.createElement("select");
         input.name = "group_id";
         input.className = "form-control";
@@ -547,39 +550,21 @@ async function renderContactDetails(container, portalState, contactId) {
         fetch(`https://groups-module.dennis-e64.workers.dev/groups/list?project=${projectId}`)
           .then(r => r.json())
           .then(data => {
-            console.log("✅ Groups response:", data);
-
-            const rows = Array.isArray(data.rows)
-              ? data.rows
-              : Array.isArray(data)
-              ? data
-              : [];
-
-            if (rows.length === 0) {
-              console.warn("Groups fetch returned no rows:", data);
-              return;
-            }
-
-            // Sort alphabetically by group_name
+            const rows = Array.isArray(data.rows) ? data.rows : Array.isArray(data) ? data : [];
             rows.sort((a, b) => (a.group_name || "").localeCompare(b.group_name || ""));
-
             const placeholder = document.createElement("option");
             placeholder.value = "";
             placeholder.textContent = "-- Select Group --";
             input.appendChild(placeholder);
-
             rows.forEach(g => {
               const opt = document.createElement("option");
               opt.value = g.group_id;
               opt.textContent = g.group_name;
-              if (contact.group_id === g.group_id) {
-                opt.selected = true; // pre-select current value
-              }
+              if (contact.group_id === g.group_id) opt.selected = true;
               input.appendChild(opt);
             });
           });
       } else if (f.lookup_type) {
-        // Dropdown bound to lookup group
         input = document.createElement("select");
         input.name = f.field_key;
         input.className = "form-control";
@@ -587,31 +572,21 @@ async function renderContactDetails(container, portalState, contactId) {
         fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=${f.lookup_type}&project=${projectId}`)
           .then(r => r.json())
           .then(values => {
-            if (!Array.isArray(values)) {
-              console.warn("Lookup fetch failed:", values);
-              return;
-            }
-
-            // Sort alphabetically by label/value
+            if (!Array.isArray(values)) return;
             values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
-
             const placeholder = document.createElement("option");
             placeholder.value = "";
             placeholder.textContent = "-- Select --";
             input.appendChild(placeholder);
-
             values.forEach(v => {
               const opt = document.createElement("option");
               opt.value = v.value;
               opt.textContent = v.label || v.value;
-              if (contact[f.field_key] === v.value) {
-                opt.selected = true;
-              }
+              if (contact[f.field_key] === v.value) opt.selected = true;
               input.appendChild(opt);
             });
           });
       } else {
-        // Default text input
         input = document.createElement("input");
         input.type = "text";
         input.name = f.field_key;
@@ -637,7 +612,6 @@ async function renderContactDetails(container, portalState, contactId) {
     e.preventDefault();
     const formData = new FormData(form);
     const updates = {};
-
     fields.forEach(f => {
       updates[f.field_key] = formData.get(f.field_key);
     });
@@ -652,14 +626,32 @@ async function renderContactDetails(container, portalState, contactId) {
           body: JSON.stringify(updates)
         }
       );
-
       const result = await res.json();
       container.innerHTML = `<section class="card"><p>${escapeHtml(result.message || "Contact updated.")}</p></section>`;
     } catch (err) {
       container.innerHTML = `<section class="card"><p>Error updating contact: ${escapeHtml(err.message)}</p></section>`;
     }
   });
+
+  // Handle Delete button
+  document.getElementById("btnDeleteContact").addEventListener("click", async () => {
+    if (!confirm("Delete this contact?")) return;
+    await fetch(`https://contacts-module.dennis-e64.workers.dev/contacts/delete/${contactId}?project=${portalState.project}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" }
+    });
+    alert("Contact deleted.");
+    // Return to list view
+    const listBtn = document.querySelector('#contacts-subtabs button[data-subtab="list"]');
+    if (listBtn) {
+      listBtn.classList.add("active");
+      const content = document.querySelector("#contactsContent");
+      await renderContactList(content, portalState);
+    }
+  });
 }
+
+
 
 
 
