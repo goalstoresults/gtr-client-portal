@@ -79,9 +79,8 @@ export async function loadContactsTab({ portalState, tabContent }) {
   }
 }
 
-// 🔧 Contact List with updated columns: Name, Business Name, Contact Type, Actions
-async function renderContactList(container, portalState) {
-  // Build filter bar UI
+// 🔧 Contact List with sortable columns: Name, Email, Business Name, Contact Type, Actions
+async function renderContactList(container, portalState, options = {}) {
   container.innerHTML = `
     <section class="card">
       <h2>Contact List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
@@ -99,13 +98,11 @@ async function renderContactList(container, portalState) {
 
   const tableDiv = container.querySelector("#contactTable");
 
-  // Collect filter values
   const first = document.getElementById("filter-first")?.value.trim();
   const last  = document.getElementById("filter-last")?.value.trim();
   const from  = document.getElementById("filter-from")?.value;
   const to    = document.getElementById("filter-to")?.value;
 
-  // Build filters with dot notation for Supabase
   const filters = [`project.eq.${portalState.project}`];
   if (first) filters.push(`first_name.ilike.*${first}*`);
   if (last)  filters.push(`last_name.ilike.*${last}*`);
@@ -118,22 +115,39 @@ async function renderContactList(container, portalState) {
 
   const hasFilters = first || last || from || to;
   const limit = hasFilters ? 500 : 100;
+  const order = options.order || "created_at.desc";
 
-  const url = `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}&${query}&order=created_at.desc&limit=${limit}`;
+  const url = `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}&${query}&order=${order}&limit=${limit}`;
   console.log("[Contacts] Fetching:", url);
 
   const resList = await fetch(url);
   const contacts = await resList.json();
 
-  // Render table with updated columns
   tableDiv.innerHTML = `
     <h4>Showing ${Array.isArray(contacts) ? contacts.length : 0} ${hasFilters ? "filtered" : "recent"} contacts (Newest first)</h4>
     <table class="notes-table">
       <thead>
         <tr>
-          <th>Name</th>
-          <th>Business Name</th>
-          <th>Contact Type</th>
+          <th>
+            Name
+            <button class="sort-btn" data-col="contact_name" data-dir="asc">▲</button>
+            <button class="sort-btn" data-col="contact_name" data-dir="desc">▼</button>
+          </th>
+          <th>
+            Email
+            <button class="sort-btn" data-col="email" data-dir="asc">▲</button>
+            <button class="sort-btn" data-col="email" data-dir="desc">▼</button>
+          </th>
+          <th>
+            Business Name
+            <button class="sort-btn" data-col="business_name" data-dir="asc">▲</button>
+            <button class="sort-btn" data-col="business_name" data-dir="desc">▼</button>
+          </th>
+          <th>
+            Contact Type
+            <button class="sort-btn" data-col="contact_type" data-dir="asc">▲</button>
+            <button class="sort-btn" data-col="contact_type" data-dir="desc">▼</button>
+          </th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -142,6 +156,7 @@ async function renderContactList(container, portalState) {
           ? contacts.map(c => `
               <tr>
                 <td>${escapeHtml(c.contact_name || "")}</td>
+                <td>${escapeHtml(c.email || "")}</td>
                 <td>${escapeHtml(c.business_name || "")}</td>
                 <td>${escapeHtml(c.contact_type || "")}</td>
                 <td>
@@ -150,7 +165,7 @@ async function renderContactList(container, portalState) {
                 </td>
               </tr>
             `).join("")
-          : `<tr><td colspan="4">(no contacts found)</td></tr>`
+          : `<tr><td colspan="5">(no contacts found)</td></tr>`
         }
       </tbody>
     </table>
@@ -193,6 +208,15 @@ async function renderContactList(container, portalState) {
     document.getElementById("filter-from").value = "";
     document.getElementById("filter-to").value = "";
     renderContactList(container, portalState);
+  });
+
+  // Wire sort buttons
+  tableDiv.querySelectorAll(".sort-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const col = btn.dataset.col;
+      const dir = btn.dataset.dir;
+      await renderContactList(container, portalState, { order: `${col}.${dir}` });
+    });
   });
 }
 
