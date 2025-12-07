@@ -79,7 +79,7 @@ export async function loadContactsTab({ portalState, tabContent }) {
   }
 }
 
-// 🔧 Contact List with default view, filters, search, sort, Select/Delete
+// 🔧 Contact List with updated columns: Name, Business Name, Contact Type, Actions
 async function renderContactList(container, portalState) {
   // Build filter bar UI
   container.innerHTML = `
@@ -116,35 +116,41 @@ async function renderContactList(container, portalState) {
     ? `and=(${filters.join(",")})`
     : filters[0];
 
-  // Decide limit based on filters
   const hasFilters = first || last || from || to;
   const limit = hasFilters ? 500 : 100;
 
-  // ✅ Explicitly include project as top-level param
   const url = `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}&${query}&order=created_at.desc&limit=${limit}`;
   console.log("[Contacts] Fetching:", url);
 
   const resList = await fetch(url);
   const contacts = await resList.json();
 
-  // Render table with count in header
+  // Render table with updated columns
   tableDiv.innerHTML = `
     <h4>Showing ${Array.isArray(contacts) ? contacts.length : 0} ${hasFilters ? "filtered" : "recent"} contacts (Newest first)</h4>
     <table class="notes-table">
-      <thead><tr><th>Name</th><th>Email</th><th>Actions</th></tr></thead>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Business Name</th>
+          <th>Contact Type</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
       <tbody>
         ${Array.isArray(contacts) && contacts.length > 0
           ? contacts.map(c => `
               <tr>
                 <td>${escapeHtml(c.contact_name || "")}</td>
-                <td>${escapeHtml(c.email || "")}</td>
+                <td>${escapeHtml(c.business_name || "")}</td>
+                <td>${escapeHtml(c.contact_type || "")}</td>
                 <td>
                   <button class="btn-primary btn-select" data-id="${c.contact_id}">Select</button>
                   <button class="btn-danger btn-delete" data-id="${c.contact_id}">Delete</button>
                 </td>
               </tr>
             `).join("")
-          : `<tr><td colspan="3">(no contacts found)</td></tr>`
+          : `<tr><td colspan="4">(no contacts found)</td></tr>`
         }
       </tbody>
     </table>
@@ -154,8 +160,6 @@ async function renderContactList(container, portalState) {
   tableDiv.querySelectorAll(".btn-select").forEach(btn => {
     btn.addEventListener("click", async () => {
       const contactId = btn.dataset.id;
-
-      // 🔑 Switch to Details tab
       const buttons = document.querySelectorAll("#contacts-subtabs button");
       buttons.forEach(b => b.classList.remove("active"));
       const detailsBtn = document.querySelector('#contacts-subtabs button[data-subtab="details"]');
@@ -174,7 +178,7 @@ async function renderContactList(container, portalState) {
         method: "DELETE",
         headers: { "Content-Type": "application/json" }
       });
-      await renderContactList(container, portalState); // refresh list
+      await renderContactList(container, portalState);
     });
   });
 
