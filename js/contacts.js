@@ -741,8 +741,8 @@ async function renderContactRelationshipsSource(container, portalState, contactI
                 <td>${r.financial_referral ? "✅" : ""}</td>
                 <td>${escapeHtml(r.created_at || "")}</td>
                 <td>
-                  <button class="btn-secondary btn-edit" data-id="${r.relationship_id}">Edit</button>
-                  <button class="btn-danger btn-delete" data-id="${r.relationship_id}">Delete</button>
+                  <button class="btn-secondary btn-edit" data-id="${r.id}">Edit</button>
+                  <button class="btn-danger btn-delete" data-id="${r.id}">Delete</button>
                 </td>
               </tr>
             `).join("")
@@ -766,13 +766,14 @@ async function renderContactRelationshipsSource(container, portalState, contactI
     btn.addEventListener("click", async () => {
       if (!confirm("Delete this relationship?")) return;
       await fetch(
-         `https://contacts-module.dennis-e64.workers.dev/contact_relationships/${btn.dataset.id}?project=${portalState.project}`,
-         { method: "DELETE" }
-       );      
+        `https://contacts-module.dennis-e64.workers.dev/contact_relationships/${btn.dataset.id}?project=${portalState.project}`,
+        { method: "DELETE" }
+      );
       await renderContactRelationshipsSource(container, portalState, contactId);
     });
   });
 }
+
 
 async function renderContactRelationshipsRelated(container, portalState, contactId) {
   const url = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${portalState.project}&related_contact_id=${contactId}`;
@@ -802,8 +803,8 @@ async function renderContactRelationshipsRelated(container, portalState, contact
                 <td>${r.financial_referral ? "✅" : ""}</td>
                 <td>${escapeHtml(r.created_at || "")}</td>
                 <td>
-                  <button class="btn-secondary btn-edit" data-id="${r.relationship_id}">Edit</button>
-                  <button class="btn-danger btn-delete" data-id="${r.relationship_id}">Delete</button>
+                  <button class="btn-secondary btn-edit" data-id="${r.id}">Edit</button>
+                  <button class="btn-danger btn-delete" data-id="${r.id}">Delete</button>
                 </td>
               </tr>
             `).join("")
@@ -827,9 +828,9 @@ async function renderContactRelationshipsRelated(container, portalState, contact
     btn.addEventListener("click", async () => {
       if (!confirm("Delete this relationship?")) return;
       await fetch(
-         `https://contacts-module.dennis-e64.workers.dev/contact_relationships/${btn.dataset.id}?project=${portalState.project}`,
-         { method: "DELETE" }
-       );
+        `https://contacts-module.dennis-e64.workers.dev/contact_relationships/${btn.dataset.id}?project=${portalState.project}`,
+        { method: "DELETE" }
+      );
       await renderContactRelationshipsRelated(container, portalState, contactId);
     });
   });
