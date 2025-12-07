@@ -64,31 +64,30 @@ async function renderClientSetup(container, portalState) {
     if (row.project === portalState.setup_project_id) opt.selected = true;
     select.appendChild(opt);
   });
-  
+
   // Add Client button handler
   container.querySelector("#btnAddClient").addEventListener("click", async () => {
     const projectId = prompt("Enter new project ID (short code):");
     if (!projectId) return;
-  
+
     const displayName = prompt("Enter display name for client:");
     if (!displayName) return;
-  
+
     const payload = {
       project: projectId,
       display_name: displayName,
       created_at: new Date().toISOString(),
-      enabled_tabs: [] // start empty, admin will configure later
+      enabled_tabs: []
     };
-  
+
     const res = await fetch("https://lookups-module.dennis-e64.workers.dev/api/projects_config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
-  
+
     if (res.ok) {
       alert("Client added.");
-      // Refresh the Client tab so dropdown updates
       renderClientSetup(container, portalState);
     } else {
       const text = await res.text();
@@ -108,7 +107,6 @@ async function renderClientSetup(container, portalState) {
 
     const enabled = selectedRow.enabled_tabs || [];
 
-    // Master tab list
     const allTabs = [
       { tab_id: "1", description: "Contacts" },
       { tab_id: "2", description: "Financials" },
@@ -123,7 +121,23 @@ async function renderClientSetup(container, portalState) {
     detailsDiv.innerHTML = `
       <section class="card">
         <p><strong>Project:</strong> ${selectedRow.project}</p>
-        <p><strong>Display Name:</strong> ${selectedRow.display_name}</p>
+        <label><strong>Display Name:</strong></label>
+        <input type="text" id="displayNameInput" value="${selectedRow.display_name || ''}" style="width:100%; margin-bottom:12px;">
+
+        <label><strong>Business Name:</strong></label>
+        <input type="text" id="businessNameInput" value="${selectedRow.business_name || ''}" style="width:100%; margin-bottom:12px;">
+
+        <label><strong>Contact First:</strong></label>
+        <input type="text" id="contactFirstInput" value="${selectedRow.contact_first || ''}" style="width:100%; margin-bottom:12px;">
+
+        <label><strong>Contact Last:</strong></label>
+        <input type="text" id="contactLastInput" value="${selectedRow.contact_last || ''}" style="width:100%; margin-bottom:12px;">
+
+        <p><strong>Contact Name:</strong> <span id="contactNameDisplay">${(selectedRow.contact_first || '')} ${(selectedRow.contact_last || '')}</span></p>
+
+        <label><strong>Contact Email:</strong></label>
+        <input type="email" id="contactEmailInput" value="${selectedRow.contact_email || ''}" style="width:100%; margin-bottom:24px;">
+
         <h3>Enabled Tabs</h3>
         <table id="tabConfigGrid" class="notes-table" style="width:100%; margin-top:12px;">
           <thead>
@@ -138,6 +152,15 @@ async function renderClientSetup(container, portalState) {
         <button id="btnSaveConfig" class="btn-primary" style="margin-top:12px;">Save Config</button>
       </section>
     `;
+
+    // Live update Contact Name display
+    ["contactFirstInput", "contactLastInput"].forEach(id => {
+      detailsDiv.querySelector(`#${id}`).addEventListener("input", () => {
+        const first = detailsDiv.querySelector("#contactFirstInput").value.trim();
+        const last = detailsDiv.querySelector("#contactLastInput").value.trim();
+        detailsDiv.querySelector("#contactNameDisplay").textContent = `${first} ${last}`.trim();
+      });
+    });
 
     const gridBody = detailsDiv.querySelector("#tabConfigGrid tbody");
     gridBody.innerHTML = allTabs.map(tab => {
@@ -168,10 +191,28 @@ async function renderClientSetup(container, portalState) {
 
       checkedTabs.sort((a, b) => a.sort - b.sort);
       const newEnabledTabs = checkedTabs.map(t => t.tab_id);
+
+      const displayName = detailsDiv.querySelector("#displayNameInput").value.trim();
+      const businessName = detailsDiv.querySelector("#businessNameInput").value.trim();
+      const contactFirst = detailsDiv.querySelector("#contactFirstInput").value.trim();
+      const contactLast = detailsDiv.querySelector("#contactLastInput").value.trim();
+      const contactEmail = detailsDiv.querySelector("#contactEmailInput").value.trim();
+      const contactName = `${contactFirst} ${contactLast}`.trim();
+
+      const patchPayload = {
+        enabled_tabs: newEnabledTabs,
+        display_name: displayName,
+        business_name: businessName,
+        contact_first: contactFirst,
+        contact_last: contactLast,
+        contact_email: contactEmail,
+        contact_name: contactName
+      };
+
       await fetch(`https://lookups-module.dennis-e64.workers.dev/api/projects_config?project=${encodeURIComponent(selectedRow.project)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled_tabs: newEnabledTabs })
+        body: JSON.stringify(patchPayload)
       });
 
       alert("Config saved.");
@@ -181,7 +222,6 @@ async function renderClientSetup(container, portalState) {
   // If a project is already selected, render its details
   if (select.value) select.dispatchEvent(new Event("change"));
 }
-
 
 
 async function renderSetupLookups(tabContent, portalState) {
