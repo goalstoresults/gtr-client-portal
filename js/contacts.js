@@ -79,7 +79,7 @@ export async function loadContactsTab({ portalState, tabContent }) {
   }
 }
 
-// 🔧 Contact List with sortable columns: Name, Email, Business Name, Contact Type, Actions
+// 🔧 Contact List with updated filters (min 3 chars + wildcard) and sortable columns
 async function renderContactList(container, portalState, options = {}) {
   container.innerHTML = `
     <section class="card">
@@ -87,8 +87,12 @@ async function renderContactList(container, portalState, options = {}) {
       <div id="contactsFilters" style="margin-bottom:12px;">
         <label>First: <input type="text" id="filter-first" /></label>
         <label style="margin-left:12px;">Last: <input type="text" id="filter-last" /></label>
-        <label style="margin-left:12px;">From: <input type="date" id="filter-from" /></label>
-        <label style="margin-left:12px;">To: <input type="date" id="filter-to" /></label>
+        <label style="margin-left:12px;">Business: <input type="text" id="filter-business" /></label>
+        <label style="margin-left:12px;">Contact Type:
+          <select id="filter-contact-type" class="form-control" style="min-width:160px;">
+            <option value="">ALL</option>
+          </select>
+        </label>
         <button id="btnApplyContactsFilter" class="secondary" style="margin-left:12px;">Apply Filter</button>
         <button id="btnClearContactsFilter" class="secondary" style="margin-left:12px;">Clear Filter</button>
       </div>
@@ -98,22 +102,40 @@ async function renderContactList(container, portalState, options = {}) {
 
   const tableDiv = container.querySelector("#contactTable");
 
+  // Populate Contact Type dropdown
+  const typeSelect = document.getElementById("filter-contact-type");
+  fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=contact_type&project=${portalState.project}`)
+    .then(r => r.json())
+    .then(values => {
+      if (!Array.isArray(values)) return;
+      values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
+      values.forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = v.value;
+        opt.textContent = v.label || v.value;
+        typeSelect.appendChild(opt);
+      });
+    });
+
+  // Collect filter values
   const first = document.getElementById("filter-first")?.value.trim();
   const last  = document.getElementById("filter-last")?.value.trim();
-  const from  = document.getElementById("filter-from")?.value;
-  const to    = document.getElementById("filter-to")?.value;
+  const biz   = document.getElementById("filter-business")?.value.trim();
+  const type  = document.getElementById("filter-contact-type")?.value;
 
   const filters = [`project.eq.${portalState.project}`];
-  if (first) filters.push(`first_name.ilike.*${first}*`);
-  if (last)  filters.push(`last_name.ilike.*${last}*`);
-  if (from)  filters.push(`created_at.gte.${from}`);
-  if (to)    filters.push(`created_at.lte.${to}`);
+
+  // Apply only if >= 3 chars, add wildcard
+  if (first && first.length >= 3) filters.push(`first_name.ilike.*${first}*`);
+  if (last && last.length >= 3)  filters.push(`last_name.ilike.*${last}*`);
+  if (biz && biz.length >= 3)    filters.push(`business_name.ilike.*${biz}*`);
+  if (type)                      filters.push(`contact_type.eq.${type}`);
 
   const query = filters.length > 1
     ? `and=(${filters.join(",")})`
     : filters[0];
 
-  const hasFilters = first || last || from || to;
+  const hasFilters = (first && first.length >= 3) || (last && last.length >= 3) || (biz && biz.length >= 3) || type;
   const limit = hasFilters ? 500 : 100;
   const order = options.order || "created_at.desc";
 
@@ -205,8 +227,8 @@ async function renderContactList(container, portalState, options = {}) {
   document.getElementById("btnClearContactsFilter").addEventListener("click", () => {
     document.getElementById("filter-first").value = "";
     document.getElementById("filter-last").value = "";
-    document.getElementById("filter-from").value = "";
-    document.getElementById("filter-to").value = "";
+    document.getElementById("filter-business").value = "";
+    document.getElementById("filter-contact-type").value = "";
     renderContactList(container, portalState);
   });
 
@@ -219,6 +241,7 @@ async function renderContactList(container, portalState, options = {}) {
     });
   });
 }
+
 
 
 // 🔧 Dynamic Add Contact Form with collapsible sections + defaults
