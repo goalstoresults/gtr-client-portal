@@ -880,7 +880,8 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
         </div>
         <div class="notes-row">
           <label>
-            <input type="checkbox" name="financial_referral" ${existing?.financial_referral ? "checked" : ""}/>
+            <!-- Explicit value="true" so FormData returns "true" when checked -->
+            <input type="checkbox" name="financial_referral" value="true" ${existing?.financial_referral ? "checked" : ""}/>
             Financial Referral
           </label>
         </div>
@@ -897,11 +898,14 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
   form.addEventListener("submit", async e => {
     e.preventDefault();
     const formData = new FormData(form);
+
+    // Normalize checkbox: only true if explicitly "true"
+    const financialReferral = formData.get("financial_referral") === "true";
+
     const payload = {
-      project: projectId,
       relationship_type: formData.get("relationship_type"),
       relationship_role: formData.get("relationship_role"),
-      financial_referral: formData.get("financial_referral") ? true : false
+      financial_referral: financialReferral
     };
 
     if (fixedSide === "source") {
@@ -915,6 +919,7 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
     try {
       if (mode === "add") {
         payload.id = crypto.randomUUID();
+        payload.project = projectId; // project required on insert
         payload.created_at = new Date().toISOString();
         await fetch("https://contacts-module.dennis-e64.workers.dev/contact_relationships", {
           method: "POST",
