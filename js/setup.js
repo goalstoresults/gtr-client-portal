@@ -56,7 +56,6 @@ async function renderClientSetup(container, portalState) {
   const resConfig = await fetch("https://lookups-module.dennis-e64.workers.dev/api/projects_config", { cache: "no-cache" });
   const configRows = await resConfig.json();
 
-  // Populate dropdown
   configRows.forEach(row => {
     const opt = document.createElement("option");
     opt.value = row.project;
@@ -65,7 +64,6 @@ async function renderClientSetup(container, portalState) {
     select.appendChild(opt);
   });
 
-  // Add Client button handler
   container.querySelector("#btnAddClient").addEventListener("click", async () => {
     const projectId = prompt("Enter new project ID (short code):");
     if (!projectId) return;
@@ -122,12 +120,10 @@ async function renderClientSetup(container, portalState) {
       <section class="card">
         <p><strong>Project:</strong> ${selectedRow.project}</p>
 
-        <!-- Display Name on its own line -->
         <label><strong>Display Name:</strong></label>
         <input type="text" id="displayNameInput" value="${selectedRow.display_name || ''}" 
                style="width:100%; margin-bottom:16px;">
 
-        <!-- Contact row: first, last, and display-only name -->
         <div style="display:flex; gap:16px; margin-bottom:16px;">
           <div style="flex:1;">
             <label><strong>Contact First Name:</strong></label>
@@ -139,14 +135,12 @@ async function renderClientSetup(container, portalState) {
           </div>
           <div style="flex:1;">
             <label><strong>Contact Name:</strong></label>
-            <div id="contactNameDisplay" 
-                 style="padding:6px 8px; border:1px solid #ccc; background:#f9f9f9;">
+            <p id="contactNameDisplay" style="margin:6px 0 0;">
               ${selectedRow.contact_name || ''}
-            </div>
+            </p>
           </div>
         </div>
 
-        <!-- Business Name and Email below -->
         <label><strong>Business Name:</strong></label>
         <input type="text" id="businessNameInput" value="${selectedRow.business_name || ''}" 
                style="width:100%; margin-bottom:12px;">
@@ -205,8 +199,6 @@ async function renderClientSetup(container, portalState) {
       const contactFirst = detailsDiv.querySelector("#contactFirstInput").value.trim();
       const contactLast = detailsDiv.querySelector("#contactLastInput").value.trim();
       const contactEmail = detailsDiv.querySelector("#contactEmailInput").value.trim();
-
-      // 🔑 Concatenate first + last for contact_name
       const contactName = `${contactFirst} ${contactLast}`.trim();
 
       const patchPayload = {
@@ -229,7 +221,6 @@ async function renderClientSetup(container, portalState) {
     });
   });
 
-  // If a project is already selected, render its details
   if (select.value) select.dispatchEvent(new Event("change"));
 }
 
