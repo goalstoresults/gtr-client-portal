@@ -468,7 +468,7 @@ async function renderAddContactForm(container, portalState) {
   });
 }
 
-// 🔧 Render Contact Details with search_name header + Delete button
+// 🔧 Render Contact Details with search_name header + Delete button near header
 async function renderContactDetails(container, portalState, contactId) {
   const projectId = portalState.project;
   if (!projectId || !contactId) {
@@ -503,8 +503,8 @@ async function renderContactDetails(container, portalState, contactId) {
   // Base container
   container.innerHTML = `
     <section class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h2>Contact Details for ${escapeHtml(headerName)}</h2>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+        <h2 style="margin:0;">Contact Details for ${escapeHtml(headerName)}</h2>
         <button id="btnDeleteContact" class="btn-danger">Delete</button>
       </div>
       <form id="editContactForm" class="notes-form"></form>
