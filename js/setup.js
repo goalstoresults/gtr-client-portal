@@ -121,23 +121,30 @@ async function renderClientSetup(container, portalState) {
     detailsDiv.innerHTML = `
       <section class="card">
         <p><strong>Project:</strong> ${selectedRow.project}</p>
-        <label><strong>Display Name:</strong></label>
-        <input type="text" id="displayNameInput" value="${selectedRow.display_name || ''}" style="width:100%; margin-bottom:12px;">
-
+    
+        <div style="display:flex; gap:16px; margin-bottom:12px;">
+          <div style="flex:1;">
+            <label><strong>Display Name:</strong></label>
+            <input type="text" id="displayNameInput" value="${selectedRow.display_name || ''}" style="width:100%;">
+          </div>
+          <div style="flex:1;">
+            <label><strong>First Name:</strong></label>
+            <input type="text" id="contactFirstInput" value="${selectedRow.contact_first || ''}" style="width:100%;">
+          </div>
+          <div style="flex:1;">
+            <label><strong>Last Name:</strong></label>
+            <input type="text" id="contactLastInput" value="${selectedRow.contact_last || ''}" style="width:100%;">
+          </div>
+        </div>
+    
+        <p><strong>Contact Name:</strong> <span id="contactNameDisplay">${(selectedRow.contact_first || '')} ${(selectedRow.contact_last || '')}</span></p>
+    
         <label><strong>Business Name:</strong></label>
         <input type="text" id="businessNameInput" value="${selectedRow.business_name || ''}" style="width:100%; margin-bottom:12px;">
-
-        <label><strong>Contact First:</strong></label>
-        <input type="text" id="contactFirstInput" value="${selectedRow.contact_first || ''}" style="width:100%; margin-bottom:12px;">
-
-        <label><strong>Contact Last:</strong></label>
-        <input type="text" id="contactLastInput" value="${selectedRow.contact_last || ''}" style="width:100%; margin-bottom:12px;">
-
-        <p><strong>Contact Name:</strong> <span id="contactNameDisplay">${(selectedRow.contact_first || '')} ${(selectedRow.contact_last || '')}</span></p>
-
+    
         <label><strong>Contact Email:</strong></label>
         <input type="email" id="contactEmailInput" value="${selectedRow.contact_email || ''}" style="width:100%; margin-bottom:24px;">
-
+    
         <h3>Enabled Tabs</h3>
         <table id="tabConfigGrid" class="notes-table" style="width:100%; margin-top:12px;">
           <thead>
@@ -153,6 +160,7 @@ async function renderClientSetup(container, portalState) {
       </section>
     `;
 
+    
     // Live update Contact Name display
     ["contactFirstInput", "contactLastInput"].forEach(id => {
       detailsDiv.querySelector(`#${id}`).addEventListener("input", () => {
