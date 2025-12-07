@@ -766,9 +766,9 @@ async function renderContactRelationshipsSource(container, portalState, contactI
     btn.addEventListener("click", async () => {
       if (!confirm("Delete this relationship?")) return;
       await fetch(
-        `https://contacts-module.dennis-e64.workers.dev/contact_relationships/delete/${btn.dataset.id}?project=${portalState.project}`,
-        { method: "DELETE" }
-      );
+         `https://contacts-module.dennis-e64.workers.dev/contact_relationships/${btn.dataset.id}?project=${portalState.project}`,
+         { method: "DELETE" }
+       );      
       await renderContactRelationshipsSource(container, portalState, contactId);
     });
   });
@@ -827,9 +827,9 @@ async function renderContactRelationshipsRelated(container, portalState, contact
     btn.addEventListener("click", async () => {
       if (!confirm("Delete this relationship?")) return;
       await fetch(
-        `https://contacts-module.dennis-e64.workers.dev/contact_relationships/delete/${btn.dataset.id}?project=${portalState.project}`,
-        { method: "DELETE" }
-      );
+         `https://contacts-module.dennis-e64.workers.dev/contact_relationships/${btn.dataset.id}?project=${portalState.project}`,
+         { method: "DELETE" }
+       );
       await renderContactRelationshipsRelated(container, portalState, contactId);
     });
   });
@@ -851,9 +851,9 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
   if (mode === "edit" && relationshipId) {
     try {
       const res = await fetch(
-        `https://contacts-module.dennis-e64.workers.dev/contact_relationships/details/${relationshipId}?project=${projectId}`,
-        { cache: "no-cache" }
-      );
+         `https://contacts-module.dennis-e64.workers.dev/contact_relationships/${relationshipId}?project=${projectId}`,
+         { cache: "no-cache" }
+       );
       existing = await res.json();
     } catch (err) {
       console.warn("Relationship details fetch failed:", err);
@@ -919,13 +919,13 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
       if (mode === "add") {
         payload.relationship_id = crypto.randomUUID();
         payload.created_at = new Date().toISOString();
-        await fetch("https://contacts-module.dennis-e64.workers.dev/contact_relationships/add", {
+        await fetch("https://contacts-module.dennis-e64.workers.dev/contact_relationships", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
       } else {
-        await fetch(`https://contacts-module.dennis-e64.workers.dev/contact_relationships/edit/${relationshipId}`, {
+        await fetch(`https://contacts-module.dennis-e64.workers.dev/contact_relationships/${relationshipId}?project=${projectId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
