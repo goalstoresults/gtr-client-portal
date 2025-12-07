@@ -122,11 +122,13 @@ async function renderClientSetup(container, portalState) {
       <section class="card">
         <p><strong>Project:</strong> ${selectedRow.project}</p>
     
-        <div style="display:flex; gap:16px; margin-bottom:12px;">
-          <div style="flex:1;">
-            <label><strong>Display Name:</strong></label>
-            <input type="text" id="displayNameInput" value="${selectedRow.display_name || ''}" style="width:100%;">
-          </div>
+        <!-- Display Name on its own line -->
+        <label><strong>Display Name:</strong></label>
+        <input type="text" id="displayNameInput" value="${selectedRow.display_name || ''}" 
+               style="width:100%; margin-bottom:16px;">
+    
+        <!-- Contact row: first, last, and display-only name -->
+        <div style="display:flex; gap:16px; margin-bottom:16px;">
           <div style="flex:1;">
             <label><strong>First Name:</strong></label>
             <input type="text" id="contactFirstInput" value="${selectedRow.contact_first || ''}" style="width:100%;">
@@ -135,15 +137,23 @@ async function renderClientSetup(container, portalState) {
             <label><strong>Last Name:</strong></label>
             <input type="text" id="contactLastInput" value="${selectedRow.contact_last || ''}" style="width:100%;">
           </div>
+          <div style="flex:1;">
+            <label><strong>Contact Name:</strong></label>
+            <div id="contactNameDisplay" 
+                 style="padding:6px 8px; border:1px solid #ccc; background:#f9f9f9;">
+              ${(selectedRow.contact_first || '')} ${(selectedRow.contact_last || '')}
+            </div>
+          </div>
         </div>
     
-        <p><strong>Contact Name:</strong> <span id="contactNameDisplay">${(selectedRow.contact_first || '')} ${(selectedRow.contact_last || '')}</span></p>
-    
+        <!-- Business Name and Email below -->
         <label><strong>Business Name:</strong></label>
-        <input type="text" id="businessNameInput" value="${selectedRow.business_name || ''}" style="width:100%; margin-bottom:12px;">
+        <input type="text" id="businessNameInput" value="${selectedRow.business_name || ''}" 
+               style="width:100%; margin-bottom:12px;">
     
         <label><strong>Contact Email:</strong></label>
-        <input type="email" id="contactEmailInput" value="${selectedRow.contact_email || ''}" style="width:100%; margin-bottom:24px;">
+        <input type="email" id="contactEmailInput" value="${selectedRow.contact_email || ''}" 
+               style="width:100%; margin-bottom:24px;">
     
         <h3>Enabled Tabs</h3>
         <table id="tabConfigGrid" class="notes-table" style="width:100%; margin-top:12px;">
