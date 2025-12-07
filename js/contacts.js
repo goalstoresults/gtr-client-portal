@@ -835,121 +835,100 @@ async function renderContactRelationshipsRelated(container, portalState, contact
   });
 }
 
+// 🔧 Relationship Form (Add/Edit)
 async function openRelationshipForm(container, portalState, { mode, fixedSide, contactId, relationshipId }) {
   const projectId = portalState.project;
-  if (!projectId) { alert("No project selected."); return; }
-
-  // Remove any existing form
-  const oldForm = container.querySelector("#relationshipForm");
-  if (oldForm) oldForm.closest("section").remove();
-
-  let existing = null;
-  if (mode === "edit" && relationshipId) {
-    const res = await fetch(
-      `https://contacts-module.dennis-e64.workers.dev/contact_relationships/${relationshipId}?project=${projectId}`,
-      { cache: "no-cache" }
-    );
-    existing = await res.json();
-    if (Array.isArray(existing)) existing = existing[0];
+  if (!projectId) {
+    container.innerHTML = `<section class="card"><p>No project selected.</p></section>`;
+    return;
   }
 
-  const formDiv = document.createElement("div");
-  formDiv.innerHTML = `
+  // Base form UI
+  container.innerHTML = `
     <section class="card">
-      <h3>${mode === "add" ? "Add Relationship" : "Edit Relationship"}</h3>
+      <h2>${mode === "add" ? "Add" : "Edit"} Relationship</h2>
       <form id="relationshipForm" class="notes-form">
         <div class="notes-row">
           <label>Relationship Type</label>
-          <input type="text" name="relationship_type" class="form-control"
-                 value="${escapeHtml(existing?.relationship_type || "")}" />
+          <input type="text" name="relationship_type" class="form-control" />
         </div>
         <div class="notes-row">
           <label>Relationship Role</label>
-          <input type="text" name="relationship_role" class="form-control"
-                 value="${escapeHtml(existing?.relationship_role || "")}" />
+          <input type="text" name="relationship_role" class="form-control" />
         </div>
         <div class="notes-row">
-          <label>${fixedSide === "source" ? "Related Contact ID" : "Source Contact ID"}</label>
-          <input type="text" name="${fixedSide === "source" ? "related_contact_id" : "source_contact_id"}"
-                 class="form-control"
-                 value="${escapeHtml(existing?.related_contact_id || existing?.source_contact_id || "")}" />
+          <label>Financial Referral 2</label>
+          <input type="checkbox" name="financial_referral" />
         </div>
-        <div class="notes-row">
-          <label>
-            <input type="checkbox" name="financial_referral" value="true" ${existing?.financial_referral ? "checked" : ""}/>
-            Financial Referral
-          </label>
-        </div>
-        <button type="submit" class="btn-primary">
-          ${mode === "add" ? "Save Relationship" : "Update Relationship"}
-        </button>
+        <button type="submit" class="btn-primary">${mode === "add" ? "Save Relationship" : "Update Relationship"}</button>
       </form>
     </section>
   `;
-  container.prepend(formDiv);
 
-  const form = formDiv.querySelector("#relationshipForm");
+  const form = container.querySelector("#relationshipForm");
+
+  // If editing, fetch existing row and populate
+  if (mode === "edit" && relationshipId) {
+    const res = await fetch(
+      `https://contacts-module.dennis-e64.workers.dev/contact_relationships/${relationshipId}?project=${projectId}`
+    );
+    const data = await res.json();
+    const rel = Array.isArray(data) ? data[0] : data;
+    if (rel) {
+      form.querySelector("[name=relationship_type]").value = rel.relationship_type || "";
+      form.querySelector("[name=relationship_role]").value = rel.relationship_role || "";
+      form.querySelector("[name=financial_referral]").checked = !!rel.financial_referral;
+    }
+  }
+
+  // Handle submit
   form.addEventListener("submit", async e => {
     e.preventDefault();
     const formData = new FormData(form);
 
-    const financialReferral = formData.get("financial_referral") === "true";
-    const updates = {
-      relationship_type: formData.get("relationship_type") || null,
-      relationship_role: formData.get("relationship_role") || null,
-      financial_referral: financialReferral
+    const payload = {
+      project: projectId, // ✅ always include project
+      relationship_type: formData.get("relationship_type"),
+      relationship_role: formData.get("relationship_role"),
+      financial_referral: formData.get("financial_referral") ? true : false,
+      updated_at: new Date().toISOString()
     };
 
-    if (fixedSide === "source") {
-      updates.source_contact_id = contactId;
-      updates.related_contact_id = formData.get("related_contact_id") || null;
-    } else {
-      updates.related_contact_id = contactId;
-      updates.source_contact_id = formData.get("source_contact_id") || null;
-    }
+    if (mode === "add") {
+      // Determine source/related side
+      if (fixedSide === "source") {
+        payload.source_contact_id = contactId;
+        payload.related_contact_id = crypto.randomUUID(); // placeholder until user selects
+      } else {
+        payload.related_contact_id = contactId;
+        payload.source_contact_id = crypto.randomUUID(); // placeholder until user selects
+      }
 
-    try {
-      if (mode === "add") {
-        const payload = {
-          id: crypto.randomUUID(),
-          project: projectId,
-          created_at: new Date().toISOString(),
-          ...updates
-        };
-        await fetch("https://contacts-module.dennis-e64.workers.dev/contact_relationships", {
+      try {
+        const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contact_relationships", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-      } else {
-        const payload = {
-          id: relationshipId,
-          project: projectId,
-          updates
-        };
-        await fetch("https://contacts-module.dennis-e64.workers.dev/contact_relationships", {
+        const result = await res.json();
+        alert("Relationship added.");
+        await renderContactRelationships(container, portalState, contactId);
+      } catch (err) {
+        alert("Error adding relationship: " + err.message);
+      }
+    } else if (mode === "edit" && relationshipId) {
+      try {
+        const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contact_relationships", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({ id: relationshipId, project: projectId, updates: payload })
         });
+        const result = await res.json();
+        alert("Relationship updated.");
+        await renderContactRelationships(container, portalState, contactId);
+      } catch (err) {
+        alert("Error updating relationship: " + err.message);
       }
-
-      alert("Relationship saved.");
-
-      // Refresh only the relevant grid from the outer tab container
-      const tabContainer = document.querySelector("#contactRelationshipsTab");
-      if (!tabContainer) return;
-
-      if (fixedSide === "source") {
-        const sourceGrid = tabContainer.querySelector("#contactRelSourceGrid");
-        if (sourceGrid) await renderContactRelationshipsSource(sourceGrid, portalState, contactId);
-      } else {
-        const relatedGrid = tabContainer.querySelector("#contactRelRelatedGrid");
-        if (relatedGrid) await renderContactRelationshipsRelated(relatedGrid, portalState, contactId);
-      }
-    } catch (err) {
-      alert("Error saving relationship: " + err.message);
-      console.error("Relationship save error", err);
     }
   });
 }
