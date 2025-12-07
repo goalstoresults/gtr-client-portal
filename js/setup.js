@@ -56,6 +56,7 @@ async function renderClientSetup(container, portalState) {
   const resConfig = await fetch("https://lookups-module.dennis-e64.workers.dev/api/projects_config", { cache: "no-cache" });
   const configRows = await resConfig.json();
 
+  // Populate dropdown
   configRows.forEach(row => {
     const opt = document.createElement("option");
     opt.value = row.project;
@@ -64,6 +65,7 @@ async function renderClientSetup(container, portalState) {
     select.appendChild(opt);
   });
 
+  // Add Client button handler
   container.querySelector("#btnAddClient").addEventListener("click", async () => {
     const projectId = prompt("Enter new project ID (short code):");
     if (!projectId) return;
@@ -218,6 +220,8 @@ async function renderClientSetup(container, portalState) {
       });
 
       alert("Config saved.");
+      // 🔄 Refresh the tab so changes are visible immediately
+      renderClientSetup(container, portalState);
     });
   });
 
