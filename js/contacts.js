@@ -835,6 +835,7 @@ async function renderContactRelationshipsRelated(container, portalState, contact
   });
 }
 
+// 🔧 Open Relationship Form (Add/Edit)
 async function openRelationshipForm(container, portalState, { mode, fixedSide, contactId, relationshipId }) {
   const projectId = portalState.project;
   if (!projectId) {
@@ -901,17 +902,17 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
     const financialReferral = formData.get("financial_referral") === "true";
 
     const payload = {
-      relationship_type: formData.get("relationship_type"),
-      relationship_role: formData.get("relationship_role"),
+      relationship_type: formData.get("relationship_type") || null,
+      relationship_role: formData.get("relationship_role") || null,
       financial_referral: financialReferral
     };
 
     if (fixedSide === "source") {
       payload.source_contact_id = contactId;
-      payload.related_contact_id = formData.get("related_contact_id");
+      payload.related_contact_id = formData.get("related_contact_id") || null;
     } else {
       payload.related_contact_id = contactId;
-      payload.source_contact_id = formData.get("source_contact_id");
+      payload.source_contact_id = formData.get("source_contact_id") || null;
     }
 
     try {
@@ -925,36 +926,36 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
           body: JSON.stringify(payload)
         });
       } else {
-        // For edit, strip id/project from body, they’re in URL filter
-        const editPayload = { ...payload };
+        // For edit, id/project are in URL filter, not body
         await fetch(`https://contacts-module.dennis-e64.workers.dev/contact_relationships/${relationshipId}?project=${projectId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(editPayload)
+          body: JSON.stringify(payload)
         });
       }
 
       alert("Relationship saved.");
 
-      // Refresh only the relevant grid, not the whole tab
+      // Refresh only the relevant grid
+      const tabContainer = document.querySelector("#contactRelationshipsTab");
       if (fixedSide === "source") {
-        await renderContactRelationshipsSource(
-          container.querySelector("#contactRelSourceGrid"),
-          portalState,
-          contactId
-        );
+        const sourceGrid = tabContainer.querySelector("#contactRelSourceGrid");
+        if (sourceGrid) {
+          await renderContactRelationshipsSource(sourceGrid, portalState, contactId);
+        }
       } else {
-        await renderContactRelationshipsRelated(
-          container.querySelector("#contactRelRelatedGrid"),
-          portalState,
-          contactId
-        );
+        const relatedGrid = tabContainer.querySelector("#contactRelRelatedGrid");
+        if (relatedGrid) {
+          await renderContactRelationshipsRelated(relatedGrid, portalState, contactId);
+        }
       }
     } catch (err) {
       alert("Error saving relationship: " + err.message);
+      console.error("PATCH/POST error", err);
     }
   });
 }
+
 
 
 // helper
