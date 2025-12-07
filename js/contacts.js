@@ -79,17 +79,23 @@ export async function loadContactsTab({ portalState, tabContent }) {
   }
 }
 
-// 🔧 Contact List with client-side filters (like Notes) + sortable columns
+// 🔧 Contact List with client-side filters + sticky filter values
 async function renderContactList(container, portalState) {
   try {
-    // --- Step 1: Build base UI ---
+    // --- Step 1: Capture current filter values before rebuild ---
+    const prevFirst = document.getElementById("filter-first")?.value.trim() || "";
+    const prevLast  = document.getElementById("filter-last")?.value.trim() || "";
+    const prevBiz   = document.getElementById("filter-business")?.value.trim() || "";
+    const prevType  = document.getElementById("filter-contact-type")?.value || "";
+
+    // --- Step 2: Build base UI with preserved values ---
     container.innerHTML = `
       <section class="card">
         <h2>Contact List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
         <div id="contactsFilters" style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-          <label>First: <input type="text" id="filter-first" /></label>
-          <label>Last: <input type="text" id="filter-last" /></label>
-          <label>Business: <input type="text" id="filter-business" /></label>
+          <label>First: <input type="text" id="filter-first" value="${escapeHtml(prevFirst)}" /></label>
+          <label>Last: <input type="text" id="filter-last" value="${escapeHtml(prevLast)}" /></label>
+          <label>Business: <input type="text" id="filter-business" value="${escapeHtml(prevBiz)}" /></label>
           <label>Contact Type:
             <select id="filter-contact-type" class="form-control" style="min-width:160px;">
               <option value="">ALL</option>
@@ -103,23 +109,23 @@ async function renderContactList(container, portalState) {
     `;
 
     const tableDiv = container.querySelector("#contactTable");
-
-    // --- Step 2: Populate Contact Type dropdown ---
     const typeSelect = document.getElementById("filter-contact-type");
-    fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=contact_type&project=${portalState.project}`)
-      .then(r => r.json())
-      .then(values => {
-        if (!Array.isArray(values)) return;
-        values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
-        values.forEach(v => {
-          const opt = document.createElement("option");
-          opt.value = v.value;
-          opt.textContent = v.label || v.value;
-          typeSelect.appendChild(opt);
-        });
-      });
 
-    // --- Step 3: Fetch contacts (always limit 500) ---
+    // --- Step 3: Populate Contact Type dropdown, preserve selection ---
+    const resTypes = await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=contact_type&project=${portalState.project}`);
+    const values = await resTypes.json();
+    if (Array.isArray(values)) {
+      values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
+      values.forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = v.value;
+        opt.textContent = v.label || v.value;
+        if (v.value === prevType) opt.selected = true;
+        typeSelect.appendChild(opt);
+      });
+    }
+
+    // --- Step 4: Fetch contacts (always limit 500) ---
     const params = new URLSearchParams({
       project: portalState.project,
       order: portalState.contactsSort?.order || "created_at.desc",
@@ -132,11 +138,11 @@ async function renderContactList(container, portalState) {
     let contacts = await resList.json();
     if (!Array.isArray(contacts)) contacts = [];
 
-    // --- Step 4: Apply client-side filters ---
-    const first = document.getElementById("filter-first")?.value.trim();
-    const last  = document.getElementById("filter-last")?.value.trim();
-    const biz   = document.getElementById("filter-business")?.value.trim();
-    const type  = document.getElementById("filter-contact-type")?.value;
+    // --- Step 5: Apply client-side filters ---
+    const first = prevFirst;
+    const last  = prevLast;
+    const biz   = prevBiz;
+    const type  = prevType;
 
     if (first && first.length >= 3) {
       const term = first.toLowerCase();
@@ -154,7 +160,7 @@ async function renderContactList(container, portalState) {
       contacts = contacts.filter(c => c.contact_type === type);
     }
 
-    // --- Step 5: Sort client-side ---
+    // --- Step 6: Sort client-side ---
     if (!portalState.contactsSort) {
       portalState.contactsSort = { column: "created_at", direction: "desc" };
     }
@@ -176,7 +182,7 @@ async function renderContactList(container, portalState) {
     }
     const sortedContacts = sortContacts(contacts, portalState.contactsSort.column, portalState.contactsSort.direction);
 
-    // --- Step 6: Build table UI ---
+    // --- Step 7: Build table UI ---
     tableDiv.innerHTML = `
       <h4>Showing ${sortedContacts.length} ${first||last||biz||type ? "filtered" : "recent"} contacts</h4>
       <table class="notes-table">
@@ -225,7 +231,7 @@ async function renderContactList(container, portalState) {
       </table>
     `;
 
-    // --- Step 7: Wire actions ---
+    // --- Step 8: Wire actions ---
     tableDiv.querySelectorAll(".btn-select").forEach(btn => {
       btn.addEventListener("click", async () => {
         const contactId = btn.dataset.id;
@@ -252,8 +258,10 @@ async function renderContactList(container, portalState) {
 
     // Filter buttons
     document.getElementById("btnApplyContactsFilter").addEventListener("click", () => {
+      // Re‑render with current values preserved
       renderContactList(container, portalState);
     });
+
     document.getElementById("btnClearContactsFilter").addEventListener("click", () => {
       document.getElementById("filter-first").value = "";
       document.getElementById("filter-last").value = "";
@@ -273,11 +281,13 @@ async function renderContactList(container, portalState) {
     });
 
   } catch (err) {
-    container.innerHTML = `<h4>Contacts</h4><p>Error loading contacts: ${err.message}</p>`;
+    container.innerHTML = `<h4>Contacts</h4><p>Error loading contacts: ${escapeHtml(err.message)}</p>`;
+    console.error(err);
   }
 }
 
 
+      
 
 
 // 🔧 Dynamic Add Contact Form with collapsible sections + defaults
