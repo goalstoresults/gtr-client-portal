@@ -656,12 +656,10 @@ async function renderContactDetails(container, portalState, contactId) {
   });
 }
 
-// 🔧 Relationships tab wrapper: two grids + Add buttons
 async function renderContactRelationships(container, portalState, contactId) {
   if (!portalState.project || !contactId) {
     container.innerHTML = `
       <section class="card">
-        <h2>Relationships</h2>
         <p>Select a contact from the list to view relationships.</p>
       </section>
     `;
@@ -686,7 +684,6 @@ async function renderContactRelationships(container, portalState, contactId) {
     </section>
   `;
 
-  // Render both grids
   await renderContactRelationshipsSource(
     container.querySelector("#contactRelSourceGrid"),
     portalState,
@@ -698,17 +695,15 @@ async function renderContactRelationships(container, portalState, contactId) {
     contactId
   );
 
-  // Wire Add buttons (forms will be added in later steps)
-  const addSourceBtn = container.querySelector("#btnAddSourceRel");
-  const addRelatedBtn = container.querySelector("#btnAddRelatedRel");
-  addSourceBtn.addEventListener("click", () =>
+  container.querySelector("#btnAddSourceRel").addEventListener("click", () =>
     openRelationshipForm(container, portalState, {
       mode: "add",
       fixedSide: "source",
       contactId
     })
   );
-  addRelatedBtn.addEventListener("click", () =>
+
+  container.querySelector("#btnAddRelatedRel").addEventListener("click", () =>
     openRelationshipForm(container, portalState, {
       mode: "add",
       fixedSide: "related",
@@ -718,7 +713,6 @@ async function renderContactRelationships(container, portalState, contactId) {
 }
 
 
-// 🔧 Grid: Relationships originating from this contact
 async function renderContactRelationshipsSource(container, portalState, contactId) {
   const url = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${portalState.project}&source_contact_id=${contactId}`;
   const res = await fetch(url, { cache: "no-cache" });
@@ -726,7 +720,6 @@ async function renderContactRelationshipsSource(container, portalState, contactI
   if (!Array.isArray(rows)) rows = [];
 
   container.innerHTML = `
-    <h3>Relationships originating from this contact</h3>
     <table class="notes-table">
       <thead>
         <tr>
@@ -759,12 +752,12 @@ async function renderContactRelationshipsSource(container, portalState, contactI
     </table>
   `;
 
-  // Wire edit/delete (handlers will be added in later steps)
   container.querySelectorAll(".btn-edit").forEach(btn => {
     btn.addEventListener("click", () => {
       openRelationshipForm(container, portalState, {
         mode: "edit",
-        relationshipId: btn.dataset.id
+        relationshipId: btn.dataset.id,
+        contactId
       });
     });
   });
@@ -781,7 +774,6 @@ async function renderContactRelationshipsSource(container, portalState, contactI
   });
 }
 
-// 🔧 Grid: Relationships pointing to this contact
 async function renderContactRelationshipsRelated(container, portalState, contactId) {
   const url = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${portalState.project}&related_contact_id=${contactId}`;
   const res = await fetch(url, { cache: "no-cache" });
@@ -789,7 +781,6 @@ async function renderContactRelationshipsRelated(container, portalState, contact
   if (!Array.isArray(rows)) rows = [];
 
   container.innerHTML = `
-    <h3>Relationships pointing to this contact</h3>
     <table class="notes-table">
       <thead>
         <tr>
@@ -822,12 +813,12 @@ async function renderContactRelationshipsRelated(container, portalState, contact
     </table>
   `;
 
-  // Wire edit/delete (handlers will be added in later steps)
   container.querySelectorAll(".btn-edit").forEach(btn => {
     btn.addEventListener("click", () => {
       openRelationshipForm(container, portalState, {
         mode: "edit",
-        relationshipId: btn.dataset.id
+        relationshipId: btn.dataset.id,
+        contactId
       });
     });
   });
@@ -852,16 +843,23 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
     return;
   }
 
+  // Remove any existing form so we don’t stack multiple
+  const oldForm = container.querySelector("#relationshipForm");
+  if (oldForm) oldForm.closest("section").remove();
+
   let existing = null;
   if (mode === "edit" && relationshipId) {
-    const res = await fetch(
-      `https://contacts-module.dennis-e64.workers.dev/contact_relationships/details/${relationshipId}?project=${projectId}`,
-      { cache: "no-cache" }
-    );
-    existing = await res.json();
+    try {
+      const res = await fetch(
+        `https://contacts-module.dennis-e64.workers.dev/contact_relationships/details/${relationshipId}?project=${projectId}`,
+        { cache: "no-cache" }
+      );
+      existing = await res.json();
+    } catch (err) {
+      console.warn("Relationship details fetch failed:", err);
+    }
   }
 
-  // Build form UI
   const formDiv = document.createElement("div");
   formDiv.innerHTML = `
     <section class="card">
@@ -884,16 +882,20 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
                  value="${escapeHtml(existing?.related_contact_id || existing?.source_contact_id || "")}" />
         </div>
         <div class="notes-row">
-          <label><input type="checkbox" name="financial_referral" ${existing?.financial_referral ? "checked" : ""}/> Financial Referral</label>
+          <label>
+            <input type="checkbox" name="financial_referral" ${existing?.financial_referral ? "checked" : ""}/>
+            Financial Referral
+          </label>
         </div>
-        <button type="submit" class="btn-primary">${mode === "add" ? "Save Relationship" : "Update Relationship"}</button>
+        <button type="submit" class="btn-primary">
+          ${mode === "add" ? "Save Relationship" : "Update Relationship"}
+        </button>
       </form>
     </section>
   `;
 
   container.prepend(formDiv);
 
-  // Handle submit
   const form = formDiv.querySelector("#relationshipForm");
   form.addEventListener("submit", async e => {
     e.preventDefault();
@@ -936,8 +938,6 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
     }
   });
 }
-
-
 
 
 // helper
