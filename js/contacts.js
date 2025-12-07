@@ -774,7 +774,6 @@ async function renderContactRelationshipsSource(container, portalState, contactI
   });
 }
 
-
 async function renderContactRelationshipsRelated(container, portalState, contactId) {
   const url = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${portalState.project}&related_contact_id=${contactId}`;
   const res = await fetch(url, { cache: "no-cache" });
@@ -850,15 +849,12 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
 
   let existing = null;
   if (mode === "edit" && relationshipId) {
-    try {
-      const res = await fetch(
-         `https://contacts-module.dennis-e64.workers.dev/contact_relationships/${relationshipId}?project=${projectId}`,
-         { cache: "no-cache" }
-       );
-      existing = await res.json();
-    } catch (err) {
-      console.warn("Relationship details fetch failed:", err);
-    }
+    const res = await fetch(
+      `https://contacts-module.dennis-e64.workers.dev/contact_relationships/${relationshipId}?project=${projectId}`,
+      { cache: "no-cache" }
+    );
+    existing = await res.json();
+    if (Array.isArray(existing)) existing = existing[0]; // Supabase returns array
   }
 
   const formDiv = document.createElement("div");
@@ -918,7 +914,7 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
 
     try {
       if (mode === "add") {
-        payload.relationship_id = crypto.randomUUID();
+        payload.id = crypto.randomUUID();
         payload.created_at = new Date().toISOString();
         await fetch("https://contacts-module.dennis-e64.workers.dev/contact_relationships", {
           method: "POST",
