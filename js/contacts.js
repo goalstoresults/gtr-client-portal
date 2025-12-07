@@ -835,7 +835,6 @@ async function renderContactRelationshipsRelated(container, portalState, contact
   });
 }
 
-// 🔧 Open Relationship Form (Add/Edit)
 async function openRelationshipForm(container, portalState, { mode, fixedSide, contactId, relationshipId }) {
   const projectId = portalState.project;
   if (!projectId) {
@@ -843,7 +842,7 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
     return;
   }
 
-  // Remove any existing form so we don’t stack multiple
+  // Remove any existing form
   const oldForm = container.querySelector("#relationshipForm");
   if (oldForm) oldForm.closest("section").remove();
 
@@ -854,7 +853,7 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
       { cache: "no-cache" }
     );
     existing = await res.json();
-    if (Array.isArray(existing)) existing = existing[0]; // Supabase returns array
+    if (Array.isArray(existing)) existing = existing[0];
   }
 
   const formDiv = document.createElement("div");
@@ -880,7 +879,6 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
         </div>
         <div class="notes-row">
           <label>
-            <!-- Explicit value="true" so FormData returns "true" when checked -->
             <input type="checkbox" name="financial_referral" value="true" ${existing?.financial_referral ? "checked" : ""}/>
             Financial Referral
           </label>
@@ -899,7 +897,7 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
     e.preventDefault();
     const formData = new FormData(form);
 
-    // Normalize checkbox: only true if explicitly "true"
+    // Normalize checkbox
     const financialReferral = formData.get("financial_referral") === "true";
 
     const payload = {
@@ -918,8 +916,8 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
 
     try {
       if (mode === "add") {
-        payload.id = crypto.randomUUID();
-        payload.project = projectId; // project required on insert
+        payload.id = crypto.randomUUID();       // include id on insert
+        payload.project = projectId;            // include project on insert
         payload.created_at = new Date().toISOString();
         await fetch("https://contacts-module.dennis-e64.workers.dev/contact_relationships", {
           method: "POST",
@@ -927,14 +925,31 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
           body: JSON.stringify(payload)
         });
       } else {
+        // For edit, strip id/project from body, they’re in URL filter
+        const editPayload = { ...payload };
         await fetch(`https://contacts-module.dennis-e64.workers.dev/contact_relationships/${relationshipId}?project=${projectId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(editPayload)
         });
       }
+
       alert("Relationship saved.");
-      await renderContactRelationships(container, portalState, contactId);
+
+      // Refresh only the relevant grid, not the whole tab
+      if (fixedSide === "source") {
+        await renderContactRelationshipsSource(
+          container.querySelector("#contactRelSourceGrid"),
+          portalState,
+          contactId
+        );
+      } else {
+        await renderContactRelationshipsRelated(
+          container.querySelector("#contactRelRelatedGrid"),
+          portalState,
+          contactId
+        );
+      }
     } catch (err) {
       alert("Error saving relationship: " + err.message);
     }
