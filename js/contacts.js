@@ -835,13 +835,9 @@ async function renderContactRelationshipsRelated(container, portalState, contact
   });
 }
 
-// 🔧 Open Relationship Form (Add/Edit)
 async function openRelationshipForm(container, portalState, { mode, fixedSide, contactId, relationshipId }) {
   const projectId = portalState.project;
-  if (!projectId) {
-    alert("No project selected.");
-    return;
-  }
+  if (!projectId) { alert("No project selected."); return; }
 
   // Remove any existing form
   const oldForm = container.querySelector("#relationshipForm");
@@ -890,7 +886,6 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
       </form>
     </section>
   `;
-
   container.prepend(formDiv);
 
   const form = formDiv.querySelector("#relationshipForm");
@@ -898,36 +893,41 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
     e.preventDefault();
     const formData = new FormData(form);
 
-    // Normalize checkbox
     const financialReferral = formData.get("financial_referral") === "true";
-
-    const payload = {
+    const updates = {
       relationship_type: formData.get("relationship_type") || null,
       relationship_role: formData.get("relationship_role") || null,
       financial_referral: financialReferral
     };
 
     if (fixedSide === "source") {
-      payload.source_contact_id = contactId;
-      payload.related_contact_id = formData.get("related_contact_id") || null;
+      updates.source_contact_id = contactId;
+      updates.related_contact_id = formData.get("related_contact_id") || null;
     } else {
-      payload.related_contact_id = contactId;
-      payload.source_contact_id = formData.get("source_contact_id") || null;
+      updates.related_contact_id = contactId;
+      updates.source_contact_id = formData.get("source_contact_id") || null;
     }
 
     try {
       if (mode === "add") {
-        payload.id = crypto.randomUUID();       // include id on insert
-        payload.project = projectId;            // include project on insert
-        payload.created_at = new Date().toISOString();
+        const payload = {
+          id: crypto.randomUUID(),
+          project: projectId,
+          created_at: new Date().toISOString(),
+          ...updates
+        };
         await fetch("https://contacts-module.dennis-e64.workers.dev/contact_relationships", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
       } else {
-        // For edit, id/project are in URL filter, not body
-        await fetch(`https://contacts-module.dennis-e64.workers.dev/contact_relationships/${relationshipId}?project=${projectId}`, {
+        const payload = {
+          id: relationshipId,
+          project: projectId,
+          updates
+        };
+        await fetch("https://contacts-module.dennis-e64.workers.dev/contact_relationships", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
@@ -936,26 +936,23 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
 
       alert("Relationship saved.");
 
-      // Refresh only the relevant grid
+      // Refresh only the relevant grid from the outer tab container
       const tabContainer = document.querySelector("#contactRelationshipsTab");
+      if (!tabContainer) return;
+
       if (fixedSide === "source") {
         const sourceGrid = tabContainer.querySelector("#contactRelSourceGrid");
-        if (sourceGrid) {
-          await renderContactRelationshipsSource(sourceGrid, portalState, contactId);
-        }
+        if (sourceGrid) await renderContactRelationshipsSource(sourceGrid, portalState, contactId);
       } else {
         const relatedGrid = tabContainer.querySelector("#contactRelRelatedGrid");
-        if (relatedGrid) {
-          await renderContactRelationshipsRelated(relatedGrid, portalState, contactId);
-        }
+        if (relatedGrid) await renderContactRelationshipsRelated(relatedGrid, portalState, contactId);
       }
     } catch (err) {
       alert("Error saving relationship: " + err.message);
-      console.error("PATCH/POST error", err);
+      console.error("Relationship save error", err);
     }
   });
 }
-
 
 
 // helper
