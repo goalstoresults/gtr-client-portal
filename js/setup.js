@@ -121,40 +121,40 @@ async function renderClientSetup(container, portalState) {
     detailsDiv.innerHTML = `
       <section class="card">
         <p><strong>Project:</strong> ${selectedRow.project}</p>
-    
+
         <!-- Display Name on its own line -->
         <label><strong>Display Name:</strong></label>
         <input type="text" id="displayNameInput" value="${selectedRow.display_name || ''}" 
                style="width:100%; margin-bottom:16px;">
-    
+
         <!-- Contact row: first, last, and display-only name -->
         <div style="display:flex; gap:16px; margin-bottom:16px;">
           <div style="flex:1;">
-            <label><strong>First Name:</strong></label>
+            <label><strong>Contact First Name:</strong></label>
             <input type="text" id="contactFirstInput" value="${selectedRow.contact_first || ''}" style="width:100%;">
           </div>
           <div style="flex:1;">
-            <label><strong>Last Name:</strong></label>
+            <label><strong>Contact Last Name:</strong></label>
             <input type="text" id="contactLastInput" value="${selectedRow.contact_last || ''}" style="width:100%;">
           </div>
           <div style="flex:1;">
             <label><strong>Contact Name:</strong></label>
             <div id="contactNameDisplay" 
                  style="padding:6px 8px; border:1px solid #ccc; background:#f9f9f9;">
-              ${(selectedRow.contact_first || '')} ${(selectedRow.contact_last || '')}
+              ${selectedRow.contact_name || ''}
             </div>
           </div>
         </div>
-    
+
         <!-- Business Name and Email below -->
         <label><strong>Business Name:</strong></label>
         <input type="text" id="businessNameInput" value="${selectedRow.business_name || ''}" 
                style="width:100%; margin-bottom:12px;">
-    
+
         <label><strong>Contact Email:</strong></label>
         <input type="email" id="contactEmailInput" value="${selectedRow.contact_email || ''}" 
                style="width:100%; margin-bottom:24px;">
-    
+
         <h3>Enabled Tabs</h3>
         <table id="tabConfigGrid" class="notes-table" style="width:100%; margin-top:12px;">
           <thead>
@@ -169,16 +169,6 @@ async function renderClientSetup(container, portalState) {
         <button id="btnSaveConfig" class="btn-primary" style="margin-top:12px;">Save Config</button>
       </section>
     `;
-
-    
-    // Live update Contact Name display
-    ["contactFirstInput", "contactLastInput"].forEach(id => {
-      detailsDiv.querySelector(`#${id}`).addEventListener("input", () => {
-        const first = detailsDiv.querySelector("#contactFirstInput").value.trim();
-        const last = detailsDiv.querySelector("#contactLastInput").value.trim();
-        detailsDiv.querySelector("#contactNameDisplay").textContent = `${first} ${last}`.trim();
-      });
-    });
 
     const gridBody = detailsDiv.querySelector("#tabConfigGrid tbody");
     gridBody.innerHTML = allTabs.map(tab => {
@@ -215,6 +205,8 @@ async function renderClientSetup(container, portalState) {
       const contactFirst = detailsDiv.querySelector("#contactFirstInput").value.trim();
       const contactLast = detailsDiv.querySelector("#contactLastInput").value.trim();
       const contactEmail = detailsDiv.querySelector("#contactEmailInput").value.trim();
+
+      // 🔑 Concatenate first + last for contact_name
       const contactName = `${contactFirst} ${contactLast}`.trim();
 
       const patchPayload = {
