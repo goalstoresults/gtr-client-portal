@@ -752,9 +752,11 @@ async function renderContactRelationshipsSource(container, portalState, contactI
     </table>
   `;
 
+  // ✅ Use tab-level container for form
   container.querySelectorAll(".btn-edit").forEach(btn => {
     btn.addEventListener("click", () => {
-      openRelationshipForm(container, portalState, {
+      const content = document.querySelector("#contactsContent");
+      openRelationshipForm(content, portalState, {
         mode: "edit",
         relationshipId: btn.dataset.id,
         contactId
@@ -813,9 +815,11 @@ async function renderContactRelationshipsRelated(container, portalState, contact
     </table>
   `;
 
+  // ✅ Use tab-level container for form
   container.querySelectorAll(".btn-edit").forEach(btn => {
     btn.addEventListener("click", () => {
-      openRelationshipForm(container, portalState, {
+      const content = document.querySelector("#contactsContent");
+      openRelationshipForm(content, portalState, {
         mode: "edit",
         relationshipId: btn.dataset.id,
         contactId
