@@ -836,7 +836,6 @@ async function renderContactRelationshipsRelated(container, portalState, contact
 }
 
 // 🔧 Relationship Form (Add/Edit)
-// 🔧 Relationship Form (Add/Edit)
 async function openRelationshipForm(container, portalState, { mode, fixedSide, contactId, relationshipId }) {
   const projectId = portalState.project;
   if (!projectId) {
@@ -862,13 +861,11 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
       <form id="relationshipForm" class="notes-form">
         <div class="notes-row">
           <label>Relationship Type</label>
-          <input type="text" name="relationship_type" class="form-control"
-                 value="${escapeHtml(existing?.relationship_type || "")}" />
+          <select name="relationship_type" id="relType" class="form-control"></select>
         </div>
         <div class="notes-row">
           <label>Relationship Role</label>
-          <input type="text" name="relationship_role" class="form-control"
-                 value="${escapeHtml(existing?.relationship_role || "")}" />
+          <select name="relationship_role" id="relRole" class="form-control"></select>
         </div>
         <div class="notes-row">
           <label>${fixedSide === "source" ? "Related Contact ID" : "Source Contact ID"}</label>
@@ -884,7 +881,7 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
         <div class="notes-row">
           <label>
             <input type="checkbox" name="financial_referral" value="true" ${existing?.financial_referral ? "checked" : ""}/>
-            Financial Referral 2
+            Financial Referral
           </label>
         </div>
         <button type="submit" class="btn-primary">
@@ -894,14 +891,35 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
     </section>
   `;
 
-  const form = container.querySelector("#relationshipForm");
+  // Populate dropdowns from lookups
+  async function populateLookup(selectEl, lookupType, currentValue) {
+    const res = await fetch(
+      `https://lookups-module.dennis-e64.workers.dev/lookups?project=${projectId}&lookup_type=${lookupType}`
+    );
+    const values = await res.json();
+    if (Array.isArray(values)) {
+      values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
+      selectEl.innerHTML = `<option value="">-- Select --</option>`;
+      values.forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = v.value;
+        opt.textContent = v.label || v.value;
+        if (currentValue === v.value) opt.selected = true;
+        selectEl.appendChild(opt);
+      });
+    }
+  }
 
+  await populateLookup(document.getElementById("relType"), "relationship_type", existing?.relationship_type);
+  await populateLookup(document.getElementById("relRole"), "relationship_role", existing?.relationship_role);
+
+  // Handle submit
+  const form = container.querySelector("#relationshipForm");
   form.addEventListener("submit", async e => {
     e.preventDefault();
     const fd = new FormData(form);
 
-    // Build schema-aligned payload
-    const base = {
+    const payload = {
       project: projectId,
       relationship_type: fd.get("relationship_type") || null,
       relationship_role: fd.get("relationship_role") || null,
@@ -909,22 +927,18 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
       financial_referral: fd.get("financial_referral") ? true : false
     };
 
-    // Fix one side to current contact, let user fill the other
     if (fixedSide === "source") {
-      base.source_contact_id = contactId;
-      base.related_contact_id = fd.get("related_contact_id");
+      payload.source_contact_id = contactId;
+      payload.related_contact_id = fd.get("related_contact_id");
     } else {
-      base.related_contact_id = contactId;
-      base.source_contact_id = fd.get("source_contact_id");
+      payload.related_contact_id = contactId;
+      payload.source_contact_id = fd.get("source_contact_id");
     }
 
     try {
       if (mode === "add") {
-        const payload = {
-          ...base,
-          id: crypto.randomUUID(),
-          created_at: new Date().toISOString()
-        };
+        payload.id = crypto.randomUUID();
+        payload.created_at = new Date().toISOString();
 
         const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contact_relationships", {
           method: "POST",
@@ -934,7 +948,7 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
         const resultText = await res.text();
         alert(res.ok ? "Relationship added." : `Add failed: ${resultText}`);
       } else {
-        const updates = { ...base };
+        const updates = { ...payload };
         const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contact_relationships", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -944,7 +958,6 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
         alert(res.ok ? "Relationship updated." : `Update failed: ${resultText}`);
       }
 
-      // Refresh grids
       await renderContactRelationships(container, portalState, contactId);
     } catch (err) {
       alert("Error saving relationship: " + err.message);
