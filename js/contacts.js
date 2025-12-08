@@ -1041,8 +1041,10 @@ async function openRelationshipForm(container, portalState, { mode, contactId, r
         return;
       }
 
-      alert("✅ Relationship saved.");
-      await renderContactRelationships(container, portalState, contactId);
+        alert("✅ Relationship saved.");
+        container.innerHTML = ""; // clear form layout
+        await renderContactRelationships(container, portalState, contactId);
+        container.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
       alert("Error saving relationship: " + err.message);
       console.error(err);
