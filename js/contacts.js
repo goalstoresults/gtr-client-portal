@@ -658,94 +658,59 @@ async function renderContactDetails(container, portalState, contactId) {
 
 // Render relationships grid for a contact
 async function renderContactRelationships(container, portalState, contactId) {
-  const projectId = portalState.project;
-  if (!projectId) {
-    container.innerHTML = `<section class="card"><p>No project selected.</p></section>`;
+  if (!portalState.project || !contactId) {
+    container.innerHTML = `
+      <section class="card">
+        <p>Select a contact from the list to view relationships.</p>
+      </section>
+    `;
     return;
   }
 
-  try {
-    // Step 1: fetch relationships (raw IDs)
-    const relUrl = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${projectId}&source_contact_id=${contactId}&related_contact_id=${contactId}`;
-    const relRes = await fetch(relUrl, { cache: "no-cache" });
-    let relationships = await relRes.json();
-    if (!Array.isArray(relationships)) relationships = [];
+  container.innerHTML = `
+    <section class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3>Relationships originating from this contact</h3>
+        <button id="btnAddSourceRel" class="btn-primary">Add Relationship</button>
+      </div>
+      <div id="contactRelSourceGrid"></div>
+    </section>
 
-    // Step 2: fetch contacts (like Notes does)
-    const contactsUrl = `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${projectId}&limit=500`;
-    const contactsRes = await fetch(contactsUrl, { cache: "no-cache" });
-    let contacts = await contactsRes.json();
-    if (!Array.isArray(contacts)) contacts = [];
+    <section class="card" style="margin-top:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3>Relationships pointing to this contact</h3>
+        <button id="btnAddRelatedRel" class="btn-primary">Add Relationship</button>
+      </div>
+      <div id="contactRelRelatedGrid"></div>
+    </section>
+  `;
 
-    // Step 3: build lookup map
-    const contactMap = {};
-    contacts.forEach(c => {
-      const name = c.contact_name || `${c.first_name || ""} ${c.last_name || ""}`.trim();
-      contactMap[c.contact_id] = name || c.contact_id;
-    });
+  await renderContactRelationshipsSource(
+    container.querySelector("#contactRelSourceGrid"),
+    portalState,
+    contactId
+  );
+  await renderContactRelationshipsRelated(
+    container.querySelector("#contactRelRelatedGrid"),
+    portalState,
+    contactId
+  );
 
-    // Step 4: render grid with names
-    container.innerHTML = `
-      <section class="card">
-        <h3>Relationships</h3>
-        <table class="grid">
-          <thead>
-            <tr>
-              <th>Source Contact</th>
-              <th>Related Contact</th>
-              <th>Type</th>
-              <th>Role</th>
-              <th>Financial Referral</th>
-              <th>Notes</th>
-              <th>Created</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${relationships.map(r => `
-              <tr>
-                <td>${escapeHtml(contactMap[r.source_contact_id] || r.source_contact_id)}</td>
-                <td>${escapeHtml(contactMap[r.related_contact_id] || r.related_contact_id)}</td>
-                <td>${escapeHtml(r.relationship_type || "")}</td>
-                <td>${escapeHtml(r.relationship_role || "")}</td>
-                <td>${r.financial_referral ? "Yes" : "No"}</td>
-                <td>${escapeHtml(r.notes || "")}</td>
-                <td>${escapeHtml(r.created_at || "")}</td>
-                <td>
-                  <button class="btn-small" onclick="openRelationshipForm(container, portalState, { mode: 'edit', contactId: '${contactId}', relationshipId: '${r.id}', fixedSide: 'source' })">Edit</button>
-                  <button class="btn-small btn-danger" onclick="deleteRelationship('${r.id}', '${projectId}', container, portalState, '${contactId}')">Delete</button>
-                </td>
-              </tr>
-            `).join("")}
-          </tbody>
-        </table>
-        <button class="btn-primary" onclick="openRelationshipForm(container, portalState, { mode: 'add', contactId: '${contactId}', fixedSide: 'source' })">Add Relationship</button>
-      </section>
-    `;
-  } catch (err) {
-    container.innerHTML = `<section class="card"><p>Error loading relationships: ${err.message}</p></section>`;
-    console.error("Relationship grid error:", err);
-  }
-}
+  container.querySelector("#btnAddSourceRel").addEventListener("click", () =>
+    openRelationshipForm(container, portalState, {
+      mode: "add",
+      fixedSide: "source",
+      contactId
+    })
+  );
 
-// Helper: delete relationship
-async function deleteRelationship(relId, projectId, container, portalState, contactId) {
-  if (!confirm("Delete this relationship?")) return;
-  try {
-    const res = await fetch(`https://contacts-module.dennis-e64.workers.dev/contact_relationships/${relId}?project=${projectId}`, {
-      method: "DELETE"
-    });
-    if (res.ok) {
-      alert("Relationship deleted.");
-      await renderContactRelationships(container, portalState, contactId);
-    } else {
-      const text = await res.text();
-      alert("Delete failed: " + text);
-    }
-  } catch (err) {
-    alert("Error deleting relationship: " + err.message);
-    console.error("Delete relationship error:", err);
-  }
+  container.querySelector("#btnAddRelatedRel").addEventListener("click", () =>
+    openRelationshipForm(container, portalState, {
+      mode: "add",
+      fixedSide: "related",
+      contactId
+    })
+  );
 }
 
 async function renderContactRelationshipsSource(container, portalState, contactId) {
