@@ -35,12 +35,16 @@ export async function loadContactsTab({ portalState, tabContent }) {
           break;
 
         case "details":
-          content.innerHTML = `
-            <section class="card">
-              <h2>Contact Details</h2>
-              <p>Select a contact from the list to view details.</p>
-            </section>
-          `;
+          if (portalState.selectedContactId) {
+            await renderContactDetails(content, portalState, portalState.selectedContactId);
+          } else {
+            content.innerHTML = `
+              <section class="card">
+                <h2>Contact Details</h2>
+                <p>Select a contact from the list to view details.</p>
+              </section>
+            `;
+          }
           break;
 
         case "relationships":
