@@ -868,10 +868,12 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
           <select name="relationship_role" id="relRole" class="form-control"></select>
         </div>
         <div class="notes-row">
-          <label>${fixedSide === "source" ? "Related Contact ID" : "Source Contact ID"}</label>
-          <input type="text" name="${fixedSide === "source" ? "related_contact_id" : "source_contact_id"}"
-                 class="form-control"
-                 value="${escapeHtml(existing?.related_contact_id || existing?.source_contact_id || "")}" />
+          <label>${fixedSide === "source" ? "Related Contact" : "Source Contact"}</label>
+          <input type="text" id="searchName" placeholder="Enter first/last name (min 3 chars)" class="form-control" />
+          <button type="button" id="btnFindContact" class="secondary">Find</button>
+          <select id="contactSelect" class="form-control" style="margin-top:8px;">
+            <option value="">-- Select Contact --</option>
+          </select>
         </div>
         <div class="notes-row">
           <label>Notes</label>
@@ -913,6 +915,38 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
   await populateLookup(document.getElementById("relType"), "relationship_type", existing?.relationship_type);
   await populateLookup(document.getElementById("relRole"), "relationship_role", existing?.relationship_role);
 
+  // Wire up contact search
+  const btnFind = document.getElementById("btnFindContact");
+  const contactSelect = document.getElementById("contactSelect");
+  btnFind.addEventListener("click", async () => {
+    const term = document.getElementById("searchName").value.trim().toLowerCase();
+    if (term.length < 3) {
+      alert("Enter at least 3 characters to search.");
+      return;
+    }
+
+    const res = await fetch(`https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${projectId}&limit=500`);
+    let contacts = await res.json();
+    if (!Array.isArray(contacts)) contacts = [];
+
+    const matches = contacts.filter(c =>
+      (c.first_name || "").toLowerCase().includes(term) ||
+      (c.last_name || "").toLowerCase().includes(term)
+    );
+
+    contactSelect.innerHTML = `<option value="">-- Select Contact --</option>`;
+    matches.forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = c.contact_id;
+      opt.textContent = `${c.first_name || ""} ${c.last_name || ""} (${c.email || ""})`;
+      contactSelect.appendChild(opt);
+    });
+
+    if (matches.length === 1) {
+      contactSelect.value = matches[0].contact_id;
+    }
+  });
+
   // Handle submit
   const form = container.querySelector("#relationshipForm");
   form.addEventListener("submit", async e => {
@@ -929,10 +963,10 @@ async function openRelationshipForm(container, portalState, { mode, fixedSide, c
 
     if (fixedSide === "source") {
       payload.source_contact_id = contactId;
-      payload.related_contact_id = fd.get("related_contact_id");
+      payload.related_contact_id = contactSelect.value;
     } else {
       payload.related_contact_id = contactId;
-      payload.source_contact_id = fd.get("source_contact_id");
+      payload.source_contact_id = contactSelect.value;
     }
 
     try {
