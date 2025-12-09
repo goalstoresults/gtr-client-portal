@@ -35,7 +35,11 @@ export async function loadGroupsTab({ portalState, tabContent }) {
           content.innerHTML = `<section class="card"><p>Select a group to view details.</p></section>`;
           break;
         case "members":
-          content.innerHTML = `<section class="card"><p>(Members view placeholder)</p></section>`;
+          if (portalState.selectedGroupId) {
+            await renderGroupMembers(content, portalState, portalState.selectedGroupId);
+          } else {
+            content.innerHTML = `<section class="card"><p>Select a group to view members.</p></section>`;
+          }
           break;
         case "roi":
           content.innerHTML = `<section class="card"><p>(ROI metrics placeholder)</p></section>`;
@@ -54,7 +58,6 @@ export async function loadGroupsTab({ portalState, tabContent }) {
   }
 }
 
-// Group List with filters, search, sort
 // Group List with simple name filter + client-side search/sort
 async function renderGroupList(container, portalState, options = {}) {
   // --- Step 1: Capture current filter value before rebuild ---
@@ -272,6 +275,109 @@ async function renderGroupDetails(container, portalState, groupId) {
     }
   });
 }
+
+async function renderGroupMembers(container, portalState, groupId) {
+  if (!portalState.project || !groupId) {
+    container.innerHTML = `<section class="card"><p>Select a group to view members.</p></section>`;
+    return;
+  }
+
+  // Preserve filters
+  const prevName = document.getElementById("filter-member-name")?.value.trim() || "";
+  const prevBiz  = document.getElementById("filter-member-business")?.value.trim() || "";
+
+  container.innerHTML = `
+    <section class="card">
+      <h2>Group Members for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
+      <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <label>Name: <input type="text" id="filter-member-name" value="${escapeHtml(prevName)}" /></label>
+        <label>Business: <input type="text" id="filter-member-business" value="${escapeHtml(prevBiz)}" /></label>
+        <button id="btnApplyMemberFilter" class="secondary">Apply Filter</button>
+        <button id="btnClearMemberFilter" class="secondary">Clear Filter</button>
+      </div>
+      <div id="groupMemberTable">Loading...</div>
+    </section>
+  `;
+
+  const tableDiv = container.querySelector("#groupMemberTable");
+
+  // Fetch contacts for this group
+  const url = `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}&group_id=${groupId}&limit=500`;
+  const res = await fetch(url, { cache: "no-cache" });
+  let contacts = await res.json();
+  if (!Array.isArray(contacts)) contacts = [];
+
+  // Apply client-side filters
+  if (prevName && prevName.length >= 3) {
+    const term = prevName.toLowerCase();
+    contacts = contacts.filter(c => (c.contact_name || "").toLowerCase().includes(term));
+  }
+  if (prevBiz && prevBiz.length >= 3) {
+    const term = prevBiz.toLowerCase();
+    contacts = contacts.filter(c => (c.business_name || "").toLowerCase().includes(term));
+  }
+
+  // Sort alphabetically by contact_name
+  contacts.sort((a, b) => (a.contact_name || "").localeCompare(b.contact_name || ""));
+
+  // Render table
+  tableDiv.innerHTML = `
+    <h4>Showing ${contacts.length} ${prevName || prevBiz ? "filtered" : "members"} contacts</h4>
+    <table class="notes-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Business Name</th>
+          <th>Contact Type</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${contacts.length > 0
+          ? contacts.map(c => `
+              <tr>
+                <td>${escapeHtml(c.contact_name || "")}</td>
+                <td>${escapeHtml(c.business_name || "")}</td>
+                <td>${escapeHtml(c.contact_type || "")}</td>
+                <td>
+                  <button class="btn-primary btn-select" data-id="${c.contact_id}">Select</button>
+                </td>
+              </tr>
+            `).join("")
+          : `<tr><td colspan="4">(no contacts found)</td></tr>`
+        }
+      </tbody>
+    </table>
+  `;
+
+  // Wire Select → same logic as Contacts list
+  tableDiv.querySelectorAll(".btn-select").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const contactId = btn.dataset.id;
+      portalState.selectedContactId = contactId;
+
+      const buttons = document.querySelectorAll("#contacts-subtabs button");
+      buttons.forEach(b => b.classList.remove("active"));
+      const detailsBtn = document.querySelector('#contacts-subtabs button[data-subtab="details"]');
+      if (detailsBtn) detailsBtn.classList.add("active");
+
+      const content = document.querySelector("#contactsContent");
+      await renderContactDetails(content, portalState, contactId);
+    });
+  });
+
+  // Wire filter buttons
+  document.getElementById("btnApplyMemberFilter").addEventListener("click", () => {
+    renderGroupMembers(container, portalState, groupId);
+  });
+  document.getElementById("btnClearMemberFilter").addEventListener("click", () => {
+    document.getElementById("filter-member-name").value = "";
+    document.getElementById("filter-member-business").value = "";
+    renderGroupMembers(container, portalState, groupId);
+  });
+}
+
+
 
 async function renderGroupAdd(container, portalState) {
   container.innerHTML = `
