@@ -32,7 +32,11 @@ export async function loadGroupsTab({ portalState, tabContent }) {
           await renderGroupList(content, portalState);
           break;
         case "details":
-          content.innerHTML = `<section class="card"><p>Select a group to view details.</p></section>`;
+          if (portalState.selectedGroupId) {
+            await renderGroupDetails(content, portalState, portalState.selectedGroupId);
+          } else {
+            content.innerHTML = `<section class="card"><p>Select a group to view details.</p></section>`;
+          }
           break;
         case "members":
           if (portalState.selectedGroupId) {
@@ -161,11 +165,13 @@ async function renderGroupList(container, portalState, options = {}) {
   tableDiv.querySelectorAll(".btn-select").forEach(btn => {
     btn.addEventListener("click", async () => {
       const groupId = btn.dataset.id;
+      portalState.selectedGroupId = groupId;   // ✅ store active group
+  
       const buttons = document.querySelectorAll("#groups-subtabs button");
       buttons.forEach(b => b.classList.remove("active"));
       const detailsBtn = document.querySelector('#groups-subtabs button[data-subtab="details"]');
       if (detailsBtn) detailsBtn.classList.add("active");
-
+  
       const content = document.querySelector("#groupsContent");
       await renderGroupDetails(content, portalState, groupId);
     });
