@@ -55,16 +55,19 @@ export async function loadGroupsTab({ portalState, tabContent }) {
 }
 
 // Group List with filters, search, sort
+// Group List with simple name filter + client-side search/sort
 async function renderGroupList(container, portalState, options = {}) {
+  // --- Step 1: Capture current filter value before rebuild ---
+  const prevName = document.getElementById("filter-group-name")?.value.trim() || "";
+
+  // --- Step 2: Build base UI with preserved value ---
   container.innerHTML = `
     <section class="card">
       <h2>Groups for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
-      <div id="groupsFilters" style="margin-bottom:12px;">
-        <label>Name: <input type="text" id="filter-group-name" /></label>
-        <label style="margin-left:12px;">From: <input type="date" id="filter-from" /></label>
-        <label style="margin-left:12px;">To: <input type="date" id="filter-to" /></label>
-        <button id="btnApplyGroupsFilter" class="btn-secondary" style="margin-left:12px;">Apply Filter</button>
-        <button id="btnClearGroupsFilter" class="btn-secondary" style="margin-left:12px;">Clear Filter</button>
+      <div id="groupsFilters" style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <label>Name: <input type="text" id="filter-group-name" value="${escapeHtml(prevName)}" /></label>
+        <button id="btnApplyGroupsFilter" class="btn-secondary">Apply Filter</button>
+        <button id="btnClearGroupsFilter" class="btn-secondary">Clear Filter</button>
       </div>
       <div id="groupTable">Loading...</div>
     </section>
@@ -72,31 +75,34 @@ async function renderGroupList(container, portalState, options = {}) {
 
   const tableDiv = container.querySelector("#groupTable");
 
-  const name = document.getElementById("filter-group-name")?.value.trim();
-  const from = document.getElementById("filter-from")?.value;
-  const to   = document.getElementById("filter-to")?.value;
-
-  const hasFilters = name || from || to;
-  const limit = hasFilters ? 500 : 100;
+  // --- Step 3: Fetch all groups (limit 500) ---
   const order = options.order || "created_at.desc";
-
   const params = new URLSearchParams({
     project: portalState.project,
     order,
-    limit: limit.toString()
+    limit: "500"
   });
-  if (name) params.set("group_name", name);
-  if (from) params.set("from", from);
-  if (to)   params.set("to", to);
-
   const url = `https://groups-module.dennis-e64.workers.dev/groups/list?${params}`;
   console.log("[Groups] Fetching:", url);
 
-  const res = await fetch(url);
-  const groups = await res.json();
+  const res = await fetch(url, { cache: "no-cache" });
+  let groups = await res.json();
+  if (!Array.isArray(groups)) groups = groups.rows || [];
+  if (!Array.isArray(groups)) groups = [];
 
+  // --- Step 4: Apply client-side filter ---
+  const name = prevName;
+  if (name && name.length >= 3) {
+    const term = name.toLowerCase();
+    groups = groups.filter(g => (g.group_name || "").toLowerCase().includes(term));
+  }
+
+  // --- Step 5: Sort alphabetically by group_name ---
+  groups.sort((a, b) => (a.group_name || "").localeCompare(b.group_name || ""));
+
+  // --- Step 6: Render table ---
   tableDiv.innerHTML = `
-    <h4>Showing ${Array.isArray(groups) ? groups.length : 0} ${hasFilters ? "filtered" : "recent"} groups</h4>
+    <h4>Showing ${groups.length} ${name ? "filtered" : "recent"} groups</h4>
     <table class="notes-table">
       <thead>
         <tr>
@@ -129,7 +135,7 @@ async function renderGroupList(container, portalState, options = {}) {
         </tr>
       </thead>
       <tbody>
-        ${Array.isArray(groups) && groups.length > 0
+        ${groups.length > 0
           ? groups.map(g => `
               <tr>
                 <td>${escapeHtml(g.group_name || "")}</td>
@@ -148,7 +154,7 @@ async function renderGroupList(container, portalState, options = {}) {
     </table>
   `;
 
-  // Wire Select
+  // --- Step 7: Wire Select ---
   tableDiv.querySelectorAll(".btn-select").forEach(btn => {
     btn.addEventListener("click", async () => {
       const groupId = btn.dataset.id;
@@ -162,18 +168,16 @@ async function renderGroupList(container, portalState, options = {}) {
     });
   });
 
-  // Wire filter buttons
+  // --- Step 8: Wire filter buttons ---
   document.getElementById("btnApplyGroupsFilter").addEventListener("click", () => {
     renderGroupList(container, portalState);
   });
   document.getElementById("btnClearGroupsFilter").addEventListener("click", () => {
     document.getElementById("filter-group-name").value = "";
-    document.getElementById("filter-from").value = "";
-    document.getElementById("filter-to").value = "";
     renderGroupList(container, portalState);
   });
 
-  // Wire sort buttons
+  // --- Step 9: Wire sort buttons ---
   tableDiv.querySelectorAll(".sort-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
       const col = btn.dataset.col;
@@ -182,6 +186,7 @@ async function renderGroupList(container, portalState, options = {}) {
     });
   });
 }
+
 
 // Group Details view
 async function renderGroupDetails(container, portalState, groupId) {
