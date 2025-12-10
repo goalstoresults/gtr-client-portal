@@ -264,12 +264,17 @@ async function renderGroupMembers(container, portalState, groupId) {
     return;
   }
 
+  // Fetch the group details to get its name
+  const res = await fetch(`/groups/details/${groupId}?project=${portalState.project}`);
+  const data = await res.json();
+  const group = Array.isArray(data) ? data[0] : data;
+
   const prevName = document.getElementById("filter-member-name")?.value.trim() || "";
   const prevBiz  = document.getElementById("filter-member-business")?.value.trim() || "";
 
   container.innerHTML = `
     <section class="card">
-      <h2>Group Members for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
+      <h2>Group Members for ${escapeHtml(group?.group_name || "(Unnamed Group)")}</h2>
       <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
         <label>Name: <input type="text" id="filter-member-name" value="${escapeHtml(prevName)}" /></label>
         <label>Business: <input type="text" id="filter-member-business" value="${escapeHtml(prevBiz)}" /></label>
