@@ -68,8 +68,8 @@ async function renderGroupList(container, portalState, options = {}) {
 
   container.innerHTML = `
     <section class="card">
-      <h2>Groups for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
-      <div id="groupsFilters" style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+      <h2>Groups for ${escapeHtml(portalState.projects_config?.business_name || portalState.display_name || portalState.project)}</h2>
+       <div id="groupsFilters" style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
         <label>Name: <input type="text" id="filter-group-name" value="${escapeHtml(prevName)}" /></label>
         <button id="btnApplyGroupsFilter" class="btn-secondary">Apply Filter</button>
         <button id="btnClearGroupsFilter" class="btn-secondary">Clear Filter</button>
