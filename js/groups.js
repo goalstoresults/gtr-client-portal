@@ -258,11 +258,13 @@ async function renderGroupDetails(container, portalState, groupId) {
 }
 
 // Group Members view
+// Group Members view
 async function renderGroupMembers(container, portalState, groupId) {
   if (!portalState.project || !groupId) {
     container.innerHTML = `<section class="card"><p>Select a group to view members.</p></section>`;
     return;
   }
+
   // Fetch the group details to get its name
   const groupRes = await fetch(`/groups/details/${groupId}?project=${portalState.project}`);
   const groupData = await groupRes.json();
@@ -288,10 +290,11 @@ async function renderGroupMembers(container, portalState, groupId) {
 
   // Call groups-module /groups/members/:id
   const url = `https://groups-module.dennis-e64.workers.dev/groups/members/${groupId}?project=${portalState.project}&limit=500`;
-  const res = await fetch(url, { cache: "no-cache" });
-  let contacts = await res.json();
+  const membersRes = await fetch(url, { cache: "no-cache" });
+  let contacts = await membersRes.json();
   if (!Array.isArray(contacts)) contacts = [];
 
+  // Apply filters
   if (prevName && prevName.length >= 3) {
     const term = prevName.toLowerCase();
     contacts = contacts.filter(c => (c.contact_name || "").toLowerCase().includes(term));
@@ -301,8 +304,10 @@ async function renderGroupMembers(container, portalState, groupId) {
     contacts = contacts.filter(c => (c.business_name || "").toLowerCase().includes(term));
   }
 
+  // Sort alphabetically by contact_name
   contacts.sort((a, b) => (a.contact_name || "").localeCompare(b.contact_name || ""));
 
+  // Render table
   tableDiv.innerHTML = `
     <h4>Showing ${contacts.length} ${prevName || prevBiz ? "filtered" : "members"} contacts</h4>
     <table class="notes-table">
@@ -328,6 +333,7 @@ async function renderGroupMembers(container, portalState, groupId) {
     </table>
   `;
 
+  // Wire up filter buttons
   document.getElementById("btnApplyMemberFilter").addEventListener("click", () => {
     renderGroupMembers(container, portalState, groupId);
   });
@@ -337,6 +343,7 @@ async function renderGroupMembers(container, portalState, groupId) {
     renderGroupMembers(container, portalState, groupId);
   });
 }
+
 
 // Add Group view
 async function renderGroupAdd(container, portalState) {
