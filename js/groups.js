@@ -266,7 +266,10 @@ async function renderGroupMembers(container, portalState, groupId) {
   }
 
   // Fetch the group details to get its name
-  const groupRes = await fetch(`/groups/details/${groupId}?project=${portalState.project}`);
+  const groupRes = await fetch(
+  `https://groups-module.dennis-e64.workers.dev/groups/details/${groupId}?project=${portalState.project}`,
+  { cache: "no-cache" }
+  );
   const groupData = await groupRes.json();
   const group = Array.isArray(groupData) ? groupData[0] : groupData;
 
