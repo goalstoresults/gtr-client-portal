@@ -63,136 +63,84 @@ export async function loadGroupsTab({ portalState, tabContent }) {
 }
 
 // Group List with simple name filter + client-side search/sort
-async function renderGroupList(container, portalState, options = {}) {
-  // --- Step 1: Capture current filter value before rebuild ---
-  const prevName = document.getElementById("filter-group-name")?.value.trim() || "";
+async function renderGroupMembers(container, portalState, groupId) {
+  if (!portalState.project || !groupId) {
+    container.innerHTML = `<section class="card"><p>Select a group to view members.</p></section>`;
+    return;
+  }
 
-  // --- Step 2: Build base UI with preserved value ---
+  // Preserve filters
+  const prevName = document.getElementById("filter-member-name")?.value.trim() || "";
+  const prevBiz  = document.getElementById("filter-member-business")?.value.trim() || "";
+
   container.innerHTML = `
     <section class="card">
-      <h2>Groups for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
-      <div id="groupsFilters" style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-        <label>Name: <input type="text" id="filter-group-name" value="${escapeHtml(prevName)}" /></label>
-        <button id="btnApplyGroupsFilter" class="btn-secondary">Apply Filter</button>
-        <button id="btnClearGroupsFilter" class="btn-secondary">Clear Filter</button>
+      <h2>Group Members for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
+      <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <label>Name: <input type="text" id="filter-member-name" value="${escapeHtml(prevName)}" /></label>
+        <label>Business: <input type="text" id="filter-member-business" value="${escapeHtml(prevBiz)}" /></label>
+        <button id="btnApplyMemberFilter" class="secondary">Apply Filter</button>
+        <button id="btnClearMemberFilter" class="secondary">Clear Filter</button>
       </div>
-      <div id="groupTable">Loading...</div>
+      <div id="groupMemberTable">Loading...</div>
     </section>
   `;
 
-  const tableDiv = container.querySelector("#groupTable");
+  const tableDiv = container.querySelector("#groupMemberTable");
 
-  // --- Step 3: Fetch all groups (limit 500) ---
-  const order = options.order || "created_at.desc";
-  const params = new URLSearchParams({
-    project: portalState.project,
-    order,
-    limit: "500"
-  });
-  const url = `https://groups-module.dennis-e64.workers.dev/groups/list?${params}`;
-  console.log("[Groups] Fetching:", url);
-
+  // Fetch contacts for this group
+  const url = `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}&group_id=${groupId}&limit=500`;
   const res = await fetch(url, { cache: "no-cache" });
-  let groups = await res.json();
-  if (!Array.isArray(groups)) groups = groups.rows || [];
-  if (!Array.isArray(groups)) groups = [];
+  let contacts = await res.json();
+  if (!Array.isArray(contacts)) contacts = [];
 
-  // --- Step 4: Apply client-side filter ---
-  const name = prevName;
-  if (name && name.length >= 3) {
-    const term = name.toLowerCase();
-    groups = groups.filter(g => (g.group_name || "").toLowerCase().includes(term));
+  // Apply client-side filters
+  if (prevName && prevName.length >= 3) {
+    const term = prevName.toLowerCase();
+    contacts = contacts.filter(c => (c.contact_name || "").toLowerCase().includes(term));
+  }
+  if (prevBiz && prevBiz.length >= 3) {
+    const term = prevBiz.toLowerCase();
+    contacts = contacts.filter(c => (c.business_name || "").toLowerCase().includes(term));
   }
 
-  // --- Step 5: Sort alphabetically by group_name ---
-  groups.sort((a, b) => (a.group_name || "").localeCompare(b.group_name || ""));
+  // Sort alphabetically by contact_name
+  contacts.sort((a, b) => (a.contact_name || "").localeCompare(b.contact_name || ""));
 
-  // --- Step 6: Render table ---
+  // Render table (no Actions column)
   tableDiv.innerHTML = `
-    <h4>Showing ${groups.length} ${name ? "filtered" : "recent"} groups</h4>
+    <h4>Showing ${contacts.length} ${prevName || prevBiz ? "filtered" : "members"} contacts</h4>
     <table class="notes-table">
       <thead>
         <tr>
-          <th>
-            Name
-            <button class="sort-btn" data-col="group_name" data-dir="asc">▲</button>
-            <button class="sort-btn" data-col="group_name" data-dir="desc">▼</button>
-          </th>
-          <th class="amount">
-            Total Amount
-            <button class="sort-btn" data-col="total_amount" data-dir="asc">▲</button>
-            <button class="sort-btn" data-col="total_amount" data-dir="desc">▼</button>
-          </th>
-          <th class="amount">
-            Total Referral Amount
-            <button class="sort-btn" data-col="total_referral_amount" data-dir="asc">▲</button>
-            <button class="sort-btn" data-col="total_referral_amount" data-dir="desc">▼</button>
-          </th>
-          <th class="amount">
-            ROI
-            <button class="sort-btn" data-col="total_roi" data-dir="asc">▲</button>
-            <button class="sort-btn" data-col="total_roi" data-dir="desc">▼</button>
-          </th>
-          <th>
-            Created
-            <button class="sort-btn" data-col="created_at" data-dir="asc">▲</button>
-            <button class="sort-btn" data-col="created_at" data-dir="desc">▼</button>
-          </th>
-          <th>Actions</th>
+          <th>Name</th>
+          <th>Business Name</th>
+          <th>Contact Type</th>
         </tr>
       </thead>
       <tbody>
-        ${groups.length > 0
-          ? groups.map(g => `
+        ${contacts.length > 0
+          ? contacts.map(c => `
               <tr>
-                <td>${escapeHtml(g.group_name || "")}</td>
-                <td class="amount">${formatCurrency(g.total_amount)}</td>
-                <td class="amount">${formatCurrency(g.total_referral_amount)}</td>
-                <td class="amount">${escapeHtml(g.total_roi || "0.0000")}</td>
-                <td>${formatDateTime(g.created_at)}</td>
-                <td>
-                  <button class="btn-primary btn-select" data-id="${g.group_id}">Select</button>
-                </td>
+                <td>${escapeHtml(c.contact_name || "")}</td>
+                <td>${escapeHtml(c.business_name || "")}</td>
+                <td>${escapeHtml(c.contact_type || "")}</td>
               </tr>
             `).join("")
-          : `<tr><td colspan="6">(no groups found)</td></tr>`
+          : `<tr><td colspan="3">(no contacts found)</td></tr>`
         }
       </tbody>
     </table>
   `;
 
-  // --- Step 7: Wire Select ---
-  tableDiv.querySelectorAll(".btn-select").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const groupId = btn.dataset.id;
-      portalState.selectedGroupId = groupId;   // ✅ store active group
-  
-      const buttons = document.querySelectorAll("#groups-subtabs button");
-      buttons.forEach(b => b.classList.remove("active"));
-      const detailsBtn = document.querySelector('#groups-subtabs button[data-subtab="details"]');
-      if (detailsBtn) detailsBtn.classList.add("active");
-  
-      const content = document.querySelector("#groupsContent");
-      await renderGroupDetails(content, portalState, groupId);
-    });
+  // Wire filter buttons
+  document.getElementById("btnApplyMemberFilter").addEventListener("click", () => {
+    renderGroupMembers(container, portalState, groupId);
   });
-
-  // --- Step 8: Wire filter buttons ---
-  document.getElementById("btnApplyGroupsFilter").addEventListener("click", () => {
-    renderGroupList(container, portalState);
-  });
-  document.getElementById("btnClearGroupsFilter").addEventListener("click", () => {
-    document.getElementById("filter-group-name").value = "";
-    renderGroupList(container, portalState);
-  });
-
-  // --- Step 9: Wire sort buttons ---
-  tableDiv.querySelectorAll(".sort-btn").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const col = btn.dataset.col;
-      const dir = btn.dataset.dir;
-      await renderGroupList(container, portalState, { order: `${col}.${dir}` });
-    });
+  document.getElementById("btnClearMemberFilter").addEventListener("click", () => {
+    document.getElementById("filter-member-name").value = "";
+    document.getElementById("filter-member-business").value = "";
+    renderGroupMembers(container, portalState, groupId);
   });
 }
 
