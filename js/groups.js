@@ -66,9 +66,15 @@ export async function loadGroupsTab({ portalState, tabContent }) {
 async function renderGroupList(container, portalState, options = {}) {
   const prevName = document.getElementById("filter-group-name")?.value.trim() || "";
 
-  container.innerHTML = `
-    <section class="card">
-      <h2>Groups for ${escapeHtml(portalState.projects_config?.business_name || portalState.display_name || portalState.project)}</h2>
+        container.innerHTML = `
+          <section class="card">
+          <h2>Groups for ${
+        escapeHtml(
+          portalState.projects_config?.business_name ||
+          portalState.display_name ||
+          portalState.project
+        )
+      }</h2>
        <div id="groupsFilters" style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
         <label>Name: <input type="text" id="filter-group-name" value="${escapeHtml(prevName)}" /></label>
         <button id="btnApplyGroupsFilter" class="btn-secondary">Apply Filter</button>
