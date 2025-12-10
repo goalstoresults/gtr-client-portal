@@ -88,6 +88,7 @@ export async function loadContactsTab({ portalState, tabContent }) {
 }
 
 // 🔧 Contact List with client-side filters + sticky filter values
+// 🔧 Contact List with client-side filters + sticky filter values
 async function renderContactList(container, portalState) {
   try {
     // --- Step 1: Capture current filter values before rebuild ---
@@ -134,10 +135,11 @@ async function renderContactList(container, portalState) {
     }
 
     // --- Step 4: Fetch contacts (always limit 500) ---
+    const limit = 500;
     const params = new URLSearchParams({
       project: portalState.project,
       order: portalState.contactsSort?.order || "created_at.desc",
-      limit: "500"
+      limit: limit.toString()
     });
     const url = `https://contacts-module.dennis-e64.workers.dev/contacts/list?${params}`;
     console.log("[Contacts] Fetching:", url);
@@ -191,15 +193,18 @@ async function renderContactList(container, portalState) {
     const sortedContacts = sortContacts(contacts, portalState.contactsSort.column, portalState.contactsSort.direction);
 
     // --- Step 7: Build table UI ---
+    const totalCount = sortedContacts.length;
+    const maxNote = totalCount >= limit ? " (maximum returned)" : "";
+
     tableDiv.innerHTML = `
-      <h4>Showing ${sortedContacts.length} ${first||last||biz||type ? "filtered" : "recent"} contacts</h4>
+      <h4>Showing ${totalCount}${maxNote} ${first||last||biz||type ? "filtered" : "recent"} contacts</h4>
       <table class="notes-table">
         <thead>
           <tr>
             <th>
               Name
-              <button class="sort-btn" data-col="contact_name" data-dir="asc">▲</button>
-              <button class="sort-btn" data-col="contact_name" data-dir="desc">▼</button>
+              <button class="sort-btn" data-col="search_name" data-dir="asc">▲</button>
+              <button class="sort-btn" data-col="search_name" data-dir="desc">▼</button>
             </th>
             <th>
               Email
@@ -223,7 +228,7 @@ async function renderContactList(container, portalState) {
           ${sortedContacts.length > 0
             ? sortedContacts.map(c => `
                 <tr>
-                  <td>${escapeHtml(c.contact_name || "")}</td>
+                  <td>${escapeHtml(c.search_name || "")}</td>
                   <td>${escapeHtml(c.email || "")}</td>
                   <td>${escapeHtml(c.business_name || "")}</td>
                   <td>${escapeHtml(c.contact_type || "")}</td>
@@ -242,7 +247,7 @@ async function renderContactList(container, portalState) {
     tableDiv.querySelectorAll(".btn-select").forEach(btn => {
       btn.addEventListener("click", async () => {
         const contactId = btn.dataset.id;
-        portalState.selectedContactId = contactId;   // ✅ store active contact
+        portalState.selectedContactId = contactId;
         const buttons = document.querySelectorAll("#contacts-subtabs button");
         buttons.forEach(b => b.classList.remove("active"));
         const detailsBtn = document.querySelector('#contacts-subtabs button[data-subtab="details"]');
@@ -252,21 +257,8 @@ async function renderContactList(container, portalState) {
       });
     });
 
-    tableDiv.querySelectorAll(".btn-delete").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const contactId = btn.dataset.id;
-        if (!confirm("Delete this contact?")) return;
-        await fetch(`https://contacts-module.dennis-e64.workers.dev/contacts/delete/${contactId}?project=${portalState.project}`, {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" }
-        });
-        await renderContactList(container, portalState);
-      });
-    });
-
     // Filter buttons
     document.getElementById("btnApplyContactsFilter").addEventListener("click", () => {
-      // Re‑render with current values preserved
       renderContactList(container, portalState);
     });
 
@@ -289,11 +281,13 @@ async function renderContactList(container, portalState) {
     });
 
   } catch (err) {
-    container.innerHTML = `<h4>Contacts</h4><p>Error loading contacts: ${escapeHtml(err.message)}</p>`;
-    console.error(err);
+    container.innerHTML = `
+      <h4>Contacts</h4>
+      <p>Error loading contacts: ${escapeHtml(err.message || "Unknown error")}</p>
+    `;
+    console.error("[Contacts] Error in renderContactList:", err);
   }
 }
-
 
       
 
