@@ -88,8 +88,8 @@ async function renderGroupMembers(container, portalState, groupId) {
 
   const tableDiv = container.querySelector("#groupMemberTable");
 
-  // Fetch contacts for this group
-  const url = `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}&group_id=${groupId}&limit=500`;
+  // 🔑 Call groups-module /groups/members/:id
+  const url = `https://groups-module.dennis-e64.workers.dev/groups/members/${groupId}?project=${portalState.project}&limit=500`;
   const res = await fetch(url, { cache: "no-cache" });
   let contacts = await res.json();
   if (!Array.isArray(contacts)) contacts = [];
@@ -143,6 +143,7 @@ async function renderGroupMembers(container, portalState, groupId) {
     renderGroupMembers(container, portalState, groupId);
   });
 }
+
 
 
 // Group Details view
