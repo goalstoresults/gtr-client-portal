@@ -263,11 +263,10 @@ async function renderGroupMembers(container, portalState, groupId) {
     container.innerHTML = `<section class="card"><p>Select a group to view members.</p></section>`;
     return;
   }
-
   // Fetch the group details to get its name
-  const res = await fetch(`/groups/details/${groupId}?project=${portalState.project}`);
-  const data = await res.json();
-  const group = Array.isArray(data) ? data[0] : data;
+  const groupRes = await fetch(`/groups/details/${groupId}?project=${portalState.project}`);
+  const groupData = await groupRes.json();
+  const group = Array.isArray(groupData) ? groupData[0] : groupData;
 
   const prevName = document.getElementById("filter-member-name")?.value.trim() || "";
   const prevBiz  = document.getElementById("filter-member-business")?.value.trim() || "";
