@@ -32,7 +32,7 @@
     import { loadLookupsTab } from "./js/lookups.js";
     import { loadDashboardTab } from "./js/dashboard.js";
     import { loadGroupsTab } from "./js/groups.js";
-    import { loadSetupTab } from "./js/setup.js";   // 👈 NEW import
+    import { loadSetupTab } from "./js/setup.js";
 
     const portalState = { project: "", contactId: "" };
     const portalTitle = document.getElementById("portal-title");
@@ -50,7 +50,7 @@
       "5": { label: "Lookups", loader: loadLookupsTab },
       "6": { label: "Dashboard", loader: loadDashboardTab },
       "7": { label: "Groups", loader: loadGroupsTab },
-      "8": { label: "Setup", loader: loadSetupTab }   // 👈 NEW entry
+      "8": { label: "Setup", loader: loadSetupTab }
     };
 
     async function loadProjects() {
@@ -64,33 +64,29 @@
         let projectParam = projectParamRaw ? projectParamRaw.trim() : "";
 
         if (!projectParam) {
-          // No project param → show blank title and selector
           selectorRow.style.display = "block";
           projectSelector.innerHTML = projects
             .map(p => `<option value="${p.project}">${p.display_name}</option>`)
             .join("");
 
-          portalState.project = ""; // nothing selected yet
+          portalState.project = "";
           portalTitle.textContent = "";
           pageTitle.textContent = "";
           tabs.style.display = "none";
 
           projectSelector.addEventListener("change", () => {
             const selected = projectSelector.options[projectSelector.selectedIndex];
-            portalState.project = selected.value;
-            portalTitle.textContent = selected.text;
-            pageTitle.textContent = selected.text;
+            const match = projects.find(p => p.project === selected.value);
+            if (!match) return;
 
-            const enabledTabs = normalizeTabs(
-              projects.find(p => p.project === selected.value)?.enabled_tabs
-            );
+            injectConfig(match);
+            const enabledTabs = normalizeTabs(match.enabled_tabs);
             renderTabs(enabledTabs);
             tabs.style.display = "block";
             tabContent.innerHTML = "";
           });
 
         } else {
-          // Project param provided → load that project immediately
           const match = projects.find(p => String(p.project).toLowerCase() === projectParam.toLowerCase());
           if (!match) {
             tabs.style.display = "none";
@@ -99,10 +95,7 @@
             return;
           }
 
-          portalState.project = match.project;
-          portalTitle.textContent = match.display_name || "";
-          pageTitle.textContent = match.display_name || "";
-
+          injectConfig(match);
           const enabledTabs = normalizeTabs(match.enabled_tabs);
           renderTabs(enabledTabs);
           tabs.style.display = "block";
@@ -115,6 +108,20 @@
         tabContent.innerHTML =
           `<section class="card"><p>Unable to load projects. Please try again later.</p></section>`;
       }
+    }
+
+    function injectConfig(config) {
+      portalState.project = config.project;
+      portalState.projects_config = config;
+      portalState.display_name = config.display_name;
+      portalState.business_name = config.business_name;
+      portalState.contact_name = config.contact_name;
+      portalState.contact_email = config.contact_email;
+      portalState.contact_first_name = config.contact_first_name;
+      portalState.contact_last_name = config.contact_last_name;
+
+      portalTitle.textContent = config.display_name || "";
+      pageTitle.textContent = config.display_name || "";
     }
 
     function normalizeTabs(raw) {
