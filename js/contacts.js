@@ -92,19 +92,18 @@ export async function loadContactsTab({ portalState, tabContent }) {
 }
 
 // 🔧 Contact List with client-side filters + sticky filter values
-// 🔧 Contact List with backend filters via contacts-module (first/last like Notes)
 async function renderContactList(container, portalState) {
   try {
-    // --- Step 1: Capture current filter values before rebuild ---
+    // --- Capture current filter values ---
     const prevFirst = document.getElementById("filter-first")?.value.trim() || "";
     const prevLast  = document.getElementById("filter-last")?.value.trim() || "";
     const prevBiz   = document.getElementById("filter-business")?.value.trim() || "";
     const prevType  = document.getElementById("filter-contact-type")?.value || "";
 
-    // --- Step 2: Build base UI with preserved values ---
+    // --- Build base UI ---
     container.innerHTML = `
       <section class="card">
-        <h2>Contact List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
+        <h2>Contacts List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
         <div id="contactsFilters" style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
           <label>First: <input type="text" id="filter-first" value="${escapeHtml(prevFirst)}" /></label>
           <label>Last: <input type="text" id="filter-last" value="${escapeHtml(prevLast)}" /></label>
@@ -124,42 +123,32 @@ async function renderContactList(container, portalState) {
     const tableDiv = container.querySelector("#contactTable");
     const typeSelect = document.getElementById("filter-contact-type");
 
-    // --- Step 3: Populate Contact Type dropdown, preserve selection ---
-    {
-      const resTypes = await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=contact_type&project=${portalState.project}`);
-      const values = await resTypes.json();
-      if (Array.isArray(values)) {
-        values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
-        values.forEach(v => {
-          const opt = document.createElement("option");
-          opt.value = v.value;
-          opt.textContent = v.label || v.value;
-          if (v.value === prevType) opt.selected = true;
-          typeSelect.appendChild(opt);
-        });
-      }
+    // --- Populate Contact Type dropdown ---
+    const resTypes = await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=contact_type&project=${portalState.project}`);
+    const values = await resTypes.json();
+    if (Array.isArray(values)) {
+      values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
+      values.forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = v.value;
+        opt.textContent = v.label || v.value;
+        if (v.value === prevType) opt.selected = true;
+        typeSelect.appendChild(opt);
+      });
     }
 
-    // --- Step 4: Call contacts-module with server-side filters (first/last) ---
-    // The Worker expects: project, order, limit, and plain first_name / last_name.
-    const limit = 500;
-    const params = new URLSearchParams({
-      project: portalState.project,
-      order: portalState.contactsSort?.order || "created_at.desc",
-      limit: String(limit)
-    });
+    // --- Build Notes-style filter clause ---
+    const filters = [`project.eq.${portalState.project}`];
+    if (prevFirst && prevFirst.length >= 3) filters.push(`first_name.ilike.*${prevFirst}*`);
+    if (prevLast  && prevLast.length  >= 3) filters.push(`last_name.ilike.*${prevLast}*`);
+    if (prevBiz   && prevBiz.length   >= 3) filters.push(`business_name.ilike.*${prevBiz}*`);
+    if (prevType)                         filters.push(`contact_type.eq.${prevType}`);
 
-    // Match Notes behavior: only include filters when there’s enough signal (>=3 chars).
-    if (prevFirst && prevFirst.length >= 3) params.set("first_name", prevFirst);
-    if (prevLast  && prevLast.length  >= 3) params.set("last_name", prevLast);
+    const filterClause = filters.length > 1 ? `and=(${filters.join(",")})` : filters[0];
+    const selectCols = "contact_id,first_name,last_name,search_name,email,business_name,contact_type,created_at";
+    const url = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${filterClause}&select=${selectCols}&order=created_at.desc&limit=500`;
 
-    // Optional: business/type (add small backend support if you want these)
-    // If you haven’t added them to the Worker yet, they’ll be ignored harmlessly.
-    if (prevBiz   && prevBiz.length   >= 3) params.set("business_name", prevBiz);
-    if (prevType)                          params.set("contact_type", prevType);
-
-    const url = `https://contacts-module.dennis-e64.workers.dev/contacts/list?${params.toString()}`;
-    console.log("[Contacts] Fetching (contacts-module):", url);
+    console.log("[Contacts] Fetching via client-api:", url);
 
     const resList = await fetch(url, { cache: "no-cache" });
     if (!resList.ok) {
@@ -169,7 +158,7 @@ async function renderContactList(container, portalState) {
     let contacts = await resList.json();
     if (!Array.isArray(contacts)) contacts = [];
 
-    // --- Step 5: Sort client-side (presentation only) ---
+    // --- Sort client-side (presentation only) ---
     if (!portalState.contactsSort) {
       portalState.contactsSort = { column: "created_at", direction: "desc" };
     }
@@ -191,35 +180,19 @@ async function renderContactList(container, portalState) {
     }
     const sortedContacts = sortContacts(contacts, portalState.contactsSort.column, portalState.contactsSort.direction);
 
-    // --- Step 6: Build table UI (your existing columns) ---
+    // --- Build table UI ---
     const totalCount = sortedContacts.length;
-    const maxNote = totalCount >= limit ? " (maximum returned)" : "";
+    const maxNote = totalCount >= 500 ? " (maximum returned)" : "";
 
     tableDiv.innerHTML = `
       <h4>Showing ${totalCount}${maxNote} ${prevFirst||prevLast||prevBiz||prevType ? "filtered" : "recent"} contacts</h4>
       <table class="notes-table">
         <thead>
           <tr>
-            <th>
-              Name
-              <button class="sort-btn" data-col="search_name" data-dir="asc">▲</button>
-              <button class="sort-btn" data-col="search_name" data-dir="desc">▼</button>
-            </th>
-            <th>
-              Email
-              <button class="sort-btn" data-col="email" data-dir="asc">▲</button>
-              <button class="sort-btn" data-col="email" data-dir="desc">▼</button>
-            </th>
-            <th>
-              Business Name
-              <button class="sort-btn" data-col="business_name" data-dir="asc">▲</button>
-              <button class="sort-btn" data-col="business_name" data-dir="desc">▼</button>
-            </th>
-            <th>
-              Contact Type
-              <button class="sort-btn" data-col="contact_type" data-dir="asc">▲</button>
-              <button class="sort-btn" data-col="contact_type" data-dir="desc">▼</button>
-            </th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Business Name</th>
+            <th>Contact Type</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -227,13 +200,11 @@ async function renderContactList(container, portalState) {
           ${sortedContacts.length > 0
             ? sortedContacts.map(c => `
                 <tr>
-                  <td>${escapeHtml(c.search_name || c.contact_name || `${c.first_name || ""} ${c.last_name || ""}`.trim())}</td>
+                  <td>${escapeHtml(c.search_name || `${c.first_name || ""} ${c.last_name || ""}`.trim())}</td>
                   <td>${escapeHtml(c.email || "")}</td>
                   <td>${escapeHtml(c.business_name || "")}</td>
                   <td>${escapeHtml(c.contact_type || "")}</td>
-                  <td>
-                    <button class="btn-primary btn-select" data-id="${c.contact_id}">Select</button>
-                  </td>
+                  <td><button class="btn-primary btn-select" data-id="${c.contact_id}">Select</button></td>
                 </tr>
               `).join("")
             : `<tr><td colspan="5">(no contacts found)</td></tr>`
@@ -242,7 +213,7 @@ async function renderContactList(container, portalState) {
       </table>
     `;
 
-    // --- Step 7: Wire actions ---
+    // --- Wire actions ---
     tableDiv.querySelectorAll(".btn-select").forEach(btn => {
       btn.addEventListener("click", async () => {
         const contactId = btn.dataset.id;
@@ -260,23 +231,12 @@ async function renderContactList(container, portalState) {
     document.getElementById("btnApplyContactsFilter").addEventListener("click", () => {
       renderContactList(container, portalState);
     });
-
     document.getElementById("btnClearContactsFilter").addEventListener("click", () => {
       document.getElementById("filter-first").value = "";
       document.getElementById("filter-last").value = "";
       document.getElementById("filter-business").value = "";
       document.getElementById("filter-contact-type").value = "";
       renderContactList(container, portalState);
-    });
-
-    // Sort buttons
-    tableDiv.querySelectorAll(".sort-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const col = btn.dataset.col;
-        const dir = btn.dataset.dir;
-        portalState.contactsSort = { column: col, direction: dir };
-        renderContactList(container, portalState);
-      });
     });
 
   } catch (err) {
@@ -288,7 +248,6 @@ async function renderContactList(container, portalState) {
   }
 }
 
-      
 
 
 // 🔧 Dynamic Add Contact Form with collapsible sections + defaults
