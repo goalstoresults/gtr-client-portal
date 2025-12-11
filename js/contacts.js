@@ -61,12 +61,16 @@ export async function loadContactsTab({ portalState, tabContent }) {
           break;
 
         case "notes":
-          content.innerHTML = `
-            <section class="card">
-              <h2>Contact Notes</h2>
-              <p>(Placeholder for notes integration with Contacts)</p>
-            </section>
-          `;
+          if (portalState.selectedContactId) {
+            await renderContactNotes(content, portalState, portalState.selectedContactId);
+          } else {
+            content.innerHTML = `
+              <section class="card">
+                <h2>Contact Notes</h2>
+                <p>Select a contact from the list first, then open Notes.</p>
+              </section>
+            `;
+          }
           break;
 
         default:
@@ -1051,6 +1055,110 @@ async function openRelationshipForm(container, portalState, { mode, contactId, r
       alert("Error saving relationship: " + err.message);
       console.error(err);
     }
+  });
+}
+
+// 🔧 Notes table with expandable detail rows
+async function renderContactNotes(container, portalState, contactId) {
+  if (!portalState.project || !contactId) {
+    container.innerHTML = `
+      <section class="card">
+        <h2>Contact Notes</h2>
+        <p>Missing project or contact ID.</p>
+      </section>
+    `;
+    return;
+  }
+
+  // Fetch notes history for this contact (limit 500 for safety)
+  const limit = 500;
+  const url = `https://notes-module.dennis-e64.workers.dev/notes_history?project=${encodeURIComponent(portalState.project)}&contact_id=${encodeURIComponent(contactId)}&limit=${limit}`;
+  const res = await fetch(url, { cache: "no-cache" });
+  let notes = await res.json();
+  if (!Array.isArray(notes)) notes = [];
+
+  // Sort newest first by created_at
+  notes.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+  const totalCount = notes.length;
+  const maxNote = totalCount >= limit ? " (maximum returned)" : "";
+
+  container.innerHTML = `
+    <section class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2>Notes for Contact</h2>
+        <div class="muted">Showing ${totalCount}${maxNote}</div>
+      </div>
+
+      <table class="notes-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Author</th>
+            <th>Summary</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${notes.length > 0
+            ? notes.map(n => {
+                const summary = (n.note_text || "").length > 60
+                  ? (n.note_text || "").slice(0, 60) + "…"
+                  : (n.note_text || "");
+                return `
+                  <tr>
+                    <td>${escapeHtml(n.created_at || "")}</td>
+                    <td>${escapeHtml(n.author || "—")}</td>
+                    <td>${escapeHtml(summary)}</td>
+                    <td>
+                      <button class="btn-secondary btn-expand" data-id="${escapeHtml(n.id)}">Expand</button>
+                    </td>
+                  </tr>
+                  <tr class="note-details" id="note-${escapeHtml(n.id)}" style="display:none;">
+                    <td colspan="4">
+                      <div class="note-full" style="padding:8px; background:#f7f7f7; border:1px solid #eee;">
+                        <p><strong>Full note:</strong><br>${escapeHtml(n.note_text || "")}</p>
+                        <div class="muted" style="display:flex; gap:16px;">
+                          <span><strong>Created:</strong> ${escapeHtml(n.created_at || "—")}</span>
+                          <span><strong>Updated:</strong> ${escapeHtml(n.updated_at || "—")}</span>
+                          ${n.tags ? `<span><strong>Tags:</strong> ${escapeHtml(n.tags)}</span>` : ""}
+                        </div>
+                        <div style="margin-top:8px;">
+                          <button class="btn-danger btn-delete" data-id="${escapeHtml(n.id)}">Delete</button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              }).join("")
+            : `<tr><td colspan="4">(no notes found)</td></tr>`}
+        </tbody>
+      </table>
+    </section>
+  `;
+
+  // Wire expand toggles
+  container.querySelectorAll(".btn-expand").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const detailsRow = document.getElementById(`note-${btn.dataset.id}`);
+      if (!detailsRow) return;
+      detailsRow.style.display = detailsRow.style.display === "none" ? "table-row" : "none";
+    });
+  });
+
+  // Wire delete
+  container.querySelectorAll(".btn-delete").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Delete this note?")) return;
+      const delUrl = `https://notes-module.dennis-e64.workers.dev/notes/delete/${encodeURIComponent(btn.dataset.id)}?project=${encodeURIComponent(portalState.project)}`;
+      const resp = await fetch(delUrl, { method: "DELETE" });
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => "");
+        alert(`❌ Delete failed: ${text || resp.status}`);
+        return;
+      }
+      await renderContactNotes(container, portalState, contactId);
+    });
   });
 }
 
