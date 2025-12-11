@@ -92,8 +92,6 @@ export async function loadContactsTab({ portalState, tabContent }) {
 }
 
 // 🔧 Contact List with client-side filters + sticky filter values
-// 🔧 Contact List with server-side filters (first/last name only)
-// 🔧 Contact List with client-side filters + sticky filter values
 async function renderContactList(container, portalState) {
   try {
     // --- Step 1: Capture current filter values before rebuild ---
