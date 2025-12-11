@@ -92,7 +92,7 @@ export async function loadContactsTab({ portalState, tabContent }) {
 }
 
 // 🔧 Contact List with client-side filters + sticky filter values
-// 🔧 Contact List using the exact same backend/filters as Notes “Find Client”
+// 🔧 Contact List with backend filters via contacts-module (first/last like Notes)
 async function renderContactList(container, portalState) {
   try {
     // --- Step 1: Capture current filter values before rebuild ---
@@ -125,33 +125,41 @@ async function renderContactList(container, portalState) {
     const typeSelect = document.getElementById("filter-contact-type");
 
     // --- Step 3: Populate Contact Type dropdown, preserve selection ---
-    const resTypes = await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=contact_type&project=${portalState.project}`);
-    const values = await resTypes.json();
-    if (Array.isArray(values)) {
-      values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
-      values.forEach(v => {
-        const opt = document.createElement("option");
-        opt.value = v.value;
-        opt.textContent = v.label || v.value;
-        if (v.value === prevType) opt.selected = true;
-        typeSelect.appendChild(opt);
-      });
+    {
+      const resTypes = await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=contact_type&project=${portalState.project}`);
+      const values = await resTypes.json();
+      if (Array.isArray(values)) {
+        values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
+        values.forEach(v => {
+          const opt = document.createElement("option");
+          opt.value = v.value;
+          opt.textContent = v.label || v.value;
+          if (v.value === prevType) opt.selected = true;
+          typeSelect.appendChild(opt);
+        });
+      }
     }
 
-    // --- Step 4: Build the EXACT same query as Notes “Find Client” ---
-    // Endpoint: client-portal-api.dennis-e64.workers.dev/api/contacts
-    // Filters: and=(project.eq.nyfo, first_name.ilike.*foo*, last_name.ilike.*bar*, business_name.ilike.*baz*, contact_type.eq.Client)
-    const filters = [`project.eq.${portalState.project}`];
-    if (prevFirst && prevFirst.length >= 3) filters.push(`first_name.ilike.*${prevFirst}*`);
-    if (prevLast  && prevLast.length  >= 3) filters.push(`last_name.ilike.*${prevLast}*`);
-    if (prevBiz   && prevBiz.length   >= 3) filters.push(`business_name.ilike.*${prevBiz}*`);
-    if (prevType)                         filters.push(`contact_type.eq.${prevType}`);
+    // --- Step 4: Call contacts-module with server-side filters (first/last) ---
+    // The Worker expects: project, order, limit, and plain first_name / last_name.
+    const limit = 500;
+    const params = new URLSearchParams({
+      project: portalState.project,
+      order: portalState.contactsSort?.order || "created_at.desc",
+      limit: String(limit)
+    });
 
-    const filterClause = filters.length > 1 ? `and=(${filters.join(",")})` : filters[0];
-    const selectCols = "contact_id,first_name,last_name,email,contact_type,business_name,search_name,created_at";
-    const url = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${filterClause}&select=${selectCols}&order=created_at.desc&limit=500`;
+    // Match Notes behavior: only include filters when there’s enough signal (>=3 chars).
+    if (prevFirst && prevFirst.length >= 3) params.set("first_name", prevFirst);
+    if (prevLast  && prevLast.length  >= 3) params.set("last_name", prevLast);
 
-    console.log("[Contacts] Fetching (notes-style):", url);
+    // Optional: business/type (add small backend support if you want these)
+    // If you haven’t added them to the Worker yet, they’ll be ignored harmlessly.
+    if (prevBiz   && prevBiz.length   >= 3) params.set("business_name", prevBiz);
+    if (prevType)                          params.set("contact_type", prevType);
+
+    const url = `https://contacts-module.dennis-e64.workers.dev/contacts/list?${params.toString()}`;
+    console.log("[Contacts] Fetching (contacts-module):", url);
 
     const resList = await fetch(url, { cache: "no-cache" });
     if (!resList.ok) {
@@ -161,7 +169,7 @@ async function renderContactList(container, portalState) {
     let contacts = await resList.json();
     if (!Array.isArray(contacts)) contacts = [];
 
-    // --- Step 5: Sort client-side (presentation only; default created_at desc) ---
+    // --- Step 5: Sort client-side (presentation only) ---
     if (!portalState.contactsSort) {
       portalState.contactsSort = { column: "created_at", direction: "desc" };
     }
@@ -183,9 +191,9 @@ async function renderContactList(container, portalState) {
     }
     const sortedContacts = sortContacts(contacts, portalState.contactsSort.column, portalState.contactsSort.direction);
 
-    // --- Step 6: Build table UI (showing search_name like Notes uses full name) ---
+    // --- Step 6: Build table UI (your existing columns) ---
     const totalCount = sortedContacts.length;
-    const maxNote = totalCount >= 500 ? " (maximum returned)" : "";
+    const maxNote = totalCount >= limit ? " (maximum returned)" : "";
 
     tableDiv.innerHTML = `
       <h4>Showing ${totalCount}${maxNote} ${prevFirst||prevLast||prevBiz||prevType ? "filtered" : "recent"} contacts</h4>
@@ -219,7 +227,7 @@ async function renderContactList(container, portalState) {
           ${sortedContacts.length > 0
             ? sortedContacts.map(c => `
                 <tr>
-                  <td>${escapeHtml(c.search_name || `${c.first_name || ""} ${c.last_name || ""}`.trim())}</td>
+                  <td>${escapeHtml(c.search_name || c.contact_name || `${c.first_name || ""} ${c.last_name || ""}`.trim())}</td>
                   <td>${escapeHtml(c.email || "")}</td>
                   <td>${escapeHtml(c.business_name || "")}</td>
                   <td>${escapeHtml(c.contact_type || "")}</td>
