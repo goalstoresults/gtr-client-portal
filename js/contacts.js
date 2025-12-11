@@ -92,19 +92,30 @@ export async function loadContactsTab({ portalState, tabContent }) {
 }
 
 // 🔧 Contact List with client-side filters + sticky filter values
+// Contacts List using client-portal-api with Notes-style filters
 async function renderContactList(container, portalState) {
   try {
-    // --- Capture current filter values ---
+    // --- Ensure project is set ---
+    if (!portalState.project) {
+      const urlProj = new URLSearchParams(location.search).get("project");
+      if (urlProj) portalState.project = urlProj;
+    }
+    if (!portalState.project) {
+      container.innerHTML = `<h4>Contacts</h4><p>Error: Project not set.</p>`;
+      return;
+    }
+
+    // --- Capture filter values ---
     const prevFirst = document.getElementById("filter-first")?.value.trim() || "";
     const prevLast  = document.getElementById("filter-last")?.value.trim() || "";
     const prevBiz   = document.getElementById("filter-business")?.value.trim() || "";
     const prevType  = document.getElementById("filter-contact-type")?.value || "";
 
-    // --- Build base UI ---
+    // --- Build UI ---
     container.innerHTML = `
       <section class="card">
-        <h2>Contacts List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
-        <div id="contactsFilters" style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <h2>Contact List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
+        <div id="contactsFilters" style="margin-bottom:12px; display:flex; gap:12px; flex-wrap:wrap;">
           <label>First: <input type="text" id="filter-first" value="${escapeHtml(prevFirst)}" /></label>
           <label>Last: <input type="text" id="filter-last" value="${escapeHtml(prevLast)}" /></label>
           <label>Business: <input type="text" id="filter-business" value="${escapeHtml(prevBiz)}" /></label>
@@ -124,18 +135,20 @@ async function renderContactList(container, portalState) {
     const typeSelect = document.getElementById("filter-contact-type");
 
     // --- Populate Contact Type dropdown ---
-    const resTypes = await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=contact_type&project=${portalState.project}`);
-    const values = await resTypes.json();
-    if (Array.isArray(values)) {
-      values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
-      values.forEach(v => {
-        const opt = document.createElement("option");
-        opt.value = v.value;
-        opt.textContent = v.label || v.value;
-        if (v.value === prevType) opt.selected = true;
-        typeSelect.appendChild(opt);
-      });
-    }
+    try {
+      const resTypes = await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=contact_type&project=${portalState.project}`);
+      const values = await resTypes.json();
+      if (Array.isArray(values)) {
+        values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
+        values.forEach(v => {
+          const opt = document.createElement("option");
+          opt.value = v.value;
+          opt.textContent = v.label || v.value;
+          if (v.value === prevType) opt.selected = true;
+          typeSelect.appendChild(opt);
+        });
+      }
+    } catch {}
 
     // --- Build Notes-style filter clause ---
     const filters = [`project.eq.${portalState.project}`];
@@ -148,8 +161,9 @@ async function renderContactList(container, portalState) {
     const selectCols = "contact_id,first_name,last_name,search_name,email,business_name,contact_type,created_at";
     const url = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${filterClause}&select=${selectCols}&order=created_at.desc&limit=500`;
 
-    console.log("[Contacts] Fetching via client-api:", url);
+    console.log("[Contacts] Fetching via client-portal-api:", url);
 
+    // --- Fetch contacts ---
     const resList = await fetch(url, { cache: "no-cache" });
     if (!resList.ok) {
       const msg = await resList.text().catch(() => "");
@@ -158,7 +172,7 @@ async function renderContactList(container, portalState) {
     let contacts = await resList.json();
     if (!Array.isArray(contacts)) contacts = [];
 
-    // --- Sort client-side (presentation only) ---
+    // --- Sort client-side ---
     if (!portalState.contactsSort) {
       portalState.contactsSort = { column: "created_at", direction: "desc" };
     }
@@ -180,7 +194,7 @@ async function renderContactList(container, portalState) {
     }
     const sortedContacts = sortContacts(contacts, portalState.contactsSort.column, portalState.contactsSort.direction);
 
-    // --- Build table UI ---
+    // --- Build table ---
     const totalCount = sortedContacts.length;
     const maxNote = totalCount >= 500 ? " (maximum returned)" : "";
 
@@ -218,10 +232,8 @@ async function renderContactList(container, portalState) {
       btn.addEventListener("click", async () => {
         const contactId = btn.dataset.id;
         portalState.selectedContactId = contactId;
-        const buttons = document.querySelectorAll("#contacts-subtabs button");
-        buttons.forEach(b => b.classList.remove("active"));
-        const detailsBtn = document.querySelector('#contacts-subtabs button[data-subtab="details"]');
-        if (detailsBtn) detailsBtn.classList.add("active");
+        document.querySelectorAll("#contacts-subtabs button").forEach(b => b.classList.remove("active"));
+        document.querySelector('#contacts-subtabs button[data-subtab="details"]')?.classList.add("active");
         const content = document.querySelector("#contactsContent");
         await renderContactDetails(content, portalState, contactId);
       });
@@ -240,13 +252,11 @@ async function renderContactList(container, portalState) {
     });
 
   } catch (err) {
-    container.innerHTML = `
-      <h4>Contacts</h4>
-      <p>Error loading contacts: ${escapeHtml(err.message || "Unknown error")}</p>
-    `;
+    container.innerHTML = `<h4>Contacts</h4><p>Error loading contacts: ${escapeHtml(err.message || "Unknown error")}</p>`;
     console.error("[Contacts] Error in renderContactList:", err);
   }
 }
+
 
 
 
