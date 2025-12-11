@@ -92,7 +92,7 @@ export async function loadContactsTab({ portalState, tabContent }) {
 }
 
 // 🔧 Contact List with client-side filters + sticky filter values
-// 🔧 Contact List with database-backed filters
+// 🔧 Contact List with database-backed filters (first/last now sent to Worker)
 async function renderContactList(container, portalState) {
   try {
     // --- Step 1: Capture current filter values ---
@@ -138,16 +138,20 @@ async function renderContactList(container, portalState) {
       });
     }
 
-    // --- Step 4: Build backend query with filters ---
+    // --- Step 4: Build backend query WITH filters (Worker expects these names) ---
     const params = new URLSearchParams({
       project: portalState.project,
       order: portalState.contactsSort?.order || "created_at.desc",
       limit: "500"
     });
-    if (prevFirst) params.append("first_name.ilike", `%${prevFirst}%`);
-    if (prevLast)  params.append("last_name.ilike", `%${prevLast}%`);
-    if (prevBiz)   params.append("business_name.ilike", `%${prevBiz}%`);
-    if (prevType)  params.append("contact_type.eq", prevType);
+
+    // Only send filters if >= 3 chars, to match your UI behavior
+    if (prevFirst && prevFirst.length >= 3) params.set("first_name", prevFirst);
+    if (prevLast  && prevLast.length  >= 3) params.set("last_name", prevLast);
+
+    // Optional: these require small backend additions (see note below)
+    if (prevBiz   && prevBiz.length   >= 3) params.set("business_name", prevBiz);
+    if (prevType)                          params.set("contact_type", prevType);
 
     const url = `https://contacts-module.dennis-e64.workers.dev/contacts/list?${params}`;
     console.log("[Contacts] Fetching with filters:", url);
@@ -156,7 +160,7 @@ async function renderContactList(container, portalState) {
     let contacts = await resList.json();
     if (!Array.isArray(contacts)) contacts = [];
 
-    // --- Step 5: Sort client-side ---
+    // --- Step 5: Sort client-side (purely presentation) ---
     if (!portalState.contactsSort) {
       portalState.contactsSort = { column: "created_at", direction: "desc" };
     }
@@ -202,7 +206,7 @@ async function renderContactList(container, portalState) {
           ${sortedContacts.length > 0
             ? sortedContacts.map(c => `
                 <tr>
-                  <td>${escapeHtml(c.search_name || "")}</td>
+                  <td>${escapeHtml(c.search_name || c.contact_name || `${c.first_name || ""} ${c.last_name || ""}`.trim())}</td>
                   <td>${escapeHtml(c.email || "")}</td>
                   <td>${escapeHtml(c.business_name || "")}</td>
                   <td>${escapeHtml(c.contact_type || "")}</td>
