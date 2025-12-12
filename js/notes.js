@@ -314,7 +314,7 @@ async function renderReview(container, portalState, noteId) {
 
         <p><strong>Subject:</strong> ${note.subject || "(no subject)"}</p>
         <p><strong>From:</strong> ${note.from_name || "(unknown)"} (${note.from_email || "no email"})</p>
-        <p><strong>Created:</strong> ${note.created}</p>
+        <p><strong>Created:</strong> ${note.created_at || ""}</p>
         <p><strong>Client:</strong> ${note.contact_name || "(unknown)"} (${note.contact_email || ""})</p>
         <p><strong>Status:</strong> ${note.status || "pending"} • 
            <strong>Needs review:</strong> ${note.needs_review ? "Yes" : "No"}</p>
@@ -443,12 +443,11 @@ async function renderReview(container, portalState, noteId) {
       const filterClause = filters.length > 1
         ? `and=(${filters.join(",")})`
         : filters[0];
-
       const selectCols = "contact_id,first_name,last_name,email,contact_type";
       const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${filterClause}&select=${selectCols}`;
       console.log("[SetClient] Searching contacts:", searchUrl);
 
-       try {
+      try {
         const resp = await fetch(searchUrl);
         if (!resp.ok) {
           const msg = await resp.text().catch(() => "");
@@ -479,8 +478,14 @@ async function renderReview(container, portalState, noteId) {
         alert("Network error searching contacts");
         console.error(err);
       }
-    });
+    }); // end of btnFindClient handler
+
+  } catch (err) {
+    container.innerHTML = `<p>Error loading note review: ${err.message}</p>`;
+    console.error(err);
   }
+} // end of renderReview
+
       
 /* Add Client to Note */
 /* Add Client to Note */
