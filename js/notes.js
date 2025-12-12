@@ -256,7 +256,6 @@ function renderAdd(container, portalState) {
 }
 
 /* Review (GET /note_review) */
-/* Review (GET /note_review) */
 async function renderReview(container, portalState, noteId) {
   console.log("[Review] Called with noteId:", noteId);
 
@@ -291,7 +290,7 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `
       <section class="card">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-          <h2 style="margin:0;">Notes Review: ${escapeHtml(note.subject || "(no subject)")}</h2>
+          <h2 style="margin:0;">Note Review: ${escapeHtml(note.subject || "(no subject)")}</h2>
           <button id="btnSetClient" class="primary"
                   style="background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
             Set Client
@@ -435,7 +434,7 @@ document.getElementById("btnFindClient").addEventListener("click", async () => {
     alert("Enter at least a first or last name.");
     return;
   }
-  if ((first && first.length < 1) || (last && last.length < 3)) {
+  if ((first && first.length < 1) || (last && last.length < 1)) {
     alert("Names must be at least 1 characters.");
     return;
   }
