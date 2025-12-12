@@ -91,25 +91,23 @@ export async function loadContactsTab({ portalState, tabContent }) {
   }
 }
 
-// 🔧 Contact List with server-side filter (starts-with, min 1 char)
+// 🔧 Contact List with dynamic grid based on project_contact_fields
 async function renderContactList(container, portalState) {
   try {
     // --- Step 1: Capture current filter values ---
     const prevFirst    = document.getElementById("filter-first")?.value.trim() || "";
     const prevLast     = document.getElementById("filter-last")?.value.trim() || "";
-    const prevSearch   = document.getElementById("filter-search")?.value.trim() || "";
     const prevBusiness = document.getElementById("filter-business")?.value.trim() || "";
     const prevType     = document.getElementById("filter-contact-type")?.value || "";
 
     // --- Step 2: Build base UI ---
     container.innerHTML = `
       <section class="card">
-        <h2>Contacts List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
+        <h2>Contact List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
         <div id="contactsFilters" style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
           <label>First: <input type="text" id="filter-first" value="${escapeHtml(prevFirst)}" /></label>
           <label>Last: <input type="text" id="filter-last" value="${escapeHtml(prevLast)}" /></label>
-          <label>Search: <input type="text" id="filter-search" value="${escapeHtml(prevSearch)}" /></label>
-          <label>Business: <input type="text" id="filter-business" value="${escapeHtml(prevBusiness)}" /></label> <!-- ✅ new editable field -->
+          <label>Business: <input type="text" id="filter-business" value="${escapeHtml(prevBusiness)}" /></label>
           <label>Contact Type:
             <select id="filter-contact-type" class="form-control" style="min-width:160px;">
               <option value="">ALL</option>
@@ -121,7 +119,6 @@ async function renderContactList(container, portalState) {
         <div id="contactTable">(no contacts found)</div>
       </section>
     `;
-
 
     const tableDiv   = container.querySelector("#contactTable");
     const typeSelect = document.getElementById("filter-contact-type");
@@ -144,17 +141,10 @@ async function renderContactList(container, portalState) {
     async function applyFilter() {
       const first    = document.getElementById("filter-first").value.trim();
       const last     = document.getElementById("filter-last").value.trim();
-      const search   = document.getElementById("filter-search").value.trim();
       const business = document.getElementById("filter-business").value.trim();
       const type     = document.getElementById("filter-contact-type").value;
 
-      if (
-        first.length < 1 &&
-        last.length < 1 &&
-        search.length < 1 &&
-        business.length < 1 &&
-        !type
-      ) {
+      if (first.length < 1 && last.length < 1 && business.length < 1 && !type) {
         tableDiv.innerHTML = `<p>(no contacts found — enter at least 1 character)</p>`;
         return;
       }
@@ -163,7 +153,6 @@ async function renderContactList(container, portalState) {
         project: portalState.project,
         first: first,
         last: last,
-        search: search,
         business: business
       });
       const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
@@ -177,39 +166,37 @@ async function renderContactList(container, portalState) {
         contacts = contacts.filter(c => c.contact_type === type);
       }
 
-      // --- Step 5: Build table UI ---
+      // --- Step 5: Fetch field config for dynamic grid ---
+      const fieldsRes = await fetch(
+        `https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${portalState.project}`,
+        { cache: "no-cache" }
+      );
+      const fieldsData = await fieldsRes.json();
+      const fields = Array.isArray(fieldsData.rows) ? fieldsData.rows : [];
+      fields.sort((a, b) => a.sort_order - b.sort_order);
+
+      const listFields = fields.filter(f => f.contact_tab === "list");
+
+      // --- Step 6: Build table UI dynamically ---
+      const headers = listFields.map(f => `<th>${escapeHtml(f.label || f.field_key)}</th>`).join("");
+      const headerRow = `<tr>${headers}<th>Actions</th></tr>`;
+
+      const rows = contacts.map(c => {
+        const cells = listFields.map(f => `<td>${escapeHtml(c[f.field_key] || "")}</td>`).join("");
+        return `
+          <tr>
+            ${cells}
+            <td><button class="btn-primary btn-select" data-id="${c.contact_id}">Select</button></td>
+          </tr>
+        `;
+      }).join("");
+
       tableDiv.innerHTML = `
         <h4>Showing ${contacts.length} contacts</h4>
         <table class="notes-table">
-          <thead>
-            <tr>
-              <th>Search Name</th>
-              <th>Business Name</th>
-              <th>First Name</th>
-              <th>Last Name</th>
-              <th>Email</th>
-              <th>Contact Type</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
+          <thead>${headerRow}</thead>
           <tbody>
-            ${
-              contacts.length > 0
-                ? contacts.map(c => `
-                    <tr>
-                      <td>${escapeHtml(c.search_name || "")}</td>
-                      <td>${escapeHtml(c.business_name || "")}</td>
-                      <td>${escapeHtml(c.first_name || "")}</td>
-                      <td>${escapeHtml(c.last_name || "")}</td>
-                      <td>${escapeHtml(c.email || "")}</td>
-                      <td>${escapeHtml(c.contact_type || "")}</td>
-                      <td>
-                        <button class="btn-primary btn-select" data-id="${c.contact_id}">Select</button>
-                      </td>
-                    </tr>
-                  `).join("")
-                : `<tr><td colspan="7">(no contacts found)</td></tr>`
-            }
+            ${rows || `<tr><td colspan="${listFields.length + 1}">(no contacts found)</td></tr>`}
           </tbody>
         </table>
       `;
@@ -229,12 +216,11 @@ async function renderContactList(container, portalState) {
       });
     }
 
-    // --- Step 6: Wire filter buttons ---
+    // --- Step 7: Wire filter buttons ---
     document.getElementById("btnApplyContactsFilter").addEventListener("click", applyFilter);
     document.getElementById("btnClearContactsFilter").addEventListener("click", () => {
       document.getElementById("filter-first").value = "";
       document.getElementById("filter-last").value = "";
-      document.getElementById("filter-search").value = "";
       document.getElementById("filter-business").value = "";
       document.getElementById("filter-contact-type").value = "";
       tableDiv.innerHTML = `(no contacts found)`;
