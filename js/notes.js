@@ -425,61 +425,62 @@ async function renderReview(container, portalState, noteId) {
         renderRelationships(container, portalState);
       });
     }
-// ✅ Updated Find Client handler: starts-with, min 1 char
-document.getElementById("btnFindClient").addEventListener("click", async () => {
-  const first = document.getElementById("filter-first").value.trim();
-  const last  = document.getElementById("filter-last").value.trim();
+    // ✅ Updated Find Client handler: starts-with, min 1 char
+    document.getElementById("btnFindClient").addEventListener("click", async () => {
+      const first = document.getElementById("filter-first").value.trim();
+      const last  = document.getElementById("filter-last").value.trim();
+    
+      if (!first && !last) {
+        alert("Enter at least a first or last name.");
+        return;
+      }
+    
+      const filters = [`project=eq.${portalState.project}`];
+      if (first.length >= 1) filters.push(`first_name.ilike.${encodeURIComponent(first + "%")}`);
+      if (last.length >= 1)  filters.push(`last_name.ilike.${encodeURIComponent(last + "%")}`);
+    
+      // ✅ Fix: prefix with and= when combining multiple filters
+      const filterClause = filters.length > 1
+        ? `and=(${filters.join(",")})`
+        : filters[0];
+    
+      const selectCols = "contact_id,first_name,last_name,email,contact_type";
+      const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${filterClause}&select=${encodeURIComponent(selectCols)}`;
+      console.log("[SetClient] Searching contacts:", searchUrl);
+    
+      try {
+        const resp = await fetch(searchUrl);
+        if (!resp.ok) {
+          const msg = await resp.text().catch(() => "");
+          alert(`Search failed (${resp.status}). ${msg}`);
+          return;
+        }
+    
+        const rows = await resp.json();
+        const resultsDiv = document.getElementById("clientSearchResults");
+        resultsDiv.innerHTML = rows.length > 0
+          ? rows.map(r => {
+              const fullName = `${r.first_name || ""} ${r.last_name || ""}`.trim();
+              const typeLabel = (r.contact_type || "contact").toLowerCase();
+              const emailSafe = r.email || "";
+              return `
+                <div style="padding:8px; border-bottom:1px solid #eee; cursor:pointer;"
+                     onclick="attachClientToNote('${r.contact_id}', '${fullName}', '${typeLabel}', '${emailSafe}', { selectedNoteId: '${portalState.selectedNoteId}', project: '${portalState.project}' })">
+                  <strong>${fullName}</strong>
+                  <span style="background:#eef; color:#336; padding:2px 6px; border-radius:12px; font-size:0.75em; margin-left:6px;">
+                    ${typeLabel}
+                  </span><br/>
+                  <small>${emailSafe}</small>
+                </div>
+              `;
+            }).join("")
+          : "<div class='muted'>No contacts found.</div>";
+      } catch (err) {
+        alert("Network error searching contacts");
+        console.error(err);
+      }
+    }); // end of btnFindClient handler
 
-  if (!first && !last) {
-    alert("Enter at least a first or last name.");
-    return;
-  }
-
-  const filters = [`project=eq.${portalState.project}`];
-  if (first.length >= 1) filters.push(`first_name.ilike.${encodeURIComponent(first + "%")}`);
-  if (last.length >= 1)  filters.push(`last_name.ilike.${encodeURIComponent(last + "%")}`);
-
-  // ✅ Fix: prefix with and= when combining multiple filters
-  const filterClause = filters.length > 1
-    ? `and=(${filters.join(",")})`
-    : filters[0];
-
-  const selectCols = "contact_id,first_name,last_name,email,contact_type";
-  const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${filterClause}&select=${selectCols}`;
-  console.log("[SetClient] Searching contacts:", searchUrl);
-
-  try {
-    const resp = await fetch(searchUrl);
-    if (!resp.ok) {
-      const msg = await resp.text().catch(() => "");
-      alert(`Search failed (${resp.status}). ${msg}`);
-      return;
-    }
-
-    const rows = await resp.json();
-    const resultsDiv = document.getElementById("clientSearchResults");
-    resultsDiv.innerHTML = rows.length > 0
-      ? rows.map(r => {
-          const fullName = `${r.first_name || ""} ${r.last_name || ""}`.trim();
-          const typeLabel = (r.contact_type || "contact").toLowerCase();
-          const emailSafe = r.email || "";
-          return `
-            <div style="padding:8px; border-bottom:1px solid #eee; cursor:pointer;"
-                 onclick="attachClientToNote('${r.contact_id}', '${fullName}', '${typeLabel}', '${emailSafe}', { selectedNoteId: '${portalState.selectedNoteId}', project: '${portalState.project}' })">
-              <strong>${fullName}</strong>
-              <span style="background:#eef; color:#336; padding:2px 6px; border-radius:12px; font-size:0.75em; margin-left:6px;">
-                ${typeLabel}
-              </span><br/>
-              <small>${emailSafe}</small>
-            </div>
-          `;
-        }).join("")
-      : "<div class='muted'>No contacts found.</div>";
-  } catch (err) {
-    alert("Network error searching contacts");
-    console.error(err);
-  }
-}); // end of btnFindClient handler
 
 
   } catch (err) {
