@@ -291,7 +291,7 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `
       <section class="card">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-          <h2 style="margin:0;">Note Review: ${escapeHtml(note.subject || "(no subject)")}</h2>
+          <h2 style="margin:0;">Notes Review: ${escapeHtml(note.subject || "(no subject)")}</h2>
           <button id="btnSetClient" class="primary"
                   style="background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
             Set Client
@@ -435,14 +435,14 @@ document.getElementById("btnFindClient").addEventListener("click", async () => {
     alert("Enter at least a first or last name.");
     return;
   }
-  if ((first && first.length < 3) || (last && last.length < 3)) {
-    alert("Names must be at least 3 characters.");
+  if ((first && first.length < 1) || (last && last.length < 3)) {
+    alert("Names must be at least 1 characters.");
     return;
   }
 
   const filters = [`project.eq.${portalState.project}`];
-  if (first) filters.push(`first_name.ilike.*${first}*`);
-  if (last)  filters.push(`last_name.ilike.*${last}*`);
+  if (first) filters.push(`first_name.ilike.${first}*`);
+  if (last)  filters.push(`last_name.ilike.${last}*`);
 
   const filterClause = filters.length > 1
     ? `and=(${filters.join(",")})`
