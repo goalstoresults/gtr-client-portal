@@ -256,6 +256,7 @@ function renderAdd(container, portalState) {
 }
 
 /* Review (GET /note_review) */
+/* Review (GET /note_review) */
 async function renderReview(container, portalState, noteId) {
   console.log("[Review] Called with noteId:", noteId);
 
@@ -290,7 +291,7 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `
       <section class="card">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-          <h2 style="margin:0;">Notes Review: ${escapeHtml(note.subject || "(no subject)")}</h2>
+          <h2 style="margin:0;">Note Review: ${escapeHtml(note.subject || "(no subject)")}</h2>
           <button id="btnSetClient" class="primary"
                   style="background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
             Set Client
@@ -314,7 +315,7 @@ async function renderReview(container, portalState, noteId) {
 
         <p><strong>Subject:</strong> ${note.subject || "(no subject)"}</p>
         <p><strong>From:</strong> ${note.from_name || "(unknown)"} (${note.from_email || "no email"})</p>
-        <p><strong>Created:</strong> ${note.created_at || ""}</p>
+        <p><strong>Created:</strong> ${note.created}</p>
         <p><strong>Client:</strong> ${note.contact_name || "(unknown)"} (${note.contact_email || ""})</p>
         <p><strong>Status:</strong> ${note.status || "pending"} • 
            <strong>Needs review:</strong> ${note.needs_review ? "Yes" : "No"}</p>
@@ -425,69 +426,73 @@ async function renderReview(container, portalState, noteId) {
         renderRelationships(container, portalState);
       });
     }
-   // ✅ Notes Find Client handler rebuilt to match Contacts logic
-    document.getElementById("btnFindClient").addEventListener("click", async () => {
-      const first = document.getElementById("filter-first").value.trim();
-      const last  = document.getElementById("filter-last").value.trim();
-    
-      if (!first && !last) {
-        alert("Enter at least a first or last name.");
-        return;
-      }
-    
-      const filters = [`project=eq.${portalState.project}`];
-      // ✅ Use =ilike (same as Contacts)
-      if (first && first.length >= 1) filters.push(`first_name=ilike.${encodeURIComponent(first + "%")}`);
-      if (last && last.length >= 1)  filters.push(`last_name=ilike.${encodeURIComponent(last + "%")}`);
-    
-      // ✅ Combine multiple filters with and=(...)
-      const filterClause = filters.length > 1
-        ? `and=(${filters.join(",")})`
-        : filters[0];
-    
-      // ✅ Match Contacts: include project in select, order by created_at.desc
-      const selectCols = "contact_id,project,first_name,last_name,email,contact_type";
-      const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${filterClause}&select=${selectCols}&order=created_at.desc`;
-      console.log("[Notes] Searching contacts:", searchUrl);
-    
-      try {
-        const resp = await fetch(searchUrl);
-        if (!resp.ok) {
-          const msg = await resp.text().catch(() => "");
-          alert(`Search failed (${resp.status}). ${msg}`);
-          return;
-        }
-    
-        const rows = await resp.json();
-        const resultsDiv = document.getElementById("clientSearchResults");
-        resultsDiv.innerHTML = rows.length > 0
-          ? rows.map(r => {
-              const fullName = `${r.first_name || ""} ${r.last_name || ""}`.trim();
-              const typeLabel = (r.contact_type || "contact").toLowerCase();
-              const emailSafe = r.email || "";
-              return `
-                <div style="padding:8px; border-bottom:1px solid #eee; cursor:pointer;"
-                     onclick="attachClientToNote('${r.contact_id}', '${fullName}', '${typeLabel}', '${emailSafe}', { selectedNoteId: '${portalState.selectedNoteId}', project: '${portalState.project}' })">
-                  <strong>${fullName}</strong>
-                  <span style="background:#eef; color:#336; padding:2px 6px; border-radius:12px; font-size:0.75em; margin-left:6px;">
-                    ${typeLabel}
-                  </span><br/>
-                  <small>${emailSafe}</small>
-                </div>
-              `;
-            }).join("")
-          : "<div class='muted'>No contacts found.</div>";
-      } catch (err) {
-        alert("Network error searching contacts");
-        console.error(err);
-      }
-    }); // end of btnFindClient handler
+
+document.getElementById("btnFindClient").addEventListener("click", async () => {
+  const first = document.getElementById("filter-first").value.trim();
+  const last = document.getElementById("filter-last").value.trim();
+
+  if (!first && !last) {
+    alert("Enter at least a first or last name.");
+    return;
+  }
+  if ((first && first.length < 3) || (last && last.length < 3)) {
+    alert("Names must be at least 3 characters.");
+    return;
+  }
+
+  const filters = [`project.eq.${portalState.project}`];
+  if (first) filters.push(`first_name.ilike.*${first}*`);
+  if (last)  filters.push(`last_name.ilike.*${last}*`);
+
+  const filterClause = filters.length > 1
+    ? `and=(${filters.join(",")})`
+    : filters[0];
+
+  const selectCols = "contact_id,first_name,last_name,email,contact_type";
+  const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${filterClause}&select=${selectCols}`;
+  console.log("[SetClient] Searching contacts:", searchUrl);
+
+  try {
+    const resp = await fetch(searchUrl);
+    if (!resp.ok) {
+      const msg = await resp.text().catch(() => "");
+      alert(`Search failed (${resp.status}). ${msg}`);
+      return;
+    }
+    const rows = await resp.json();
+    const resultsDiv = document.getElementById("clientSearchResults");
+    resultsDiv.innerHTML = rows.length > 0
+      ? rows.map(r => {
+          const fullName = `${r.first_name || ""} ${r.last_name || ""}`.trim();
+          const typeLabel = (r.contact_type || "contact").toLowerCase();
+          const emailSafe = r.email || "";
+          return `
+            <div style="padding:8px; border-bottom:1px solid #eee; cursor:pointer;"
+                 onclick="attachClientToNote('${r.contact_id}', '${fullName}', '${typeLabel}', '${emailSafe}', { selectedNoteId: '${portalState.selectedNoteId}', project: '${portalState.project}' })">
+              <strong>${fullName}</strong>
+              <span style="background:#eef; color:#336; padding:2px 6px; border-radius:12px; font-size:0.75em; margin-left:6px;">
+                ${typeLabel}
+              </span><br/>
+              <small>${emailSafe}</small>
+            </div>
+          `;
+        }).join("")
+      : "<div class='muted'>No contacts found.</div>";
+  } catch (err) {
+    alert("Network error searching contacts");
+    console.error(err);
+  }
+});
+
 
   } catch (err) {
     container.innerHTML = `<p>Error loading note review: ${err.message}</p>`;
     console.error(err);
   }
-} // end of renderReview
+}
+
+
+
 
       
 /* Add Client to Note */
