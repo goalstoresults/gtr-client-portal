@@ -104,12 +104,12 @@ async function renderContactList(container, portalState) {
     // --- Step 2: Build base UI ---
     container.innerHTML = `
       <section class="card">
-        <h2>Contact List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
+        <h2>Contacts List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
         <div id="contactsFilters" style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
           <label>First: <input type="text" id="filter-first" value="${escapeHtml(prevFirst)}" /></label>
           <label>Last: <input type="text" id="filter-last" value="${escapeHtml(prevLast)}" /></label>
           <label>Search: <input type="text" id="filter-search" value="${escapeHtml(prevSearch)}" /></label>
-          <label>Business: <input type="text" id="filter-business" value="${escapeHtml(prevBusiness)}" /></label>
+          <label>Business: <input type="text" id="filter-business" value="${escapeHtml(prevBusiness)}" /></label> <!-- ✅ new editable field -->
           <label>Contact Type:
             <select id="filter-contact-type" class="form-control" style="min-width:160px;">
               <option value="">ALL</option>
@@ -121,6 +121,7 @@ async function renderContactList(container, portalState) {
         <div id="contactTable">(no contacts found)</div>
       </section>
     `;
+
 
     const tableDiv   = container.querySelector("#contactTable");
     const typeSelect = document.getElementById("filter-contact-type");
