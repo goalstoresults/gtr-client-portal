@@ -290,7 +290,7 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `
       <section class="card">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-          <h2 style="margin:0;">Note Review: ${escapeHtml(note.subject || "(no subject)")}</h2>
+          <h2 style="margin:0;">Notes Review: ${escapeHtml(note.subject || "(no subject)")}</h2>
           <button id="btnSetClient" class="primary"
                   style="background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
             Set Client
@@ -782,8 +782,8 @@ grid.querySelectorAll(".get-id-btn").forEach(btn => {
       
         // ✅ Always include project filter, using dot notation
         const filters = [`project.eq.${project}`];
-        if (first) filters.push(`first_name.ilike.*${first}*`);
-        if (last)  filters.push(`last_name.ilike.*${last}*`);
+        if (first) filters.push(`first_name.ilike.${first}*`);
+        if (last)  filters.push(`last_name.ilike.${last}*`);
       
         const query = filters.length > 1
           ? `and=(${filters.join(",")})`
