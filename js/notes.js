@@ -290,7 +290,7 @@ async function renderReview(container, portalState, noteId) {
     container.innerHTML = `
       <section class="card">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-          <h2 style="margin:0;">Notes Review: ${escapeHtml(note.subject || "(no subject)")}</h2>
+          <h2 style="margin:0;">Note Review: ${escapeHtml(note.subject || "(no subject)")}</h2>
           <button id="btnSetClient" class="primary"
                   style="background:#2979ff; color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:500; cursor:pointer;">
             Set Client
@@ -425,7 +425,7 @@ async function renderReview(container, portalState, noteId) {
         renderRelationships(container, portalState);
       });
     }
-    // ✅ Updated Find Client handler: starts-with, min 1 char
+     // ✅ Updated Find Client handler: starts-with, min 1 char
     document.getElementById("btnFindClient").addEventListener("click", async () => {
       const first = document.getElementById("filter-first").value.trim();
       const last  = document.getElementById("filter-last").value.trim();
@@ -436,16 +436,17 @@ async function renderReview(container, portalState, noteId) {
       }
     
       const filters = [`project=eq.${portalState.project}`];
-      if (first.length >= 1) filters.push(`first_name.ilike.${encodeURIComponent(first + "%")}`);
-      if (last.length >= 1)  filters.push(`last_name.ilike.${encodeURIComponent(last + "%")}`);
+      // ✅ Use =ilike (correct PostgREST syntax)
+      if (first.length >= 1) filters.push(`first_name=ilike.${encodeURIComponent(first + "%")}`);
+      if (last.length >= 1)  filters.push(`last_name=ilike.${encodeURIComponent(last + "%")}`);
     
-      // ✅ Fix: prefix with and= when combining multiple filters
+      // ✅ Combine multiple filters with and=(...)
       const filterClause = filters.length > 1
         ? `and=(${filters.join(",")})`
         : filters[0];
     
       const selectCols = "contact_id,first_name,last_name,email,contact_type";
-      const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${filterClause}&select=${encodeURIComponent(selectCols)}`;
+      const searchUrl = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${filterClause}&select=${selectCols}`;
       console.log("[SetClient] Searching contacts:", searchUrl);
     
       try {
@@ -480,6 +481,7 @@ async function renderReview(container, portalState, noteId) {
         console.error(err);
       }
     }); // end of btnFindClient handler
+
 
 
 
