@@ -135,80 +135,107 @@ async function renderContactList(container, portalState) {
       });
     }
 
-    // --- Step 4: Apply filter (server-side search) ---
-    async function applyFilter() {
-      const first = document.getElementById("filter-first").value.trim();
-      const last  = document.getElementById("filter-last").value.trim();
-      const type  = document.getElementById("filter-contact-type").value;
+// --- Step 4: Apply filter (server-side search) ---
+async function applyFilter() {
+  const first    = document.getElementById("filter-first").value.trim();
+  const last     = document.getElementById("filter-last").value.trim();
+  const search   = document.getElementById("filter-search")?.value.trim() || "";
+  const business = document.getElementById("filter-business")?.value.trim() || "";
+  const type     = document.getElementById("filter-contact-type").value;
 
-      if (first.length < 1 && last.length < 1 && !type) {
-        tableDiv.innerHTML = `<p>(no contacts found — enter at least 1 character)</p>`;
-        return;
-      }
+  // Guard: require at least one filter
+  if (
+    first.length < 1 &&
+    last.length < 1 &&
+    search.length < 1 &&
+    business.length < 1 &&
+    !type
+  ) {
+    tableDiv.innerHTML = `<p>(no contacts found — enter at least 1 character)</p>`;
+    return;
+  }
 
-      const params = new URLSearchParams({
-        project: portalState.project,
-        first: first,
-        last: last
-      });
-      const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
-      console.log("[Contacts] Searching:", url);
+  // Build query params
+  const params = new URLSearchParams({
+    project: portalState.project,
+    first: first,
+    last: last,
+    search: search,       // ✅ new param for search_name
+    business: business    // ✅ optional param for business_name
+  });
 
-      const resList = await fetch(url, { cache: "no-cache" });
-      let contacts = await resList.json();
-      if (!Array.isArray(contacts)) contacts = [];
+  const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
+  console.log("[Contacts] Searching:", url);
 
-      if (type) {
-        contacts = contacts.filter(c => c.contact_type === type);
-      }
+  // Fetch contacts
+  const resList = await fetch(url, { cache: "no-cache" });
+  let contacts = await resList.json();
+  if (!Array.isArray(contacts)) contacts = [];
 
-      // --- Step 5: Build table UI ---
-      tableDiv.innerHTML = `
-        <h4>Showing ${contacts.length} contacts</h4>
-        <table class="notes-table">
-          <thead>
-            <tr>
-              <th>First Name</th>
-              <th>Last Name</th>
-              <th>Email</th>
-              <th>Contact Type</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${contacts.length > 0
-              ? contacts.map(c => `
-                  <tr>
-                    <td>${escapeHtml(c.first_name || "")}</td>
-                    <td>${escapeHtml(c.last_name || "")}</td>
-                    <td>${escapeHtml(c.email || "")}</td>
-                    <td>${escapeHtml(c.contact_type || "")}</td>
-                    <td>
-                      <button class="btn-primary btn-select" data-id="${c.contact_id}">Select</button>
-                    </td>
-                  </tr>
-                `).join("")
-              : `<tr><td colspan="5">(no contacts found)</td></tr>`
-            }
-          </tbody>
-        </table>
-      `;
+  // Apply contact_type filter client-side
+  if (type) {
+    contacts = contacts.filter(c => c.contact_type === type);
+  }
 
-      // Wire select buttons
-      tableDiv.querySelectorAll(".btn-select").forEach(btn => {
-        btn.addEventListener("click", async () => {
-          const contactId = btn.dataset.id;
-          portalState.selectedContactId = contactId;
-          const buttons = document.querySelectorAll("#contacts-subtabs button");
-          buttons.forEach(b => b.classList.remove("active"));
-          const detailsBtn = document.querySelector('#contacts-subtabs button[data-subtab="details"]');
-          if (detailsBtn) detailsBtn.classList.add("active");
-          const content = document.querySelector("#contactsContent");
-          await renderContactDetails(content, portalState, contactId);
-        });
-      });
-    }
+  // --- Step 5: Build table UI ---
+  tableDiv.innerHTML = `
+    <h4>Showing ${contacts.length} contacts</h4>
+    <table class="notes-table">
+      <thead>
+        <tr>
+          <th>Search Name</th>
+          <th>Business Name</th>
+          <th>First Name</th>
+          <th>Last Name</th>
+          <th>Email</th>
+          <th>Contact Type</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${
+          contacts.length > 0
+            ? contacts
+                .map(
+                  c => `
+              <tr>
+                <td>${escapeHtml(c.search_name || "")}</td>
+                <td>${escapeHtml(c.business_name || "")}</td>
+                <td>${escapeHtml(c.first_name || "")}</td>
+                <td>${escapeHtml(c.last_name || "")}</td>
+                <td>${escapeHtml(c.email || "")}</td>
+                <td>${escapeHtml(c.contact_type || "")}</td>
+                <td>
+                  <button class="btn-primary btn-select" data-id="${c.contact_id}">Select</button>
+                </td>
+              </tr>
+            `
+                )
+                .join("")
+            : `<tr><td colspan="7">(no contacts found)</td></tr>`
+        }
+      </tbody>
+    </table>
+  `;
 
+  // Wire select buttons
+  tableDiv.querySelectorAll(".btn-select").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const contactId = btn.dataset.id;
+      portalState.selectedContactId = contactId;
+      const buttons = document.querySelectorAll("#contacts-subtabs button");
+      buttons.forEach(b => b.classList.remove("active"));
+      const detailsBtn = document.querySelector(
+        '#contacts-subtabs button[data-subtab="details"]'
+      );
+      if (detailsBtn) detailsBtn.classList.add("active");
+      const content = document.querySelector("#contactsContent");
+      await renderContactDetails(content, portalState, contactId);
+    });
+  });
+}
+
+    
     // --- Step 6: Wire filter buttons ---
     document.getElementById("btnApplyContactsFilter").addEventListener("click", applyFilter);
     document.getElementById("btnClearContactsFilter").addEventListener("click", () => {
