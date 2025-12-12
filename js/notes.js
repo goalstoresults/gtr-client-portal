@@ -480,7 +480,7 @@ async function renderReview(container, portalState, noteId) {
         console.error(err);
       }
     });
-
+  }
       
 /* Add Client to Note */
 /* Add Client to Note */
