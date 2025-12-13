@@ -354,6 +354,17 @@ button {
   text-decoration: underline;
 }
 
+/* Context bar styling */
+.contact-context-bar {
+  padding: 8px 16px;
+  background: #eef6ff;   /* subtle soft blue */
+  font-weight: bold;
+  border-bottom: 1px solid #ccc;
+  font-size: 1rem;
+}
+
+
+
 /* Right-align numeric/currency columns */
 .notes-table td.amount,
 .notes-table th.amount {
