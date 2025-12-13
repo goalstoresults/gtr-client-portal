@@ -12,7 +12,6 @@ export async function loadContactsTab({ portalState, tabContent }) {
     contextBar = document.createElement("div");
     contextBar.id = "contact-context-bar";
     contextBar.className = "contact-context-bar";
-    contextBar.style = "padding:8px 16px; background:#f0f0f0; font-weight:bold; border-bottom:1px solid #ccc;";
     tabContent.prepend(contextBar);
   }
   contextBar.textContent = portalState.selectedContactName
