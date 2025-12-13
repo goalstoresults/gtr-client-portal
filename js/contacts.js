@@ -1002,110 +1002,95 @@ async function openRelationshipForm(container, portalState, { mode, contactId, r
   });
 }
 
-// 🔧 Notes table with expandable detail rows
+// 🔧 Render Contact Notes (scoped to Contacts tab, no external notes-module calls)
 async function renderContactNotes(container, portalState, contactId) {
   if (!portalState.project || !contactId) {
     container.innerHTML = `
       <section class="card">
         <h2>Contact Notes</h2>
-        <p>Missing project or contact ID.</p>
+        <p>Select a contact from the list first, then open Notes.</p>
       </section>
     `;
     return;
   }
 
-  // Fetch notes history for this contact (limit 500 for safety)
-  const limit = 500;
-  const url = `https://notes-module.dennis-e64.workers.dev/notes_history?project=${encodeURIComponent(portalState.project)}&contact_id=${encodeURIComponent(contactId)}&limit=${limit}`;
-  const res = await fetch(url, { cache: "no-cache" });
-  let notes = await res.json();
-  if (!Array.isArray(notes)) notes = [];
-
-  // Sort newest first by created_at
-  notes.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-
-  const totalCount = notes.length;
-  const maxNote = totalCount >= limit ? " (maximum returned)" : "";
-
+  // Base UI
   container.innerHTML = `
     <section class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h2>Notes for Contact</h2>
-        <div class="muted">Showing ${totalCount}${maxNote}</div>
-      </div>
+      <h2>Notes for Contact ${escapeHtml(contactId)}</h2>
+      <div id="notesGrid"></div>
+      <form id="addNoteForm" class="notes-form" style="margin-top:12px;">
+        <label for="noteText">New Note:</label>
+        <textarea id="noteText" name="noteText" class="form-control" rows="3"></textarea>
+        <button type="submit" class="btn-primary" style="margin-top:8px;">Add Note</button>
+      </form>
+    </section>
+  `;
 
+  const notesGrid = container.querySelector("#notesGrid");
+  const addForm   = container.querySelector("#addNoteForm");
+
+  // Local notes store (in-memory for now)
+  portalState.contactNotes = portalState.contactNotes || {};
+  const notes = portalState.contactNotes[contactId] || [];
+
+  // Render notes grid
+  function renderGrid() {
+    notesGrid.innerHTML = `
       <table class="notes-table">
         <thead>
           <tr>
-            <th>Date</th>
-            <th>Author</th>
-            <th>Summary</th>
+            <th>Note</th>
+            <th>Created</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          ${notes.length > 0
-            ? notes.map(n => {
-                const summary = (n.note_text || "").length > 60
-                  ? (n.note_text || "").slice(0, 60) + "…"
-                  : (n.note_text || "");
-                return `
+          ${
+            notes.length > 0
+              ? notes.map((n, idx) => `
                   <tr>
-                    <td>${escapeHtml(n.created_at || "")}</td>
-                    <td>${escapeHtml(n.author || "—")}</td>
-                    <td>${escapeHtml(summary)}</td>
+                    <td>${escapeHtml(n.text)}</td>
+                    <td>${escapeHtml(n.created)}</td>
                     <td>
-                      <button class="btn-secondary btn-expand" data-id="${escapeHtml(n.id)}">Expand</button>
+                      <button class="btn-danger btn-delete" data-idx="${idx}">Delete</button>
                     </td>
                   </tr>
-                  <tr class="note-details" id="note-${escapeHtml(n.id)}" style="display:none;">
-                    <td colspan="4">
-                      <div class="note-full" style="padding:8px; background:#f7f7f7; border:1px solid #eee;">
-                        <p><strong>Full note:</strong><br>${escapeHtml(n.note_text || "")}</p>
-                        <div class="muted" style="display:flex; gap:16px;">
-                          <span><strong>Created:</strong> ${escapeHtml(n.created_at || "—")}</span>
-                          <span><strong>Updated:</strong> ${escapeHtml(n.updated_at || "—")}</span>
-                          ${n.tags ? `<span><strong>Tags:</strong> ${escapeHtml(n.tags)}</span>` : ""}
-                        </div>
-                        <div style="margin-top:8px;">
-                          <button class="btn-danger btn-delete" data-id="${escapeHtml(n.id)}">Delete</button>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                `;
-              }).join("")
-            : `<tr><td colspan="4">(no notes found)</td></tr>`}
+                `).join("")
+              : `<tr><td colspan="3">(no notes yet)</td></tr>`
+          }
         </tbody>
       </table>
-    </section>
-  `;
+    `;
 
-  // Wire expand toggles
-  container.querySelectorAll(".btn-expand").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const detailsRow = document.getElementById(`note-${btn.dataset.id}`);
-      if (!detailsRow) return;
-      detailsRow.style.display = detailsRow.style.display === "none" ? "table-row" : "none";
+    // Wire delete buttons
+    notesGrid.querySelectorAll(".btn-delete").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const idx = parseInt(btn.dataset.idx, 10);
+        notes.splice(idx, 1);
+        portalState.contactNotes[contactId] = notes;
+        renderGrid();
+      });
     });
-  });
+  }
 
-  // Wire delete
-  container.querySelectorAll(".btn-delete").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      if (!confirm("Delete this note?")) return;
-      const delUrl = `https://notes-module.dennis-e64.workers.dev/notes/delete/${encodeURIComponent(btn.dataset.id)}?project=${encodeURIComponent(portalState.project)}`;
-      const resp = await fetch(delUrl, { method: "DELETE" });
-      if (!resp.ok) {
-        const text = await resp.text().catch(() => "");
-        alert(`❌ Delete failed: ${text || resp.status}`);
-        return;
-      }
-      await renderContactNotes(container, portalState, contactId);
-    });
+  renderGrid();
+
+  // Handle add note form
+  addForm.addEventListener("submit", e => {
+    e.preventDefault();
+    const text = addForm.querySelector("#noteText").value.trim();
+    if (!text) return;
+    const newNote = {
+      text,
+      created: new Date().toISOString()
+    };
+    notes.push(newNote);
+    portalState.contactNotes[contactId] = notes;
+    addForm.reset();
+    renderGrid();
   });
 }
-
 
 
 // helper
