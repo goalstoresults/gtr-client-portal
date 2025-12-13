@@ -1002,7 +1002,7 @@ async function openRelationshipForm(container, portalState, { mode, contactId, r
   });
 }
 
-// 🔧 Render Contact Notes (scoped to Contacts tab, no external notes-module calls)
+// 🔧 Render Contact Notes (fetch from contacts-module backend)
 async function renderContactNotes(container, portalState, contactId) {
   if (!portalState.project || !contactId) {
     container.innerHTML = `
@@ -1014,82 +1014,40 @@ async function renderContactNotes(container, portalState, contactId) {
     return;
   }
 
-  // Base UI
+  const url = `https://contacts-module.dennis-e64.workers.dev/notes_history?project=${portalState.project}&contact_id=${contactId}`;
+  console.log("[ContactNotes] Fetching:", url);
+
+  const res = await fetch(url, { cache: "no-cache" });
+  let notes = await res.json();
+  if (!Array.isArray(notes)) notes = [];
+
   container.innerHTML = `
     <section class="card">
       <h2>Notes for Contact ${escapeHtml(contactId)}</h2>
-      <div id="notesGrid"></div>
-      <form id="addNoteForm" class="notes-form" style="margin-top:12px;">
-        <label for="noteText">New Note:</label>
-        <textarea id="noteText" name="noteText" class="form-control" rows="3"></textarea>
-        <button type="submit" class="btn-primary" style="margin-top:8px;">Add Note</button>
-      </form>
-    </section>
-  `;
-
-  const notesGrid = container.querySelector("#notesGrid");
-  const addForm   = container.querySelector("#addNoteForm");
-
-  // Local notes store (in-memory for now)
-  portalState.contactNotes = portalState.contactNotes || {};
-  const notes = portalState.contactNotes[contactId] || [];
-
-  // Render notes grid
-  function renderGrid() {
-    notesGrid.innerHTML = `
       <table class="notes-table">
         <thead>
           <tr>
-            <th>Note</th>
-            <th>Created</th>
-            <th>Actions</th>
+            <th>Date</th>
+            <th>Subject</th>
+            <th>Summary</th>
           </tr>
         </thead>
         <tbody>
           ${
             notes.length > 0
-              ? notes.map((n, idx) => `
+              ? notes.map(n => `
                   <tr>
-                    <td>${escapeHtml(n.text)}</td>
-                    <td>${escapeHtml(n.created)}</td>
-                    <td>
-                      <button class="btn-danger btn-delete" data-idx="${idx}">Delete</button>
-                    </td>
+                    <td>${escapeHtml(n.note_date || "")}</td>
+                    <td>${escapeHtml(n.subject || "")}</td>
+                    <td>${escapeHtml(n.summary || "")}</td>
                   </tr>
                 `).join("")
               : `<tr><td colspan="3">(no notes yet)</td></tr>`
           }
         </tbody>
       </table>
-    `;
-
-    // Wire delete buttons
-    notesGrid.querySelectorAll(".btn-delete").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const idx = parseInt(btn.dataset.idx, 10);
-        notes.splice(idx, 1);
-        portalState.contactNotes[contactId] = notes;
-        renderGrid();
-      });
-    });
-  }
-
-  renderGrid();
-
-  // Handle add note form
-  addForm.addEventListener("submit", e => {
-    e.preventDefault();
-    const text = addForm.querySelector("#noteText").value.trim();
-    if (!text) return;
-    const newNote = {
-      text,
-      created: new Date().toISOString()
-    };
-    notes.push(newNote);
-    portalState.contactNotes[contactId] = notes;
-    addForm.reset();
-    renderGrid();
-  });
+    </section>
+  `;
 }
 
 
