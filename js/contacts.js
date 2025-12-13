@@ -1002,7 +1002,6 @@ async function openRelationshipForm(container, portalState, { mode, contactId, r
   });
 }
 
-// 🔧 Render Contact Notes (fetch from contacts-module backend)
 async function renderContactNotes(container, portalState, contactId) {
   if (!portalState.project || !contactId) {
     container.innerHTML = `
@@ -1015,8 +1014,6 @@ async function renderContactNotes(container, portalState, contactId) {
   }
 
   const url = `https://contacts-module.dennis-e64.workers.dev/notes_history?project=${portalState.project}&contact_id=${contactId}`;
-  console.log("[ContactNotes] Fetching:", url);
-
   const res = await fetch(url, { cache: "no-cache" });
   let notes = await res.json();
   if (!Array.isArray(notes)) notes = [];
@@ -1030,24 +1027,64 @@ async function renderContactNotes(container, portalState, contactId) {
             <th>Date</th>
             <th>Subject</th>
             <th>Summary</th>
+            <th>Actions</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="notesRows">
           ${
             notes.length > 0
-              ? notes.map(n => `
+              ? notes.map((n, idx) => `
                   <tr>
                     <td>${escapeHtml(n.note_date || "")}</td>
                     <td>${escapeHtml(n.subject || "")}</td>
                     <td>${escapeHtml(n.summary || "")}</td>
+                    <td>
+                      <button class="btn-secondary btn-expand" data-idx="${idx}" style="display:flex; align-items:center; gap:4px;">
+                        ▶ Expand
+                      </button>
+                    </td>
+                  </tr>
+                  <tr class="note-details" data-idx="${idx}" style="display:none;">
+                    <td colspan="4" style="background:#f9f9f9; padding:12px;">
+                      <div><strong>From:</strong> ${escapeHtml(n.from_name || "")} (${escapeHtml(n.from_email || "")})</div>
+                      <div><strong>Status:</strong> ${escapeHtml(n.review_status || "")}</div>
+                      <div><strong>Needs Review:</strong> ${n.needs_review ? "Yes" : "No"}</div>
+                      <div style="margin-top:8px;"><strong>Raw Text:</strong></div>
+                      <pre style="white-space:pre-wrap; background:#fff; padding:8px; border:1px solid #ccc;">${escapeHtml(n.raw_text || "")}</pre>
+                      <button class="btn-danger btn-delete-note" data-id="${n.id}" style="margin-top:8px;">Delete Note</button>
+                    </td>
                   </tr>
                 `).join("")
-              : `<tr><td colspan="3">(no notes yet)</td></tr>`
+              : `<tr><td colspan="4">(no notes yet)</td></tr>`
           }
         </tbody>
       </table>
     </section>
   `;
+
+  // Wire expand/collapse buttons
+  container.querySelectorAll(".btn-expand").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = btn.dataset.idx;
+      const row = container.querySelector(`.note-details[data-idx="${idx}"]`);
+      const isVisible = row.style.display !== "none";
+      row.style.display = isVisible ? "none" : "table-row";
+      btn.innerHTML = isVisible ? "▶ Expand" : "▼ Collapse";
+    });
+  });
+
+  // Wire delete buttons
+  container.querySelectorAll(".btn-delete-note").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Delete this note?")) return;
+      const noteId = btn.dataset.id;
+      await fetch(`https://contacts-module.dennis-e64.workers.dev/notes_history/${noteId}?project=${portalState.project}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" }
+      });
+      await renderContactNotes(container, portalState, contactId); // reload
+    });
+  });
 }
 
 
