@@ -33,15 +33,35 @@ function setActiveSubtab(tabId) {
 function initNotes(portalState) {
   // ✅ Expose a stable reference for cross-tab navigation
   window.portalState = portalState;
-  
+
+  // 🔧 Inject contact context bar just above subtabs
+  let contextBar = document.getElementById("contact-context-bar");
+  if (!contextBar) {
+    contextBar = document.createElement("div");
+    contextBar.id = "contact-context-bar";
+    contextBar.className = "contact-context-bar"; // styled in style.css
+    const notesNav = document.getElementById("notes-subtabs");
+    if (notesNav) notesNav.parentNode.insertBefore(contextBar, notesNav);
+  }
+
+  contextBar.textContent = portalState.selectedContactName
+    ? `Contact: ${portalState.selectedContactName}`
+    : "No contact selected";
+
+  // Base container message
   const container = document.getElementById("notesContent");
   if (container) container.innerHTML = `<p>Select a subtab to begin.</p>`;
+
+  // Wire subtab buttons
   document.querySelectorAll("#notes-subtabs button").forEach(btn =>
     btn.addEventListener("click", () => loadNotesSubtab(btn.dataset.subtab, portalState))
   );
+
+  // Disable review/relationships until a note is selected
   setSubtabEnabled("review", false);
   setSubtabEnabled("relationships", false);
 }
+
 
 function setSubtabEnabled(subtab, enabled) {
   const btn = document.querySelector(`#notes-subtabs button[data-subtab="${subtab}"]`);
@@ -182,6 +202,16 @@ async function renderHistory(container, portalState) {
       btn.addEventListener("click", () => {
         const noteId = btn.dataset.id;
         portalState.selectedNoteId = noteId;
+    
+        // 🔧 Update context bar with the note’s client/contact name
+        const contextBar = document.getElementById("contact-context-bar");
+        if (contextBar) {
+          const clientName = btn.closest("tr").querySelector("td:nth-child(4)")?.textContent || "";
+          contextBar.textContent = clientName
+            ? `Contact: ${clientName}`
+            : "Contact not linked yet";
+        }
+    
         setSubtabEnabled("review", true);
         setSubtabEnabled("relationships", true);
         document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
@@ -284,6 +314,15 @@ async function renderReview(container, portalState, noteId) {
     } else if (note.contact_id) {
       portalState.clientId = note.contact_id;
     }
+
+    // 🔧 Update context bar with the note’s contact name
+    const contextBar = document.getElementById("contact-context-bar");
+    if (contextBar) {
+      contextBar.textContent = note.contact_name
+        ? `Contact: ${note.contact_name}`
+        : "Contact not linked yet";
+    }
+
 
     console.log("[Review] Hydrated clientId:", portalState.clientId);
     
