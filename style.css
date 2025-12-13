@@ -357,7 +357,7 @@ button {
 /* Context bar styling */
 .contact-context-bar {
   padding: 8px 16px;
-  background: #fff9e6;   /* subtle soft blue #eef6ff */
+  background: #eef6ff;   /* subtle soft blue */
   font-weight: bold;
   border-bottom: 1px solid #ccc;
   font-size: 1rem;
