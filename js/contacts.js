@@ -1,9 +1,23 @@
 // js/contacts.js v2.0
 // 🔧 Load Contacts Tab with subtab switching
+
 export async function loadContactsTab({ portalState, tabContent }) {
   // Load base HTML template
   const res = await fetch("./components/contacts.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
+
+  // 🔧 Inject contact context bar (above subtabs)
+  let contextBar = document.getElementById("contact-context-bar");
+  if (!contextBar) {
+    contextBar = document.createElement("div");
+    contextBar.id = "contact-context-bar";
+    contextBar.className = "contact-context-bar";
+    contextBar.style = "padding:8px 16px; background:#f0f0f0; font-weight:bold; border-bottom:1px solid #ccc;";
+    tabContent.prepend(contextBar);
+  }
+  contextBar.textContent = portalState.selectedContactName
+    ? `Contact: ${portalState.selectedContactName}`
+    : "No contact selected";
 
   const content = tabContent.querySelector("#contactsContent");
   const buttons = tabContent.querySelectorAll("#contacts-subtabs button");
@@ -21,16 +35,6 @@ export async function loadContactsTab({ portalState, tabContent }) {
           break;
 
         case "list":
-          // ✅ Reset filters safely (no optional chaining on assignment)
-          const fFirst = document.getElementById("filter-first");
-          const fLast  = document.getElementById("filter-last");
-          const fFrom  = document.getElementById("filter-from");
-          const fTo    = document.getElementById("filter-to");
-          if (fFirst) fFirst.value = "";
-          if (fLast)  fLast.value  = "";
-          if (fFrom)  fFrom.value  = "";
-          if (fTo)    fTo.value    = "";
-
           await renderContactList(content, portalState);
           break;
 
@@ -91,7 +95,9 @@ export async function loadContactsTab({ portalState, tabContent }) {
   }
 }
 
+
 // 🔧 Contact List with dynamic grid based on project_contact_fields
+// 🔧 Contact List with dynamic grid + context bar update
 async function renderContactList(container, portalState) {
   try {
     // --- Step 1: Capture current filter values ---
@@ -201,11 +207,29 @@ async function renderContactList(container, portalState) {
         </table>
       `;
 
-      // Wire select buttons
+      // --- Step 7: Wire select buttons ---
       tableDiv.querySelectorAll(".btn-select").forEach(btn => {
         btn.addEventListener("click", async () => {
           const contactId = btn.dataset.id;
           portalState.selectedContactId = contactId;
+
+          // Fetch contact details to get name
+          const res = await fetch(`https://contacts-module.dennis-e64.workers.dev/contacts/details/${contactId}`, {
+            cache: "no-cache"
+          });
+          const data = await res.json();
+          const contact = Array.isArray(data) ? data[0] : data;
+
+          portalState.selectedContactName =
+            contact.search_name || `${contact.first_name || ""} ${contact.last_name || ""}`.trim();
+
+          // Update context bar
+          const contextBar = document.getElementById("contact-context-bar");
+          if (contextBar) {
+            contextBar.textContent = `Contact: ${portalState.selectedContactName}`;
+          }
+
+          // Switch to Details tab
           const buttons = document.querySelectorAll("#contacts-subtabs button");
           buttons.forEach(b => b.classList.remove("active"));
           const detailsBtn = document.querySelector('#contacts-subtabs button[data-subtab="details"]');
@@ -216,7 +240,7 @@ async function renderContactList(container, portalState) {
       });
     }
 
-    // --- Step 7: Wire filter buttons ---
+    // --- Step 8: Wire filter buttons ---
     document.getElementById("btnApplyContactsFilter").addEventListener("click", applyFilter);
     document.getElementById("btnClearContactsFilter").addEventListener("click", () => {
       document.getElementById("filter-first").value = "";
