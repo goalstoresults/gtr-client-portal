@@ -363,6 +363,16 @@ button {
   font-size: 1rem;
 }
 
+.logo {
+  height: 40px;
+  object-fit: contain;
+}
+
+.footer-logo {
+  height: 28px;
+  opacity: 0.85; /* subtle watermark feel */
+}
+
 
 
 /* Right-align numeric/currency columns */
