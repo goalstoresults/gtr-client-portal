@@ -5,14 +5,33 @@
   <title id="page-title"></title>
   <link rel="stylesheet" href="style.css" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    .logo-waiting {
+      display: block;
+      margin: 20px auto;
+      height: 80px;
+    }
+    .footer-logo {
+      height: 28px;
+      opacity: 0.85;
+    }
+    footer {
+      margin-top: 20px;
+      text-align: left;
+      color: #666;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      padding: 8px;
+    }
+  </style>
 </head>
 <body>
   <header>
+    <!-- Logo container only used when no project -->
+    <div id="logo-container" style="text-align:center; margin:20px 0;"></div>
     <h1 id="portal-title"></h1>
-    <div id="project-selector-row" style="display:none;">
-      <label for="project-selector">Project:</label>
-      <select id="project-selector"></select>
-    </div>
+    <div id="project-selector-row" style="display:none;"></div>
   </header>
 
   <!-- Top-level tabs -->
@@ -20,9 +39,9 @@
 
   <div id="tab-content"></div>
 
-  <footer style="margin-top:20px; text-align:left; color:#666; position:fixed; bottom:0; left:0; padding:8px;">
+  <footer>
     <img src="./gtrlogo-gold-white.png" alt="Goals To Results" class="footer-logo" />
-    <small style="display:block;">Portal Version: 2.0.0</small>
+    <small style="display:block;">Portal Version: 1.3.0</small>
   </footer>
 
   <script type="module">
@@ -38,10 +57,10 @@
     const portalState = { project: "", contactId: "" };
     const portalTitle = document.getElementById("portal-title");
     const pageTitle = document.getElementById("page-title");
-    const projectSelector = document.getElementById("project-selector");
     const selectorRow = document.getElementById("project-selector-row");
     const tabs = document.getElementById("tabs");
     const tabContent = document.getElementById("tab-content");
+    const logoContainer = document.getElementById("logo-container");
 
     const tabMap = {
       "1": { label: "Contacts", loader: loadContactsTab },
@@ -65,32 +84,37 @@
         let projectParam = projectParamRaw ? projectParamRaw.trim() : "";
 
         if (!projectParam) {
+          // 🚨 Show logo + text field gate
+          logoContainer.innerHTML = `<img src="./gtrlogo-gold-dark.png" alt="Goals To Results" class="logo-waiting" />`;
+
           selectorRow.style.display = "block";
           selectorRow.innerHTML = `
-            <img src="./gtrlogo-gold-white.png" alt="Goals To Results" class="logo" />
             <label for="projectInput"><strong>Enter Project Name:</strong></label>
             <input id="projectInput" type="text" placeholder="Project name" />
             <button id="btnSetProject" class="primary">Enter</button>
           `;
-        
+
           portalState.project = "";
           portalTitle.textContent = "";
           pageTitle.textContent = "";
           tabs.style.display = "none";
-        
+
           document.getElementById("btnSetProject").addEventListener("click", () => {
             const projectName = document.getElementById("projectInput").value.trim();
             if (!projectName) {
               alert("Please enter a project name.");
               return;
             }
-        
+
             const match = projects.find(p => String(p.project).toLowerCase() === projectName.toLowerCase());
             if (!match) {
               tabContent.innerHTML = `<section class="card"><p>Invalid project specified. No UI available.</p></section>`;
               return;
             }
-        
+
+            // ✅ Remove logo once project is valid
+            logoContainer.innerHTML = "";
+
             injectConfig(match);
             const enabledTabs = normalizeTabs(match.enabled_tabs);
             renderTabs(enabledTabs);
