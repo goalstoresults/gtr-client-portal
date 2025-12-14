@@ -11,6 +11,22 @@
       margin: 20px auto;
       height: 80px;
     }
+    .project-entry {
+      text-align: center;
+      margin-top: 20px;
+    }
+    .project-entry label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+    .project-entry input {
+      padding: 6px;
+      margin-right: 8px;
+    }
+    .project-entry button {
+      padding: 6px 12px;
+    }
     .footer-logo {
       height: 28px;
       opacity: 0.85;
@@ -84,12 +100,13 @@
         let projectParam = projectParamRaw ? projectParamRaw.trim() : "";
 
         if (!projectParam) {
-          // 🚨 Show logo + text field gate
+          // 🚨 Show logo + centered text field gate
           logoContainer.innerHTML = `<img src="./gtrlogo-gold-black.png" alt="Goals To Results" class="logo-waiting" />`;
 
           selectorRow.style.display = "block";
+          selectorRow.className = "project-entry";
           selectorRow.innerHTML = `
-            <label for="projectInput"><strong>Enter Project Name:</strong></label>
+            <label for="projectInput">Enter Project Name:</label>
             <input id="projectInput" type="text" placeholder="Project name" />
             <button id="btnSetProject" class="primary">Enter</button>
           `;
@@ -112,8 +129,9 @@
               return;
             }
 
-            // ✅ Remove logo once project is valid
+            // ✅ Remove logo + project entry once project is valid
             logoContainer.innerHTML = "";
+            selectorRow.style.display = "none";
 
             injectConfig(match);
             const enabledTabs = normalizeTabs(match.enabled_tabs);
@@ -130,6 +148,10 @@
               `<section class="card"><p>Invalid project specified. No UI available.</p></section>`;
             return;
           }
+
+          // ✅ Hide logo + project entry when project param is present
+          logoContainer.innerHTML = "";
+          selectorRow.style.display = "none";
 
           injectConfig(match);
           const enabledTabs = normalizeTabs(match.enabled_tabs);
