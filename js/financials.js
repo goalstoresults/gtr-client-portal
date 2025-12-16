@@ -1,10 +1,8 @@
 // js/financials.js
-// 🔧 Load Financials Tab with subtab switching
-
 import { escapeHtml, renderContactPicker } from "./utilities.js";
 
 export async function loadFinancialsTab({ portalState, tabContent }) {
-  // Load base HTML template
+  // Load Financials template
   const res = await fetch("./components/financials.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
 
@@ -13,7 +11,6 @@ export async function loadFinancialsTab({ portalState, tabContent }) {
 
   buttons.forEach(btn => {
     btn.addEventListener("click", async () => {
-      // Reset active state
       buttons.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
@@ -30,15 +27,13 @@ export async function loadFinancialsTab({ portalState, tabContent }) {
           break;
         default:
           content.innerHTML = `
-            <section class="card">
-              <p>Select a subtab to begin.</p>
-            </section>
+            <section class="card"><p>Select a subtab to begin.</p></section>
           `;
       }
     });
   });
 
-  // ✅ Default to List view when tab first loads
+  // Default to List view
   const defaultBtn = tabContent.querySelector('#financials-subtabs button[data-subtab="list"]');
   if (defaultBtn) {
     defaultBtn.classList.add("active");
@@ -48,13 +43,29 @@ export async function loadFinancialsTab({ portalState, tabContent }) {
 
 // 🔧 Add Payment flow
 async function renderFinancialAdd(container, portalState) {
-  await renderContactPicker(container, portalState, async (contact) => {
+  // Context bar + picker area
+  container.innerHTML = `
+    <div class="context-bar" style="background:#e6f2ff; padding:8px; margin-bottom:12px;">
+      <span id="financials-context">No contact selected</span>
+    </div>
+    <div id="financialsAddArea"></div>
+  `;
+
+  const addArea = container.querySelector("#financialsAddArea");
+
+  await renderContactPicker(addArea, portalState, async (contact) => {
+    // Update context bar when contact selected
+    const ctx = container.querySelector("#financials-context");
+    ctx.textContent = `Selected: ${escapeHtml(contact.search_name || contact.contact_id)}`;
+
+    // Render Add Payment form
     await renderAddPaymentForm(container, portalState, contact);
   });
 }
 
 async function renderAddPaymentForm(container, portalState, contact) {
-  container.innerHTML = `
+  const addArea = container.querySelector("#financialsAddArea");
+  addArea.innerHTML = `
     <section class="card">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <h3>Add Payment for ${escapeHtml(contact.search_name || contact.contact_id)}</h3>
