@@ -79,10 +79,10 @@ async function renderFinancialAdd(container, portalState) {
     </section>
   `;
 
-  // Populate contacts dropdown
+  // Populate contacts dropdown, sorted by search_name
   const contactSelect = document.getElementById("contactSelect");
   try {
-    const url = `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}&limit=500`;
+    const url = `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}&order=search_name.asc&limit=500`;
     const res = await fetch(url, { cache: "no-cache" });
     let contacts = await res.json();
     if (!Array.isArray(contacts)) contacts = contacts.rows || [];
