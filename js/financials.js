@@ -236,4 +236,15 @@ async function renderFinancialSummary(container, portalState) {
             summary.length
               ? summary.map(s => `
                 <tr>
-                  <td>${escapeHtml(s.referral_name
+                  <td>${escapeHtml(s.referral_name || s.referral_id || "")}</td>
+                  <td>${escapeHtml(s.total_amount || "")}</td>
+                  <td>${escapeHtml(s.count || "")}</td>
+                </tr>
+              `).join("")
+              : `<tr><td colspan="3">(no summary data)</td></tr>`
+          }
+        </tbody>
+      </table>
+    </section>
+  `;
+}
