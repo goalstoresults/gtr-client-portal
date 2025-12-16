@@ -1,23 +1,19 @@
 // js/financials.js
-console.log("[Financials.js] loaded");
+// 🔧 Load Financials Tab with subtab switching
+
+import { escapeHtml, renderContactPicker } from "./utilities.js";
 
 export async function loadFinancialsTab({ portalState, tabContent }) {
-  tabContent.innerHTML = `
-    <section class="card">
-      <nav id="financials-subtabs" class="subtabs" style="margin-bottom:12px;">
-        <button data-subtab="add">Add</button>
-        <button data-subtab="list">List</button>
-        <button data-subtab="summary">Summary</button>
-      </nav>
-      <div id="financialsContent"></div>
-    </section>
-  `;
+  // Load base HTML template
+  const res = await fetch("./components/financials.html", { cache: "no-cache" });
+  tabContent.innerHTML = await res.text();
 
   const content = tabContent.querySelector("#financialsContent");
   const buttons = tabContent.querySelectorAll("#financials-subtabs button");
 
   buttons.forEach(btn => {
     btn.addEventListener("click", async () => {
+      // Reset active state
       buttons.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
@@ -33,12 +29,16 @@ export async function loadFinancialsTab({ portalState, tabContent }) {
           await renderFinancialSummary(content, portalState);
           break;
         default:
-          content.innerHTML = `<section class="card"><p>Select a subtab to begin.</p></section>`;
+          content.innerHTML = `
+            <section class="card">
+              <p>Select a subtab to begin.</p>
+            </section>
+          `;
       }
     });
   });
 
-  // Default to List view
+  // ✅ Default to List view when tab first loads
   const defaultBtn = tabContent.querySelector('#financials-subtabs button[data-subtab="list"]');
   if (defaultBtn) {
     defaultBtn.classList.add("active");
@@ -46,19 +46,19 @@ export async function loadFinancialsTab({ portalState, tabContent }) {
   }
 }
 
-// Add Payment view
+// 🔧 Add Payment flow
 async function renderFinancialAdd(container, portalState) {
+  await renderContactPicker(container, portalState, async (contact) => {
+    await renderAddPaymentForm(container, portalState, contact);
+  });
+}
+
+async function renderAddPaymentForm(container, portalState, contact) {
   container.innerHTML = `
     <section class="card">
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h3>Add Payment</h3>
+        <h3>Add Payment for ${escapeHtml(contact.search_name || contact.contact_id)}</h3>
         <button id="btnSavePayment" class="btn-primary">Save</button>
-      </div>
-      <div class="notes-row">
-        <label class="notes-label">Contact</label>
-        <select id="contactSelect" class="form-control">
-          <option value="">Loading contacts...</option>
-        </select>
       </div>
       <div class="notes-row">
         <label class="notes-label">Amount</label>
@@ -79,37 +79,14 @@ async function renderFinancialAdd(container, portalState) {
     </section>
   `;
 
-  // Populate contacts dropdown, sorted by search_name
-  const contactSelect = document.getElementById("contactSelect");
-  try {
-    const url = `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}&order=search_name.asc&limit=500`;
-    const res = await fetch(url, { cache: "no-cache" });
-    let contacts = await res.json();
-    if (!Array.isArray(contacts)) contacts = contacts.rows || [];
-    if (!Array.isArray(contacts)) contacts = [];
-
-    if (contacts.length > 0) {
-      contactSelect.innerHTML = contacts
-        .map(c => `<option value="${escapeHtml(c.contact_id)}">${escapeHtml(c.search_name || (c.first_name + " " + c.last_name))}</option>`)
-        .join("");
-    } else {
-      contactSelect.innerHTML = `<option value="">(no contacts found)</option>`;
-    }
-  } catch (err) {
-    console.error("[Financials] Error loading contacts:", err);
-    contactSelect.innerHTML = `<option value="">(error loading contacts)</option>`;
-  }
-
-  // Save handler
   document.getElementById("btnSavePayment").addEventListener("click", async () => {
-    const contactId = contactSelect.value.trim();
     const amount = document.getElementById("paymentAmount").value.trim();
     const date = document.getElementById("paymentDate").value.trim();
     const invoice = document.getElementById("invoiceNumber").value.trim();
     const referral = document.getElementById("referralId").value.trim();
 
-    if (!contactId || !amount || !date) {
-      alert("Contact, Amount, and Date are required");
+    if (!amount || !date) {
+      alert("Amount and Date are required");
       return;
     }
 
@@ -117,7 +94,7 @@ async function renderFinancialAdd(container, portalState) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contact_id: contactId,
+        contact_id: contact.contact_id,
         payment_amount: amount,
         payment_date: date,
         invoice_number: invoice,
@@ -137,105 +114,64 @@ async function renderFinancialAdd(container, portalState) {
   });
 }
 
-
-// List Payments view
+// 🔧 List Payments
 async function renderFinancialList(container, portalState) {
-  container.innerHTML = `
-    <section class="card">
-      <h2>Payments for ${escapeHtml(portalState.projects_config?.business_name || portalState.display_name || portalState.project)}</h2>
-      <div id="paymentsTable">Loading...</div>
-    </section>
-  `;
-
-  const tableDiv = container.querySelector("#paymentsTable");
   const url = `https://financials-module.dennis-e64.workers.dev/payments/list?project=${portalState.project}&limit=500`;
-  console.log("[Financials] Fetching:", url);
-
   const res = await fetch(url, { cache: "no-cache" });
   let payments = await res.json();
-  if (!Array.isArray(payments)) payments = payments.rows || [];
   if (!Array.isArray(payments)) payments = [];
-
-  tableDiv.innerHTML = `
-    <h4>Showing ${payments.length} payments</h4>
-    <table class="notes-table">
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th class="amount">Amount</th>
-          <th>Invoice #</th>
-          <th>Referral ID</th>
-          <th>Contact ID</th>
-          <th>Created</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${payments.length > 0
-          ? payments.map(p => `
-              <tr>
-                <td>${formatDateTime(p.payment_date)}</td>
-                <td class="amount">${formatCurrency(p.payment_amount)}</td>
-                <td>${escapeHtml(p.invoice_number || "")}</td>
-                <td>${escapeHtml(p.referral_id || "")}</td>
-                <td>${escapeHtml(p.contact_id || "")}</td>
-                <td>${formatDateTime(p.created_at)}</td>
-              </tr>
-            `).join("")
-          : `<tr><td colspan="6">(no payments found)</td></tr>`
-        }
-      </tbody>
-    </table>
-  `;
-}
-
-// Summary view
-async function renderFinancialSummary(container, portalState) {
-  container.innerHTML = `<section class="card"><p>Loading summary...</p></section>`;
-
-  const url = `https://financials-module.dennis-e64.workers.dev/payments/summary?project=${portalState.project}`;
-  console.log("[Financials] Fetching summary:", url);
-
-  const res = await fetch(url, { cache: "no-cache" });
-  const summary = await res.json();
 
   container.innerHTML = `
     <section class="card">
-      <h3>Financial Summary</h3>
-      <p>Total Payments: ${formatCurrency(summary.total)}</p>
-      <h4>By Referral</h4>
-      <ul>
-        ${summary.by_referral.map(r => `<li>${escapeHtml(r.referral_id || "(none)")}: ${formatCurrency(r.total)}</li>`).join("")}
-      </ul>
-      <h4>By Invoice</h4>
-      <ul>
-        ${summary.by_invoice.map(i => `<li>${escapeHtml(i.invoice_number || "(none)")}: ${formatCurrency(i.total)}</li>`).join("")}
-      </ul>
+      <h3>Payments List</h3>
+      <table class="notes-table">
+        <thead>
+          <tr>
+            <th>Date</th><th>Amount</th><th>Invoice #</th><th>Referral</th><th>Contact</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${payments.map(p => `
+            <tr>
+              <td>${escapeHtml(p.payment_date || "")}</td>
+              <td>${escapeHtml(p.payment_amount || "")}</td>
+              <td>${escapeHtml(p.invoice_number || "")}</td>
+              <td>${escapeHtml(p.referral_id || "")}</td>
+              <td>${escapeHtml(p.contact_id || "")}</td>
+            </tr>
+          `).join("") || `<tr><td colspan="5">(no payments found)</td></tr>`}
+        </tbody>
+      </table>
     </section>
   `;
 }
 
-// Helpers
-function formatDateTime(value) {
-  if (!value) return "";
-  const d = new Date(value);
-  return d.toLocaleString("en-US", {
-    month: "2-digit",
-    day: "2-digit",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true
-  });
-}
+// 🔧 Summary Payments
+async function renderFinancialSummary(container, portalState) {
+  const url = `https://financials-module.dennis-e64.workers.dev/payments/summary?project=${portalState.project}`;
+  const res = await fetch(url, { cache: "no-cache" });
+  let summary = await res.json();
+  if (!Array.isArray(summary)) summary = [];
 
-function escapeHtml(str) {
-  const s = String(str ?? "");
-  return s.replace(/[&<>"']/g, c => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-  }[c]));
-}
-
-function formatCurrency(value) {
-  const num = Number(value) || 0;
-  return `$${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  container.innerHTML = `
+    <section class="card">
+      <h3>Payments Summary</h3>
+      <table class="notes-table">
+        <thead>
+          <tr>
+            <th>Referral</th><th>Total Amount</th><th>Count</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${summary.map(s => `
+            <tr>
+              <td>${escapeHtml(s.referral_id || "")}</td>
+              <td>${escapeHtml(s.total_amount || "")}</td>
+              <td>${escapeHtml(s.count || "")}</td>
+            </tr>
+          `).join("") || `<tr><td colspan="3">(no summary data)</td></tr>`}
+        </tbody>
+      </table>
+    </section>
+  `;
 }
