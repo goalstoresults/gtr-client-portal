@@ -1,4 +1,4 @@
-// js/financials.js v2.1
+// js/financials.js v2.2
 // Load Financials Tab with subtab switching + tab-level context bar
 
 import { escapeHtml, renderContactPicker } from "./utilities.js";
@@ -106,15 +106,17 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
 
   formArea.innerHTML = `
     <section class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
         <h3 style="margin:0;">Add Payment for ${escapeHtml(contact.search_name || contact.contact_id)}</h3>
         <button id="btnSavePayment" class="btn-primary">Save</button>
       </div>
 
-      <!-- Non-editable referral display (top-right under heading) -->
+      <!-- Referral shown as disabled dropdown -->
       <div class="notes-row">
         <label class="notes-label">Referral</label>
-        <input class="form-control" value="${escapeHtml(referralName)}" disabled />
+        <select class="form-control" disabled>
+          <option>${escapeHtml(referralName)}</option>
+        </select>
       </div>
 
       <div class="notes-row">
@@ -152,6 +154,7 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
         payment_date: date,
         invoice_number: invoice,
         referral_id: referralId || null,
+        referral_name: referralName || null, // include name for display
         project: portalState.project
       })
     });
@@ -233,15 +236,4 @@ async function renderFinancialSummary(container, portalState) {
             summary.length
               ? summary.map(s => `
                 <tr>
-                  <td>${escapeHtml(s.referral_name || s.referral_id || "")}</td>
-                  <td>${escapeHtml(s.total_amount || "")}</td>
-                  <td>${escapeHtml(s.count || "")}</td>
-                </tr>
-              `).join("")
-              : `<tr><td colspan="3">(no summary data)</td></tr>`
-          }
-        </tbody>
-      </table>
-    </section>
-  `;
-}
+                  <td>${escapeHtml(s.referral_name
