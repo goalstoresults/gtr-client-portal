@@ -1,16 +1,31 @@
-// js/financials.js
+// js/financials.js v2.0
+// 🔧 Load Financials Tab with subtab switching
+
 import { escapeHtml, renderContactPicker } from "./utilities.js";
 
 export async function loadFinancialsTab({ portalState, tabContent }) {
-  // Load Financials template
+  // Load base HTML template
   const res = await fetch("./components/financials.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
+
+  // 🔧 Inject financials context bar (above subtabs)
+  let contextBar = document.getElementById("financials-context-bar");
+  if (!contextBar) {
+    contextBar = document.createElement("div");
+    contextBar.id = "financials-context-bar";
+    contextBar.className = "contact-context-bar";
+    tabContent.prepend(contextBar);
+  }
+  contextBar.textContent = portalState.selectedContactName
+    ? `Contact: ${portalState.selectedContactName}`
+    : "No contact selected";
 
   const content = tabContent.querySelector("#financialsContent");
   const buttons = tabContent.querySelectorAll("#financials-subtabs button");
 
   buttons.forEach(btn => {
     btn.addEventListener("click", async () => {
+      // Reset active state
       buttons.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
@@ -27,13 +42,15 @@ export async function loadFinancialsTab({ portalState, tabContent }) {
           break;
         default:
           content.innerHTML = `
-            <section class="card"><p>Select a subtab to begin.</p></section>
+            <section class="card">
+              <p>Select a subtab to begin.</p>
+            </section>
           `;
       }
     });
   });
 
-  // Default to List view
+  // ✅ Default to List view when tab first loads
   const defaultBtn = tabContent.querySelector('#financials-subtabs button[data-subtab="list"]');
   if (defaultBtn) {
     defaultBtn.classList.add("active");
@@ -43,29 +60,31 @@ export async function loadFinancialsTab({ portalState, tabContent }) {
 
 // 🔧 Add Payment flow
 async function renderFinancialAdd(container, portalState) {
-  // Context bar + picker area
   container.innerHTML = `
-    <div class="context-bar" style="background:#e6f2ff; padding:8px; margin-bottom:12px;">
-      <span id="financials-context">No contact selected</span>
-    </div>
-    <div id="financialsAddArea"></div>
+    <section class="card">
+      <p>Select a contact to add a payment.</p>
+      <div id="financialsPickerArea"></div>
+      <div id="financialsFormArea"></div>
+    </section>
   `;
 
-  const addArea = container.querySelector("#financialsAddArea");
+  const pickerArea = container.querySelector("#financialsPickerArea");
+  const formArea = container.querySelector("#financialsFormArea");
 
-  await renderContactPicker(addArea, portalState, async (contact) => {
+  await renderContactPicker(pickerArea, portalState, async (contact) => {
     // Update context bar when contact selected
-    const ctx = container.querySelector("#financials-context");
-    ctx.textContent = `Selected: ${escapeHtml(contact.search_name || contact.contact_id)}`;
+    const ctx = document.getElementById("financials-context-bar");
+    if (ctx) {
+      ctx.textContent = `Contact: ${escapeHtml(contact.search_name || contact.contact_id)}`;
+    }
 
     // Render Add Payment form
-    await renderAddPaymentForm(container, portalState, contact);
+    await renderAddPaymentForm(formArea, portalState, contact);
   });
 }
 
-async function renderAddPaymentForm(container, portalState, contact) {
-  const addArea = container.querySelector("#financialsAddArea");
-  addArea.innerHTML = `
+async function renderAddPaymentForm(formArea, portalState, contact) {
+  formArea.innerHTML = `
     <section class="card">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <h3>Add Payment for ${escapeHtml(contact.search_name || contact.contact_id)}</h3>
@@ -148,7 +167,7 @@ async function renderFinancialList(container, portalState) {
               <td>${escapeHtml(p.payment_amount || "")}</td>
               <td>${escapeHtml(p.invoice_number || "")}</td>
               <td>${escapeHtml(p.referral_id || "")}</td>
-              <td>${escapeHtml(p.contact_id || "")}</td>
+              <td>${escapeHtml(p.search_name || p.contact_id || "")}</td>
             </tr>
           `).join("") || `<tr><td colspan="5">(no payments found)</td></tr>`}
         </tbody>
