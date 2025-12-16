@@ -59,37 +59,38 @@ export async function loadFinancialsTab({ portalState, tabContent }) {
 }
 
 // 🔧 Add Payment flow
-async function renderFinancialAdd(container, portalState) {
-  container.innerHTML = `
-    <section class="card">
-      <p>Select a contact to add a payment.</p>
-      <div id="financialsPickerArea"></div>
-      <div id="financialsFormArea"></div>
-    </section>
-  `;
-
-  const pickerArea = container.querySelector("#financialsPickerArea");
-  const formArea = container.querySelector("#financialsFormArea");
-
-  await renderContactPicker(pickerArea, portalState, async (contact) => {
-    // Update context bar when contact selected
-    const ctx = document.getElementById("financials-context-bar");
-    if (ctx) {
-      ctx.textContent = `Contact: ${escapeHtml(contact.search_name || contact.contact_id)}`;
-    }
-
-    // Render Add Payment form
-    await renderAddPaymentForm(formArea, portalState, contact);
-  });
-}
-
 async function renderAddPaymentForm(formArea, portalState, contact) {
+  // 🔍 Find referral relationship
+  let referralName = "No Referral Found";
+  let referralId = null;
+
+  try {
+    const url = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${portalState.project}&source_contact_id=${contact.contact_id}`;
+    const res = await fetch(url, { cache: "no-cache" });
+    const relationships = await res.json();
+    if (Array.isArray(relationships)) {
+      const match = relationships.find(r => r.financial_referral === true);
+      if (match) {
+        referralName = match.related_contact_name || match.related_contact_id || "Referral Found";
+        referralId = match.related_contact_id || null;
+      }
+    }
+  } catch (err) {
+    console.warn("Referral lookup failed:", err);
+  }
+
   formArea.innerHTML = `
     <section class="card">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <h3>Add Payment for ${escapeHtml(contact.search_name || contact.contact_id)}</h3>
         <button id="btnSavePayment" class="btn-primary">Save</button>
       </div>
+
+      <div class="notes-row">
+        <label class="notes-label">Referral</label>
+        <input class="form-control" value="${escapeHtml(referralName)}" disabled />
+      </div>
+
       <div class="notes-row">
         <label class="notes-label">Amount</label>
         <input id="paymentAmount" class="form-control" type="number" step="0.01" />
@@ -102,10 +103,6 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
         <label class="notes-label">Invoice #</label>
         <input id="invoiceNumber" class="form-control" />
       </div>
-      <div class="notes-row">
-        <label class="notes-label">Referral ID (optional)</label>
-        <input id="referralId" class="form-control" placeholder="UUID" />
-      </div>
     </section>
   `;
 
@@ -113,7 +110,6 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
     const amount = document.getElementById("paymentAmount").value.trim();
     const date = document.getElementById("paymentDate").value.trim();
     const invoice = document.getElementById("invoiceNumber").value.trim();
-    const referral = document.getElementById("referralId").value.trim();
 
     if (!amount || !date) {
       alert("Amount and Date are required");
@@ -128,7 +124,7 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
         payment_amount: amount,
         payment_date: date,
         invoice_number: invoice,
-        referral_id: referral || null,
+        referral_id: referralId || null,
         project: portalState.project
       })
     });
@@ -143,6 +139,7 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
     }
   });
 }
+
 
 // 🔧 List Payments
 async function renderFinancialList(container, portalState) {
