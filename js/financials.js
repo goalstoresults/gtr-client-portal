@@ -55,8 +55,10 @@ async function renderFinancialAdd(container, portalState) {
         <button id="btnSavePayment" class="btn-primary">Save</button>
       </div>
       <div class="notes-row">
-        <label class="notes-label">Contact ID</label>
-        <input id="contactId" class="form-control" placeholder="UUID of contact" />
+        <label class="notes-label">Contact</label>
+        <select id="contactSelect" class="form-control">
+          <option value="">Loading contacts...</option>
+        </select>
       </div>
       <div class="notes-row">
         <label class="notes-label">Amount</label>
@@ -77,15 +79,37 @@ async function renderFinancialAdd(container, portalState) {
     </section>
   `;
 
+  // Populate contacts dropdown
+  const contactSelect = document.getElementById("contactSelect");
+  try {
+    const url = `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}&limit=500`;
+    const res = await fetch(url, { cache: "no-cache" });
+    let contacts = await res.json();
+    if (!Array.isArray(contacts)) contacts = contacts.rows || [];
+    if (!Array.isArray(contacts)) contacts = [];
+
+    if (contacts.length > 0) {
+      contactSelect.innerHTML = contacts
+        .map(c => `<option value="${escapeHtml(c.contact_id)}">${escapeHtml(c.search_name || (c.first_name + " " + c.last_name))}</option>`)
+        .join("");
+    } else {
+      contactSelect.innerHTML = `<option value="">(no contacts found)</option>`;
+    }
+  } catch (err) {
+    console.error("[Financials] Error loading contacts:", err);
+    contactSelect.innerHTML = `<option value="">(error loading contacts)</option>`;
+  }
+
+  // Save handler
   document.getElementById("btnSavePayment").addEventListener("click", async () => {
-    const contactId = document.getElementById("contactId").value.trim();
+    const contactId = contactSelect.value.trim();
     const amount = document.getElementById("paymentAmount").value.trim();
     const date = document.getElementById("paymentDate").value.trim();
     const invoice = document.getElementById("invoiceNumber").value.trim();
     const referral = document.getElementById("referralId").value.trim();
 
     if (!contactId || !amount || !date) {
-      alert("Contact ID, Amount, and Date are required");
+      alert("Contact, Amount, and Date are required");
       return;
     }
 
@@ -97,7 +121,8 @@ async function renderFinancialAdd(container, portalState) {
         payment_amount: amount,
         payment_date: date,
         invoice_number: invoice,
-        referral_id: referral || null
+        referral_id: referral || null,
+        project: portalState.project
       })
     });
 
@@ -111,6 +136,7 @@ async function renderFinancialAdd(container, portalState) {
     }
   });
 }
+
 
 // List Payments view
 async function renderFinancialList(container, portalState) {
