@@ -1,5 +1,5 @@
-// js/financials.js v2.0
-// 🔧 Load Financials Tab with subtab switching
+// js/financials.js v2.1
+// Load Financials Tab with subtab switching + tab-level context bar
 
 import { escapeHtml, renderContactPicker } from "./utilities.js";
 
@@ -8,7 +8,7 @@ export async function loadFinancialsTab({ portalState, tabContent }) {
   const res = await fetch("./components/financials.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
 
-  // 🔧 Inject financials context bar (above subtabs)
+  // Inject financials context bar (above subtabs) — mirrors Contacts v2.0
   let contextBar = document.getElementById("financials-context-bar");
   if (!contextBar) {
     contextBar = document.createElement("div");
@@ -23,34 +23,35 @@ export async function loadFinancialsTab({ portalState, tabContent }) {
   const content = tabContent.querySelector("#financialsContent");
   const buttons = tabContent.querySelectorAll("#financials-subtabs button");
 
+  // Wire subtab buttons
   buttons.forEach(btn => {
     btn.addEventListener("click", async () => {
-      // Reset active state
       buttons.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
       const subtab = btn.dataset.subtab;
-      switch (subtab) {
-        case "add":
-          await renderFinancialAdd(content, portalState);
-          break;
-        case "list":
-          await renderFinancialList(content, portalState);
-          break;
-        case "summary":
-          await renderFinancialSummary(content, portalState);
-          break;
-        default:
-          content.innerHTML = `
-            <section class="card">
-              <p>Select a subtab to begin.</p>
-            </section>
-          `;
+      if (subtab === "add") {
+        await renderFinancialAdd(content, portalState);
+        return;
       }
+      if (subtab === "list") {
+        await renderFinancialList(content, portalState);
+        return;
+      }
+      if (subtab === "summary") {
+        await renderFinancialSummary(content, portalState);
+        return;
+      }
+
+      content.innerHTML = `
+        <section class="card">
+          <p>Select a subtab to begin.</p>
+        </section>
+      `;
     });
   });
 
-  // ✅ Default to List view when tab first loads
+  // Default to List view
   const defaultBtn = tabContent.querySelector('#financials-subtabs button[data-subtab="list"]');
   if (defaultBtn) {
     defaultBtn.classList.add("active");
@@ -58,9 +59,32 @@ export async function loadFinancialsTab({ portalState, tabContent }) {
   }
 }
 
-// 🔧 Add Payment flow
+/* ---------- Add ---------- */
+
+async function renderFinancialAdd(container, portalState) {
+  container.innerHTML = `
+    <section class="card">
+      <p>Select a contact to add a payment.</p>
+      <div id="financialsPickerArea"></div>
+      <div id="financialsFormArea"></div>
+    </section>
+  `;
+
+  const pickerArea = container.querySelector("#financialsPickerArea");
+  const formArea = container.querySelector("#financialsFormArea");
+
+  await renderContactPicker(pickerArea, portalState, async (contact) => {
+    // Update tab-level context bar
+    const ctx = document.getElementById("financials-context-bar");
+    if (ctx) ctx.textContent = `Contact: ${escapeHtml(contact.search_name || contact.contact_id)}`;
+
+    // Render Add Payment form beneath the picker
+    await renderAddPaymentForm(formArea, portalState, contact);
+  });
+}
+
 async function renderAddPaymentForm(formArea, portalState, contact) {
-  // 🔍 Find referral relationship
+  // Look up referral from Relationships where this contact is the source and financial_referral is true
   let referralName = "No Referral Found";
   let referralId = null;
 
@@ -68,24 +92,26 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
     const url = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${portalState.project}&source_contact_id=${contact.contact_id}`;
     const res = await fetch(url, { cache: "no-cache" });
     const relationships = await res.json();
+
     if (Array.isArray(relationships)) {
       const match = relationships.find(r => r.financial_referral === true);
       if (match) {
-        referralName = match.related_contact_name || match.related_contact_id || "Referral Found";
         referralId = match.related_contact_id || null;
+        referralName = match.related_contact_name || match.related_contact_id || "Referral Found";
       }
     }
   } catch (err) {
-    console.warn("Referral lookup failed:", err);
+    console.warn("[Financials] Referral lookup failed:", err);
   }
 
   formArea.innerHTML = `
     <section class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h3>Add Payment for ${escapeHtml(contact.search_name || contact.contact_id)}</h3>
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+        <h3 style="margin:0;">Add Payment for ${escapeHtml(contact.search_name || contact.contact_id)}</h3>
         <button id="btnSavePayment" class="btn-primary">Save</button>
       </div>
 
+      <!-- Non-editable referral display (top-right under heading) -->
       <div class="notes-row">
         <label class="notes-label">Referral</label>
         <input class="form-control" value="${escapeHtml(referralName)}" disabled />
@@ -116,6 +142,7 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
       return;
     }
 
+    // Submit with referral_id hidden (if found)
     await fetch(`https://financials-module.dennis-e64.workers.dev/payments/add?project=${portalState.project}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -131,6 +158,7 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
 
     alert("Payment added");
 
+    // Switch to List view
     const listBtn = document.querySelector('#financials-subtabs button[data-subtab="list"]');
     if (listBtn) {
       listBtn.classList.add("active");
@@ -140,8 +168,8 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
   });
 }
 
+/* ---------- List ---------- */
 
-// 🔧 List Payments
 async function renderFinancialList(container, portalState) {
   const url = `https://financials-module.dennis-e64.workers.dev/payments/list?project=${portalState.project}&limit=500`;
   const res = await fetch(url, { cache: "no-cache" });
@@ -154,26 +182,35 @@ async function renderFinancialList(container, portalState) {
       <table class="notes-table">
         <thead>
           <tr>
-            <th>Date</th><th>Amount</th><th>Invoice #</th><th>Referral</th><th>Contact</th>
+            <th>Date</th>
+            <th>Amount</th>
+            <th>Invoice #</th>
+            <th>Referral</th>
+            <th>Contact</th>
           </tr>
         </thead>
         <tbody>
-          ${payments.map(p => `
-            <tr>
-              <td>${escapeHtml(p.payment_date || "")}</td>
-              <td>${escapeHtml(p.payment_amount || "")}</td>
-              <td>${escapeHtml(p.invoice_number || "")}</td>
-              <td>${escapeHtml(p.referral_id || "")}</td>
-              <td>${escapeHtml(p.search_name || p.contact_id || "")}</td>
-            </tr>
-          `).join("") || `<tr><td colspan="5">(no payments found)</td></tr>`}
+          ${
+            payments.length
+              ? payments.map(p => `
+                <tr>
+                  <td>${escapeHtml(p.payment_date || "")}</td>
+                  <td>${escapeHtml(p.payment_amount || "")}</td>
+                  <td>${escapeHtml(p.invoice_number || "")}</td>
+                  <td>${escapeHtml(p.referral_name || p.referral_id || "")}</td>
+                  <td>${escapeHtml(p.search_name || p.contact_id || "")}</td>
+                </tr>
+              `).join("")
+              : `<tr><td colspan="5">(no payments found)</td></tr>`
+          }
         </tbody>
       </table>
     </section>
   `;
 }
 
-// 🔧 Summary Payments
+/* ---------- Summary ---------- */
+
 async function renderFinancialSummary(container, portalState) {
   const url = `https://financials-module.dennis-e64.workers.dev/payments/summary?project=${portalState.project}`;
   const res = await fetch(url, { cache: "no-cache" });
@@ -186,17 +223,23 @@ async function renderFinancialSummary(container, portalState) {
       <table class="notes-table">
         <thead>
           <tr>
-            <th>Referral</th><th>Total Amount</th><th>Count</th>
+            <th>Referral</th>
+            <th>Total Amount</th>
+            <th>Count</th>
           </tr>
         </thead>
         <tbody>
-          ${summary.map(s => `
-            <tr>
-              <td>${escapeHtml(s.referral_id || "")}</td>
-              <td>${escapeHtml(s.total_amount || "")}</td>
-              <td>${escapeHtml(s.count || "")}</td>
-            </tr>
-          `).join("") || `<tr><td colspan="3">(no summary data)</td></tr>`}
+          ${
+            summary.length
+              ? summary.map(s => `
+                <tr>
+                  <td>${escapeHtml(s.referral_name || s.referral_id || "")}</td>
+                  <td>${escapeHtml(s.total_amount || "")}</td>
+                  <td>${escapeHtml(s.count || "")}</td>
+                </tr>
+              `).join("")
+              : `<tr><td colspan="3">(no summary data)</td></tr>`
+          }
         </tbody>
       </table>
     </section>
