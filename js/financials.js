@@ -55,6 +55,10 @@ async function renderFinancialAdd(container, portalState) {
         <button id="btnSavePayment" class="btn-primary">Save</button>
       </div>
       <div class="notes-row">
+        <label class="notes-label">Contact ID</label>
+        <input id="contactId" class="form-control" placeholder="UUID of contact" />
+      </div>
+      <div class="notes-row">
         <label class="notes-label">Amount</label>
         <input id="paymentAmount" class="form-control" type="number" step="0.01" />
       </div>
@@ -74,13 +78,14 @@ async function renderFinancialAdd(container, portalState) {
   `;
 
   document.getElementById("btnSavePayment").addEventListener("click", async () => {
+    const contactId = document.getElementById("contactId").value.trim();
     const amount = document.getElementById("paymentAmount").value.trim();
     const date = document.getElementById("paymentDate").value.trim();
     const invoice = document.getElementById("invoiceNumber").value.trim();
     const referral = document.getElementById("referralId").value.trim();
 
-    if (!amount || !date) {
-      alert("Amount and Date are required");
+    if (!contactId || !amount || !date) {
+      alert("Contact ID, Amount, and Date are required");
       return;
     }
 
@@ -88,6 +93,7 @@ async function renderFinancialAdd(container, portalState) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        contact_id: contactId,
         payment_amount: amount,
         payment_date: date,
         invoice_number: invoice,
@@ -96,6 +102,7 @@ async function renderFinancialAdd(container, portalState) {
     });
 
     alert("Payment added");
+
     const listBtn = document.querySelector('#financials-subtabs button[data-subtab="list"]');
     if (listBtn) {
       listBtn.classList.add("active");
@@ -132,6 +139,7 @@ async function renderFinancialList(container, portalState) {
           <th class="amount">Amount</th>
           <th>Invoice #</th>
           <th>Referral ID</th>
+          <th>Contact ID</th>
           <th>Created</th>
         </tr>
       </thead>
@@ -143,10 +151,11 @@ async function renderFinancialList(container, portalState) {
                 <td class="amount">${formatCurrency(p.payment_amount)}</td>
                 <td>${escapeHtml(p.invoice_number || "")}</td>
                 <td>${escapeHtml(p.referral_id || "")}</td>
+                <td>${escapeHtml(p.contact_id || "")}</td>
                 <td>${formatDateTime(p.created_at)}</td>
               </tr>
             `).join("")
-          : `<tr><td colspan="5">(no payments found)</td></tr>`
+          : `<tr><td colspan="6">(no payments found)</td></tr>`
         }
       </tbody>
     </table>
@@ -155,15 +164,31 @@ async function renderFinancialList(container, portalState) {
 
 // Summary view
 async function renderFinancialSummary(container, portalState) {
+  container.innerHTML = `<section class="card"><p>Loading summary...</p></section>`;
+
+  const url = `https://financials-module.dennis-e64.workers.dev/payments/summary?project=${portalState.project}`;
+  console.log("[Financials] Fetching summary:", url);
+
+  const res = await fetch(url, { cache: "no-cache" });
+  const summary = await res.json();
+
   container.innerHTML = `
     <section class="card">
       <h3>Financial Summary</h3>
-      <p>(Aggregated totals and referral breakdowns will be displayed here.)</p>
+      <p>Total Payments: ${formatCurrency(summary.total)}</p>
+      <h4>By Referral</h4>
+      <ul>
+        ${summary.by_referral.map(r => `<li>${escapeHtml(r.referral_id || "(none)")}: ${formatCurrency(r.total)}</li>`).join("")}
+      </ul>
+      <h4>By Invoice</h4>
+      <ul>
+        ${summary.by_invoice.map(i => `<li>${escapeHtml(i.invoice_number || "(none)")}: ${formatCurrency(i.total)}</li>`).join("")}
+      </ul>
     </section>
   `;
 }
 
-// Helpers (reuse from groups.js)
+// Helpers
 function formatDateTime(value) {
   if (!value) return "";
   const d = new Date(value);
