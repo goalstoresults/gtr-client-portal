@@ -264,6 +264,7 @@ async function renderContactList(container, portalState) {
 
 
 // 🔧 Dynamic Add Contact Form with collapsible sections + defaults
+// 🔧 Dynamic Add Contact Form with collapsible sections + defaults
 async function renderAddContactForm(container, portalState) {
   const projectId = portalState.project;
   if (!projectId) {
@@ -277,8 +278,11 @@ async function renderAddContactForm(container, portalState) {
     { cache: "no-cache" }
   );
   const data = await res.json();
-  const fields = Array.isArray(data.rows) ? data.rows : [];
+  let fields = Array.isArray(data.rows) ? data.rows : [];
   fields.sort((a, b) => a.sort_order - b.sort_order);
+
+  // ✅ Only use fields tagged for the Add tab
+  fields = fields.filter(f => f.contact_tab === "add");
 
   // Base container
   container.innerHTML = `
@@ -328,31 +332,16 @@ async function renderAddContactForm(container, portalState) {
         fetch(`https://groups-module.dennis-e64.workers.dev/groups/list?project=${projectId}`)
           .then(r => r.json())
           .then(data => {
-            console.log("✅ Groups response:", data);
-
-            const rows = Array.isArray(data.rows)
-              ? data.rows
-              : Array.isArray(data)
-              ? data
-              : [];
-
-            if (rows.length === 0) {
-              console.warn("Groups fetch returned no rows:", data);
-              return;
-            }
-
-            // Sort alphabetically by group_name
+            const rows = Array.isArray(data.rows) ? data.rows : Array.isArray(data) ? data : [];
             rows.sort((a, b) => (a.group_name || "").localeCompare(b.group_name || ""));
-
             const placeholder = document.createElement("option");
             placeholder.value = "";
             placeholder.textContent = "-- Select Group --";
             input.appendChild(placeholder);
-
             rows.forEach(g => {
               const opt = document.createElement("option");
-              opt.value = g.group_id;        // foreign key stored
-              opt.textContent = g.group_name; // human-readable name shown
+              opt.value = g.group_id;
+              opt.textContent = g.group_name;
               input.appendChild(opt);
             });
           });
@@ -365,19 +354,12 @@ async function renderAddContactForm(container, portalState) {
         fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=${f.lookup_type}&project=${projectId}`)
           .then(r => r.json())
           .then(values => {
-            if (!Array.isArray(values)) {
-              console.warn("Lookup fetch failed:", values);
-              return;
-            }
-
-            // Sort alphabetically by label/value
+            if (!Array.isArray(values)) return;
             values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
-
             const placeholder = document.createElement("option");
             placeholder.value = "";
             placeholder.textContent = "-- Select --";
             input.appendChild(placeholder);
-
             values.forEach(v => {
               const opt = document.createElement("option");
               opt.value = v.value;
@@ -441,6 +423,7 @@ async function renderAddContactForm(container, portalState) {
     }
   });
 }
+
 
 // 🔧 Render Contact Details with search_name header + Delete button near header
 async function renderContactDetails(container, portalState, contactId) {
