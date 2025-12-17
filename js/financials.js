@@ -176,8 +176,17 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
 async function renderFinancialList(container, portalState) {
   const url = `https://financials-module.dennis-e64.workers.dev/payments/list?project=${portalState.project}&limit=500`;
   const res = await fetch(url, { cache: "no-cache" });
-  let payments = await res.json();
-  if (!Array.isArray(payments)) payments = [];
+  let json;
+
+  try {
+    json = await res.json();
+  } catch {
+    json = [];
+  }
+
+  const payments = Array.isArray(json)
+    ? json
+    : (Array.isArray(json?.data) ? json.data : []);
 
   container.innerHTML = `
     <section class="card">
@@ -186,10 +195,10 @@ async function renderFinancialList(container, portalState) {
         <thead>
           <tr>
             <th>Date</th>
+            <th>Contact</th>
             <th>Amount</th>
             <th>Invoice #</th>
             <th>Referral</th>
-            <th>Contact</th>
           </tr>
         </thead>
         <tbody>
@@ -198,10 +207,10 @@ async function renderFinancialList(container, portalState) {
               ? payments.map(p => `
                 <tr>
                   <td>${escapeHtml(p.payment_date || "")}</td>
-                  <td>${escapeHtml((p.payment_amount !== undefined && p.payment_amount !== null) ? String(p.payment_amount) : "")}</td>
+                  <td>${escapeHtml(p.contact_id || "")}</td>
+                  <td>${escapeHtml(p.payment_amount?.toString() || "")}</td>
                   <td>${escapeHtml(p.invoice_number || "")}</td>
                   <td>${escapeHtml(p.referral_id || "")}</td>
-                  <td>${escapeHtml(p.contact_id || "")}</td>
                 </tr>
               `).join("")
               : `<tr><td colspan="5">(no payments found)</td></tr>`
@@ -211,6 +220,7 @@ async function renderFinancialList(container, portalState) {
     </section>
   `;
 }
+
 
 
 /* ---------- Summary ---------- */
