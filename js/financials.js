@@ -104,9 +104,6 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
     console.warn("[Financials] Referral lookup failed:", err);
   }
 
-  referralId = null;
-
-  
   formArea.innerHTML = `
     <section class="card">
       <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
@@ -142,10 +139,10 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
     const date = document.getElementById("paymentDate").value.trim();
     const invoice = document.getElementById("invoiceNumber").value.trim();
 
-  //  if (!amount || !date) {
-  //    alert("Amount and Date are required");
-  //    return;
-  //  }
+    if (!amount || !date) {
+      alert("Amount and Date are required");
+      return;
+    }
 
     // Submit with referral_id hidden (if found)
     await fetch(`https://financials-module.dennis-e64.workers.dev/payments/add?project=${portalState.project}`, {
