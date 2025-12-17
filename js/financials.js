@@ -64,24 +64,48 @@ export async function loadFinancialsTab({ portalState, tabContent }) {
 async function renderFinancialAdd(container, portalState) {
   container.innerHTML = `
     <section class="card">
-      <p>Select a contact to add a payment.</p>
-      <div id="financialsPickerArea"></div>
-      <div id="financialsFormArea"></div>
+      <h3>Financials – Add Payment</h3>
+      <div id="contactPickerArea"></div>
+      <div id="bulkAddArea" style="display:none; margin-top:12px;">
+        <p>Upload a CSV file with columns: Customer Name, Invoice Number, Payment Date, Payment Amount.</p>
+        <input id="bulkFileInput" type="file" accept=".csv,.json" />
+        <button id="btnStartBulk" class="btn-primary">Start Import</button>
+      </div>
     </section>
   `;
 
-  const pickerArea = container.querySelector("#financialsPickerArea");
-  const formArea = container.querySelector("#financialsFormArea");
-
+  // Render the generic contact picker
+  const pickerArea = document.getElementById("contactPickerArea");
   await renderContactPicker(pickerArea, portalState, async (contact) => {
-    // Update tab-level context bar
-    const ctx = document.getElementById("financials-context-bar");
-    if (ctx) ctx.textContent = `Contact: ${escapeHtml(contact.search_name || contact.contact_id)}`;
-
-    // Render Add Payment form beneath the picker
+    // When a contact is selected, show single-payment form
+    const formArea = document.createElement("div");
     await renderAddPaymentForm(formArea, portalState, contact);
+    container.appendChild(formArea);
+  });
+
+  // Inject Bulk Add button ONLY in Financials tab
+  const clearBtn = pickerArea.querySelector("#btnClearFilter");
+  if (clearBtn) {
+    const bulkBtn = document.createElement("button");
+    bulkBtn.textContent = "Add Bulk";
+    bulkBtn.className = "btn-primary";
+    bulkBtn.style.backgroundColor = "#007bff"; // blue
+
+    bulkBtn.addEventListener("click", () => {
+      const bulkArea = document.getElementById("bulkAddArea");
+      bulkArea.style.display = bulkArea.style.display === "none" ? "block" : "none";
+      bulkArea.scrollIntoView({ behavior: "smooth" });
+    });
+
+    clearBtn.insertAdjacentElement("afterend", bulkBtn);
+  }
+
+  // Wire Start Import button
+  document.getElementById("btnStartBulk").addEventListener("click", () => {
+    startBulkImport(portalState);
   });
 }
+
 
 async function renderAddPaymentForm(formArea, portalState, contact) {
   formArea.innerHTML = `
