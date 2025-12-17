@@ -174,39 +174,11 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
 /* ---------- List ---------- */
 
 async function renderFinancialList(container, portalState) {
-  // 1) Fetch payments (raw rows)
-  const paymentsRes = await fetch(
-    `https://financials-module.dennis-e64.workers.dev/payments/list?project=${portalState.project}&limit=500`,
-    { cache: "no-cache" }
-  );
-  let payments = [];
-  try {
-    const j = await paymentsRes.json();
-    payments = Array.isArray(j) ? j : (Array.isArray(j?.data) ? j.data : []);
-  } catch {
-    payments = [];
-  }
+  const url = `https://financials-module.dennis-e64.workers.dev/payments/list?project=${portalState.project}&limit=500`;
+  const res = await fetch(url, { cache: "no-cache" });
+  let payments = await res.json();
+  if (!Array.isArray(payments)) payments = [];
 
-  // 2) Fetch contacts to build ID → name map (client-side join)
-  const contactsRes = await fetch(
-    `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}&limit=2000`,
-    { cache: "no-cache" }
-  );
-  let contacts = [];
-  try {
-    const cj = await contactsRes.json();
-    contacts = Array.isArray(cj) ? cj : (Array.isArray(cj?.data) ? cj.data : []);
-  } catch {
-    contacts = [];
-  }
-
-  const nameById = new Map();
-  for (const c of contacts) {
-    // Use search_name when available; fallback to contact_id
-    nameById.set(c.contact_id, c.search_name || c.contact_name || c.contact_id);
-  }
-
-  // 3) Render table (Date first, Contact second), using names
   container.innerHTML = `
     <section class="card">
       <h3>Payments List</h3>
@@ -218,34 +190,50 @@ async function renderFinancialList(container, portalState) {
             <th>Amount</th>
             <th>Invoice #</th>
             <th>Referral</th>
-            <th>Needs review</th>
+            <th>Needs Review</th>
           </tr>
         </thead>
         <tbody>
           ${
             payments.length
-              ? payments.map(p => {
-                  const contactName = nameById.get(p.contact_id) || p.contact_id || "";
-                  const referralName = nameById.get(p.referral_id) || p.referral_id || "";
-                  const amt = p.payment_amount != null ? String(p.payment_amount) : "";
-
-                  return `
-                    <tr>
-                      <td>${escapeHtml(p.payment_date || "")}</td>
-                      <td>${escapeHtml(contactName)}</td>
-                      <td>${escapeHtml(amt)}</td>
-                      <td>${escapeHtml(p.invoice_number || "")}</td>
-                      <td>${escapeHtml(referralName)}</td>
-                      <td>${p.needs_review ? "✅" : ""}</td>
-                    </tr>
-                  `;
-                }).join("")
+              ? payments.map(p => `
+                <tr>
+                  <td>${escapeHtml(p.payment_date || "")}</td>
+                  <td>${escapeHtml(p.search_name || p.contact_id || "")}</td>
+                  <td>${escapeHtml(p.payment_amount?.toString() || "")}</td>
+                  <td>${escapeHtml(p.invoice_number || "")}</td>
+                  <td>${escapeHtml(p.referral_name || p.referral_id || "")}</td>
+                  <td>
+                    <input type="checkbox" class="needsReviewCheckbox"
+                      data-id="${p.payment_id}"
+                      ${p.needs_review ? "checked" : ""} />
+                  </td>
+                </tr>
+              `).join("")
               : `<tr><td colspan="6">(no payments found)</td></tr>`
           }
         </tbody>
       </table>
     </section>
   `;
+
+  // Wire up checkbox change events
+  container.querySelectorAll(".needsReviewCheckbox").forEach(cb => {
+    cb.addEventListener("change", async (e) => {
+      const paymentId = e.target.dataset.id;
+      const checked = e.target.checked;
+
+      await fetch(`https://financials-module.dennis-e64.workers.dev/payments/updateNeedsReview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          payment_id: paymentId,
+          needs_review: checked,
+          project: portalState.project
+        })
+      });
+    });
+  });
 }
 
 
