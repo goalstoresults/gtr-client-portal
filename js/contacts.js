@@ -454,8 +454,8 @@ async function renderContactDetails(container, portalState, contactId) {
   let fields = Array.isArray(fieldsData.rows) ? fieldsData.rows : [];
   fields.sort((a, b) => a.sort_order - b.sort_order);
 
-  // ✅ Only use fields tagged for the Details tab
-  fields = fields.filter(f => f.contact_tab === "details");
+  // ✅ Use the same layout as Add tab
+  fields = fields.filter(f => f.contact_tab === "add");
 
   const headerName = contact.search_name || contact.contact_id;
 
