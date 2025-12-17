@@ -86,18 +86,7 @@ async function renderFinancialAdd(container, portalState) {
 async function renderAddPaymentForm(formArea, portalState, contact) {
   formArea.innerHTML = `
     <section class="card">
-      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-        <h3 style="margin:0;">Add Payment for ${escapeHtml(contact.search_name || contact.contact_id)}</h3>
-        <button id="btnSavePayment" class="btn-primary">Save</button>
-        <button id="btnBulkAdd" class="btn-secondary">Bulk Add</button>
-      </div>
-
-      <div id="bulkAddArea" style="display:none; margin-top:12px;">
-        <p>Upload a CSV file with columns: Customer Name, Invoice Number, Payment Date, Payment Amount.</p>
-        <input id="bulkFileInput" type="file" accept=".csv,.json" />
-        <button id="btnStartBulk" class="btn-primary">Start Import</button>
-      </div>
-
+      <h3>Add Payment for ${escapeHtml(contact.search_name || contact.contact_id)}</h3>
       <div class="notes-row">
         <label class="notes-label">Amount</label>
         <input id="paymentAmount" class="form-control" type="number" step="0.01" />
@@ -110,10 +99,10 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
         <label class="notes-label">Invoice #</label>
         <input id="invoiceNumber" class="form-control" />
       </div>
+      <button id="btnSavePayment" class="btn-primary">Save</button>
     </section>
   `;
 
-  // Single save handler
   document.getElementById("btnSavePayment").addEventListener("click", async () => {
     const amount = document.getElementById("paymentAmount").value.trim();
     const date = document.getElementById("paymentDate").value.trim();
@@ -137,17 +126,6 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
     });
 
     alert("Payment added");
-  });
-
-  // Toggle bulk add area
-  document.getElementById("btnBulkAdd").addEventListener("click", () => {
-    const bulkArea = document.getElementById("bulkAddArea");
-    bulkArea.style.display = bulkArea.style.display === "none" ? "block" : "none";
-  });
-
-  // Delegate to separate function
-  document.getElementById("btnStartBulk").addEventListener("click", () => {
-    startBulkImport(portalState);
   });
 }
 
