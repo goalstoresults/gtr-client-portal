@@ -104,7 +104,7 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
     console.warn("[Financials] Referral lookup failed:", err);
   }
 
-  let referralId = null;
+  referralId = null;
 
   
   formArea.innerHTML = `
