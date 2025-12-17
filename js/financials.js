@@ -66,6 +66,8 @@ async function renderFinancialAdd(container, portalState) {
     <section class="card">
       <h3>Financials – Add Payment</h3>
       <div id="contactPickerArea"></div>
+
+      <!-- Bulk import area -->
       <div id="bulkAddArea" style="display:none; margin-top:12px;">
         <p>Upload a CSV file with columns: Customer Name, Invoice Number, Payment Date, Payment Amount.</p>
         <input id="bulkFileInput" type="file" accept=".csv,.json" />
@@ -77,15 +79,14 @@ async function renderFinancialAdd(container, portalState) {
   // Render the generic contact picker
   const pickerArea = document.getElementById("contactPickerArea");
   await renderContactPicker(pickerArea, portalState, async (contact) => {
-    // When a contact is selected, show single-payment form
     const formArea = document.createElement("div");
     await renderAddPaymentForm(formArea, portalState, contact);
     container.appendChild(formArea);
   });
 
-  // Inject Bulk Add button ONLY in Financials tab
-  const clearBtn = pickerArea.querySelector("#btnClearFilter");
-  if (clearBtn) {
+  // 🔑 Add Bulk button underneath filter buttons
+  const filterRow = pickerArea.querySelector("div[style*='display:flex']");
+  if (filterRow) {
     const bulkBtn = document.createElement("button");
     bulkBtn.textContent = "Add Bulk";
     bulkBtn.className = "btn-primary";
@@ -97,7 +98,8 @@ async function renderFinancialAdd(container, portalState) {
       bulkArea.scrollIntoView({ behavior: "smooth" });
     });
 
-    clearBtn.insertAdjacentElement("afterend", bulkBtn);
+    // Append underneath
+    filterRow.insertAdjacentElement("afterend", bulkBtn);
   }
 
   // Wire Start Import button
