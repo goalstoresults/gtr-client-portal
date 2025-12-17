@@ -66,17 +66,22 @@ async function renderFinancialAdd(container, portalState) {
     <section class="card">
       <h3>Financials – Add Payment</h3>
       <div id="contactPickerArea"></div>
-
-      <!-- Bulk import area -->
-      <div id="bulkAddArea" style="display:none; margin-top:12px;">
-        <p>Upload a CSV file with columns: Customer Name, Invoice Number, Payment Date, Payment Amount.</p>
-        <input id="bulkFileInput" type="file" accept=".csv,.json" />
-        <button id="btnStartBulk" class="btn-primary">Start Import</button>
-      </div>
     </section>
+
+    <!-- ✅ Add Bulk button placed AFTER the card -->
+    <div style="margin-top:16px;">
+      <button id="btnBulkAdd" class="btn-primary" style="background-color:#007bff;">Add Bulk</button>
+    </div>
+
+    <!-- Bulk import area (initially hidden) -->
+    <div id="bulkAddArea" style="display:none; margin-top:12px;">
+      <p>Upload a CSV file with columns: Customer Name, Invoice Number, Payment Date, Payment Amount.</p>
+      <input id="bulkFileInput" type="file" accept=".csv,.json" />
+      <button id="btnStartBulk" class="btn-primary">Start Import</button>
+    </div>
   `;
 
-  // Render the generic contact picker
+  // Render contact picker inside the card
   const pickerArea = document.getElementById("contactPickerArea");
   await renderContactPicker(pickerArea, portalState, async (contact) => {
     const formArea = document.createElement("div");
@@ -84,25 +89,14 @@ async function renderFinancialAdd(container, portalState) {
     container.appendChild(formArea);
   });
 
-  // 🔑 Add Bulk button underneath filter buttons
-  const filterRow = pickerArea.querySelector("div[style*='display:flex']");
-  if (filterRow) {
-    const bulkBtn = document.createElement("button");
-    bulkBtn.textContent = "Add Bulk";
-    bulkBtn.className = "btn-primary";
-    bulkBtn.style.backgroundColor = "#007bff"; // blue
+  // Wire up Add Bulk button
+  document.getElementById("btnBulkAdd").addEventListener("click", () => {
+    const bulkArea = document.getElementById("bulkAddArea");
+    bulkArea.style.display = bulkArea.style.display === "none" ? "block" : "none";
+    bulkArea.scrollIntoView({ behavior: "smooth" });
+  });
 
-    bulkBtn.addEventListener("click", () => {
-      const bulkArea = document.getElementById("bulkAddArea");
-      bulkArea.style.display = bulkArea.style.display === "none" ? "block" : "none";
-      bulkArea.scrollIntoView({ behavior: "smooth" });
-    });
-
-    // Append underneath
-    filterRow.insertAdjacentElement("afterend", bulkBtn);
-  }
-
-  // Wire Start Import button
+  // Wire up Start Import button
   document.getElementById("btnStartBulk").addEventListener("click", () => {
     startBulkImport(portalState);
   });
