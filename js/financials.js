@@ -84,39 +84,18 @@ async function renderFinancialAdd(container, portalState) {
 }
 
 async function renderAddPaymentForm(formArea, portalState, contact) {
-  // Look up referral from Relationships where this contact is the source and financial_referral is true
-  let referralName = "No Referral Found";
-  let referralId = null;
-
-  try {
-    const url = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${portalState.project}&source_contact_id=${contact.contact_id}`;
-    const res = await fetch(url, { cache: "no-cache" });
-    const relationships = await res.json();
-
-    if (Array.isArray(relationships)) {
-      const match = relationships.find(r => r.financial_referral === true);
-      if (match) {
-        referralId = match.related_contact_id || null;
-        referralName = match.related_contact_name || match.related_contact_id || "Referral Found";
-      }
-    }
-  } catch (err) {
-    console.warn("[Financials] Referral lookup failed:", err);
-  }
-
   formArea.innerHTML = `
     <section class="card">
       <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
         <h3 style="margin:0;">Add Payment for ${escapeHtml(contact.search_name || contact.contact_id)}</h3>
         <button id="btnSavePayment" class="btn-primary">Save</button>
+        <button id="btnBulkAdd" class="btn-secondary">Bulk Add</button>
       </div>
 
-      <!-- Referral shown as disabled dropdown -->
-      <div class="notes-row">
-        <label class="notes-label">Referral</label>
-        <select class="form-control" disabled>
-          <option>${escapeHtml(referralName)}</option>
-        </select>
+      <div id="bulkAddArea" style="display:none; margin-top:12px;">
+        <p>Upload a CSV file with columns: Customer Name, Invoice Number, Payment Date, Payment Amount.</p>
+        <input id="bulkFileInput" type="file" accept=".csv,.json" />
+        <button id="btnStartBulk" class="btn-primary">Start Import</button>
       </div>
 
       <div class="notes-row">
@@ -134,6 +113,7 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
     </section>
   `;
 
+  // Single save handler
   document.getElementById("btnSavePayment").addEventListener("click", async () => {
     const amount = document.getElementById("paymentAmount").value.trim();
     const date = document.getElementById("paymentDate").value.trim();
@@ -144,32 +124,85 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
       return;
     }
 
-    // Submit with referral_id hidden (if found)
     await fetch(`https://financials-module.dennis-e64.workers.dev/payments/add?project=${portalState.project}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contact_id: contact.contact_id,
-        payment_amount: amount,
+        payment_amount: parseFloat(amount),
         payment_date: date,
-        invoice_number: invoice,
-        referral_id: referralId || null,
-        referral_name: referralName || null, // include name for display
+        invoice_number: invoice || null,
         project: portalState.project
       })
     });
 
     alert("Payment added");
+  });
 
-    // Switch to List view
+  // Toggle bulk add area
+  document.getElementById("btnBulkAdd").addEventListener("click", () => {
+    const bulkArea = document.getElementById("bulkAddArea");
+    bulkArea.style.display = bulkArea.style.display === "none" ? "block" : "none";
+  });
+
+  // Delegate to separate function
+  document.getElementById("btnStartBulk").addEventListener("click", () => {
+    startBulkImport(portalState);
+  });
+}
+
+
+/* ---------- Bulk Add ---------- */
+async function startBulkImport(portalState) {
+  const fileInput = document.getElementById("bulkFileInput");
+  if (!fileInput.files.length) {
+    alert("Please select a file first");
+    return;
+  }
+
+  const file = fileInput.files[0];
+  const text = await file.text();
+  let rows = [];
+
+  if (file.name.endsWith(".json")) {
+    rows = JSON.parse(text);
+  } else {
+    // Simple CSV parser: assumes header row
+    const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+    const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
+    rows = lines.slice(1).map(line => {
+      const cols = line.split(",");
+      return {
+        customer_name: cols[headers.indexOf("customer name")]?.trim(),
+        invoice_number: cols[headers.indexOf("invoice number")]?.trim(),
+        payment_date: cols[headers.indexOf("payment date")]?.trim(),
+        payment_amount: cols[headers.indexOf("payment amount")]?.trim()
+      };
+    });
+  }
+
+  // Send to backend import endpoint
+  const res = await fetch(`https://financials-module.dennis-e64.workers.dev/payments/import?project=${portalState.project}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(rows)
+  });
+
+  if (res.ok) {
+    alert("Bulk import complete");
+    // Refresh list view
     const listBtn = document.querySelector('#financials-subtabs button[data-subtab="list"]');
     if (listBtn) {
       listBtn.classList.add("active");
       const content = document.querySelector("#financialsContent");
       await renderFinancialList(content, portalState);
     }
-  });
+  } else {
+    alert("Bulk import failed");
+  }
 }
+
+
 
 /* ---------- List ---------- */
 
