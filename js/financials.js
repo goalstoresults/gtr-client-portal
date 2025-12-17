@@ -198,10 +198,10 @@ async function renderFinancialList(container, portalState) {
               ? payments.map(p => `
                 <tr>
                   <td>${escapeHtml(p.payment_date || "")}</td>
-                  <td>${escapeHtml(p.payment_amount || "")}</td>
+                  <td>${escapeHtml((p.payment_amount !== undefined && p.payment_amount !== null) ? String(p.payment_amount) : "")}</td>
                   <td>${escapeHtml(p.invoice_number || "")}</td>
-                  <td>${escapeHtml(p.referral_name || p.referral_id || "")}</td>
-                  <td>${escapeHtml(p.search_name || p.contact_id || "")}</td>
+                  <td>${escapeHtml(p.referral_id || "")}</td>
+                  <td>${escapeHtml(p.contact_id || "")}</td>
                 </tr>
               `).join("")
               : `<tr><td colspan="5">(no payments found)</td></tr>`
@@ -211,6 +211,7 @@ async function renderFinancialList(container, portalState) {
     </section>
   `;
 }
+
 
 /* ---------- Summary ---------- */
 
