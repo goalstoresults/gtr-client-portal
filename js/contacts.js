@@ -451,13 +451,14 @@ async function renderContactDetails(container, portalState, contactId) {
     { cache: "no-cache" }
   );
   const fieldsData = await fieldsRes.json();
-  const fields = Array.isArray(fieldsData.rows) ? fieldsData.rows : [];
+  let fields = Array.isArray(fieldsData.rows) ? fieldsData.rows : [];
   fields.sort((a, b) => a.sort_order - b.sort_order);
 
-  // Header value: prefer search_name, fallback to contact_id
+  // ✅ Only use fields tagged for the Details tab
+  fields = fields.filter(f => f.contact_tab === "details");
+
   const headerName = contact.search_name || contact.contact_id;
 
-  // Base container
   container.innerHTML = `
     <section class="card">
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
@@ -598,7 +599,6 @@ async function renderContactDetails(container, portalState, contactId) {
       headers: { "Content-Type": "application/json" }
     });
     alert("Contact deleted.");
-    // Return to list view
     const listBtn = document.querySelector('#contacts-subtabs button[data-subtab="list"]');
     if (listBtn) {
       listBtn.classList.add("active");
@@ -607,6 +607,7 @@ async function renderContactDetails(container, portalState, contactId) {
     }
   });
 }
+
 
 // Render relationships grid for a contact
 async function renderContactRelationships(container, portalState, contactId) {
