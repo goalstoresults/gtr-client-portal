@@ -391,37 +391,46 @@ async function renderAddContactForm(container, portalState) {
   form.appendChild(saveBtn);
 
   // Handle form submission
-  form.addEventListener("submit", async e => {
-    e.preventDefault();
-    const formData = new FormData(form);
-    const payload = {};
+form.addEventListener("submit", async e => {
+  e.preventDefault();
+  console.log("Form submitted");
 
-    fields.forEach(f => {
-      payload[f.field_key] = formData.get(f.field_key);
+  const formData = new FormData(form);
+  const payload = {};
+
+  fields.forEach(f => {
+    payload[f.field_key] = formData.get(f.field_key);
+  });
+
+  payload.contact_id = crypto.randomUUID();
+  payload.project = projectId;
+  payload.created_at = new Date().toISOString();
+
+  const first = formData.get("first_name") || "";
+  const last = formData.get("last_name") || "";
+  payload.contact_name = `${first} ${last}`.trim();
+
+  console.log("Submitting payload:", payload);
+
+  try {
+    const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
     });
 
-    payload.contact_id = crypto.randomUUID();
-    payload.project = projectId;
-    payload.created_at = new Date().toISOString();
+    console.log("Response status:", res.status);
+    const text = await res.clone().text();
+    console.log("Response body:", text);
 
-    // Build contact_name consistently
-    const first = formData.get("first_name") || "";
-    const last = formData.get("last_name") || "";
-    payload.contact_name = `${first} ${last}`.trim();
+    const result = JSON.parse(text);
+    container.innerHTML = `<section class="card"><p>${escapeHtml(result.message || "Contact saved.")}</p></section>`;
+  } catch (err) {
+    console.error("Error saving contact:", err);
+    container.innerHTML = `<section class="card"><p>Error saving contact: ${escapeHtml(err.message)}</p></section>`;
+  }
+});
 
-    try {
-      const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      const result = await res.json();
-      container.innerHTML = `<section class="card"><p>${escapeHtml(result.message || "Contact saved.")}</p></section>`;
-    } catch (err) {
-      container.innerHTML = `<section class="card"><p>Error saving contact: ${escapeHtml(err.message)}</p></section>`;
-    }
-  });
 }
 
 
