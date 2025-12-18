@@ -258,13 +258,7 @@ async function renderContactList(container, portalState) {
   }
 }
 
-
-
-
-
-
-// 🔧 Dynamic Add Contact Form with collapsible sections + defaults
-// 🔧 Dynamic Add Contact Form with collapsible sections + defaults
+// 🔧 Dynamic Add Contact Form with collapsible sections + normalization
 async function renderAddContactForm(container, portalState) {
   const projectId = portalState.project;
   if (!projectId) {
@@ -278,8 +272,16 @@ async function renderAddContactForm(container, portalState) {
     { cache: "no-cache" }
   );
   const data = await res.json();
-  const fields = Array.isArray(data.rows) ? data.rows : [];
+  let fields = Array.isArray(data.rows) ? data.rows : [];
   fields.sort((a, b) => a.sort_order - b.sort_order);
+
+  // Use Add tab fields for consistency
+  let addFields = fields.filter(f => f.contact_tab === "add");
+  if (addFields.length === 0) {
+    console.warn("No fields tagged 'add' — falling back to all fields");
+    addFields = fields;
+  }
+  fields = addFields;
 
   // Base container
   container.innerHTML = `
@@ -299,7 +301,7 @@ async function renderAddContactForm(container, portalState) {
     return acc;
   }, {});
 
-  // Render each section as collapsible <details>
+  // Render each section
   for (const [section, sectionFields] of Object.entries(grouped)) {
     const details = document.createElement("details");
     details.className = "notes-section";
@@ -321,7 +323,6 @@ async function renderAddContactForm(container, portalState) {
       let input;
 
       if (f.field_key === "group_id") {
-        // Special case: dropdown bound to groups table
         input = document.createElement("select");
         input.name = "group_id";
         input.className = "form-control";
@@ -329,36 +330,20 @@ async function renderAddContactForm(container, portalState) {
         fetch(`https://groups-module.dennis-e64.workers.dev/groups/list?project=${projectId}`)
           .then(r => r.json())
           .then(data => {
-            console.log("✅ Groups response:", data);
-
-            const rows = Array.isArray(data.rows)
-              ? data.rows
-              : Array.isArray(data)
-              ? data
-              : [];
-
-            if (rows.length === 0) {
-              console.warn("Groups fetch returned no rows:", data);
-              return;
-            }
-
-            // Sort alphabetically by group_name
+            const rows = Array.isArray(data.rows) ? data.rows : Array.isArray(data) ? data : [];
             rows.sort((a, b) => (a.group_name || "").localeCompare(b.group_name || ""));
-
             const placeholder = document.createElement("option");
             placeholder.value = "";
             placeholder.textContent = "-- Select Group --";
             input.appendChild(placeholder);
-
             rows.forEach(g => {
               const opt = document.createElement("option");
-              opt.value = g.group_id;        // foreign key stored
-              opt.textContent = g.group_name; // human-readable name shown
+              opt.value = g.group_id;        // full UUID
+              opt.textContent = g.group_name;
               input.appendChild(opt);
             });
           });
       } else if (f.lookup_type) {
-        // Dropdown bound to lookup group
         input = document.createElement("select");
         input.name = f.field_key;
         input.className = "form-control";
@@ -366,19 +351,12 @@ async function renderAddContactForm(container, portalState) {
         fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=${f.lookup_type}&project=${projectId}`)
           .then(r => r.json())
           .then(values => {
-            if (!Array.isArray(values)) {
-              console.warn("Lookup fetch failed:", values);
-              return;
-            }
-
-            // Sort alphabetically by label/value
+            if (!Array.isArray(values)) return;
             values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
-
             const placeholder = document.createElement("option");
             placeholder.value = "";
             placeholder.textContent = "-- Select --";
             input.appendChild(placeholder);
-
             values.forEach(v => {
               const opt = document.createElement("option");
               opt.value = v.value;
@@ -387,7 +365,6 @@ async function renderAddContactForm(container, portalState) {
             });
           });
       } else {
-        // Default text input
         input = document.createElement("input");
         input.type = "text";
         input.name = f.field_key;
@@ -402,21 +379,30 @@ async function renderAddContactForm(container, portalState) {
     form.appendChild(details);
   }
 
-  // Add Save button
+  // Save button
   const saveBtn = document.createElement("button");
   saveBtn.type = "submit";
   saveBtn.className = "btn-primary";
   saveBtn.textContent = "Save Contact";
   form.appendChild(saveBtn);
 
-  // Handle form submission
+  // Handle form submission with normalization
   form.addEventListener("submit", async e => {
     e.preventDefault();
     const formData = new FormData(form);
     const payload = {};
 
     fields.forEach(f => {
-      payload[f.field_key] = formData.get(f.field_key);
+      let val = formData.get(f.field_key);
+
+      if (val === "") {
+        payload[f.field_key] = null;
+      } else if (f.data_type === "integer") {
+        const parsed = parseInt(val, 10);
+        payload[f.field_key] = isNaN(parsed) ? null : parsed;
+      } else {
+        payload[f.field_key] = val; // preserve UUIDs and strings
+      }
     });
 
     payload.contact_id = crypto.randomUUID();
@@ -442,6 +428,10 @@ async function renderAddContactForm(container, portalState) {
     }
   });
 }
+
+
+
+
 
 
 async function renderContactDetails(container, portalState, contactId) {
