@@ -444,7 +444,7 @@ async function renderAddContactForm(container, portalState) {
 }
 
 
-// 🔧 Render Contact Details with search_name header + Delete button near header
+// 🔧 Render Contact Details with normalization for integer fields
 async function renderContactDetails(container, portalState, contactId) {
   const projectId = portalState.project;
   if (!projectId || !contactId) {
@@ -473,7 +473,7 @@ async function renderContactDetails(container, portalState, contactId) {
   let fields = Array.isArray(fieldsData.rows) ? fieldsData.rows : [];
   fields.sort((a, b) => a.sort_order - b.sort_order);
 
-  // ✅ Use the same layout as Add tab
+  // ✅ Use Add tab fields for consistency
   fields = fields.filter(f => f.contact_tab === "add");
 
   const headerName = contact.search_name || contact.contact_id;
@@ -584,14 +584,25 @@ async function renderContactDetails(container, portalState, contactId) {
   saveBtn.textContent = "Save Changes";
   form.appendChild(saveBtn);
 
-  // Handle form submission
+  // Handle form submission with normalization
   form.addEventListener("submit", async e => {
     e.preventDefault();
     const formData = new FormData(form);
     const updates = {};
+
     fields.forEach(f => {
-      updates[f.field_key] = formData.get(f.field_key);
+      let val = formData.get(f.field_key);
+
+      if (val === "") {
+        updates[f.field_key] = null;
+      } else if (f.data_type === "integer" || f.field_key.endsWith("_id")) {
+        const parsed = parseInt(val, 10);
+        updates[f.field_key] = isNaN(parsed) ? null : parsed;
+      } else {
+        updates[f.field_key] = val;
+      }
     });
+
     updates.updated_at = new Date().toISOString();
 
     try {
