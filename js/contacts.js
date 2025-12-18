@@ -281,8 +281,13 @@ async function renderAddContactForm(container, portalState) {
   let fields = Array.isArray(data.rows) ? data.rows : [];
   fields.sort((a, b) => a.sort_order - b.sort_order);
 
-  // ✅ Only use fields tagged for the Add tab
-  fields = fields.filter(f => f.contact_tab === "add");
+  // ✅ Only use fields tagged for the Add tab, with fallback
+  let addFields = fields.filter(f => f.contact_tab === "add");
+  if (addFields.length === 0) {
+    console.warn("No fields tagged 'add' — falling back to all fields");
+    addFields = fields;
+  }
+  fields = addFields;
 
   // Base container
   container.innerHTML = `
@@ -391,46 +396,38 @@ async function renderAddContactForm(container, portalState) {
   form.appendChild(saveBtn);
 
   // Handle form submission
-form.addEventListener("submit", async e => {
-  e.preventDefault();
-  console.log("Form submitted");
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const formData = new FormData(form);
+    const payload = {};
 
-  const formData = new FormData(form);
-  const payload = {};
-
-  fields.forEach(f => {
-    payload[f.field_key] = formData.get(f.field_key);
-  });
-
-  payload.contact_id = crypto.randomUUID();
-  payload.project = projectId;
-  payload.created_at = new Date().toISOString();
-
-  const first = formData.get("first_name") || "";
-  const last = formData.get("last_name") || "";
-  payload.contact_name = `${first} ${last}`.trim();
-
-  console.log("Submitting payload:", payload);
-
-  try {
-    const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+    fields.forEach(f => {
+      payload[f.field_key] = formData.get(f.field_key);
     });
 
-    console.log("Response status:", res.status);
-    const text = await res.clone().text();
-    console.log("Response body:", text);
+    payload.contact_id = crypto.randomUUID();
+    payload.project = projectId;
+    payload.created_at = new Date().toISOString();
 
-    const result = JSON.parse(text);
-    container.innerHTML = `<section class="card"><p>${escapeHtml(result.message || "Contact saved.")}</p></section>`;
-  } catch (err) {
-    console.error("Error saving contact:", err);
-    container.innerHTML = `<section class="card"><p>Error saving contact: ${escapeHtml(err.message)}</p></section>`;
-  }
-});
+    // Build contact_name consistently
+    const first = formData.get("first_name") || "";
+    const last = formData.get("last_name") || "";
+    payload.contact_name = `${first} ${last}`.trim();
 
+    try {
+      const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await res.json();
+      container.innerHTML = `<section class="card"><p>${escapeHtml(result.message || "Contact saved.")}</p></section>`;
+    } catch (err) {
+      console.error("Error saving contact:", err);
+      container.innerHTML = `<section class="card"><p>Error saving contact: ${escapeHtml(err.message)}</p></section>`;
+    }
+  });
 }
 
 
