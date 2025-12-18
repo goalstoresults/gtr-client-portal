@@ -444,7 +444,6 @@ async function renderAddContactForm(container, portalState) {
 }
 
 
-// 🔧 Render Contact Details with normalization for integer fields
 async function renderContactDetails(container, portalState, contactId) {
   const projectId = portalState.project;
   if (!projectId || !contactId) {
@@ -473,7 +472,7 @@ async function renderContactDetails(container, portalState, contactId) {
   let fields = Array.isArray(fieldsData.rows) ? fieldsData.rows : [];
   fields.sort((a, b) => a.sort_order - b.sort_order);
 
-  // ✅ Use Add tab fields for consistency
+  // Use Add tab fields for consistency
   fields = fields.filter(f => f.contact_tab === "add");
 
   const headerName = contact.search_name || contact.contact_id;
@@ -595,11 +594,11 @@ async function renderContactDetails(container, portalState, contactId) {
 
       if (val === "") {
         updates[f.field_key] = null;
-      } else if (f.data_type === "integer" || f.field_key.endsWith("_id")) {
+      } else if (f.data_type === "integer") {
         const parsed = parseInt(val, 10);
         updates[f.field_key] = isNaN(parsed) ? null : parsed;
       } else {
-        updates[f.field_key] = val;
+        updates[f.field_key] = val; // preserve UUIDs and strings
       }
     });
 
