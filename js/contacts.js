@@ -258,7 +258,9 @@ async function renderContactList(container, portalState) {
   }
 }
 
-// 🔧 Dynamic Add Contact Form with collapsible sections + normalization
+
+
+// 🔧 Add Contact Form (same structure as Details, but POST + new contact_id)
 async function renderAddContactForm(container, portalState) {
   const projectId = portalState.project;
   if (!projectId) {
@@ -266,24 +268,18 @@ async function renderAddContactForm(container, portalState) {
     return;
   }
 
-  // Fetch configured fields for this project
-  const res = await fetch(
+  // Fetch configured fields
+  const fieldsRes = await fetch(
     `https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${projectId}`,
     { cache: "no-cache" }
   );
-  const data = await res.json();
-  let fields = Array.isArray(data.rows) ? data.rows : [];
+  const fieldsData = await fieldsRes.json();
+  let fields = Array.isArray(fieldsData.rows) ? fieldsData.rows : [];
   fields.sort((a, b) => a.sort_order - b.sort_order);
 
   // Use Add tab fields for consistency
-  let addFields = fields.filter(f => f.contact_tab === "add");
-  if (addFields.length === 0) {
-    console.warn("No fields tagged 'add' — falling back to all fields");
-    addFields = fields;
-  }
-  fields = addFields;
+  fields = fields.filter(f => f.contact_tab === "add");
 
-  // Base container
   container.innerHTML = `
     <section class="card">
       <h2>Add Contact for ${escapeHtml(portalState.display_name || projectId)}</h2>
@@ -303,14 +299,10 @@ async function renderAddContactForm(container, portalState) {
 
   // Render each section
   for (const [section, sectionFields] of Object.entries(grouped)) {
-    const details = document.createElement("details");
-    details.className = "notes-section";
-    details.open = true;
-
-    const summary = document.createElement("summary");
-    summary.textContent = section;
-    summary.className = "section-title";
-    details.appendChild(summary);
+    const sectionHeader = document.createElement("h3");
+    sectionHeader.textContent = section;
+    sectionHeader.className = "section-title";
+    form.appendChild(sectionHeader);
 
     for (const f of sectionFields) {
       const wrapper = document.createElement("div");
@@ -338,7 +330,7 @@ async function renderAddContactForm(container, portalState) {
             input.appendChild(placeholder);
             rows.forEach(g => {
               const opt = document.createElement("option");
-              opt.value = g.group_id;        // full UUID
+              opt.value = g.group_id; // full UUID
               opt.textContent = g.group_name;
               input.appendChild(opt);
             });
@@ -373,10 +365,8 @@ async function renderAddContactForm(container, portalState) {
 
       wrapper.appendChild(label);
       wrapper.appendChild(input);
-      details.appendChild(wrapper);
+      form.appendChild(wrapper);
     }
-
-    form.appendChild(details);
   }
 
   // Save button
@@ -428,8 +418,6 @@ async function renderAddContactForm(container, portalState) {
     }
   });
 }
-
-
 
 
 
