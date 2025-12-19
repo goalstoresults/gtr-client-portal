@@ -89,10 +89,17 @@ async function renderClientSetup(container, portalState) {
     renderClientSetup(container, portalState);
   });
 
-  select.addEventListener("change", () => {
-    const selectedRow = configRows.find(r => r.project === select.value);
-    if (!selectedRow) { detailsDiv.innerHTML = ""; return; }
-
+    select.addEventListener("change", () => {
+    const selectedProject = select.value;
+    portalState.setup_project_id = selectedProject;   // <-- critical line
+    portalState.display_name = configRows.find(r => r.project === selectedProject)?.display_name || "";
+  
+    const selectedRow = configRows.find(r => r.project === selectedProject);
+    if (!selectedRow) {
+      detailsDiv.innerHTML = "";
+      return;
+    }
+  
     const enabled = selectedRow.enabled_tabs || [];
     const allTabs = [
       { tab_id: "1", description: "Contacts" },
