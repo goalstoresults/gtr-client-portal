@@ -280,15 +280,16 @@ async function renderAddContactForm(container, portalState) {
 
   // Header and Save button moved inside the form, top-aligned
   container.innerHTML = `
-    <section class="card">
-      <form id="addContactForm" class="notes-form">
-        <div class="form-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <h2 style="margin:0;">Add Contact for ${escapeHtml(portalState.display_name || projectId)}</h2>
-          <button type="submit" class="btn-primary">Save Contact</button>
-        </div>
-        <!-- fields will be appended here -->
-      </form>
-    </section>
+      <section class="card">
+        <form id="addContactForm" class="notes-form">
+          <div class="form-header" style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+            <h2 style="margin:0;">Add Contact for ${escapeHtml(portalState.display_name || projectId)}</h2>
+            <button type="submit" class="btn-primary">Save Contact</button>
+          </div>
+          <!-- fields will be appended here -->
+        </form>
+      </section>
+
   `;
 
   const form = container.querySelector("#addContactForm");
