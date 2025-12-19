@@ -81,6 +81,7 @@ async function renderClientSetup(container, portalState) {
       display_name: displayName,
       created_at: new Date().toISOString(),
       enabled_tabs: [],
+      owner_ghl_id: "",          // new field, default empty
       search_name_mode: "auto"   // default to auto
     };
 
@@ -155,6 +156,10 @@ async function renderClientSetup(container, portalState) {
         <input type="email" id="contactEmailInput" value="${selectedRow.contact_email || ''}" 
                style="width:100%; margin-bottom:24px;">
 
+        <label><strong>Owner GHL ID:</strong></label>
+        <input type="text" id="ownerGhlIdInput" value="${selectedRow.owner_ghl_id || ''}" 
+               style="width:100%; margin-bottom:24px;">
+
         <label><strong>Search Name Mode:</strong></label>
         <select id="searchNameModeSelect" style="width:100%; margin-bottom:24px;">
           <option value="auto" ${selectedRow.search_name_mode === "auto" ? "selected" : ""}>Auto</option>
@@ -212,6 +217,7 @@ async function renderClientSetup(container, portalState) {
       const contactLast = detailsDiv.querySelector("#contactLastInput").value.trim();
       const contactEmail = detailsDiv.querySelector("#contactEmailInput").value.trim();
       const contactName = `${contactFirst} ${contactLast}`.trim();
+      const ownerGhlId = detailsDiv.querySelector("#ownerGhlIdInput").value.trim();
       const searchNameMode = detailsDiv.querySelector("#searchNameModeSelect").value;
 
       const patchPayload = {
@@ -222,7 +228,8 @@ async function renderClientSetup(container, portalState) {
         contact_last: contactLast,
         contact_email: contactEmail,
         contact_name: contactName,
-        search_name_mode: searchNameMode
+        owner_ghl_id: ownerGhlId,         // new field
+        search_name_mode: searchNameMode  // existing field
       };
 
       await fetch(`https://lookups-module.dennis-e64.workers.dev/api/projects_config?project=${encodeURIComponent(selectedRow.project)}`, {
@@ -235,8 +242,8 @@ async function renderClientSetup(container, portalState) {
       renderClientSetup(container, portalState);
     });
   });
-
-  if (select.value) select.dispatchEvent(new Event("change"));
+  
+ if (select.value) select.dispatchEvent(new Event("change")); 
 }
 
 
