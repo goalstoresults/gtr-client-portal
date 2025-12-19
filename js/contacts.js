@@ -282,7 +282,10 @@ async function renderAddContactForm(container, portalState) {
 
   container.innerHTML = `
     <section class="card">
+    <div class="contact-header">
       <h2>Add Contact for ${escapeHtml(portalState.display_name || projectId)}</h2>
+      <button class="add-contact-btn">Add</button>
+      </div>
       <form id="addContactForm" class="notes-form"></form>
     </section>
   `;
