@@ -136,11 +136,17 @@ async function renderClientSetup(container, portalState) {
         <label><strong>Owner GHL ID:</strong></label>
         <input id="ownerGhlIdInput" value="${selectedRow.owner_ghl_id || ''}" style="width:100%; margin-bottom:24px;">
 
-        <label><strong>Search Name Source:</strong></label>
+       <label><strong>Search Name Source:</strong></label>
         <select id="searchNameSourceSelect" style="width:100%; margin-bottom:24px;">
-          <option value="contact" ${selectedRow.search_name_source === "contact" ? "selected" : ""}>Contact</option>
-          <option value="business" ${selectedRow.search_name_source === "business" ? "selected" : ""}>Business</option>
-          <option value="mix" ${selectedRow.search_name_source === "mix" ? "selected" : ""}>Mix</option>
+          <option value="contact" ${selectedRow.search_name_source === "contact" ? "selected" : ""}>
+            Contact — search name is contact name always
+          </option>
+          <option value="business" ${selectedRow.search_name_source === "business" ? "selected" : ""}>
+            Business — search name is business name always
+          </option>
+          <option value="mix" ${selectedRow.search_name_source === "mix" ? "selected" : ""}>
+            Mix — search name is business name if contact is null, otherwise contact name
+          </option>
         </select>
 
         <h3>Enabled Tabs</h3>
