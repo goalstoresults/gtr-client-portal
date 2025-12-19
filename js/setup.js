@@ -17,6 +17,9 @@ export async function loadSetupTab({ portalState, tabContent }) {
         case "contact":
           renderContactSetup(setupContent, portalState);
           break;  
+        case "contact-list":
+        renderContactListSetup(setupContent, portalState);
+        break;
         case "lookups":
           renderSetupLookups(setupContent, portalState);
           break;
@@ -715,6 +718,155 @@ async function renderContactSetup(container, portalState) {
   });
 }
 
+async function renderContactListSetup(container, portalState) {
+  if (!portalState.setup_project_id) {
+    container.innerHTML = `
+      <section class="card">
+        <p>Please select a project in the Client tab before configuring Contact List fields.</p>
+      </section>
+    `;
+    return;
+  }
+
+  // Fetch project lookup groups (for dropdown options)
+  const resLookups = await fetch(
+    `https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${portalState.setup_project_id}`,
+    { cache: "no-cache" }
+  );
+  const lookupsData = await resLookups.json();
+  const lookupGroups = Array.isArray(lookupsData.lookups)
+    ? [...new Set(lookupsData.lookups.map(l => l.lookup_type))].sort()
+    : [];
+
+  // Fetch section lookup values
+  const sectionValues = lookupsData.lookups
+    .filter(l => l.lookup_type === "section")
+    .map(l => l.value);
+
+  container.innerHTML = `
+    <section class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <h2>Contact List Setup for ${escapeHtml(portalState.display_name || portalState.setup_project_id)}</h2>
+        <div>
+          <button id="btnDefaultListMode" class="btn-secondary" style="margin-right:8px;">Default Mode</button>
+          <button id="btnSaveListConfig" class="btn-primary">Save Config</button>
+        </div>
+      </div>
+      <p>Enable fields for the List view, customize labels, set order, bind lookup groups, and assign sections.</p>
+      <table id="contactListFieldsGrid" class="notes-table" style="width:100%; margin-top:12px;">
+        <thead>
+          <tr>
+            <th style="width:60px;">Enabled</th>
+            <th style="width:200px;">System Field</th>
+            <th style="width:200px;">Label</th>
+            <th style="width:100px;">Order</th>
+            <th style="width:180px;">Lookup Type</th>
+            <th style="width:160px;">Section</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  `;
+
+  const gridBody = container.querySelector("#contactListFieldsGrid tbody");
+
+  // Fetch existing config rows for this project (list tab only)
+  const url = `https://lookups-module.dennis-e64.workers.dev/contact_fields?project=${portalState.setup_project_id}`;
+  const res = await fetch(url, { cache: "no-cache" });
+  const data = await res.json();
+  const configured = Array.isArray(data.rows) ? data.rows.filter(r => r.contact_tab === "list") : [];
+
+  // Define system fields relevant for list view
+  const listFields = [
+    "search_name","first_name","last_name","business_name","email","contact_type"
+  ];
+
+  function toTitleCase(field) {
+    return field.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  }
+
+  gridBody.innerHTML = listFields.map(field => {
+    const row = configured.find(r => r.field_key === field);
+    const enabled = !!row;
+    const label = row ? row.label : "";
+    const order = row ? row.sort_order : "";
+    const boundLookup = row ? (row.lookup_type || "") : "";
+    const section = row ? (row.section || "") : "";
+    const placeholder = toTitleCase(field);
+
+    const lookupOptions = [`<option value="">-- none --</option>`]
+      .concat(lookupGroups.map(g => `<option value="${g}" ${boundLookup === g ? "selected" : ""}>${g}</option>`))
+      .join("");
+
+    const sectionOptions = [`<option value="">-- none --</option>`]
+      .concat(sectionValues.map(s => `<option value="${s}" ${section === s ? "selected" : ""}>${s}</option>`))
+      .join("");
+
+    return `
+      <tr data-field="${field}">
+        <td style="text-align:center;">
+          <input type="checkbox" class="enableCheckbox" ${enabled ? "checked" : ""}>
+        </td>
+        <td>${field}</td>
+        <td>
+          <input type="text" class="labelInput"
+                 value="${escapeHtml(label)}"
+                 placeholder="${placeholder}"
+                 style="width:100%;">
+        </td>
+        <td><input type="number" class="orderInput" value="${order}" style="width:70px;"></td>
+        <td>
+          <select class="lookupTypeSelect" style="width:100%;">${lookupOptions}</select>
+        </td>
+        <td>
+          <select class="sectionSelect" style="width:100%;">${sectionOptions}</select>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  // Default Mode
+  container.querySelector("#btnDefaultListMode").addEventListener("click", () => {
+    const rows = gridBody.querySelectorAll("tr");
+    rows.forEach((tr, idx) => {
+      const checkbox = tr.querySelector(".enableCheckbox");
+      const labelInput = tr.querySelector(".labelInput");
+      const orderInput = tr.querySelector(".orderInput");
+
+      checkbox.checked = true;
+      if (!labelInput.value.trim()) {
+        labelInput.value = labelInput.placeholder;
+      }
+      orderInput.value = idx + 1;
+    });
+  });
+
+  // Save
+  container.querySelector("#btnSaveListConfig").addEventListener("click", async () => {
+    const rows = [];
+    gridBody.querySelectorAll("tr").forEach(tr => {
+      const field = tr.dataset.field;
+      const enabled = tr.querySelector(".enableCheckbox").checked;
+      if (enabled) {
+        const labelInput = tr.querySelector(".labelInput");
+        const label = labelInput.value.trim() || labelInput.placeholder;
+        const order = parseInt(tr.querySelector(".orderInput").value, 10) || 99;
+        const lookupType = tr.querySelector(".lookupTypeSelect").value || null;
+        const section = tr.querySelector(".sectionSelect").value || null;
+        rows.push({ field_key: field, label, sort_order: order, lookup_type: lookupType, section, contact_tab: "list" });
+      }
+    });
+
+    await fetch("https://lookups-module.dennis-e64.workers.dev/contact_fields/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project: portalState.setup_project_id, fields: rows })
+    });
+
+    alert("Contact list fields saved.");
+  });
+}
 
 
 
