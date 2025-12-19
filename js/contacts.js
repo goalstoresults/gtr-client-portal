@@ -1071,7 +1071,7 @@ async function renderContactNotes(container, portalState, contactId) {
 
   container.innerHTML = `
     <section class="card">
-      <h2>Notes for Contact ${escapeHtml(contactId)}</h2>
+      <h2>Notes</h2>
       <table class="notes-table">
         <thead>
           <tr>
