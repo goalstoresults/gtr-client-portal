@@ -373,6 +373,23 @@ button {
   opacity: 0.85; /* subtle watermark feel */
 }
 
+.contact-header {
+  display: flex;                 /* lay out header and button side by side */
+  justify-content: space-between;/* header text left, button right */
+  align-items: center;           /* vertical centering */
+  padding: 8px 12px;             /* optional spacing */
+  border-bottom: 1px solid #ccc; /* optional divider line */
+}
+
+.add-contact-btn {
+  cursor: pointer;
+  padding: 6px 12px;
+  background-color: #007bff; /* example blue */
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+}
+
 
 
 /* Right-align numeric/currency columns */
