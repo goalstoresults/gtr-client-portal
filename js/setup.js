@@ -81,7 +81,6 @@ async function renderClientSetup(container, portalState) {
       display_name: displayName,
       created_at: new Date().toISOString(),
       enabled_tabs: [],
-      owner_ghl_id: "",          // new field, default empty
       search_name_mode: "auto"   // default to auto
     };
 
@@ -156,10 +155,6 @@ async function renderClientSetup(container, portalState) {
         <input type="email" id="contactEmailInput" value="${selectedRow.contact_email || ''}" 
                style="width:100%; margin-bottom:24px;">
 
-        <label><strong>Owner GHL ID:</strong></label>
-        <input type="text" id="ownerGhlIdInput" value="${selectedRow.owner_ghl_id || ''}" 
-               style="width:100%; margin-bottom:24px;">
-
         <label><strong>Search Name Mode:</strong></label>
         <select id="searchNameModeSelect" style="width:100%; margin-bottom:24px;">
           <option value="auto" ${selectedRow.search_name_mode === "auto" ? "selected" : ""}>Auto</option>
@@ -172,7 +167,78 @@ async function renderClientSetup(container, portalState) {
             <tr>
               <th style="width:80px;">Enabled</th>
               <th>Tab Name</th>
-              <th style="width:120px;">
+              <th style="width:120px;">Sort Order</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <button id="btnSaveConfig" class="btn-primary" style="margin-top:12px;">Save Config</button>
+      </section>
+    `;
+
+    const gridBody = detailsDiv.querySelector("#tabConfigGrid tbody");
+    gridBody.innerHTML = allTabs.map(tab => {
+      const checked = enabled.includes(tab.tab_id) ? "checked" : "";
+      const sortIndex = enabled.indexOf(tab.tab_id);
+      return `
+        <tr>
+          <td style="text-align:center;">
+            <input type="checkbox" data-tabid="${tab.tab_id}" ${checked}>
+          </td>
+          <td>${tab.description}</td>
+          <td>
+            <input type="number" min="1" max="99" value="${sortIndex >= 0 ? sortIndex + 1 : ""}" style="width:80px;" data-sort="${tab.tab_id}">
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    detailsDiv.querySelector("#btnSaveConfig").addEventListener("click", async () => {
+      const checkedTabs = [];
+      gridBody.querySelectorAll("input[type=checkbox]").forEach(cb => {
+        if (cb.checked) {
+          const sortInput = gridBody.querySelector(`input[data-sort="${cb.dataset.tabid}"]`);
+          const sortVal = parseInt(sortInput.value, 10);
+          checkedTabs.push({ tab_id: cb.dataset.tabid, sort: Number.isFinite(sortVal) ? sortVal : 99 });
+        }
+      });
+
+      checkedTabs.sort((a, b) => a.sort - b.sort);
+      const newEnabledTabs = checkedTabs.map(t => t.tab_id);
+
+      const displayName = detailsDiv.querySelector("#displayNameInput").value.trim();
+      const businessName = detailsDiv.querySelector("#businessNameInput").value.trim();
+      const contactFirst = detailsDiv.querySelector("#contactFirstInput").value.trim();
+      const contactLast = detailsDiv.querySelector("#contactLastInput").value.trim();
+      const contactEmail = detailsDiv.querySelector("#contactEmailInput").value.trim();
+      const contactName = `${contactFirst} ${contactLast}`.trim();
+      const searchNameMode = detailsDiv.querySelector("#searchNameModeSelect").value;
+
+      const patchPayload = {
+        enabled_tabs: newEnabledTabs,
+        display_name: displayName,
+        business_name: businessName,
+        contact_first: contactFirst,
+        contact_last: contactLast,
+        contact_email: contactEmail,
+        contact_name: contactName,
+        search_name_mode: searchNameMode
+      };
+
+      await fetch(`https://lookups-module.dennis-e64.workers.dev/api/projects_config?project=${encodeURIComponent(selectedRow.project)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patchPayload)
+      });
+
+      alert("Config saved.");
+      renderClientSetup(container, portalState);
+    });
+  });
+
+  if (select.value) select.dispatchEvent(new Event("change"));
+}
+
 
 async function renderSetupLookups(tabContent, portalState) {
   if (!portalState.setup_project_id) {
