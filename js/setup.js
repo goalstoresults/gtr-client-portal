@@ -777,10 +777,8 @@ async function renderContactListSetup(container, portalState) {
   const data = await res.json();
   const configured = Array.isArray(data.rows) ? data.rows.filter(r => r.contact_tab === "list") : [];
 
-  // Define system fields relevant for list view
-  const listFields = [
-    "search_name","first_name","last_name","business_name","email","contact_type"
-  ];
+  // Define default list fields
+  const listFields = ["search_name","first_name","last_name","business_name","email","contact_type"];
 
   function toTitleCase(field) {
     return field.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
@@ -867,7 +865,6 @@ async function renderContactListSetup(container, portalState) {
     alert("Contact list fields saved.");
   });
 }
-
 
 
 
