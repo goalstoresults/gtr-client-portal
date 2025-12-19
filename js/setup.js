@@ -81,8 +81,8 @@ async function renderClientSetup(container, portalState) {
       display_name: displayName,
       created_at: new Date().toISOString(),
       enabled_tabs: [],
-      owner_ghl_id: "",          // new field, default empty
-      search_name_mode: "auto"   // default to auto
+      owner_ghl_id: "",
+      search_name_source: "contact"   // default strategy
     };
 
     const res = await fetch("https://lookups-module.dennis-e64.workers.dev/api/projects_config", {
@@ -160,10 +160,11 @@ async function renderClientSetup(container, portalState) {
         <input type="text" id="ownerGhlIdInput" value="${selectedRow.owner_ghl_id || ''}" 
                style="width:100%; margin-bottom:24px;">
 
-        <label><strong>Search Name Mode:</strong></label>
-        <select id="searchNameModeSelect" style="width:100%; margin-bottom:24px;">
-          <option value="auto" ${selectedRow.search_name_mode === "auto" ? "selected" : ""}>Auto</option>
-          <option value="person" ${selectedRow.search_name_mode === "person" ? "selected" : ""}>Person</option>
+        <label><strong>Search Name Source:</strong></label>
+        <select id="searchNameSourceSelect" style="width:100%; margin-bottom:24px;">
+          <option value="contact" ${selectedRow.search_name_source === "contact" ? "selected" : ""}>Contact</option>
+          <option value="business" ${selectedRow.search_name_source === "business" ? "selected" : ""}>Business</option>
+          <option value="mix" ${selectedRow.search_name_source === "mix" ? "selected" : ""}>Mix</option>
         </select>
 
         <h3>Enabled Tabs</h3>
@@ -218,7 +219,7 @@ async function renderClientSetup(container, portalState) {
       const contactEmail = detailsDiv.querySelector("#contactEmailInput").value.trim();
       const contactName = `${contactFirst} ${contactLast}`.trim();
       const ownerGhlId = detailsDiv.querySelector("#ownerGhlIdInput").value.trim();
-      const searchNameMode = detailsDiv.querySelector("#searchNameModeSelect").value;
+      const searchNameSource = detailsDiv.querySelector("#searchNameSourceSelect").value;
 
       const patchPayload = {
         enabled_tabs: newEnabledTabs,
@@ -228,8 +229,8 @@ async function renderClientSetup(container, portalState) {
         contact_last: contactLast,
         contact_email: contactEmail,
         contact_name: contactName,
-        owner_ghl_id: ownerGhlId,         // new field
-        search_name_mode: searchNameMode  // existing field
+        owner_ghl_id: ownerGhlId,
+        search_name_source: searchNameSource
       };
 
       await fetch(`https://lookups-module.dennis-e64.workers.dev/api/projects_config?project=${encodeURIComponent(selectedRow.project)}`, {
@@ -239,12 +240,16 @@ async function renderClientSetup(container, portalState) {
       });
 
       alert("Config saved.");
+      // 🔄 Refresh the setup so changes are visible immediately
       renderClientSetup(container, portalState);
     });
   });
-  
- if (select.value) select.dispatchEvent(new Event("change")); 
+
+  // auto‑trigger change if a client is already selected
+  if (select.value) select.dispatchEvent(new Event("change"));
 }
+
+
 
 
 async function renderSetupLookups(tabContent, portalState) {
