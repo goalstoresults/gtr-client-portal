@@ -157,8 +157,8 @@ async function renderClientSetup(container, portalState) {
 
         <label><strong>Search Name Mode:</strong></label>
         <select id="searchNameModeSelect" style="width:100%; margin-bottom:24px;">
-          <option value="auto" ${selectedRow.search_name_mode === "auto" ? "selected" : ""}>Auto-generate</option>
-          <option value="person" ${selectedRow.search_name_mode === "person" ? "selected" : ""}>User-defined</option>
+          <option value="auto" ${selectedRow.search_name_mode === "auto" ? "selected" : ""}>Auto</option>
+          <option value="person" ${selectedRow.search_name_mode === "person" ? "selected" : ""}>Person</option>
         </select>
 
         <h3>Enabled Tabs</h3>
