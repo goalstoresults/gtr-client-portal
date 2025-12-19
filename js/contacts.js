@@ -258,8 +258,6 @@ async function renderContactList(container, portalState) {
   }
 }
 
-
-
 // 🔧 Add Contact Form (same structure as Details, but POST + new contact_id)
 async function renderAddContactForm(container, portalState) {
   const projectId = portalState.project;
@@ -280,13 +278,16 @@ async function renderAddContactForm(container, portalState) {
   // Use Add tab fields for consistency
   fields = fields.filter(f => f.contact_tab === "add");
 
+  // Header and Save button moved inside the form, top-aligned
   container.innerHTML = `
     <section class="card">
-    <div class="contact-header">
-      <h2>Add Contact for ${escapeHtml(portalState.display_name || projectId)}</h2>
-      <button class="add-contact-btn">Add</button>
-      </div>
-      <form id="addContactForm" class="notes-form"></form>
+      <form id="addContactForm" class="notes-form">
+        <div class="form-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h2 style="margin:0;">Add Contact for ${escapeHtml(portalState.display_name || projectId)}</h2>
+          <button type="submit" class="btn-primary">Save Contact</button>
+        </div>
+        <!-- fields will be appended here -->
+      </form>
     </section>
   `;
 
@@ -372,13 +373,6 @@ async function renderAddContactForm(container, portalState) {
     }
   }
 
-  // Save button
-  const saveBtn = document.createElement("button");
-  saveBtn.type = "submit";
-  saveBtn.className = "btn-primary";
-  saveBtn.textContent = "Save Contact";
-  form.appendChild(saveBtn);
-
   // Handle form submission with normalization
   form.addEventListener("submit", async e => {
     e.preventDefault();
@@ -421,6 +415,9 @@ async function renderAddContactForm(container, portalState) {
     }
   });
 }
+
+
+
 
 
 
