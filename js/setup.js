@@ -41,14 +41,12 @@ async function renderClientSetup(container, portalState) {
         <h2>Select Client</h2>
         <button id="btnAddClient" class="btn-primary">Add Client</button>
       </div>
-
       <div style="margin-top:16px;">
         <label><strong>Client:</strong></label>
         <select id="clientSelect" style="margin-left:12px;">
           <option value="">---Select---</option>
         </select>
       </div>
-
       <div id="clientDetails" style="margin-top:24px;"></div>
     </section>
   `;
@@ -59,7 +57,6 @@ async function renderClientSetup(container, portalState) {
   const resConfig = await fetch("https://lookups-module.dennis-e64.workers.dev/api/projects_config", { cache: "no-cache" });
   const configRows = await resConfig.json();
 
-  // Populate dropdown
   configRows.forEach(row => {
     const opt = document.createElement("option");
     opt.value = row.project;
@@ -68,11 +65,9 @@ async function renderClientSetup(container, portalState) {
     select.appendChild(opt);
   });
 
-  // Add Client button handler
   container.querySelector("#btnAddClient").addEventListener("click", async () => {
     const projectId = prompt("Enter new project ID (short code):");
     if (!projectId) return;
-
     const displayName = prompt("Enter display name for client:");
     if (!displayName) return;
 
@@ -82,36 +77,23 @@ async function renderClientSetup(container, portalState) {
       created_at: new Date().toISOString(),
       enabled_tabs: [],
       owner_ghl_id: "",
-      search_name_source: "contact"   // default strategy
+      search_name_source: "contact"
     };
 
-    const res = await fetch("https://lookups-module.dennis-e64.workers.dev/api/projects_config", {
+    await fetch("https://lookups-module.dennis-e64.workers.dev/api/projects_config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
-
-    if (res.ok) {
-      alert("Client added.");
-      renderClientSetup(container, portalState);
-    } else {
-      const text = await res.text();
-      alert("Error adding client: " + text);
-    }
+    alert("Client added.");
+    renderClientSetup(container, portalState);
   });
 
   select.addEventListener("change", () => {
-    const selectedProject = select.value;
-    portalState.setup_project_id = selectedProject;
-
-    const selectedRow = configRows.find(r => r.project === selectedProject);
-    if (!selectedRow) {
-      detailsDiv.innerHTML = "";
-      return;
-    }
+    const selectedRow = configRows.find(r => r.project === select.value);
+    if (!selectedRow) { detailsDiv.innerHTML = ""; return; }
 
     const enabled = selectedRow.enabled_tabs || [];
-
     const allTabs = [
       { tab_id: "1", description: "Contacts" },
       { tab_id: "2", description: "Financials" },
@@ -128,37 +110,31 @@ async function renderClientSetup(container, portalState) {
         <p><strong>Project:</strong> ${selectedRow.project}</p>
 
         <label><strong>Display Name:</strong></label>
-        <input type="text" id="displayNameInput" value="${selectedRow.display_name || ''}" 
-               style="width:100%; margin-bottom:16px;">
+        <input id="displayNameInput" value="${selectedRow.display_name || ''}" style="width:100%; margin-bottom:16px;">
 
         <div style="display:flex; gap:16px; margin-bottom:16px;">
           <div style="flex:1;">
             <label><strong>Contact First Name:</strong></label>
-            <input type="text" id="contactFirstInput" value="${selectedRow.contact_first || ''}" style="width:100%;">
+            <input id="contactFirstInput" value="${selectedRow.contact_first || ''}" style="width:100%;">
           </div>
           <div style="flex:1;">
             <label><strong>Contact Last Name:</strong></label>
-            <input type="text" id="contactLastInput" value="${selectedRow.contact_last || ''}" style="width:100%;">
+            <input id="contactLastInput" value="${selectedRow.contact_last || ''}" style="width:100%;">
           </div>
           <div style="flex:1;">
             <label><strong>Contact Name:</strong></label>
-            <p id="contactNameDisplay" style="margin:6px 0 0;">
-              ${selectedRow.contact_name || ''}
-            </p>
+            <p id="contactNameDisplay">${selectedRow.contact_name || ''}</p>
           </div>
         </div>
 
         <label><strong>Business Name:</strong></label>
-        <input type="text" id="businessNameInput" value="${selectedRow.business_name || ''}" 
-               style="width:100%; margin-bottom:12px;">
+        <input id="businessNameInput" value="${selectedRow.business_name || ''}" style="width:100%; margin-bottom:12px;">
 
         <label><strong>Contact Email:</strong></label>
-        <input type="email" id="contactEmailInput" value="${selectedRow.contact_email || ''}" 
-               style="width:100%; margin-bottom:24px;">
+        <input id="contactEmailInput" value="${selectedRow.contact_email || ''}" style="width:100%; margin-bottom:24px;">
 
         <label><strong>Owner GHL ID:</strong></label>
-        <input type="text" id="ownerGhlIdInput" value="${selectedRow.owner_ghl_id || ''}" 
-               style="width:100%; margin-bottom:24px;">
+        <input id="ownerGhlIdInput" value="${selectedRow.owner_ghl_id || ''}" style="width:100%; margin-bottom:24px;">
 
         <label><strong>Search Name Source:</strong></label>
         <select id="searchNameSourceSelect" style="width:100%; margin-bottom:24px;">
@@ -208,29 +184,19 @@ async function renderClientSetup(container, portalState) {
           checkedTabs.push({ tab_id: cb.dataset.tabid, sort: Number.isFinite(sortVal) ? sortVal : 99 });
         }
       });
-
       checkedTabs.sort((a, b) => a.sort - b.sort);
       const newEnabledTabs = checkedTabs.map(t => t.tab_id);
 
-      const displayName = detailsDiv.querySelector("#displayNameInput").value.trim();
-      const businessName = detailsDiv.querySelector("#businessNameInput").value.trim();
-      const contactFirst = detailsDiv.querySelector("#contactFirstInput").value.trim();
-      const contactLast = detailsDiv.querySelector("#contactLastInput").value.trim();
-      const contactEmail = detailsDiv.querySelector("#contactEmailInput").value.trim();
-      const contactName = `${contactFirst} ${contactLast}`.trim();
-      const ownerGhlId = detailsDiv.querySelector("#ownerGhlIdInput").value.trim();
-      const searchNameSource = detailsDiv.querySelector("#searchNameSourceSelect").value;
-
       const patchPayload = {
         enabled_tabs: newEnabledTabs,
-        display_name: displayName,
-        business_name: businessName,
-        contact_first: contactFirst,
-        contact_last: contactLast,
-        contact_email: contactEmail,
-        contact_name: contactName,
-        owner_ghl_id: ownerGhlId,
-        search_name_source: searchNameSource
+        display_name: detailsDiv.querySelector("#displayNameInput").value.trim(),
+        business_name: detailsDiv.querySelector("#businessNameInput").value.trim(),
+        contact_first: detailsDiv.querySelector("#contactFirstInput").value.trim(),
+        contact_last: detailsDiv.querySelector("#contactLastInput").value.trim(),
+        contact_email: detailsDiv.querySelector("#contactEmailInput").value.trim(),
+        contact_name: `${detailsDiv.querySelector("#contactFirstInput").value.trim()} ${detailsDiv.querySelector("#contactLastInput").value.trim()}`.trim(),
+        owner_ghl_id: detailsDiv.querySelector("#ownerGhlIdInput").value.trim(),
+        search_name_source: detailsDiv.querySelector("#searchNameSourceSelect").value
       };
 
       await fetch(`https://lookups-module.dennis-e64.workers.dev/api/projects_config?project=${encodeURIComponent(selectedRow.project)}`, {
@@ -238,14 +204,11 @@ async function renderClientSetup(container, portalState) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patchPayload)
       });
-
       alert("Config saved.");
-      // 🔄 Refresh the setup so changes are visible immediately
       renderClientSetup(container, portalState);
     });
   });
 
-  // auto‑trigger change if a client is already selected
   if (select.value) select.dispatchEvent(new Event("change"));
 }
 
