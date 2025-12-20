@@ -194,102 +194,115 @@ async function renderContactList(container, portalState) {
     }
 
     // --- Step 5: Render sorted table ---
-    function renderSortedTable() {
-      const sorted = [...contacts];
+function renderSortedTable() {
+  const sorted = [...contacts];
 
-      if (currentSortField) {
-        sorted.sort((a, b) => {
-          const valA = (a[currentSortField] || "").toLowerCase();
-          const valB = (b[currentSortField] || "").toLowerCase();
-          return currentSortDirection === "asc"
-            ? valA.localeCompare(valB)
-            : valB.localeCompare(valA);
-        });
+  if (currentSortField) {
+    sorted.sort((a, b) => {
+      const valA = (a[currentSortField] || "").toLowerCase();
+      const valB = (b[currentSortField] || "").toLowerCase();
+      return currentSortDirection === "asc"
+        ? valA.localeCompare(valB)
+        : valB.localeCompare(valA);
+    });
+  }
+
+  // ✅ Always show both arrows (△▽), bold the active one (▲▼)
+  const headers = listFields.map(f => {
+    const isSorted = currentSortField === f.field_key;
+
+    const upArrow   = isSorted && currentSortDirection === "asc"  ? "▲" : "△";
+    const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+
+    return `
+      <th class="sortable" data-field="${f.field_key}">
+        ${escapeHtml(f.label || f.field_key)}
+        <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+          <span class="sort-up">${upArrow}</span>
+          <span class="sort-down">${downArrow}</span>
+        </span>
+      </th>
+    `;
+  }).join("");
+
+  // ✅ ROW RENDERER — THIS IS WHERE updated_at GETS FORMATTED
+  const rows = sorted.map(c => {
+    const cells = listFields.map(f => {
+      const key = f.field_key;
+
+      // ✅ Format updated_at using your helper
+      if (key === "updated_at") {
+        return `<td>${formatDateTime(c.updated_at)}</td>`;
       }
 
-      // ✅ Always show both arrows (△▽), bold the active one (▲▼)
-      const headers = listFields.map(f => {
-        const isSorted = currentSortField === f.field_key;
+      // ✅ Default: escape and print normally
+      return `<td>${escapeHtml(c[key] || "")}</td>`;
+    }).join("");
 
-        const upArrow   = isSorted && currentSortDirection === "asc"  ? "▲" : "△";
-        const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+    return `
+      <tr>
+        ${cells}
+        <td><button class="btn-primary btn-select" data-id="${c.contact_id}">Select</button></td>
+      </tr>
+    `;
+  }).join("");
 
-        return `
-          <th class="sortable" data-field="${f.field_key}">
-            ${escapeHtml(f.label || f.field_key)}
-            <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-              <span class="sort-up">${upArrow}</span>
-              <span class="sort-down">${downArrow}</span>
-            </span>
-          </th>
-        `;
-      }).join("");
+  tableDiv.innerHTML = `
+    <h4>Showing ${sorted.length} contacts</h4>
+    <table class="notes-table">
+      <thead><tr>${headers}<th>Actions</th></tr></thead>
+      <tbody>
+        ${rows || `<tr><td colspan="${listFields.length + 1}">(no contacts found)</td></tr>`}
+      </tbody>
+    </table>
+  `;
 
-      const rows = sorted.map(c => {
-        const cells = listFields.map(f => `<td>${escapeHtml(c[f.field_key] || "")}</td>`).join("");
-        return `
-          <tr>
-            ${cells}
-            <td><button class="btn-primary btn-select" data-id="${c.contact_id}">Select</button></td>
-          </tr>
-        `;
-      }).join("");
+  // ✅ Wire select buttons
+  tableDiv.querySelectorAll(".btn-select").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const contactId = btn.dataset.id;
+      portalState.selectedContactId = contactId;
 
-      tableDiv.innerHTML = `
-        <h4>Showing ${sorted.length} contacts</h4>
-        <table class="notes-table">
-          <thead><tr>${headers}<th>Actions</th></tr></thead>
-          <tbody>
-            ${rows || `<tr><td colspan="${listFields.length + 1}">(no contacts found)</td></tr>`}
-          </tbody>
-        </table>
-      `;
+      const res = await fetch(
+        `https://contacts-module.dennis-e64.workers.dev/contacts/details/${contactId}`,
+        { cache: "no-cache" }
+      );
+      const data = await res.json();
+      const contact = Array.isArray(data) ? data[0] : data;
 
-      // --- Wire select buttons ---
-      tableDiv.querySelectorAll(".btn-select").forEach(btn => {
-        btn.addEventListener("click", async () => {
-          const contactId = btn.dataset.id;
-          portalState.selectedContactId = contactId;
+      portalState.selectedContactName =
+        contact.search_name ||
+        `${contact.first_name || ""} ${contact.last_name || ""}`.trim();
 
-          const res = await fetch(
-            `https://contacts-module.dennis-e64.workers.dev/contacts/details/${contactId}`,
-            { cache: "no-cache" }
-          );
-          const data = await res.json();
-          const contact = Array.isArray(data) ? data[0] : data;
+      const contextBar = document.getElementById("contact-context-bar");
+      if (contextBar) contextBar.textContent = `Contact: ${portalState.selectedContactName}`;
 
-          portalState.selectedContactName =
-            contact.search_name ||
-            `${contact.first_name || ""} ${contact.last_name || ""}`.trim();
+      document.querySelectorAll("#contacts-subtabs button").forEach(b => b.classList.remove("active"));
+      const detailsBtn = document.querySelector('#contacts-subtabs button[data-subtab="details"]');
+      if (detailsBtn) detailsBtn.classList.add("active");
 
-          const contextBar = document.getElementById("contact-context-bar");
-          if (contextBar) contextBar.textContent = `Contact: ${portalState.selectedContactName}`;
+      const content = document.querySelector("#contactsContent");
+      await renderContactDetails(content, portalState, contactId);
+    });
+  });
 
-          document.querySelectorAll("#contacts-subtabs button").forEach(b => b.classList.remove("active"));
-          const detailsBtn = document.querySelector('#contacts-subtabs button[data-subtab="details"]');
-          if (detailsBtn) detailsBtn.classList.add("active");
+  // ✅ Wire sortable headers
+  tableDiv.querySelectorAll("th.sortable").forEach(th => {
+    th.addEventListener("click", () => {
+      const field = th.dataset.field;
 
-          const content = document.querySelector("#contactsContent");
-          await renderContactDetails(content, portalState, contactId);
-        });
-      });
+      if (currentSortField === field) {
+        currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+      } else {
+        currentSortField = field;
+        currentSortDirection = "asc";
+      }
 
-      // --- Wire sortable headers ---
-      tableDiv.querySelectorAll("th.sortable").forEach(th => {
-        th.addEventListener("click", () => {
-          const field = th.dataset.field;
+      renderSortedTable();
+    });
+  });
+}
 
-          if (currentSortField === field) {
-            currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
-          } else {
-            currentSortField = field;
-            currentSortDirection = "asc";
-          }
-
-          renderSortedTable();
-        });
-      });
-    }
 
     // --- Step 6: Wire filter buttons ---
     document.getElementById("btnApplyContactsFilter").addEventListener("click", applyFilter);
@@ -1193,6 +1206,18 @@ async function renderContactNotes(container, portalState, contactId) {
   });
 }
 
+function formatDateTime(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  return d.toLocaleString("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  });
+}
 
 // helper
 function escapeHtml(str) {
