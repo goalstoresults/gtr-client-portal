@@ -205,7 +205,7 @@ async function startBulkImport(portalState) {
 /* ---------- List ---------- */
 
 async function renderFinancialList(container, portalState) {
-  // 1) Fetch payments (raw rows; IDs are text)
+  // 1) Fetch payments
   const paymentsRes = await fetch(
     `https://financials-module.dennis-e64.workers.dev/payments/list?project=${portalState.project}&limit=500`,
     { cache: "no-cache" }
@@ -218,7 +218,7 @@ async function renderFinancialList(container, portalState) {
     payments = [];
   }
 
-  // 2) Fetch contacts to build ID → name map (client-side join)
+  // 2) Fetch contacts for name lookup
   const contactsRes = await fetch(
     `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}&limit=2000`,
     { cache: "no-cache" }
@@ -236,75 +236,141 @@ async function renderFinancialList(container, portalState) {
     nameById.set(c.contact_id, c.search_name || c.contact_name || c.contact_id);
   }
 
-  // 3) Render table (Date first, Contact second) with checkbox
-  container.innerHTML = `
-    <section class="card">
-      <h3>Payments List</h3>
-      <table class="notes-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Contact</th>
-            <th>Amount</th>
-            <th>Invoice #</th>
-            <th>Referral</th>
-            <th>Needs review</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${
-            payments.length
-              ? payments.map(p => {
-                  const contactName = nameById.get(p.contact_id) || p.contact_id || "";
-                  const referralName = nameById.get(p.referral_id) || p.referral_id || "";
-                  const amt = p.payment_amount != null ? String(p.payment_amount) : "";
+  // Sorting state
+  let currentSortField = "payment_date";
+  let currentSortDirection = "desc";
 
-                  return `
-                    <tr>
-                      <td>${escapeHtml(p.payment_date || "")}</td>
-                      <td>${escapeHtml(contactName)}</td>
-                      <td>${escapeHtml(amt)}</td>
-                      <td>${escapeHtml(p.invoice_number || "")}</td>
-                      <td>${escapeHtml(referralName)}</td>
-                      <td>
-                        <input type="checkbox"
-                               class="needsReviewCheckbox"
-                               data-id="${p.payment_id}"
-                               ${p.needs_review ? "checked" : ""} />
-                      </td>
-                    </tr>
-                  `;
-                }).join("")
-              : `<tr><td colspan="6">(no payments found)</td></tr>`
-          }
-        </tbody>
-      </table>
-    </section>
-  `;
+  // Columns definition
+  const columns = [
+    { key: "payment_date", label: "Date", isDate: true },
+    { key: "contact_name", label: "Contact" },
+    { key: "payment_amount", label: "Amount", numeric: true },
+    { key: "invoice_number", label: "Invoice #" },
+    { key: "referral_name", label: "Referral" }
+  ];
 
-  // 4) Wire checkbox -> backend PATCH
-  container.querySelectorAll(".needsReviewCheckbox").forEach(cb => {
-    cb.addEventListener("change", async (e) => {
-      const paymentId = e.target.dataset.id;
-      const checked = e.target.checked;
-      try {
-        await fetch(`https://financials-module.dennis-e64.workers.dev/payments/updateNeedsReview`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            payment_id: paymentId,
-            needs_review: checked,
-            project: portalState.project
-          })
-        });
-      } catch (err) {
-        console.warn("Failed to update needs_review:", err);
-        // revert UI if backend fails
-        e.target.checked = !checked;
-        alert("Update failed. Please try again.");
+  // Preprocess rows
+  payments = payments.map(p => ({
+    ...p,
+    contact_name: nameById.get(p.contact_id) || "",
+    referral_name: nameById.get(p.referral_id) || "",
+    payment_amount: Number(p.payment_amount) || 0
+  }));
+
+  function sortPayments() {
+    payments.sort((a, b) => {
+      let A = a[currentSortField];
+      let B = b[currentSortField];
+
+      if (columns.find(c => c.key === currentSortField)?.isDate) {
+        A = new Date(A);
+        B = new Date(B);
+      } else if (columns.find(c => c.key === currentSortField)?.numeric) {
+        A = Number(A) || 0;
+        B = Number(B) || 0;
+      } else {
+        A = (A || "").toString().toLowerCase();
+        B = (B || "").toString().toLowerCase();
       }
+
+      if (A < B) return currentSortDirection === "asc" ? -1 : 1;
+      if (A > B) return currentSortDirection === "asc" ? 1 : -1;
+      return 0;
     });
-  });
+  }
+
+  function renderTable() {
+    sortPayments();
+
+    const headerHtml = columns.map(col => {
+      const isSorted = currentSortField === col.key;
+      const upArrow   = isSorted && currentSortDirection === "asc"  ? "▲" : "△";
+      const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+
+      return `
+        <th class="sortable" data-field="${col.key}">
+          ${escapeHtml(col.label)}
+          <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+            <span class="sort-up">${upArrow}</span>
+            <span class="sort-down">${downArrow}</span>
+          </span>
+        </th>
+      `;
+    }).join("");
+
+    const rowsHtml = payments.map(p => `
+      <tr>
+        <td>${escapeHtml(formatDateTimeFull(p.payment_date))}</td>
+        <td>${escapeHtml(p.contact_name)}</td>
+        <td>${escapeHtml(p.payment_amount.toFixed(2))}</td>
+        <td>${escapeHtml(p.invoice_number || "")}</td>
+        <td>${escapeHtml(p.referral_name || "")}</td>
+        <td>
+          <input type="checkbox"
+                 class="needsReviewCheckbox"
+                 data-id="${p.payment_id}"
+                 ${p.needs_review ? "checked" : ""} />
+        </td>
+      </tr>
+    `).join("");
+
+    container.innerHTML = `
+      <section class="card">
+        <h3>Payments List</h3>
+        <table class="notes-table">
+          <thead>
+            <tr>
+              ${headerHtml}
+              <th>Needs Review</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml || `<tr><td colspan="6">(no payments found)</td></tr>`}
+          </tbody>
+        </table>
+      </section>
+    `;
+
+    // Wire sorting
+    container.querySelectorAll("th.sortable").forEach(th => {
+      th.addEventListener("click", () => {
+        const field = th.dataset.field;
+
+        if (currentSortField === field) {
+          currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+        } else {
+          currentSortField = field;
+          currentSortDirection = "asc";
+        }
+
+        renderTable();
+      });
+    });
+
+    // Wire checkbox updates
+    container.querySelectorAll(".needsReviewCheckbox").forEach(cb => {
+      cb.addEventListener("change", async (e) => {
+        const paymentId = e.target.dataset.id;
+        const checked = e.target.checked;
+        try {
+          await fetch(`https://financials-module.dennis-e64.workers.dev/payments/updateNeedsReview`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              payment_id: paymentId,
+              needs_review: checked,
+              project: portalState.project
+            })
+          });
+        } catch (err) {
+          e.target.checked = !checked;
+          alert("Update failed. Please try again.");
+        }
+      });
+    });
+  }
+
+  renderTable();
 }
 
 
@@ -318,31 +384,109 @@ async function renderFinancialSummary(container, portalState) {
   let summary = await res.json();
   if (!Array.isArray(summary)) summary = [];
 
-  container.innerHTML = `
-    <section class="card">
-      <h3>Payments Summary</h3>
-      <table class="notes-table">
-        <thead>
-          <tr>
-            <th>Referral</th>
-            <th>Total Amount</th>
-            <th>Count</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${
-            summary.length
-              ? summary.map(s => `
-                <tr>
-                  <td>${escapeHtml(s.referral_name || s.referral_id || "")}</td>
-                  <td>${escapeHtml(s.total_amount || "")}</td>
-                  <td>${escapeHtml(s.count || "")}</td>
-                </tr>
-              `).join("")
-              : `<tr><td colspan="3">(no summary data)</td></tr>`
-          }
-        </tbody>
-      </table>
-    </section>
-  `;
+  // Sorting state
+  let currentSortField = "referral_name";
+  let currentSortDirection = "asc";
+
+  const columns = [
+    { key: "referral_name", label: "Referral" },
+    { key: "total_amount", label: "Total Amount", numeric: true },
+    { key: "count", label: "Count", numeric: true }
+  ];
+
+  function sortSummary() {
+    summary.sort((a, b) => {
+      let A = a[currentSortField];
+      let B = b[currentSortField];
+
+      if (columns.find(c => c.key === currentSortField)?.numeric) {
+        A = Number(A) || 0;
+        B = Number(B) || 0;
+      } else {
+        A = (A || "").toString().toLowerCase();
+        B = (B || "").toString().toLowerCase();
+      }
+
+      if (A < B) return currentSortDirection === "asc" ? -1 : 1;
+      if (A > B) return currentSortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }
+
+  function renderTable() {
+    sortSummary();
+
+    const headerHtml = columns.map(col => {
+      const isSorted = currentSortField === col.key;
+      const upArrow   = isSorted && currentSortDirection === "asc"  ? "▲" : "△";
+      const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+
+      return `
+        <th class="sortable" data-field="${col.key}">
+          ${escapeHtml(col.label)}
+          <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+            <span class="sort-up">${upArrow}</span>
+            <span class="sort-down">${downArrow}</span>
+          </span>
+        </th>
+      `;
+    }).join("");
+
+    const rowsHtml = summary.map(s => `
+      <tr>
+        <td>${escapeHtml(s.referral_name || s.referral_id || "")}</td>
+        <td>${escapeHtml((Number(s.total_amount) || 0).toFixed(2))}</td>
+        <td>${escapeHtml(s.count || "")}</td>
+      </tr>
+    `).join("");
+
+    container.innerHTML = `
+      <section class="card">
+        <h3>Payments Summary</h3>
+        <table class="notes-table">
+          <thead>
+            <tr>${headerHtml}</tr>
+          </thead>
+          <tbody>
+            ${rowsHtml || `<tr><td colspan="3">(no summary data)</td></tr>`}
+          </tbody>
+        </table>
+      </section>
+    `;
+
+    // Wire sorting
+    container.querySelectorAll("th.sortable").forEach(th => {
+      th.addEventListener("click", () => {
+        const field = th.dataset.field;
+
+        if (currentSortField === field) {
+          currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+        } else {
+          currentSortField = field;
+          currentSortDirection = "asc";
+        }
+
+        renderTable();
+      });
+    });
+  }
+
+  renderTable();
+}
+
+
+function formatDateTimeFull(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const yyyy = d.getFullYear();
+
+  let hh = d.getHours();
+  const min = String(d.getMinutes()).padStart(2, "0");
+  const ampm = hh >= 12 ? "PM" : "AM";
+  hh = hh % 12;
+  if (hh === 0) hh = 12;
+
+  return `${mm}/${dd}/${yyyy} ${hh}:${min} ${ampm}`;
 }
