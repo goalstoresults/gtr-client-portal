@@ -96,16 +96,13 @@ export async function loadContactsTab({ portalState, tabContent }) {
 
 
 // 🔧 Contact List with dynamic grid based on project_contact_fields
-// 🔧 Contact List with dynamic grid + context bar update
 async function renderContactList(container, portalState) {
   try {
-    // --- Step 1: Capture current filter values ---
     const prevFirst    = document.getElementById("filter-first")?.value.trim() || "";
     const prevLast     = document.getElementById("filter-last")?.value.trim() || "";
     const prevBusiness = document.getElementById("filter-business")?.value.trim() || "";
     const prevType     = document.getElementById("filter-contact-type")?.value || "";
 
-    // --- Step 2: Build base UI ---
     container.innerHTML = `
       <section class="card">
         <h2>Contact List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
@@ -128,7 +125,6 @@ async function renderContactList(container, portalState) {
     const tableDiv   = container.querySelector("#contactTable");
     const typeSelect = document.getElementById("filter-contact-type");
 
-    // --- Step 3: Populate Contact Type dropdown ---
     const resTypes = await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=contact_type&project=${portalState.project}`);
     const values = await resTypes.json();
     if (Array.isArray(values)) {
@@ -142,7 +138,11 @@ async function renderContactList(container, portalState) {
       });
     }
 
-    // --- Step 4: Apply filter (server-side search) ---
+    let currentSortField = null;
+    let currentSortDirection = 'asc';
+    let contacts = [];
+    let listFields = [];
+
     async function applyFilter() {
       const first    = document.getElementById("filter-first").value.trim();
       const last     = document.getElementById("filter-last").value.trim();
@@ -161,32 +161,39 @@ async function renderContactList(container, portalState) {
         business: business
       });
       const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
-      console.log("[Contacts] Searching:", url);
-
       const resList = await fetch(url, { cache: "no-cache" });
-      let contacts = await resList.json();
+      contacts = await resList.json();
       if (!Array.isArray(contacts)) contacts = [];
+      if (type) contacts = contacts.filter(c => c.contact_type === type);
 
-      if (type) {
-        contacts = contacts.filter(c => c.contact_type === type);
-      }
-
-      // --- Step 5: Fetch field config for dynamic grid ---
-      const fieldsRes = await fetch(
-        `https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${portalState.project}`,
-        { cache: "no-cache" }
-      );
+      const fieldsRes = await fetch(`https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${portalState.project}`, { cache: "no-cache" });
       const fieldsData = await fieldsRes.json();
       const fields = Array.isArray(fieldsData.rows) ? fieldsData.rows : [];
       fields.sort((a, b) => a.sort_order - b.sort_order);
+      listFields = fields.filter(f => f.contact_tab === "list");
 
-      const listFields = fields.filter(f => f.contact_tab === "list");
+      renderSortedTable();
+    }
 
-      // --- Step 6: Build table UI dynamically ---
-      const headers = listFields.map(f => `<th>${escapeHtml(f.label || f.field_key)}</th>`).join("");
-      const headerRow = `<tr>${headers}<th>Actions</th></tr>`;
+    function renderSortedTable() {
+      const sorted = [...contacts];
+      if (currentSortField) {
+        sorted.sort((a, b) => {
+          const valA = (a[currentSortField] || "").toLowerCase();
+          const valB = (b[currentSortField] || "").toLowerCase();
+          return currentSortDirection === "asc"
+            ? valA.localeCompare(valB)
+            : valB.localeCompare(valA);
+        });
+      }
 
-      const rows = contacts.map(c => {
+      const headers = listFields.map(f => {
+        const isSorted = currentSortField === f.field_key;
+        const arrow = isSorted ? (currentSortDirection === "asc" ? " ▲" : " ▼") : "";
+        return `<th class="sortable" data-field="${f.field_key}">${escapeHtml(f.label || f.field_key)}${arrow}</th>`;
+      }).join("");
+
+      const rows = sorted.map(c => {
         const cells = listFields.map(f => `<td>${escapeHtml(c[f.field_key] || "")}</td>`).join("");
         return `
           <tr>
@@ -197,49 +204,47 @@ async function renderContactList(container, portalState) {
       }).join("");
 
       tableDiv.innerHTML = `
-        <h4>Showing ${contacts.length} contacts</h4>
+        <h4>Showing ${sorted.length} contacts</h4>
         <table class="notes-table">
-          <thead>${headerRow}</thead>
+          <thead><tr>${headers}<th>Actions</th></tr></thead>
           <tbody>
             ${rows || `<tr><td colspan="${listFields.length + 1}">(no contacts found)</td></tr>`}
           </tbody>
         </table>
       `;
 
-      // --- Step 7: Wire select buttons ---
       tableDiv.querySelectorAll(".btn-select").forEach(btn => {
         btn.addEventListener("click", async () => {
           const contactId = btn.dataset.id;
           portalState.selectedContactId = contactId;
-
-          // Fetch contact details to get name
-          const res = await fetch(`https://contacts-module.dennis-e64.workers.dev/contacts/details/${contactId}`, {
-            cache: "no-cache"
-          });
+          const res = await fetch(`https://contacts-module.dennis-e64.workers.dev/contacts/details/${contactId}`, { cache: "no-cache" });
           const data = await res.json();
           const contact = Array.isArray(data) ? data[0] : data;
-
-          portalState.selectedContactName =
-            contact.search_name || `${contact.first_name || ""} ${contact.last_name || ""}`.trim();
-
-          // Update context bar
+          portalState.selectedContactName = contact.search_name || `${contact.first_name || ""} ${contact.last_name || ""}`.trim();
           const contextBar = document.getElementById("contact-context-bar");
-          if (contextBar) {
-            contextBar.textContent = `Contact: ${portalState.selectedContactName}`;
-          }
-
-          // Switch to Details tab
-          const buttons = document.querySelectorAll("#contacts-subtabs button");
-          buttons.forEach(b => b.classList.remove("active"));
+          if (contextBar) contextBar.textContent = `Contact: ${portalState.selectedContactName}`;
+          document.querySelectorAll("#contacts-subtabs button").forEach(b => b.classList.remove("active"));
           const detailsBtn = document.querySelector('#contacts-subtabs button[data-subtab="details"]');
           if (detailsBtn) detailsBtn.classList.add("active");
           const content = document.querySelector("#contactsContent");
           await renderContactDetails(content, portalState, contactId);
         });
       });
+
+      tableDiv.querySelectorAll("th.sortable").forEach(th => {
+        th.addEventListener("click", () => {
+          const field = th.dataset.field;
+          if (currentSortField === field) {
+            currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+          } else {
+            currentSortField = field;
+            currentSortDirection = "asc";
+          }
+          renderSortedTable();
+        });
+      });
     }
 
-    // --- Step 8: Wire filter buttons ---
     document.getElementById("btnApplyContactsFilter").addEventListener("click", applyFilter);
     document.getElementById("btnClearContactsFilter").addEventListener("click", () => {
       document.getElementById("filter-first").value = "";
@@ -257,6 +262,7 @@ async function renderContactList(container, portalState) {
     console.error("[Contacts] Error in renderContactList:", err);
   }
 }
+
 
 // 🔧 Add Contact Form (same structure as Details, but POST + new contact_id)
 async function renderAddContactForm(container, portalState) {
