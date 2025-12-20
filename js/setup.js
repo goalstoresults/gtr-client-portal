@@ -1,23 +1,58 @@
 // setup.js
 
-// Central list of valid contact fields (update to match contacts table)
+// Central list of valid contact fields (matches contacts table + derived fields)
 const CONTACT_FIELD_OPTIONS = [
   "contact_id",
   "first_name",
   "last_name",
+  "contact_name",
   "business_name",
   "email",
   "phone",
+  "phone1",
+  "additional_emails",
+  "additional_emails_2",
+  "additional_phones",
+  "additional_phones_2",
+  "website",
+  "title",
+  "source",
   "contact_type",
-  "search_name",
-  "created_at",
-  "updated_at",
-  "address",
+  "last_activity",
+  "last_appointment",
+  "last_payment_date",
+  "last_payment_amount",
+  "no_referred_clients",
+  "address_full",
+  "street_address",
   "city",
   "state",
   "postal_code",
-  "country"
+  "loa_sent_date",
+  "loa_signed_date",
+  "onboarding_start_date",
+  "onboarding_completed_date",
+  "group_id",
+  "search_name",
+  "search_name_source",
+  "created_at",
+  "updated_at",
+  "project"
 ];
+
+// ---------- Utils ----------
+
+function escapeHtml(str) {
+  return str?.replace(/[&<>"']/g, c => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  }[c])) || "";
+}
+
+// ---------- Entry point ----------
 
 export async function loadSetupTab({ portalState, tabContent }) {
   const res = await fetch("./components/setup.html", { cache: "no-cache" });
@@ -53,9 +88,16 @@ export async function loadSetupTab({ portalState, tabContent }) {
       }
     });
   });
+
+  // Optional: default to Client tab
+  const defaultBtn = subtabs.querySelector('button[data-subtab="client"]');
+  if (defaultBtn) {
+    defaultBtn.classList.add("active");
+    renderClientSetup(setupContent, portalState);
+  }
 }
 
-/* ---------------- Client setup ---------------- */
+// ---------- Client setup ----------
 
 async function renderClientSetup(container, portalState) {
   container.innerHTML = `
@@ -72,12 +114,15 @@ async function renderClientSetup(container, portalState) {
       </div>
       <div id="clientDetails" style="margin-top:24px;"></div>
     </section>
-  ";
+  `;
 
   const select = container.querySelector("#clientSelect");
   const detailsDiv = container.querySelector("#clientDetails");
 
-  const resConfig = await fetch("https://lookups-module.dennis-e64.workers.dev/api/projects_config", { cache: "no-cache" });
+  const resConfig = await fetch(
+    "https://lookups-module.dennis-e64.workers.dev/api/projects_config",
+    { cache: "no-cache" }
+  );
   const configRows = await resConfig.json();
 
   configRows.forEach(row => {
@@ -115,7 +160,8 @@ async function renderClientSetup(container, portalState) {
   select.addEventListener("change", () => {
     const selectedProject = select.value;
     portalState.setup_project_id = selectedProject;
-    portalState.display_name = configRows.find(r => r.project === selectedProject)?.display_name || "";
+    portalState.display_name =
+      configRows.find(r => r.project === selectedProject)?.display_name || "";
 
     const selectedRow = configRows.find(r => r.project === selectedProject);
     if (!selectedRow) {
@@ -137,34 +183,34 @@ async function renderClientSetup(container, portalState) {
 
     detailsDiv.innerHTML = `
       <section class="card">
-        <p><strong>Project:</strong> ${selectedRow.project}</p>
+        <p><strong>Project:</strong> ${escapeHtml(selectedRow.project)}</p>
 
         <label><strong>Display Name:</strong></label>
-        <input id="displayNameInput" value="${selectedRow.display_name || ''}" style="width:100%; margin-bottom:16px;">
+        <input id="displayNameInput" value="${escapeHtml(selectedRow.display_name || "")}" style="width:100%; margin-bottom:16px;">
 
         <div style="display:flex; gap:16px; margin-bottom:16px;">
           <div style="flex:1;">
             <label><strong>Contact First Name:</strong></label>
-            <input id="contactFirstInput" value="${selectedRow.contact_first || ''}" style="width:100%;">
+            <input id="contactFirstInput" value="${escapeHtml(selectedRow.contact_first || "")}" style="width:100%;">
           </div>
           <div style="flex:1;">
             <label><strong>Contact Last Name:</strong></label>
-            <input id="contactLastInput" value="${selectedRow.contact_last || ''}" style="width:100%;">
+            <input id="contactLastInput" value="${escapeHtml(selectedRow.contact_last || "")}" style="width:100%;">
           </div>
           <div style="flex:1;">
             <label><strong>Contact Name:</strong></label>
-            <p id="contactNameDisplay">${selectedRow.contact_name || ''}</p>
+            <p id="contactNameDisplay">${escapeHtml(selectedRow.contact_name || "")}</p>
           </div>
         </div>
 
         <label><strong>Business Name:</strong></label>
-        <input id="businessNameInput" value="${selectedRow.business_name || ''}" style="width:100%; margin-bottom:12px;">
+        <input id="businessNameInput" value="${escapeHtml(selectedRow.business_name || "")}" style="width:100%; margin-bottom:12px;">
 
         <label><strong>Contact Email:</strong></label>
-        <input id="contactEmailInput" value="${selectedRow.contact_email || ''}" style="width:100%; margin-bottom:24px;">
+        <input id="contactEmailInput" value="${escapeHtml(selectedRow.contact_email || "")}" style="width:100%; margin-bottom:24px;">
 
         <label><strong>Owner GHL ID:</strong></label>
-        <input id="ownerGhlIdInput" value="${selectedRow.owner_ghl_id || ''}" style="width:100%; margin-bottom:24px;">
+        <input id="ownerGhlIdInput" value="${escapeHtml(selectedRow.owner_ghl_id || "")}" style="width:100%; margin-bottom:24px;">
 
         <label><strong>Search Name Source:</strong></label>
         <select id="searchNameSourceSelect" style="width:100%; margin-bottom:24px;">
@@ -175,7 +221,7 @@ async function renderClientSetup(container, portalState) {
             Business — search name is business name always
           </option>
           <option value="mix" ${selectedRow.search_name_source === "mix" ? "selected" : ""}>
-            Mix — search name is business name if contact is null, otherwise contact name
+            Mix — business if present, otherwise contact name
           </option>
         </select>
 
@@ -203,9 +249,11 @@ async function renderClientSetup(container, portalState) {
           <td style="text-align:center;">
             <input type="checkbox" data-tabid="${tab.tab_id}" ${checked}>
           </td>
-          <td>${tab.description}</td>
+          <td>${escapeHtml(tab.description)}</td>
           <td>
-            <input type="number" min="1" max="99" value="${sortIndex >= 0 ? sortIndex + 1 : ""}" style="width:80px;" data-sort="${tab.tab_id}">
+            <input type="number" min="1" max="99"
+                   value="${sortIndex >= 0 ? sortIndex + 1 : ""}"
+                   style="width:80px;" data-sort="${tab.tab_id}">
           </td>
         </tr>
       `;
@@ -235,11 +283,14 @@ async function renderClientSetup(container, portalState) {
         search_name_source: detailsDiv.querySelector("#searchNameSourceSelect").value
       };
 
-      await fetch(`https://lookups-module.dennis-e64.workers.dev/api/projects_config?project=${encodeURIComponent(selectedRow.project)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patchPayload)
-      });
+      await fetch(
+        `https://lookups-module.dennis-e64.workers.dev/api/projects_config?project=${encodeURIComponent(selectedRow.project)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patchPayload)
+        }
+      );
       alert("Config saved.");
       renderClientSetup(container, portalState);
     });
@@ -248,7 +299,7 @@ async function renderClientSetup(container, portalState) {
   if (select.value) select.dispatchEvent(new Event("change"));
 }
 
-/* ---------------- Lookups setup ---------------- */
+// ---------- Lookups setup ----------
 
 async function renderSetupLookups(tabContent, portalState) {
   if (!portalState.setup_project_id) {
@@ -262,14 +313,16 @@ async function renderSetupLookups(tabContent, portalState) {
 
   tabContent.innerHTML = `
     <section class="card">
-      <div class="lookup-groups-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div class="lookup-groups-header"
+           style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
         <h2 style="margin:0;">Lookup Groups for ${escapeHtml(portalState.display_name || portalState.setup_project_id)}</h2>
         <div>
           <button id="btnCloneLookups" class="btn-secondary" style="margin-right:8px;">Clone Group</button>
           <button id="addGroupBtn" class="btn-primary">+ Add Lookup Group</button>
         </div>
       </div>
-      <div id="cloneForm" style="display:none; margin-bottom:12px; border:1px solid #ccc; padding:8px;"></div>
+      <div id="cloneForm"
+           style="display:none; margin-bottom:12px; border:1px solid #ccc; padding:8px;"></div>
       <div id="lookupGroups">Loading...</div>
     </section>
   `;
@@ -277,12 +330,13 @@ async function renderSetupLookups(tabContent, portalState) {
   const groupsDiv = tabContent.querySelector("#lookupGroups");
 
   try {
-    const url = `https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${portalState.setup_project_id}`;
+    const url =
+      `https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${portalState.setup_project_id}`;
     const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
 
     if (!res.ok || data.status !== "ok" || !Array.isArray(data.lookups)) {
-      groupsDiv.innerHTML = `<p>Error loading lookups: ${data.error || "Unknown error"}</p>`;
+      groupsDiv.innerHTML = `<p>Error loading lookups: ${escapeHtml(data.error || "Unknown error")}</p>`;
       return;
     }
 
@@ -307,8 +361,10 @@ async function renderSetupLookups(tabContent, portalState) {
           <tbody>
             ${grouped[type].map(item => `
               <tr data-id="${item.id}">
-                <td><input type="text" class="valueInput" value="${escapeHtml(item.value)}" style="width:100%;"></td>
-                <td><input type="number" class="sortInput" value="${item.sort_order}" style="width:70px;"></td>
+                <td><input type="text" class="valueInput"
+                           value="${escapeHtml(item.value)}" style="width:100%;"></td>
+                <td><input type="number" class="sortInput"
+                           value="${item.sort_order}" style="width:70px;"></td>
                 <td>
                   <select class="activeDropdown">
                     <option value="true" ${item.is_active ? "selected" : ""}>Yes</option>
@@ -323,10 +379,12 @@ async function renderSetupLookups(tabContent, portalState) {
             `).join("")}
           </tbody>
         </table>
-        <button class="addValueBtn btn-primary" data-type="${type}" style="margin-top:8px;">+ Add Value</button>
+        <button class="addValueBtn btn-primary" data-type="${escapeHtml(type)}"
+                style="margin-top:8px;">+ Add Value</button>
       </section>
     `).join("");
 
+    // Add group inline
     const addGroupBtn = tabContent.querySelector("#addGroupBtn");
     addGroupBtn.addEventListener("click", () => {
       const addRow = document.createElement("div");
@@ -383,11 +441,14 @@ async function renderSetupLookups(tabContent, portalState) {
           created_at: new Date().toISOString()
         };
 
-        await fetch("https://lookups-module.dennis-e64.workers.dev/lookups/addGroup", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
+        await fetch(
+          "https://lookups-module.dennis-e64.workers.dev/lookups/addGroup",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          }
+        );
 
         renderSetupLookups(tabContent, portalState);
       });
@@ -397,89 +458,103 @@ async function renderSetupLookups(tabContent, portalState) {
       });
     });
 
+    // Clone group fold-out
     const cloneBtn = tabContent.querySelector("#btnCloneLookups");
     cloneBtn.addEventListener("click", async () => {
       const formDiv = tabContent.querySelector("#cloneForm");
       formDiv.style.display = formDiv.style.display === "none" ? "block" : "none";
 
-      if (formDiv.innerHTML === "") {
-        const resConfig = await fetch("https://lookups-module.dennis-e64.workers.dev/api/projects_config", { cache: "no-cache" });
-        const configRows = await resConfig.json();
+      if (formDiv.innerHTML !== "") return;
 
-        formDiv.innerHTML = `
-          <label>Select Another Project:</label>
-          <select id="cloneProjectSelect"><option value="">-- choose --</option></select>
-          <br/>
-          <label>Select a Group:</label>
-          <select id="cloneGroupSelect"><option value="">-- choose --</option></select>
-          <br/>
-          <button id="btnDoClone" class="btn-primary">Clone</button>
-        `;
+      const resConfig = await fetch(
+        "https://lookups-module.dennis-e64.workers.dev/api/projects_config",
+        { cache: "no-cache" }
+      );
+      const configRows = await resConfig.json();
 
-        const projectSelect = formDiv.querySelector("#cloneProjectSelect");
-        configRows.forEach(row => {
-          if (row.project !== portalState.setup_project_id) {
+      formDiv.innerHTML = `
+        <label>Select Another Project:</label>
+        <select id="cloneProjectSelect"><option value="">-- choose --</option></select>
+        <br/>
+        <label>Select a Group:</label>
+        <select id="cloneGroupSelect"><option value="">-- choose --</option></select>
+        <br/>
+        <button id="btnDoClone" class="btn-primary">Clone</button>
+      `;
+
+      const projectSelect = formDiv.querySelector("#cloneProjectSelect");
+      configRows.forEach(row => {
+        if (row.project !== portalState.setup_project_id) {
+          const opt = document.createElement("option");
+          opt.value = row.project;
+          opt.textContent = row.display_name;
+          projectSelect.appendChild(opt);
+        }
+      });
+
+      projectSelect.addEventListener("change", async () => {
+        const sourceProject = projectSelect.value;
+        const groupSelect = formDiv.querySelector("#cloneGroupSelect");
+        groupSelect.innerHTML = `<option value="">-- choose --</option>`;
+
+        if (!sourceProject) return;
+
+        const resSource = await fetch(
+          `https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${sourceProject}`,
+          { cache: "no-cache" }
+        );
+        const sourceData = await resSource.json();
+
+        if (sourceData.status === "ok" && Array.isArray(sourceData.lookups)) {
+          const groups = [...new Set(sourceData.lookups.map(l => l.lookup_type))];
+          groups.forEach(g => {
             const opt = document.createElement("option");
-            opt.value = row.project;
-            opt.textContent = row.display_name;
-            projectSelect.appendChild(opt);
-          }
-        });
+            opt.value = g;
+            opt.textContent = g;
+            groupSelect.appendChild(opt);
+          });
+        }
+      });
 
-        projectSelect.addEventListener("change", async () => {
-          const sourceProject = projectSelect.value;
-          const groupSelect = formDiv.querySelector("#cloneGroupSelect");
-          groupSelect.innerHTML = `<option value="">-- choose --</option>`;
+      formDiv.querySelector("#btnDoClone").addEventListener("click", async () => {
+        const sourceProject = projectSelect.value;
+        const group = formDiv.querySelector("#cloneGroupSelect").value;
+        if (!sourceProject || !group) return;
 
-          if (!sourceProject) return;
+        const resSource = await fetch(
+          `https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${sourceProject}`,
+          { cache: "no-cache" }
+        );
+        const sourceData = await resSource.json();
 
-          const resSource = await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${sourceProject}`, { cache: "no-cache" });
-          const sourceData = await resSource.json();
+        if (sourceData.status === "ok" && Array.isArray(sourceData.lookups)) {
+          const payload = sourceData.lookups
+            .filter(l => l.lookup_type === group)
+            .map(l => ({
+              lookup_type: l.lookup_type,
+              value: l.value,
+              sort_order: l.sort_order,
+              is_active: l.is_active,
+              project: portalState.setup_project_id,
+              created_at: new Date().toISOString()
+            }));
 
-          if (sourceData.status === "ok" && Array.isArray(sourceData.lookups)) {
-            const groups = [...new Set(sourceData.lookups.map(l => l.lookup_type))];
-            groups.forEach(g => {
-              const opt = document.createElement("option");
-              opt.value = g;
-              opt.textContent = g;
-              groupSelect.appendChild(opt);
-            });
-          }
-        });
-
-        formDiv.querySelector("#btnDoClone").addEventListener("click", async () => {
-          const sourceProject = projectSelect.value;
-          const group = formDiv.querySelector("#cloneGroupSelect").value;
-          if (!sourceProject || !group) return;
-
-          const resSource = await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${sourceProject}`, { cache: "no-cache" });
-          const sourceData = await resSource.json();
-
-          if (sourceData.status === "ok" && Array.isArray(sourceData.lookups)) {
-            const payload = sourceData.lookups
-              .filter(l => l.lookup_type === group)
-              .map(l => ({
-                lookup_type: l.lookup_type,
-                value: l.value,
-                sort_order: l.sort_order,
-                is_active: l.is_active,
-                project: portalState.setup_project_id,
-                created_at: new Date().toISOString()
-              }));
-
-            await fetch("https://lookups-module.dennis-e64.workers.dev/lookups/addValue", {
+          await fetch(
+            "https://lookups-module.dennis-e64.workers.dev/lookups/addValue",
+            {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload)
-            });
+            }
+          );
 
-            alert(`Group "${group}" cloned from ${sourceProject}.`);
-            renderSetupLookups(tabContent, portalState);
-          }
-        });
-      }
+          alert(`Group "${group}" cloned from ${sourceProject}.`);
+          renderSetupLookups(tabContent, portalState);
+        }
+      });
     });
 
+    // Save/Delete/Add value delegation
     groupsDiv.addEventListener("click", async e => {
       const row = e.target.closest("tr");
       const id = row?.dataset?.id;
@@ -491,20 +566,24 @@ async function renderSetupLookups(tabContent, portalState) {
 
         const updates = { value, sort_order: sort, is_active: active };
 
-        await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups/edit/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ updates })
-        });
+        await fetch(
+          `https://lookups-module.dennis-e64.workers.dev/lookups/edit/${id}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ updates })
+          }
+        );
 
         renderSetupLookups(tabContent, portalState);
       }
 
       if (e.target.classList.contains("deleteBtn")) {
         if (!confirm("Delete this lookup value?")) return;
-        await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups/delete/${id}`, {
-          method: "DELETE"
-        });
+        await fetch(
+          `https://lookups-module.dennis-e64.workers.dev/lookups/delete/${id}`,
+          { method: "DELETE" }
+        );
         renderSetupLookups(tabContent, portalState);
       }
 
@@ -514,7 +593,13 @@ async function renderSetupLookups(tabContent, portalState) {
         const tbody = groupSection.querySelector("tbody");
 
         const lastRow = tbody.querySelector("tr:last-child");
-        const lastSort = lastRow ? parseInt(lastRow.querySelector(".sortInput")?.value || lastRow.querySelector("td:nth-child(2)")?.textContent, 10) : 0;
+        const lastSort = lastRow
+          ? parseInt(
+              lastRow.querySelector(".sortInput")?.value ||
+              lastRow.querySelector("td:nth-child(2)")?.textContent,
+              10
+            )
+          : 0;
         const nextSort = (isNaN(lastSort) ? 0 : lastSort) + 10;
 
         const newRow = document.createElement("tr");
@@ -553,11 +638,14 @@ async function renderSetupLookups(tabContent, portalState) {
             created_at: new Date().toISOString()
           };
 
-          await fetch("https://lookups-module.dennis-e64.workers.dev/lookups/addValue", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          });
+          await fetch(
+            "https://lookups-module.dennis-e64.workers.dev/lookups/addValue",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+            }
+          );
 
           renderSetupLookups(tabContent, portalState);
         });
@@ -567,13 +655,11 @@ async function renderSetupLookups(tabContent, portalState) {
         });
       }
     });
-
   } catch (err) {
-    groupsDiv.innerHTML = `<p>Error loading lookups: ${err.message}</p>`;
+    groupsDiv.innerHTML = `<p>Error loading lookups: ${escapeHtml(err.message)}</p>`;
   }
 }
-
-/* ---------------- Contact Add setup ---------------- */
+// ---------- Contact Add setup ----------
 
 async function renderContactSetup(container, portalState) {
   if (!portalState.setup_project_id) {
@@ -594,9 +680,11 @@ async function renderContactSetup(container, portalState) {
     ? [...new Set(lookupsData.lookups.map(l => l.lookup_type))].sort()
     : [];
 
-  const sectionValues = lookupsData.lookups
-    .filter(l => l.lookup_type === "section")
-    .map(l => l.value);
+  const sectionValues = Array.isArray(lookupsData.lookups)
+    ? lookupsData.lookups
+        .filter(l => l.lookup_type === "section")
+        .map(l => l.value)
+    : [];
 
   container.innerHTML = `
     <section class="card">
@@ -627,15 +715,29 @@ async function renderContactSetup(container, portalState) {
 
   const gridBody = container.querySelector("#contactAddFieldsGrid tbody");
 
-  const url = `https://lookups-module.dennis-e64.workers.dev/contact_fields?project=${portalState.setup_project_id}`;
+  const url =
+    `https://lookups-module.dennis-e64.workers.dev/contact_fields?project=${portalState.setup_project_id}`;
   const res = await fetch(url, { cache: "no-cache" });
   const data = await res.json();
-  const configured = Array.isArray(data.rows) ? data.rows.filter(r => r.contact_tab === "add") : [];
+  const configured = Array.isArray(data.rows)
+    ? data.rows.filter(r => r.contact_tab === "add")
+    : [];
 
-  const addFields = ["first_name", "last_name", "business_name", "email", "phone", "contact_type"];
+  // sensible defaults for Add
+  const addFields = [
+    "first_name",
+    "last_name",
+    "business_name",
+    "email",
+    "phone",
+    "contact_type"
+  ];
 
   function toTitleCase(field) {
-    return field.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    return field
+      .split("_")
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
   }
 
   gridBody.innerHTML = addFields.map(field => {
@@ -648,15 +750,27 @@ async function renderContactSetup(container, portalState) {
     const placeholder = toTitleCase(field);
 
     const lookupOptions = [`<option value="">-- none --</option>`]
-      .concat(lookupGroups.map(g => `<option value="${g}" ${boundLookup === g ? "selected" : ""}>${g}</option>`))
+      .concat(
+        lookupGroups.map(
+          g => `<option value="${g}" ${boundLookup === g ? "selected" : ""}>${g}</option>`
+        )
+      )
       .join("");
 
     const sectionOptions = [`<option value="">-- none --</option>`]
-      .concat(sectionValues.map(s => `<option value="${s}" ${section === s ? "selected" : ""}>${s}</option>`))
+      .concat(
+        sectionValues.map(
+          s => `<option value="${s}" ${section === s ? "selected" : ""}>${s}</option>`
+        )
+      )
       .join("");
 
     const systemFieldOptions = [`<option value="">-- select field --</option>`]
-      .concat(CONTACT_FIELD_OPTIONS.map(f => `<option value="${f}" ${f === field ? "selected" : ""}>${f}</option>`))
+      .concat(
+        CONTACT_FIELD_OPTIONS.map(
+          f => `<option value="${f}" ${f === field ? "selected" : ""}>${f}</option>`
+        )
+      )
       .join("");
 
     return `
@@ -670,7 +784,7 @@ async function renderContactSetup(container, portalState) {
         <td>
           <input type="text" class="labelInput"
                  value="${escapeHtml(label)}"
-                 placeholder="${placeholder}"
+                 placeholder="${escapeHtml(placeholder)}"
                  style="width:100%;">
         </td>
         <td><input type="number" class="orderInput" value="${order}" style="width:70px;"></td>
@@ -684,6 +798,7 @@ async function renderContactSetup(container, portalState) {
     `;
   }).join("");
 
+  // Default Mode
   container.querySelector("#btnDefaultAddMode").addEventListener("click", () => {
     const rows = gridBody.querySelectorAll("tr");
     rows.forEach((tr, idx) => {
@@ -699,13 +814,16 @@ async function renderContactSetup(container, portalState) {
     });
   });
 
+  // Add Field
   container.querySelector("#btnAddAddField").addEventListener("click", () => {
     const used = new Set(
-      [...gridBody.querySelectorAll("tr")].map(tr => {
-        const explicit = tr.dataset.field;
-        const selectVal = tr.querySelector(".systemFieldSelect")?.value;
-        return selectVal || explicit || "";
-      }).filter(Boolean)
+      [...gridBody.querySelectorAll("tr")]
+        .map(tr => {
+          const explicit = tr.dataset.field;
+          const selectVal = tr.querySelector(".systemFieldSelect")?.value;
+          return selectVal || explicit || "";
+        })
+        .filter(Boolean)
     );
 
     const available = CONTACT_FIELD_OPTIONS.filter(f => !used.has(f));
@@ -749,12 +867,13 @@ async function renderContactSetup(container, portalState) {
     gridBody.appendChild(newRow);
   });
 
+  // Save
   container.querySelector("#btnSaveAddConfig").addEventListener("click", async () => {
     await saveContactSetup(portalState, "add", gridBody);
   });
 }
 
-/* ---------------- Contact List setup ---------------- */
+// ---------- Contact List setup ----------
 
 async function renderContactListSetup(container, portalState) {
   if (!portalState.setup_project_id) {
@@ -775,9 +894,11 @@ async function renderContactListSetup(container, portalState) {
     ? [...new Set(lookupsData.lookups.map(l => l.lookup_type))].sort()
     : [];
 
-  const sectionValues = lookupsData.lookups
-    .filter(l => l.lookup_type === "section")
-    .map(l => l.value);
+  const sectionValues = Array.isArray(lookupsData.lookups)
+    ? lookupsData.lookups
+        .filter(l => l.lookup_type === "section")
+        .map(l => l.value)
+    : [];
 
   container.innerHTML = `
     <section class="card">
@@ -808,15 +929,29 @@ async function renderContactListSetup(container, portalState) {
 
   const gridBody = container.querySelector("#contactListFieldsGrid tbody");
 
-  const url = `https://lookups-module.dennis-e64.workers.dev/contact_fields?project=${portalState.setup_project_id}`;
+  const url =
+    `https://lookups-module.dennis-e64.workers.dev/contact_fields?project=${portalState.setup_project_id}`;
   const res = await fetch(url, { cache: "no-cache" });
   const data = await res.json();
-  const configured = Array.isArray(data.rows) ? data.rows.filter(r => r.contact_tab === "list") : [];
+  const configured = Array.isArray(data.rows)
+    ? data.rows.filter(r => r.contact_tab === "list")
+    : [];
 
-  const listFields = ["search_name", "first_name", "last_name", "business_name", "email", "contact_type"];
+  // sensible defaults for List
+  const listFields = [
+    "search_name",
+    "first_name",
+    "last_name",
+    "business_name",
+    "email",
+    "contact_type"
+  ];
 
   function toTitleCase(field) {
-    return field.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    return field
+      .split("_")
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
   }
 
   gridBody.innerHTML = listFields.map(field => {
@@ -829,15 +964,27 @@ async function renderContactListSetup(container, portalState) {
     const placeholder = toTitleCase(field);
 
     const lookupOptions = [`<option value="">-- none --</option>`]
-      .concat(lookupGroups.map(g => `<option value="${g}" ${boundLookup === g ? "selected" : ""}>${g}</option>`))
+      .concat(
+        lookupGroups.map(
+          g => `<option value="${g}" ${boundLookup === g ? "selected" : ""}>${g}</option>`
+        )
+      )
       .join("");
 
     const sectionOptions = [`<option value="">-- none --</option>`]
-      .concat(sectionValues.map(s => `<option value="${s}" ${section === s ? "selected" : ""}>${s}</option>`))
+      .concat(
+        sectionValues.map(
+          s => `<option value="${s}" ${section === s ? "selected" : ""}>${s}</option>`
+        )
+      )
       .join("");
 
     const systemFieldOptions = [`<option value="">-- select field --</option>`]
-      .concat(CONTACT_FIELD_OPTIONS.map(f => `<option value="${f}" ${f === field ? "selected" : ""}>${f}</option>`))
+      .concat(
+        CONTACT_FIELD_OPTIONS.map(
+          f => `<option value="${f}" ${f === field ? "selected" : ""}>${f}</option>`
+        )
+      )
       .join("");
 
     return `
@@ -851,7 +998,7 @@ async function renderContactListSetup(container, portalState) {
         <td>
           <input type="text" class="labelInput"
                  value="${escapeHtml(label)}"
-                 placeholder="${placeholder}"
+                 placeholder="${escapeHtml(placeholder)}"
                  style="width:100%;">
         </td>
         <td><input type="number" class="orderInput" value="${order}" style="width:70px;"></td>
@@ -865,6 +1012,7 @@ async function renderContactListSetup(container, portalState) {
     `;
   }).join("");
 
+  // Default Mode
   container.querySelector("#btnDefaultListMode").addEventListener("click", () => {
     const rows = gridBody.querySelectorAll("tr");
     rows.forEach((tr, idx) => {
@@ -880,13 +1028,16 @@ async function renderContactListSetup(container, portalState) {
     });
   });
 
+  // Add Field
   container.querySelector("#btnAddListField").addEventListener("click", () => {
     const used = new Set(
-      [...gridBody.querySelectorAll("tr")].map(tr => {
-        const explicit = tr.dataset.field;
-        const selectVal = tr.querySelector(".systemFieldSelect")?.value;
-        return selectVal || explicit || "";
-      }).filter(Boolean)
+      [...gridBody.querySelectorAll("tr")]
+        .map(tr => {
+          const explicit = tr.dataset.field;
+          const selectVal = tr.querySelector(".systemFieldSelect")?.value;
+          return selectVal || explicit || "";
+        })
+        .filter(Boolean)
     );
 
     const available = CONTACT_FIELD_OPTIONS.filter(f => !used.has(f));
@@ -930,12 +1081,13 @@ async function renderContactListSetup(container, portalState) {
     gridBody.appendChild(newRow);
   });
 
+  // Save
   container.querySelector("#btnSaveListConfig").addEventListener("click", async () => {
     await saveContactSetup(portalState, "list", gridBody);
   });
 }
 
-/* ---------------- Shared save for contact fields ---------------- */
+// ---------- Shared save ----------
 
 async function saveContactSetup(portalState, tab, gridBody) {
   const rows = [];
@@ -949,9 +1101,12 @@ async function saveContactSetup(portalState, tab, gridBody) {
     if (!fieldKey) return;
 
     const labelInput = tr.querySelector(".labelInput");
-    const label = (labelInput.value.trim() || labelInput.placeholder || fieldKey).trim();
+    const label =
+      (labelInput.value.trim() || labelInput.placeholder || fieldKey).trim();
+
     const orderRaw = parseInt(tr.querySelector(".orderInput").value, 10);
     const sortOrder = Number.isFinite(orderRaw) ? orderRaw : 99;
+
     const lookupType = tr.querySelector(".lookupTypeSelect").value || null;
     const section = tr.querySelector(".sectionSelect").value || null;
 
@@ -965,24 +1120,17 @@ async function saveContactSetup(portalState, tab, gridBody) {
     });
   });
 
-  await fetch("https://lookups-module.dennis-e64.workers.dev/contact_fields/save", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ project: portalState.setup_project_id, fields: rows })
-  });
+  await fetch(
+    "https://lookups-module.dennis-e64.workers.dev/contact_fields/save",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        project: portalState.setup_project_id,
+        fields: rows
+      })
+    }
+  );
 
   alert(`Contact ${tab} fields saved.`);
 }
-
-/* ---------------- Utils ---------------- */
-
-function escapeHtml(str) {
-  return str?.replace(/[&<>"']/g, c => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;"
-  }[c])) || "";
-}
-
