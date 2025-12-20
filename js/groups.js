@@ -62,117 +62,174 @@ export async function loadGroupsTab({ portalState, tabContent }) {
   }
 }
 
-// Group List with simple name filter + client-side search/sort
-async function renderGroupList(container, portalState, options = {}) {
+// Group List with unified grid sorting (matches Contacts look & feel)
+async function renderGroupList(container, portalState) {
   const prevName = document.getElementById("filter-group-name")?.value.trim() || "";
 
-        container.innerHTML = `
-          <section class="card">
-          <h2>Groups for ${
+  container.innerHTML = `
+    <section class="card">
+      <h2>Groups for ${
         escapeHtml(
           portalState.projects_config?.business_name ||
           portalState.display_name ||
           portalState.project
         )
       }</h2>
-       <div id="groupsFilters" style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+
+      <div id="groupsFilters" style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
         <label>Name: <input type="text" id="filter-group-name" value="${escapeHtml(prevName)}" /></label>
         <button id="btnApplyGroupsFilter" class="btn-secondary">Apply Filter</button>
         <button id="btnClearGroupsFilter" class="btn-secondary">Clear Filter</button>
       </div>
+
       <div id="groupTable">Loading...</div>
     </section>
   `;
 
   const tableDiv = container.querySelector("#groupTable");
 
-  const order = options.order || "created_at.desc";
-  const params = new URLSearchParams({
-    project: portalState.project,
-    order,
-    limit: "500"
-  });
-  const url = `https://groups-module.dennis-e64.workers.dev/groups/list?${params}`;
-  console.log("[Groups] Fetching:", url);
-
+  // Fetch groups
+  const url = `https://groups-module.dennis-e64.workers.dev/groups/list?project=${portalState.project}&limit=500`;
   const res = await fetch(url, { cache: "no-cache" });
   let groups = await res.json();
   if (!Array.isArray(groups)) groups = groups.rows || [];
   if (!Array.isArray(groups)) groups = [];
 
+  // Apply name filter
   if (prevName && prevName.length >= 3) {
     const term = prevName.toLowerCase();
     groups = groups.filter(g => (g.group_name || "").toLowerCase().includes(term));
   }
 
-  groups.sort((a, b) => (a.group_name || "").localeCompare(b.group_name || ""));
+  // Sorting state
+  let currentSortField = "group_name";
+  let currentSortDirection = "asc";
 
-  tableDiv.innerHTML = `
-    <h4>Showing ${groups.length} ${prevName ? "filtered" : "recent"} groups</h4>
-    <table class="notes-table">
-      <thead>
-        <tr>
-          <th>
-            Name
-            <button class="sort-btn" data-col="group_name" data-dir="asc">▲</button>
-            <button class="sort-btn" data-col="group_name" data-dir="desc">▼</button>
-          </th>
-          <th class="amount">Total Amount</th>
-          <th class="amount">Total Referral Amount</th>
-          <th class="amount">ROI</th>
-          <th>Created</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${groups.length > 0
-          ? groups.map(g => `
-              <tr>
-                <td>${escapeHtml(g.group_name || "")}</td>
-                <td class="amount">${formatCurrency(g.total_amount)}</td>
-                <td class="amount">${formatCurrency(g.total_referral_amount)}</td>
-                <td class="amount">${escapeHtml(g.total_roi || "0.0000")}</td>
-                <td>${formatDateTime(g.created_at)}</td>
-                <td>
-                  <button class="btn-primary btn-select" data-id="${g.group_id}">Select</button>
-                </td>
-              </tr>
-            `).join("")
-          : `<tr><td colspan="6">(no groups found)</td></tr>`
-        }
-      </tbody>
-    </table>
-  `;
+  // Columns definition
+  const columns = [
+    { key: "group_name", label: "Name" },
+    { key: "total_amount", label: "Total Amount", numeric: true },
+    { key: "total_referral_amount", label: "Total Referral Amount", numeric: true },
+    { key: "total_roi", label: "ROI", numeric: true },
+    { key: "created_at", label: "Created" }
+  ];
 
-  tableDiv.querySelectorAll(".btn-select").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const groupId = btn.dataset.id;
-      portalState.selectedGroupId = groupId;   // ✅ store active group
-      const buttons = document.querySelectorAll("#groups-subtabs button");
-      buttons.forEach(b => b.classList.remove("active"));
-      const detailsBtn = document.querySelector('#groups-subtabs button[data-subtab="details"]');
-      if (detailsBtn) detailsBtn.classList.add("active");
-      const content = document.querySelector("#groupsContent");
-      await renderGroupDetails(content, portalState, groupId);
+  function sortGroups() {
+    groups.sort((a, b) => {
+      let A = a[currentSortField];
+      let B = b[currentSortField];
+
+      if (A == null) A = "";
+      if (B == null) B = "";
+
+      // Numeric sort
+      if (columns.find(c => c.key === currentSortField)?.numeric) {
+        const numA = Number(A) || 0;
+        const numB = Number(B) || 0;
+        return currentSortDirection === "asc" ? numA - numB : numB - numA;
+      }
+
+      // String/date sort
+      const strA = String(A).toLowerCase();
+      const strB = String(B).toLowerCase();
+      return currentSortDirection === "asc"
+        ? strA.localeCompare(strB)
+        : strB.localeCompare(strA);
     });
-  });
+  }
 
+  function renderTable() {
+    sortGroups();
+
+    const headerHtml = columns.map(col => {
+      const isSorted = currentSortField === col.key;
+      const upArrow   = isSorted && currentSortDirection === "asc"  ? "▲" : "△";
+      const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+
+      return `
+        <th class="sortable" data-field="${col.key}">
+          ${escapeHtml(col.label)}
+          <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+            <span class="sort-up">${upArrow}</span>
+            <span class="sort-down">${downArrow}</span>
+          </span>
+        </th>
+      `;
+    }).join("");
+
+    const rowsHtml = groups.map(g => `
+      <tr>
+        <td>${escapeHtml(g.group_name || "")}</td>
+        <td class="amount">${formatCurrency(g.total_amount)}</td>
+        <td class="amount">${formatCurrency(g.total_referral_amount)}</td>
+        <td class="amount">${escapeHtml(g.total_roi || "0.0000")}</td>
+        <td>${formatDateTime(g.created_at)}</td>
+        <td><button class="btn-primary btn-select" data-id="${g.group_id}">Select</button></td>
+      </tr>
+    `).join("");
+
+    tableDiv.innerHTML = `
+      <h4>Showing ${groups.length} ${prevName ? "filtered" : "recent"} groups</h4>
+      <table class="notes-table">
+        <thead>
+          <tr>
+            ${headerHtml}
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml || `<tr><td colspan="6">(no groups found)</td></tr>`}
+        </tbody>
+      </table>
+    `;
+
+    // Wire sorting
+    tableDiv.querySelectorAll("th.sortable").forEach(th => {
+      th.addEventListener("click", () => {
+        const field = th.dataset.field;
+
+        if (currentSortField === field) {
+          currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+        } else {
+          currentSortField = field;
+          currentSortDirection = "asc";
+        }
+
+        renderTable();
+      });
+    });
+
+    // Wire Select buttons
+    tableDiv.querySelectorAll(".btn-select").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const groupId = btn.dataset.id;
+        portalState.selectedGroupId = groupId;
+
+        const buttons = document.querySelectorAll("#groups-subtabs button");
+        buttons.forEach(b => b.classList.remove("active"));
+        const detailsBtn = document.querySelector('#groups-subtabs button[data-subtab="details"]');
+        if (detailsBtn) detailsBtn.classList.add("active");
+
+        const content = document.querySelector("#groupsContent");
+        await renderGroupDetails(content, portalState, groupId);
+      });
+    });
+  }
+
+  // Initial render
+  renderTable();
+
+  // Filter buttons
   document.getElementById("btnApplyGroupsFilter").addEventListener("click", () => {
     renderGroupList(container, portalState);
   });
+
   document.getElementById("btnClearGroupsFilter").addEventListener("click", () => {
     document.getElementById("filter-group-name").value = "";
     renderGroupList(container, portalState);
   });
-
-  tableDiv.querySelectorAll(".sort-btn").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const col = btn.dataset.col;
-      const dir = btn.dataset.dir;
-      await renderGroupList(container, portalState, { order: `${col}.${dir}` });
-    });
-  });
 }
+
 
 // Group Details view
 async function renderGroupDetails(container, portalState, groupId) {
