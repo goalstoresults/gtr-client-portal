@@ -746,7 +746,7 @@ async function renderContactSetup(container, portalState) {
     return;
   }
 
-  // Load lookup groups for dropdowns
+  // Load lookup groups + sections
   const resLookups = await fetch(
     `https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${portalState.setup_project_id}`,
     { cache: "no-cache" }
@@ -763,7 +763,7 @@ async function renderContactSetup(container, portalState) {
         .map(l => l.value)
     : [];
 
-  // Render UI
+  // Render shell
   container.innerHTML = `
     <section class="card">
       <div style="display:flex; align-items:center; justify-content:space-between;">
@@ -805,15 +805,61 @@ async function renderContactSetup(container, portalState) {
     ? data.rows.filter(r => r.contact_tab === "add")
     : [];
 
-  // Default Add fields
-  const addFields = [
-    "first_name",
-    "last_name",
-    "business_name",
-    "email",
-    "phone",
-    "contact_type"
-  ];
+  const defaultBtn = container.querySelector("#btnDefaultAddMode");
+
+  // ✅ Default Mode only appears when there are NO rows
+  if (configured.length > 0) {
+    defaultBtn.style.display = "none";
+  } else {
+    defaultBtn.style.display = "inline-block";
+
+    defaultBtn.addEventListener("click", () => {
+      const defaults = [
+        { field_key: "first_name", label: "First Name", sort_order: 10, section: "General" },
+        { field_key: "last_name", label: "Last Name", sort_order: 20, section: "General" },
+        { field_key: "business_name", label: "Business Name", sort_order: 30, section: "General" },
+        { field_key: "email", label: "Email", sort_order: 40, section: "General" },
+        { field_key: "phone", label: "Phone", sort_order: 50, section: "General" },
+        { field_key: "contact_type", label: "Contact Type", sort_order: 60, section: "General" }
+      ];
+
+      gridBody.innerHTML = defaults.map(row => {
+        const field = row.field_key;
+        const label = row.label;
+        const order = row.sort_order;
+        const section = row.section;
+        const placeholder = field.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
+        const lookupOptions = [`<option value="">-- none --</option>`]
+          .concat(lookupGroups.map(g => `<option value="${g}">${g}</option>`))
+          .join("");
+
+        const sectionOptions = [`<option value="">-- none --</option>`]
+          .concat(sectionValues.map(s => `<option value="${s}" ${s === section ? "selected" : ""}>${s}</option>`))
+          .join("");
+
+        const systemFieldOptions = [`<option value="">-- select field --</option>`]
+          .concat(CONTACT_FIELD_OPTIONS.map(
+            f => `<option value="${f}" ${f === field ? "selected" : ""}>${f}</option>`
+          ))
+          .join("");
+
+        return `
+          <tr data-field="${field}">
+            <td style="text-align:center;"><input type="checkbox" class="enableCheckbox" checked></td>
+            <td><select class="systemFieldSelect" style="width:100%;">${systemFieldOptions}</select></td>
+            <td><input type="text" class="labelInput" value="${escapeHtml(label)}" placeholder="${escapeHtml(placeholder)}" style="width:100%;"></td>
+            <td><input type="number" class="orderInput" value="${order}" style="width:70px;"></td>
+            <td><select class="lookupTypeSelect" style="width:100%;">${lookupOptions}</select></td>
+            <td><select class="sectionSelect" style="width:100%;">${sectionOptions}</select></td>
+          </tr>
+        `;
+      }).join("");
+    });
+  }
+
+  // ✅ Render existing rows dynamically
+  const sortedRows = configured.sort((a, b) => a.sort_order - b.sort_order);
 
   function toTitleCase(field) {
     return field
@@ -822,109 +868,52 @@ async function renderContactSetup(container, portalState) {
       .join(" ");
   }
 
-  // Render rows
-  gridBody.innerHTML = addFields
-    .map(field => {
-      const row = configured.find(r => r.field_key === field);
-      const enabled = !!row;
-      const label = row ? row.label : "";
-      const order = row ? row.sort_order : "";
-      const boundLookup = row ? (row.lookup_type || "") : "";
-      const section = row ? (row.section || "") : "";
-      const placeholder = toTitleCase(field);
+  gridBody.innerHTML = sortedRows.map(row => {
+    const field = row.field_key;
+    const label = row.label || "";
+    const order = row.sort_order || "";
+    const boundLookup = row.lookup_type || "";
+    const section = row.section || "";
+    const placeholder = toTitleCase(field);
 
-      const lookupOptions = [`<option value="">-- none --</option>`]
-        .concat(
-          lookupGroups.map(
-            g => `<option value="${g}" ${boundLookup === g ? "selected" : ""}>${g}</option>`
-          )
-        )
-        .join("");
+    const lookupOptions = [`<option value="">-- none --</option>`]
+      .concat(lookupGroups.map(
+        g => `<option value="${g}" ${boundLookup === g ? "selected" : ""}>${g}</option>`
+      ))
+      .join("");
 
-      const sectionOptions = [`<option value="">-- none --</option>`]
-        .concat(
-          sectionValues.map(
-            s => `<option value="${s}" ${section === s ? "selected" : ""}>${s}</option>`
-          )
-        )
-        .join("");
+    const sectionOptions = [`<option value="">-- none --</option>`]
+      .concat(sectionValues.map(
+        s => `<option value="${s}" ${section === s ? "selected" : ""}>${s}</option>`
+      ))
+      .join("");
 
-      const systemFieldOptions = [`<option value="">-- select field --</option>`]
-        .concat(
-          CONTACT_FIELD_OPTIONS.map(
-            f => `<option value="${f}" ${f === field ? "selected" : ""}>${f}</option>`
-          )
-        )
-        .join("");
+    const systemFieldOptions = [`<option value="">-- select field --</option>`]
+      .concat(CONTACT_FIELD_OPTIONS.map(
+        f => `<option value="${f}" ${f === field ? "selected" : ""}>${f}</option>`
+      ))
+      .join("");
 
-      return `
-        <tr data-field="${field}">
-          <td style="text-align:center;">
-            <input type="checkbox" class="enableCheckbox" ${enabled ? "checked" : ""}>
-          </td>
-
-          <td>
-            <select class="systemFieldSelect" style="width:100%;">
-              ${systemFieldOptions}
-            </select>
-          </td>
-
-          <td>
-            <input type="text"
-                   class="labelInput"
-                   value="${escapeHtml(label)}"
-                   placeholder="${escapeHtml(placeholder)}"
-                   style="width:100%;">
-          </td>
-
-          <td>
-            <input type="number"
-                   class="orderInput"
-                   value="${order}"
-                   style="width:70px;">
-          </td>
-
-          <td>
-            <select class="lookupTypeSelect" style="width:100%;">
-              ${lookupOptions}
-            </select>
-          </td>
-
-          <td>
-            <select class="sectionSelect" style="width:100%;">
-              ${sectionOptions}
-            </select>
-          </td>
-        </tr>
-      `;
-    })
-    .join("");
-
-  // ✅ Default Mode
-  container.querySelector("#btnDefaultAddMode").addEventListener("click", () => {
-    const rows = gridBody.querySelectorAll("tr");
-    rows.forEach((tr, idx) => {
-      tr.querySelector(".enableCheckbox").checked = true;
-
-      const labelInput = tr.querySelector(".labelInput");
-      if (!labelInput.value.trim()) {
-        labelInput.value = labelInput.placeholder;
-      }
-
-      tr.querySelector(".orderInput").value = idx + 1;
-    });
-  });
+    return `
+      <tr data-field="${field}">
+        <td style="text-align:center;"><input type="checkbox" class="enableCheckbox" checked></td>
+        <td><select class="systemFieldSelect" style="width:100%;">${systemFieldOptions}</select></td>
+        <td><input type="text" class="labelInput" value="${escapeHtml(label)}" placeholder="${escapeHtml(placeholder)}" style="width:100%;"></td>
+        <td><input type="number" class="orderInput" value="${order}" style="width:70px;"></td>
+        <td><select class="lookupTypeSelect" style="width:100%;">${lookupOptions}</select></td>
+        <td><select class="sectionSelect" style="width:100%;">${sectionOptions}</select></td>
+      </tr>
+    `;
+  }).join("");
 
   // ✅ Add Field
   container.querySelector("#btnAddAddField").addEventListener("click", () => {
     const used = new Set(
-      [...gridBody.querySelectorAll("tr")]
-        .map(tr => {
-          const explicit = tr.dataset.field;
-          const selectVal = tr.querySelector(".systemFieldSelect")?.value;
-          return selectVal || explicit || "";
-        })
-        .filter(Boolean)
+      [...gridBody.querySelectorAll("tr")].map(tr => {
+        const explicit = tr.dataset.field;
+        const selectVal = tr.querySelector(".systemFieldSelect")?.value;
+        return selectVal || explicit || "";
+      }).filter(Boolean)
     );
 
     const available = CONTACT_FIELD_OPTIONS.filter(f => !used.has(f));
@@ -948,37 +937,13 @@ async function renderContactSetup(container, portalState) {
     const newRow = document.createElement("tr");
     newRow.dataset.field = "";
     newRow.innerHTML = `
-      <td style="text-align:center;">
-        <input type="checkbox" class="enableCheckbox" checked>
-      </td>
-
-      <td>
-        <select class="systemFieldSelect" style="width:100%;">
-          ${systemFieldOptions}
-        </select>
-      </td>
-
-      <td>
-        <input type="text" class="labelInput" placeholder="Label" style="width:100%;">
-      </td>
-
-      <td>
-        <input type="number" class="orderInput" value="99" style="width:70px;">
-      </td>
-
-      <td>
-        <select class="lookupTypeSelect" style="width:100%;">
-          ${lookupOptions}
-        </select>
-      </td>
-
-      <td>
-        <select class="sectionSelect" style="width:100%;">
-          ${sectionOptions}
-        </select>
-      </td>
+      <td style="text-align:center;"><input type="checkbox" class="enableCheckbox" checked></td>
+      <td><select class="systemFieldSelect" style="width:100%;">${systemFieldOptions}</select></td>
+      <td><input type="text" class="labelInput" placeholder="Label" style="width:100%;"></td>
+      <td><input type="number" class="orderInput" value="99" style="width:70px;"></td>
+      <td><select class="lookupTypeSelect" style="width:100%;">${lookupOptions}</select></td>
+      <td><select class="sectionSelect" style="width:100%;">${sectionOptions}</select></td>
     `;
-
     gridBody.appendChild(newRow);
   });
 
@@ -1001,6 +966,7 @@ async function renderContactListSetup(container, portalState) {
     return;
   }
 
+  // Load lookup groups + sections
   const resLookups = await fetch(
     `https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${portalState.setup_project_id}`,
     { cache: "no-cache" }
@@ -1017,6 +983,7 @@ async function renderContactListSetup(container, portalState) {
         .map(l => l.value)
     : [];
 
+  // Render shell
   container.innerHTML = `
     <section class="card">
       <div style="display:flex; align-items:center; justify-content:space-between;">
@@ -1027,7 +994,9 @@ async function renderContactListSetup(container, portalState) {
           <button id="btnSaveListConfig" class="btn-primary">Save Config</button>
         </div>
       </div>
+
       <p>Enable fields for the List view, customize labels, set order, bind lookup groups, and assign sections.</p>
+
       <table id="contactListFieldsGrid" class="notes-table" style="width:100%; margin-top:12px;">
         <thead>
           <tr>
@@ -1046,6 +1015,7 @@ async function renderContactListSetup(container, portalState) {
 
   const gridBody = container.querySelector("#contactListFieldsGrid tbody");
 
+  // Load existing config
   const url =
     `https://lookups-module.dennis-e64.workers.dev/contact_fields?project=${portalState.setup_project_id}`;
   const res = await fetch(url, { cache: "no-cache" });
@@ -1055,6 +1025,61 @@ async function renderContactListSetup(container, portalState) {
     ? data.rows.filter(r => r.contact_tab === "list")
     : [];
 
+  const defaultBtn = container.querySelector("#btnDefaultListMode");
+
+  // ✅ Default Mode only appears when there are NO rows
+  if (configured.length > 0) {
+    defaultBtn.style.display = "none";
+  } else {
+    defaultBtn.style.display = "inline-block";
+
+    defaultBtn.addEventListener("click", () => {
+      const defaults = [
+        { field_key: "search_name", label: "Name", sort_order: 10, section: "General" },
+        { field_key: "first_name", label: "First Name", sort_order: 20, section: "General" },
+        { field_key: "last_name", label: "Last Name", sort_order: 30, section: "General" },
+        { field_key: "business_name", label: "Business Name", sort_order: 40, section: "General" },
+        { field_key: "email", label: "Email", sort_order: 50, section: "General" },
+        { field_key: "contact_type", label: "Contact Type", sort_order: 60, section: "General" },
+        { field_key: "updated_at", label: "Last Updated", sort_order: 70, section: "" }
+      ];
+
+      gridBody.innerHTML = defaults.map(row => {
+        const field = row.field_key;
+        const label = row.label;
+        const order = row.sort_order;
+        const section = row.section;
+        const placeholder = field.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
+        const lookupOptions = [`<option value="">-- none --</option>`]
+          .concat(lookupGroups.map(g => `<option value="${g}">${g}</option>`))
+          .join("");
+
+        const sectionOptions = [`<option value="">-- none --</option>`]
+          .concat(sectionValues.map(s => `<option value="${s}" ${s === section ? "selected" : ""}>${s}</option>`))
+          .join("");
+
+        const systemFieldOptions = [`<option value="">-- select field --</option>`]
+          .concat(CONTACT_FIELD_OPTIONS.map(
+            f => `<option value="${f}" ${f === field ? "selected" : ""}>${f}</option>`
+          ))
+          .join("");
+
+        return `
+          <tr data-field="${field}">
+            <td style="text-align:center;"><input type="checkbox" class="enableCheckbox" checked></td>
+            <td><select class="systemFieldSelect" style="width:100%;">${systemFieldOptions}</select></td>
+            <td><input type="text" class="labelInput" value="${escapeHtml(label)}" placeholder="${escapeHtml(placeholder)}" style="width:100%;"></td>
+            <td><input type="number" class="orderInput" value="${order}" style="width:70px;"></td>
+            <td><select class="lookupTypeSelect" style="width:100%;">${lookupOptions}</select></td>
+            <td><select class="sectionSelect" style="width:100%;">${sectionOptions}</select></td>
+          </tr>
+        `;
+      }).join("");
+    });
+  }
+
+  // ✅ Render existing rows dynamically
   const sortedRows = configured.sort((a, b) => a.sort_order - b.sort_order);
 
   function toTitleCase(field) {
@@ -1073,79 +1098,43 @@ async function renderContactListSetup(container, portalState) {
     const placeholder = toTitleCase(field);
 
     const lookupOptions = [`<option value="">-- none --</option>`]
-      .concat(
-        lookupGroups.map(
-          g => `<option value="${g}" ${boundLookup === g ? "selected" : ""}>${g}</option>`
-        )
-      )
+      .concat(lookupGroups.map(
+        g => `<option value="${g}" ${boundLookup === g ? "selected" : ""}>${g}</option>`
+      ))
       .join("");
 
     const sectionOptions = [`<option value="">-- none --</option>`]
-      .concat(
-        sectionValues.map(
-          s => `<option value="${s}" ${section === s ? "selected" : ""}>${s}</option>`
-        )
-      )
+      .concat(sectionValues.map(
+        s => `<option value="${s}" ${section === s ? "selected" : ""}>${s}</option>`
+      ))
       .join("");
 
     const systemFieldOptions = [`<option value="">-- select field --</option>`]
-      .concat(
-        CONTACT_FIELD_OPTIONS.map(
-          f => `<option value="${f}" ${f === field ? "selected" : ""}>${f}</option>`
-        )
-      )
+      .concat(CONTACT_FIELD_OPTIONS.map(
+        f => `<option value="${f}" ${f === field ? "selected" : ""}>${f}</option>`
+      ))
       .join("");
 
     return `
       <tr data-field="${field}">
-        <td style="text-align:center;">
-          <input type="checkbox" class="enableCheckbox" checked>
-        </td>
-        <td>
-          <select class="systemFieldSelect" style="width:100%;">${systemFieldOptions}</select>
-        </td>
-        <td>
-          <input type="text" class="labelInput"
-                 value="${escapeHtml(label)}"
-                 placeholder="${escapeHtml(placeholder)}"
-                 style="width:100%;">
-        </td>
+        <td style="text-align:center;"><input type="checkbox" class="enableCheckbox" checked></td>
+        <td><select class="systemFieldSelect" style="width:100%;">${systemFieldOptions}</select></td>
+        <td><input type="text" class="labelInput" value="${escapeHtml(label)}" placeholder="${escapeHtml(placeholder)}" style="width:100%;"></td>
         <td><input type="number" class="orderInput" value="${order}" style="width:70px;"></td>
-        <td>
-          <select class="lookupTypeSelect" style="width:100%;">${lookupOptions}</select>
-        </td>
-        <td>
-          <select class="sectionSelect" style="width:100%;">${sectionOptions}</select>
-        </td>
+        <td><select class="lookupTypeSelect" style="width:100%;">${lookupOptions}</select></td>
+        <td><select class="sectionSelect" style="width:100%;">${sectionOptions}</select></td>
       </tr>
     `;
   }).join("");
 
-  // ✅ Default Mode
-  container.querySelector("#btnDefaultListMode").addEventListener("click", () => {
-    const rows = gridBody.querySelectorAll("tr");
-    rows.forEach((tr, idx) => {
-      tr.querySelector(".enableCheckbox").checked = true;
-
-      const labelInput = tr.querySelector(".labelInput");
-      if (!labelInput.value.trim()) {
-        labelInput.value = labelInput.placeholder;
-      }
-
-      tr.querySelector(".orderInput").value = idx + 1;
-    });
-  });
-
   // ✅ Add Field
   container.querySelector("#btnAddListField").addEventListener("click", () => {
     const used = new Set(
-      [...gridBody.querySelectorAll("tr")]
-        .map(tr => {
-          const explicit = tr.dataset.field;
-          const selectVal = tr.querySelector(".systemFieldSelect")?.value;
-          return selectVal || explicit || "";
-        })
-        .filter(Boolean)
+      [...gridBody.querySelectorAll("tr")].map(tr => {
+        const explicit = tr.dataset.field;
+        const selectVal = tr.querySelector(".systemFieldSelect")?.value;
+        return selectVal || explicit || "";
+      }).filter(Boolean)
     );
 
     const available = CONTACT_FIELD_OPTIONS.filter(f => !used.has(f));
@@ -1169,22 +1158,12 @@ async function renderContactListSetup(container, portalState) {
     const newRow = document.createElement("tr");
     newRow.dataset.field = "";
     newRow.innerHTML = `
-      <td style="text-align:center;">
-        <input type="checkbox" class="enableCheckbox" checked>
-      </td>
-      <td>
-        <select class="systemFieldSelect" style="width:100%;">${systemFieldOptions}</select>
-      </td>
-      <td>
-        <input type="text" class="labelInput" placeholder="Label" style="width:100%;">
-      </td>
+      <td style="text-align:center;"><input type="checkbox" class="enableCheckbox" checked></td>
+      <td><select class="systemFieldSelect" style="width:100%;">${systemFieldOptions}</select></td>
+      <td><input type="text" class="labelInput" placeholder="Label" style="width:100%;"></td>
       <td><input type="number" class="orderInput" value="99" style="width:70px;"></td>
-      <td>
-        <select class="lookupTypeSelect" style="width:100%;">${lookupOptions}</select>
-      </td>
-      <td>
-        <select class="sectionSelect" style="width:100%;">${sectionOptions}</select>
-      </td>
+      <td><select class="lookupTypeSelect" style="width:100%;">${lookupOptions}</select></td>
+      <td><select class="sectionSelect" style="width:100%;">${sectionOptions}</select></td>
     `;
     gridBody.appendChild(newRow);
   });
