@@ -98,26 +98,32 @@ export async function loadContactsTab({ portalState, tabContent }) {
 // 🔧 Contact List with dynamic grid based on project_contact_fields
 async function renderContactList(container, portalState) {
   try {
+    // --- Step 1: Capture previous filter values ---
     const prevFirst    = document.getElementById("filter-first")?.value.trim() || "";
     const prevLast     = document.getElementById("filter-last")?.value.trim() || "";
     const prevBusiness = document.getElementById("filter-business")?.value.trim() || "";
     const prevType     = document.getElementById("filter-contact-type")?.value || "";
 
+    // --- Step 2: Build UI ---
     container.innerHTML = `
       <section class="card">
         <h2>Contact List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
+
         <div id="contactsFilters" style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
           <label>First: <input type="text" id="filter-first" value="${escapeHtml(prevFirst)}" /></label>
           <label>Last: <input type="text" id="filter-last" value="${escapeHtml(prevLast)}" /></label>
           <label>Business: <input type="text" id="filter-business" value="${escapeHtml(prevBusiness)}" /></label>
+
           <label>Contact Type:
             <select id="filter-contact-type" class="form-control" style="min-width:160px;">
               <option value="">ALL</option>
             </select>
           </label>
+
           <button id="btnApplyContactsFilter" class="secondary">Apply Filter</button>
           <button id="btnClearContactsFilter" class="secondary">Clear Filter</button>
         </div>
+
         <div id="contactTable">(no contacts found)</div>
       </section>
     `;
@@ -125,7 +131,10 @@ async function renderContactList(container, portalState) {
     const tableDiv   = container.querySelector("#contactTable");
     const typeSelect = document.getElementById("filter-contact-type");
 
-    const resTypes = await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=contact_type&project=${portalState.project}`);
+    // --- Step 3: Populate Contact Type dropdown ---
+    const resTypes = await fetch(
+      `https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=contact_type&project=${portalState.project}`
+    );
     const values = await resTypes.json();
     if (Array.isArray(values)) {
       values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
@@ -138,45 +147,56 @@ async function renderContactList(container, portalState) {
       });
     }
 
+    // --- Sorting state ---
     let currentSortField = null;
-    let currentSortDirection = 'asc';
+    let currentSortDirection = "asc";
     let contacts = [];
     let listFields = [];
 
+    // --- Step 4: Apply filter ---
     async function applyFilter() {
       const first    = document.getElementById("filter-first").value.trim();
       const last     = document.getElementById("filter-last").value.trim();
       const business = document.getElementById("filter-business").value.trim();
       const type     = document.getElementById("filter-contact-type").value;
 
-      if (first.length < 1 && last.length < 1 && business.length < 1 && !type) {
+      if (!first && !last && !business && !type) {
         tableDiv.innerHTML = `<p>(no contacts found — enter at least 1 character)</p>`;
         return;
       }
 
       const params = new URLSearchParams({
         project: portalState.project,
-        first: first,
-        last: last,
-        business: business
+        first,
+        last,
+        business
       });
+
       const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
       const resList = await fetch(url, { cache: "no-cache" });
       contacts = await resList.json();
       if (!Array.isArray(contacts)) contacts = [];
+
       if (type) contacts = contacts.filter(c => c.contact_type === type);
 
-      const fieldsRes = await fetch(`https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${portalState.project}`, { cache: "no-cache" });
+      // Fetch dynamic field config
+      const fieldsRes = await fetch(
+        `https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${portalState.project}`,
+        { cache: "no-cache" }
+      );
       const fieldsData = await fieldsRes.json();
       const fields = Array.isArray(fieldsData.rows) ? fieldsData.rows : [];
       fields.sort((a, b) => a.sort_order - b.sort_order);
+
       listFields = fields.filter(f => f.contact_tab === "list");
 
       renderSortedTable();
     }
 
+    // --- Step 5: Render sorted table ---
     function renderSortedTable() {
       const sorted = [...contacts];
+
       if (currentSortField) {
         sorted.sort((a, b) => {
           const valA = (a[currentSortField] || "").toLowerCase();
@@ -187,10 +207,22 @@ async function renderContactList(container, portalState) {
         });
       }
 
+      // ✅ Always show both arrows (△▽), bold the active one (▲▼)
       const headers = listFields.map(f => {
         const isSorted = currentSortField === f.field_key;
-        const arrow = isSorted ? (currentSortDirection === "asc" ? " ▲" : " ▼") : "";
-        return `<th class="sortable" data-field="${f.field_key}">${escapeHtml(f.label || f.field_key)}${arrow}</th>`;
+
+        const upArrow   = isSorted && currentSortDirection === "asc"  ? "▲" : "△";
+        const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+
+        return `
+          <th class="sortable" data-field="${f.field_key}">
+            ${escapeHtml(f.label || f.field_key)}
+            <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+              <span class="sort-up">${upArrow}</span>
+              <span class="sort-down">${downArrow}</span>
+            </span>
+          </th>
+        `;
       }).join("");
 
       const rows = sorted.map(c => {
@@ -213,39 +245,55 @@ async function renderContactList(container, portalState) {
         </table>
       `;
 
+      // --- Wire select buttons ---
       tableDiv.querySelectorAll(".btn-select").forEach(btn => {
         btn.addEventListener("click", async () => {
           const contactId = btn.dataset.id;
           portalState.selectedContactId = contactId;
-          const res = await fetch(`https://contacts-module.dennis-e64.workers.dev/contacts/details/${contactId}`, { cache: "no-cache" });
+
+          const res = await fetch(
+            `https://contacts-module.dennis-e64.workers.dev/contacts/details/${contactId}`,
+            { cache: "no-cache" }
+          );
           const data = await res.json();
           const contact = Array.isArray(data) ? data[0] : data;
-          portalState.selectedContactName = contact.search_name || `${contact.first_name || ""} ${contact.last_name || ""}`.trim();
+
+          portalState.selectedContactName =
+            contact.search_name ||
+            `${contact.first_name || ""} ${contact.last_name || ""}`.trim();
+
           const contextBar = document.getElementById("contact-context-bar");
           if (contextBar) contextBar.textContent = `Contact: ${portalState.selectedContactName}`;
+
           document.querySelectorAll("#contacts-subtabs button").forEach(b => b.classList.remove("active"));
           const detailsBtn = document.querySelector('#contacts-subtabs button[data-subtab="details"]');
           if (detailsBtn) detailsBtn.classList.add("active");
+
           const content = document.querySelector("#contactsContent");
           await renderContactDetails(content, portalState, contactId);
         });
       });
 
+      // --- Wire sortable headers ---
       tableDiv.querySelectorAll("th.sortable").forEach(th => {
         th.addEventListener("click", () => {
           const field = th.dataset.field;
+
           if (currentSortField === field) {
             currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
           } else {
             currentSortField = field;
             currentSortDirection = "asc";
           }
+
           renderSortedTable();
         });
       });
     }
 
+    // --- Step 6: Wire filter buttons ---
     document.getElementById("btnApplyContactsFilter").addEventListener("click", applyFilter);
+
     document.getElementById("btnClearContactsFilter").addEventListener("click", () => {
       document.getElementById("filter-first").value = "";
       document.getElementById("filter-last").value = "";
@@ -262,6 +310,7 @@ async function renderContactList(container, portalState) {
     console.error("[Contacts] Error in renderContactList:", err);
   }
 }
+
 
 
 // 🔧 Add Contact Form (same structure as Details, but POST + new contact_id)
