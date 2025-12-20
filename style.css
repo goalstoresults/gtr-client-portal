@@ -390,6 +390,23 @@ button {
   border-radius: 4px;
 }
 
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.sort-arrows {
+  opacity: 0.6;
+}
+
+th.sortable:hover .sort-arrows {
+  opacity: 1;
+}
+
+.sort-up, .sort-down {
+  padding: 0 1px;
+}
+
 
 
 /* Right-align numeric/currency columns */
