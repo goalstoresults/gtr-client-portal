@@ -314,8 +314,7 @@ async function renderGroupDetails(container, portalState, groupId) {
   });
 }
 
-// Group Members view
-// Group Members view
+// Group Members view with unified grid sorting (matches Contacts + Groups + Notes)
 async function renderGroupMembers(container, portalState, groupId) {
   if (!portalState.project || !groupId) {
     container.innerHTML = `<section class="card"><p>Select a group to view members.</p></section>`;
@@ -324,8 +323,8 @@ async function renderGroupMembers(container, portalState, groupId) {
 
   // Fetch the group details to get its name
   const groupRes = await fetch(
-  `https://groups-module.dennis-e64.workers.dev/groups/details/${groupId}?project=${portalState.project}`,
-  { cache: "no-cache" }
+    `https://groups-module.dennis-e64.workers.dev/groups/details/${groupId}?project=${portalState.project}`,
+    { cache: "no-cache" }
   );
   const groupData = await groupRes.json();
   const group = Array.isArray(groupData) ? groupData[0] : groupData;
@@ -348,7 +347,7 @@ async function renderGroupMembers(container, portalState, groupId) {
 
   const tableDiv = container.querySelector("#groupMemberTable");
 
-  // Call groups-module /groups/members/:id
+  // Fetch members
   const url = `https://groups-module.dennis-e64.workers.dev/groups/members/${groupId}?project=${portalState.project}&limit=500`;
   const membersRes = await fetch(url, { cache: "no-cache" });
   let contacts = await membersRes.json();
@@ -364,39 +363,95 @@ async function renderGroupMembers(container, portalState, groupId) {
     contacts = contacts.filter(c => (c.business_name || "").toLowerCase().includes(term));
   }
 
-  // Sort alphabetically by contact_name
-  contacts.sort((a, b) => (a.contact_name || "").localeCompare(b.contact_name || ""));
+  // --- Sorting state ---
+  let currentSortField = "contact_name";
+  let currentSortDirection = "asc";
 
-  // Render table
-  tableDiv.innerHTML = `
-    <h4>Showing ${contacts.length} ${prevName || prevBiz ? "filtered" : "members"} contacts</h4>
-    <table class="notes-table">
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Business Name</th>
-          <th>Contact Type</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${contacts.length > 0
-          ? contacts.map(c => `
-              <tr>
-                <td>${escapeHtml(c.contact_name || "")}</td>
-                <td>${escapeHtml(c.business_name || "")}</td>
-                <td>${escapeHtml(c.contact_type || "")}</td>
-              </tr>
-            `).join("")
-          : `<tr><td colspan="3">(no contacts found)</td></tr>`
+  // --- Columns definition ---
+  const columns = [
+    { key: "contact_name", label: "Name" },
+    { key: "business_name", label: "Business Name" },
+    { key: "contact_type", label: "Contact Type" }
+  ];
+
+  function sortMembers() {
+    contacts.sort((a, b) => {
+      let A = a[currentSortField] || "";
+      let B = b[currentSortField] || "";
+
+      A = A.toString().toLowerCase();
+      B = B.toString().toLowerCase();
+
+      return currentSortDirection === "asc"
+        ? A.localeCompare(B)
+        : B.localeCompare(A);
+    });
+  }
+
+  function renderMembersTable() {
+    sortMembers();
+
+    const headerHtml = columns.map(col => {
+      const isSorted = currentSortField === col.key;
+      const upArrow   = isSorted && currentSortDirection === "asc"  ? "▲" : "△";
+      const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+
+      return `
+        <th class="sortable" data-field="${col.key}">
+          ${escapeHtml(col.label)}
+          <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+            <span class="sort-up">${upArrow}</span>
+            <span class="sort-down">${downArrow}</span>
+          </span>
+        </th>
+      `;
+    }).join("");
+
+    const rowsHtml = contacts.map(c => `
+      <tr>
+        <td>${escapeHtml(c.contact_name || "")}</td>
+        <td>${escapeHtml(c.business_name || "")}</td>
+        <td>${escapeHtml(c.contact_type || "")}</td>
+      </tr>
+    `).join("");
+
+    tableDiv.innerHTML = `
+      <h4>Showing ${contacts.length} ${prevName || prevBiz ? "filtered" : "members"} contacts</h4>
+      <table class="notes-table">
+        <thead>
+          <tr>${headerHtml}</tr>
+        </thead>
+        <tbody>
+          ${rowsHtml || `<tr><td colspan="3">(no contacts found)</td></tr>`}
+        </tbody>
+      </table>
+    `;
+
+    // Wire sorting
+    tableDiv.querySelectorAll("th.sortable").forEach(th => {
+      th.addEventListener("click", () => {
+        const field = th.dataset.field;
+
+        if (currentSortField === field) {
+          currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+        } else {
+          currentSortField = field;
+          currentSortDirection = "asc";
         }
-      </tbody>
-    </table>
-  `;
+
+        renderMembersTable();
+      });
+    });
+  }
+
+  // ✅ Initial render
+  renderMembersTable();
 
   // Wire up filter buttons
   document.getElementById("btnApplyMemberFilter").addEventListener("click", () => {
     renderGroupMembers(container, portalState, groupId);
   });
+
   document.getElementById("btnClearMemberFilter").addEventListener("click", () => {
     document.getElementById("filter-member-name").value = "";
     document.getElementById("filter-member-business").value = "";
