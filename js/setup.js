@@ -2,42 +2,18 @@
 
 // Central list of valid contact fields (matches contacts table + derived fields)
 const CONTACT_FIELD_OPTIONS = [
-  "contact_id",
   "first_name",
   "last_name",
   "contact_name",
   "business_name",
   "email",
   "phone",
-  "phone1",
-  "additional_emails",
-  "additional_emails_2",
-  "additional_phones",
-  "additional_phones_2",
   "website",
   "title",
   "source",
   "contact_type",
-  "last_activity",
-  "last_appointment",
-  "last_payment_date",
-  "last_payment_amount",
-  "no_referred_clients",
-  "address_full",
-  "street_address",
-  "city",
-  "state",
-  "postal_code",
-  "loa_sent_date",
-  "loa_signed_date",
-  "onboarding_start_date",
-  "onboarding_completed_date",
-  "group_id",
   "search_name",
-  "search_name_source",
-  "created_at",
   "updated_at",
-  "project"
 ];
 
 // ---------- Utils ----------
