@@ -1001,7 +1001,6 @@ async function renderContactListSetup(container, portalState) {
     return;
   }
 
-  // Load lookup groups for dropdowns
   const resLookups = await fetch(
     `https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${portalState.setup_project_id}`,
     { cache: "no-cache" }
@@ -1018,7 +1017,6 @@ async function renderContactListSetup(container, portalState) {
         .map(l => l.value)
     : [];
 
-  // Render UI
   container.innerHTML = `
     <section class="card">
       <div style="display:flex; align-items:center; justify-content:space-between;">
@@ -1029,9 +1027,7 @@ async function renderContactListSetup(container, portalState) {
           <button id="btnSaveListConfig" class="btn-primary">Save Config</button>
         </div>
       </div>
-
       <p>Enable fields for the List view, customize labels, set order, bind lookup groups, and assign sections.</p>
-
       <table id="contactListFieldsGrid" class="notes-table" style="width:100%; margin-top:12px;">
         <thead>
           <tr>
@@ -1050,7 +1046,6 @@ async function renderContactListSetup(container, portalState) {
 
   const gridBody = container.querySelector("#contactListFieldsGrid tbody");
 
-  // Load existing config
   const url =
     `https://lookups-module.dennis-e64.workers.dev/contact_fields?project=${portalState.setup_project_id}`;
   const res = await fetch(url, { cache: "no-cache" });
@@ -1060,15 +1055,7 @@ async function renderContactListSetup(container, portalState) {
     ? data.rows.filter(r => r.contact_tab === "list")
     : [];
 
-  // Default List fields
-  const listFields = [
-    "search_name",
-    "first_name",
-    "last_name",
-    "business_name",
-    "email",
-    "contact_type"
-  ];
+  const sortedRows = configured.sort((a, b) => a.sort_order - b.sort_order);
 
   function toTitleCase(field) {
     return field
@@ -1077,83 +1064,62 @@ async function renderContactListSetup(container, portalState) {
       .join(" ");
   }
 
-  // Render rows
-  gridBody.innerHTML = listFields
-    .map(field => {
-      const row = configured.find(r => r.field_key === field);
-      const enabled = !!row;
-      const label = row ? row.label : "";
-      const order = row ? row.sort_order : "";
-      const boundLookup = row ? (row.lookup_type || "") : "";
-      const section = row ? (row.section || "") : "";
-      const placeholder = toTitleCase(field);
+  gridBody.innerHTML = sortedRows.map(row => {
+    const field = row.field_key;
+    const label = row.label || "";
+    const order = row.sort_order || "";
+    const boundLookup = row.lookup_type || "";
+    const section = row.section || "";
+    const placeholder = toTitleCase(field);
 
-      const lookupOptions = [`<option value="">-- none --</option>`]
-        .concat(
-          lookupGroups.map(
-            g => `<option value="${g}" ${boundLookup === g ? "selected" : ""}>${g}</option>`
-          )
+    const lookupOptions = [`<option value="">-- none --</option>`]
+      .concat(
+        lookupGroups.map(
+          g => `<option value="${g}" ${boundLookup === g ? "selected" : ""}>${g}</option>`
         )
-        .join("");
+      )
+      .join("");
 
-      const sectionOptions = [`<option value="">-- none --</option>`]
-        .concat(
-          sectionValues.map(
-            s => `<option value="${s}" ${section === s ? "selected" : ""}>${s}</option>`
-          )
+    const sectionOptions = [`<option value="">-- none --</option>`]
+      .concat(
+        sectionValues.map(
+          s => `<option value="${s}" ${section === s ? "selected" : ""}>${s}</option>`
         )
-        .join("");
+      )
+      .join("");
 
-      const systemFieldOptions = [`<option value="">-- select field --</option>`]
-        .concat(
-          CONTACT_FIELD_OPTIONS.map(
-            f => `<option value="${f}" ${f === field ? "selected" : ""}>${f}</option>`
-          )
+    const systemFieldOptions = [`<option value="">-- select field --</option>`]
+      .concat(
+        CONTACT_FIELD_OPTIONS.map(
+          f => `<option value="${f}" ${f === field ? "selected" : ""}>${f}</option>`
         )
-        .join("");
+      )
+      .join("");
 
-      return `
-        <tr data-field="${field}">
-          <td style="text-align:center;">
-            <input type="checkbox" class="enableCheckbox" ${enabled ? "checked" : ""}>
-          </td>
-
-          <td>
-            <select class="systemFieldSelect" style="width:100%;">
-              ${systemFieldOptions}
-            </select>
-          </td>
-
-          <td>
-            <input type="text"
-                   class="labelInput"
-                   value="${escapeHtml(label)}"
-                   placeholder="${escapeHtml(placeholder)}"
-                   style="width:100%;">
-          </td>
-
-          <td>
-            <input type="number"
-                   class="orderInput"
-                   value="${order}"
-                   style="width:70px;">
-          </td>
-
-          <td>
-            <select class="lookupTypeSelect" style="width:100%;">
-              ${lookupOptions}
-            </select>
-          </td>
-
-          <td>
-            <select class="sectionSelect" style="width:100%;">
-              ${sectionOptions}
-            </select>
-          </td>
-        </tr>
-      `;
-    })
-    .join("");
+    return `
+      <tr data-field="${field}">
+        <td style="text-align:center;">
+          <input type="checkbox" class="enableCheckbox" checked>
+        </td>
+        <td>
+          <select class="systemFieldSelect" style="width:100%;">${systemFieldOptions}</select>
+        </td>
+        <td>
+          <input type="text" class="labelInput"
+                 value="${escapeHtml(label)}"
+                 placeholder="${escapeHtml(placeholder)}"
+                 style="width:100%;">
+        </td>
+        <td><input type="number" class="orderInput" value="${order}" style="width:70px;"></td>
+        <td>
+          <select class="lookupTypeSelect" style="width:100%;">${lookupOptions}</select>
+        </td>
+        <td>
+          <select class="sectionSelect" style="width:100%;">${sectionOptions}</select>
+        </td>
+      </tr>
+    `;
+  }).join("");
 
   // ✅ Default Mode
   container.querySelector("#btnDefaultListMode").addEventListener("click", () => {
@@ -1206,34 +1172,20 @@ async function renderContactListSetup(container, portalState) {
       <td style="text-align:center;">
         <input type="checkbox" class="enableCheckbox" checked>
       </td>
-
       <td>
-        <select class="systemFieldSelect" style="width:100%;">
-          ${systemFieldOptions}
-        </select>
+        <select class="systemFieldSelect" style="width:100%;">${systemFieldOptions}</select>
       </td>
-
       <td>
         <input type="text" class="labelInput" placeholder="Label" style="width:100%;">
       </td>
-
+      <td><input type="number" class="orderInput" value="99" style="width:70px;"></td>
       <td>
-        <input type="number" class="orderInput" value="99" style="width:70px;">
+        <select class="lookupTypeSelect" style="width:100%;">${lookupOptions}</select>
       </td>
-
       <td>
-        <select class="lookupTypeSelect" style="width:100%;">
-          ${lookupOptions}
-        </select>
-      </td>
-
-      <td>
-        <select class="sectionSelect" style="width:100%;">
-          ${sectionOptions}
-        </select>
+        <select class="sectionSelect" style="width:100%;">${sectionOptions}</select>
       </td>
     `;
-
     gridBody.appendChild(newRow);
   });
 
@@ -1242,6 +1194,7 @@ async function renderContactListSetup(container, portalState) {
     await saveContactSetup(portalState, "list", gridBody);
   });
 }
+
 
 
 // ---------- Shared save ----------
