@@ -863,6 +863,7 @@ async function renderContactRelationshipsRelated(container, portalState, contact
 async function renderContactRelationshipsReferralSummary(container, portalState, contactId) {
   const base = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${portalState.project}`;
 
+  // Fetch referrals where this contact is the source OR the related contact
   const [asSourceRes, asRelatedRes] = await Promise.all([
     fetch(`${base}&source_contact_id=${contactId}`, { cache: "no-cache" }),
     fetch(`${base}&related_contact_id=${contactId}`, { cache: "no-cache" })
@@ -879,30 +880,41 @@ async function renderContactRelationshipsReferralSummary(container, portalState,
   asRelated = asRelated.filter(r => (r.relationship_type || "").toLowerCase() === "referral");
 
   // ✅ Normalize into a single unified list
-  const combined = [
-    ...asSource.map(r => ({
-      direction: "Outbound",
-      referrer: portalState.selectedContactName,
-      referee: r.related_contact_name || r.related_contact_id,
-      financial: r.financial_referral,
-      created: r.created_at
-    })),
-    ...asRelated.map(r => ({
-      direction: "Inbound",
-      referrer: r.source_contact_name || r.source_contact_id,
-      referee: portalState.selectedContactName,
-      financial: r.financial_referral,
-      created: r.created_at
-    }))
-  ];
+  const outbound = asSource.map(r => ({
+    direction: "Outbound",
+    referredBy: portalState.selectedContactName,
+    referredTo: r.related_contact_name || r.related_contact_id,
+    financial: r.financial_referral,
+    created: r.created_at
+  }));
+
+  const inbound = asRelated.map(r => ({
+    direction: "Inbound",
+    referredBy: r.source_contact_name || r.source_contact_id,
+    referredTo: portalState.selectedContactName,
+    financial: r.financial_referral,
+    created: r.created_at
+  }));
+
+  const combined = [...outbound, ...inbound];
+
+  const inboundCount = inbound.length;
+  const outboundCount = outbound.length;
 
   container.innerHTML = `
+    <h3 style="margin-bottom:8px;">
+      Referral Summary
+      <span style="font-size:0.85em; color:#666;">
+        (Inbound: ${inboundCount}, Outbound: ${outboundCount})
+      </span>
+    </h3>
+
     <table class="notes-table">
       <thead>
         <tr>
           <th>Direction</th>
-          <th>Referrer</th>
-          <th>Referee</th>
+          <th>Referred By</th>
+          <th>Referred To</th>
           <th>Financial</th>
           <th>Created</th>
         </tr>
@@ -912,8 +924,8 @@ async function renderContactRelationshipsReferralSummary(container, portalState,
           ? combined.map(r => `
               <tr>
                 <td>${escapeHtml(r.direction)}</td>
-                <td>${escapeHtml(r.referrer)}</td>
-                <td>${escapeHtml(r.referee)}</td>
+                <td>${escapeHtml(r.referredBy)}</td>
+                <td>${escapeHtml(r.referredTo)}</td>
                 <td>${r.financial ? "✅" : ""}</td>
                 <td>${formatDateTime(r.created)}</td>
               </tr>
@@ -924,6 +936,7 @@ async function renderContactRelationshipsReferralSummary(container, portalState,
     </table>
   `;
 }
+
 
 
 
