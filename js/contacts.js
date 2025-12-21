@@ -973,6 +973,7 @@ async function renderContactRelationshipsReferralSummary(container, portalState,
 
 
 
+
 // 🔧 Relationship Form (Add/Edit)
 // Full, drop-in relationship form (mirrors Notes pattern)
 async function openRelationshipForm(container, portalState, { mode, contactId, relationshipId, fixedSide }) {
