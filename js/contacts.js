@@ -859,7 +859,7 @@ async function renderContactRelationshipsRelated(container, portalState, contact
 async function renderContactRelationshipsReferralSummary(container, portalState, contactId) {
   const base = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${portalState.project}`;
 
-  // Fetch relationships where this contact is the source OR the related contact
+  // Fetch relationships where this contact is either source or related
   const [asSourceRes, asRelatedRes] = await Promise.all([
     fetch(`${base}&source_contact_id=${contactId}`, { cache: "no-cache" }),
     fetch(`${base}&related_contact_id=${contactId}`, { cache: "no-cache" })
@@ -871,32 +871,63 @@ async function renderContactRelationshipsReferralSummary(container, portalState,
   if (!Array.isArray(asSource)) asSource = [];
   if (!Array.isArray(asRelated)) asRelated = [];
 
-  // ✅ Only referrals
-  asSource = asSource.filter(r => (r.relationship_type || "").toLowerCase() === "referral");
-  asRelated = asRelated.filter(r => (r.relationship_type || "").toLowerCase() === "referral");
+  // Merge and keep only referrals
+  let all = [...asSource, ...asRelated];
+  all = all.filter(r => (r.relationship_type || "").toLowerCase() === "referral");
 
-  // ✅ OUTBOUND: this contact is the source (referred BY this contact)
-  const outbound = asSource.map(r => ({
-    direction: "Outbound",
-    referredBy: r.source_contact_name || r.source_contact_id,
-    referredTo: r.related_contact_name || r.related_contact_id,
-    financial: r.financial_referral,
-    created: r.created_at
-  }));
+  const combined = [];
 
-  // ✅ INBOUND: this contact is the related (referred TO this contact)
-  const inbound = asRelated.map(r => ({
-    direction: "Inbound",
-    referredBy: r.source_contact_name || r.source_contact_id,
-    referredTo: r.related_contact_name || r.related_contact_id,
-    financial: r.financial_referral,
-    created: r.created_at
-  }));
+  for (const r of all) {
+    const role = (r.relationship_role || "").toLowerCase();
 
-  const combined = [...outbound, ...inbound];
+    // Determine who actually referred whom
+    let referrerId, referrerName, refereeId, refereeName;
 
-  const inboundCount = inbound.length;
-  const outboundCount = outbound.length;
+    if (role === "referred by") {
+      // Sentence: "This contact was referred by related contact"
+      // => Referrer = related, Referred To = source
+      referrerId = r.related_contact_id;
+      referrerName = r.related_contact_name || r.related_contact_id;
+      refereeId = r.source_contact_id;
+      refereeName = r.source_contact_name || r.source_contact_id;
+    } else if (role === "referred to") {
+      // Sentence: "This contact referred to related contact"
+      // => Referrer = source, Referred To = related
+      referrerId = r.source_contact_id;
+      referrerName = r.source_contact_name || r.source_contact_id;
+      refereeId = r.related_contact_id;
+      refereeName = r.related_contact_name || r.related_contact_id;
+    } else {
+      // Fallback: assume source = referrer, related = referred to
+      referrerId = r.source_contact_id;
+      referrerName = r.source_contact_name || r.source_contact_id;
+      refereeId = r.related_contact_id;
+      refereeName = r.related_contact_name || r.related_contact_id;
+    }
+
+    // Classify direction from the perspective of the *current* contact
+    let direction;
+
+    if (String(contactId) === String(referrerId)) {
+      direction = "Outbound"; // this contact did the referring
+    } else if (String(contactId) === String(refereeId)) {
+      direction = "Inbound"; // this contact was referred by someone
+    } else {
+      // Safety: skip rows that don't actually involve this contact as referrer or referee
+      continue;
+    }
+
+    combined.push({
+      direction,
+      referredBy: referrerName,
+      referredTo: refereeName,
+      financial: r.financial_referral,
+      created: r.created_at
+    });
+  }
+
+  const inboundCount = combined.filter(r => r.direction === "Inbound").length;
+  const outboundCount = combined.filter(r => r.direction === "Outbound").length;
 
   container.innerHTML = `
     <h3 style="margin-bottom:4px;">
