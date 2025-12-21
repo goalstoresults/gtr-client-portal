@@ -159,26 +159,29 @@ async function renderContactList(container, portalState) {
       const last     = document.getElementById("filter-last").value.trim();
       const business = document.getElementById("filter-business").value.trim();
       const type     = document.getElementById("filter-contact-type").value;
-
-      if (!first && !last && !business && !type) {
-        tableDiv.innerHTML = `<p>(no contacts found — enter at least 1 character)</p>`;
+    
+      // ✅ Allow search if first OR last has at least 1 character
+      const hasMinimumInput = first.length >= 1 || last.length >= 1 || business.length >= 1 || type;
+    
+      if (!hasMinimumInput) {
+        tableDiv.innerHTML = `<p>(no contacts found — enter at least 1 character in First or Last)</p>`;
         return;
       }
-
+    
       const params = new URLSearchParams({
         project: portalState.project,
         first,
         last,
         business
       });
-
+    
       const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
       const resList = await fetch(url, { cache: "no-cache" });
       contacts = await resList.json();
       if (!Array.isArray(contacts)) contacts = [];
-
+    
       if (type) contacts = contacts.filter(c => c.contact_type === type);
-
+    
       // Fetch dynamic field config
       const fieldsRes = await fetch(
         `https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${portalState.project}`,
@@ -187,11 +190,12 @@ async function renderContactList(container, portalState) {
       const fieldsData = await fieldsRes.json();
       const fields = Array.isArray(fieldsData.rows) ? fieldsData.rows : [];
       fields.sort((a, b) => a.sort_order - b.sort_order);
-
+    
       listFields = fields.filter(f => f.contact_tab === "list");
-
+    
       renderSortedTable();
     }
+
 
     // --- Step 5: Render sorted table ---
 function renderSortedTable() {
