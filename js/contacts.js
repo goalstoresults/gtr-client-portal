@@ -913,8 +913,8 @@ async function renderContactRelationshipsReferralSummary(container, portalState,
       <thead>
         <tr>
           <th>Direction</th>
-          <th>Referred By</th>
           <th>Referred To</th>
+          <th>Referred By</th>
           <th>Financial</th>
           <th>Created</th>
         </tr>
