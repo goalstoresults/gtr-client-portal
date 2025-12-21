@@ -882,16 +882,16 @@ async function renderContactRelationshipsReferralSummary(container, portalState,
   // ✅ Normalize into a single unified list
   const outbound = asSource.map(r => ({
     direction: "Outbound",
-    referredBy: portalState.selectedContactName,
     referredTo: r.related_contact_name || r.related_contact_id,
+    referredBy: portalState.selectedContactName,
     financial: r.financial_referral,
     created: r.created_at
   }));
 
   const inbound = asRelated.map(r => ({
     direction: "Inbound",
-    referredBy: r.source_contact_name || r.source_contact_id,
     referredTo: portalState.selectedContactName,
+    referredBy: r.source_contact_name || r.source_contact_id,
     financial: r.financial_referral,
     created: r.created_at
   }));
@@ -902,12 +902,17 @@ async function renderContactRelationshipsReferralSummary(container, portalState,
   const outboundCount = outbound.length;
 
   container.innerHTML = `
-    <h3 style="margin-bottom:8px;">
+    <h3 style="margin-bottom:4px;">
       Referral Summary
       <span style="font-size:0.85em; color:#666;">
         (Inbound: ${inboundCount}, Outbound: ${outboundCount})
       </span>
     </h3>
+
+    <div style="font-size:0.85em; color:#666; margin-bottom:10px;">
+      Inbound = referrals made <strong>to</strong> this contact.  
+      Outbound = referrals made <strong>by</strong> this contact.
+    </div>
 
     <table class="notes-table">
       <thead>
@@ -924,8 +929,8 @@ async function renderContactRelationshipsReferralSummary(container, portalState,
           ? combined.map(r => `
               <tr>
                 <td>${escapeHtml(r.direction)}</td>
-                <td>${escapeHtml(r.referredBy)}</td>
                 <td>${escapeHtml(r.referredTo)}</td>
+                <td>${escapeHtml(r.referredBy)}</td>
                 <td>${r.financial ? "✅" : ""}</td>
                 <td>${formatDateTime(r.created)}</td>
               </tr>
