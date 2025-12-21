@@ -706,10 +706,10 @@ async function renderContactRelationships(container, portalState, contactId) {
     </section>
 
     <section class="card" style="margin-top:16px;">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h3>Relationships pointing to this contact</h3>
-        <button id="btnAddRelatedRel" class="btn-primary">Add Relationship</button>
-      </div>
+      <h3>Relationships pointing to this contact</h3>
+      <p style="font-size:0.9em; color:#666; margin-bottom:8px;">
+        These relationships originate from other contacts. To modify them, visit the source contact.
+      </p>
       <div id="contactRelRelatedGrid"></div>
     </section>
   `;
@@ -719,6 +719,7 @@ async function renderContactRelationships(container, portalState, contactId) {
     portalState,
     contactId
   );
+
   await renderContactRelationshipsRelated(
     container.querySelector("#contactRelRelatedGrid"),
     portalState,
@@ -732,16 +733,11 @@ async function renderContactRelationships(container, portalState, contactId) {
       contactId
     })
   );
-
-  container.querySelector("#btnAddRelatedRel").addEventListener("click", () =>
-    openRelationshipForm(container, portalState, {
-      mode: "add",
-      fixedSide: "related",
-      contactId
-    })
-  );
 }
 
+
+
+// ✅ SOURCE GRID — FULLY EDITABLE
 async function renderContactRelationshipsSource(container, portalState, contactId) {
   const url = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${portalState.project}&source_contact_id=${contactId}`;
   const res = await fetch(url, { cache: "no-cache" });
@@ -768,7 +764,7 @@ async function renderContactRelationshipsSource(container, portalState, contactI
                 <td>${escapeHtml(r.relationship_role || "")}</td>
                 <td>${escapeHtml(r.related_contact_name || r.related_contact_id || "")}</td>
                 <td>${r.financial_referral ? "✅" : ""}</td>
-                <td>${escapeHtml(r.created_at || "")}</td>
+                <td>${formatDateTime(r.created_at)}</td>
                 <td>
                   <button class="btn-secondary btn-edit" data-id="${r.id}">Edit</button>
                   <button class="btn-danger btn-delete" data-id="${r.id}">Delete</button>
@@ -781,7 +777,7 @@ async function renderContactRelationshipsSource(container, portalState, contactI
     </table>
   `;
 
-  // ✅ Use tab-level container for form
+  // ✅ Edit
   container.querySelectorAll(".btn-edit").forEach(btn => {
     btn.addEventListener("click", () => {
       const content = document.querySelector("#contactsContent");
@@ -793,6 +789,7 @@ async function renderContactRelationshipsSource(container, portalState, contactI
     });
   });
 
+  // ✅ Delete
   container.querySelectorAll(".btn-delete").forEach(btn => {
     btn.addEventListener("click", async () => {
       if (!confirm("Delete this relationship?")) return;
@@ -805,6 +802,9 @@ async function renderContactRelationshipsSource(container, portalState, contactI
   });
 }
 
+
+
+// ✅ RELATED GRID — READ‑ONLY (NO ADD, NO EDIT, NO DELETE)
 async function renderContactRelationshipsRelated(container, portalState, contactId) {
   const url = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${portalState.project}&related_contact_id=${contactId}`;
   const res = await fetch(url, { cache: "no-cache" });
@@ -831,11 +831,8 @@ async function renderContactRelationshipsRelated(container, portalState, contact
                 <td>${escapeHtml(r.relationship_role || "")}</td>
                 <td>${escapeHtml(r.source_contact_name || r.source_contact_id || "")}</td>
                 <td>${r.financial_referral ? "✅" : ""}</td>
-                <td>${escapeHtml(r.created_at || "")}</td>
-                <td>
-                  <button class="btn-secondary btn-edit" data-id="${r.id}">Edit</button>
-                  <button class="btn-danger btn-delete" data-id="${r.id}">Delete</button>
-                </td>
+                <td>${formatDateTime(r.created_at)}</td>
+                <td style="color:#999;">—</td>
               </tr>
             `).join("")
           : `<tr><td colspan="6">(no relationships)</td></tr>`
@@ -843,30 +840,9 @@ async function renderContactRelationshipsRelated(container, portalState, contact
       </tbody>
     </table>
   `;
-
-  // ✅ Use tab-level container for form
-  container.querySelectorAll(".btn-edit").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const content = document.querySelector("#contactsContent");
-      openRelationshipForm(content, portalState, {
-        mode: "edit",
-        relationshipId: btn.dataset.id,
-        contactId
-      });
-    });
-  });
-
-  container.querySelectorAll(".btn-delete").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      if (!confirm("Delete this relationship?")) return;
-      await fetch(
-        `https://contacts-module.dennis-e64.workers.dev/contact_relationships/${btn.dataset.id}?project=${portalState.project}`,
-        { method: "DELETE" }
-      );
-      await renderContactRelationshipsRelated(container, portalState, contactId);
-    });
-  });
 }
+
+
 
 // 🔧 Relationship Form (Add/Edit)
 // Full, drop-in relationship form (mirrors Notes pattern)
