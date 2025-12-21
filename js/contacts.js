@@ -714,10 +714,6 @@ async function renderContactRelationships(container, portalState, contactId) {
     </section>
 
     <section class="card" style="margin-top:16px;">
-      <h3>Referral Summary</h3>
-      <p style="font-size:0.9em; color:#666; margin-bottom:8px;">
-        This summary shows all referrals involving this contact, regardless of direction.
-      </p>
       <div id="contactRelReferralGrid"></div>
     </section>
   `;
