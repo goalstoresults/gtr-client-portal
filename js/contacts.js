@@ -712,6 +712,14 @@ async function renderContactRelationships(container, portalState, contactId) {
       </p>
       <div id="contactRelRelatedGrid"></div>
     </section>
+
+    <section class="card" style="margin-top:16px;">
+      <h3>Referral Summary</h3>
+      <p style="font-size:0.9em; color:#666; margin-bottom:8px;">
+        This summary shows all referrals involving this contact, regardless of direction.
+      </p>
+      <div id="contactRelReferralGrid"></div>
+    </section>
   `;
 
   await renderContactRelationshipsSource(
@@ -722,6 +730,12 @@ async function renderContactRelationships(container, portalState, contactId) {
 
   await renderContactRelationshipsRelated(
     container.querySelector("#contactRelRelatedGrid"),
+    portalState,
+    contactId
+  );
+
+  await renderContactRelationshipsReferralSummary(
+    container.querySelector("#contactRelReferralGrid"),
     portalState,
     contactId
   );
@@ -811,6 +825,9 @@ async function renderContactRelationshipsRelated(container, portalState, contact
   let rows = await res.json();
   if (!Array.isArray(rows)) rows = [];
 
+  // ✅ EXCLUDE REFERRALS
+  rows = rows.filter(r => (r.relationship_type || "").toLowerCase() !== "referral");
+
   container.innerHTML = `
     <table class="notes-table">
       <thead>
@@ -836,6 +853,72 @@ async function renderContactRelationshipsRelated(container, portalState, contact
               </tr>
             `).join("")
           : `<tr><td colspan="6">(no relationships)</td></tr>`
+        }
+      </tbody>
+    </table>
+  `;
+}
+
+
+async function renderContactRelationshipsReferralSummary(container, portalState, contactId) {
+  const base = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${portalState.project}`;
+
+  const [asSourceRes, asRelatedRes] = await Promise.all([
+    fetch(`${base}&source_contact_id=${contactId}`, { cache: "no-cache" }),
+    fetch(`${base}&related_contact_id=${contactId}`, { cache: "no-cache" })
+  ]);
+
+  let asSource = await asSourceRes.json();
+  let asRelated = await asRelatedRes.json();
+
+  if (!Array.isArray(asSource)) asSource = [];
+  if (!Array.isArray(asRelated)) asRelated = [];
+
+  // ✅ Only referrals
+  asSource = asSource.filter(r => (r.relationship_type || "").toLowerCase() === "referral");
+  asRelated = asRelated.filter(r => (r.relationship_type || "").toLowerCase() === "referral");
+
+  // ✅ Normalize into a single unified list
+  const combined = [
+    ...asSource.map(r => ({
+      direction: "Outbound",
+      referrer: portalState.selectedContactName,
+      referee: r.related_contact_name || r.related_contact_id,
+      financial: r.financial_referral,
+      created: r.created_at
+    })),
+    ...asRelated.map(r => ({
+      direction: "Inbound",
+      referrer: r.source_contact_name || r.source_contact_id,
+      referee: portalState.selectedContactName,
+      financial: r.financial_referral,
+      created: r.created_at
+    }))
+  ];
+
+  container.innerHTML = `
+    <table class="notes-table">
+      <thead>
+        <tr>
+          <th>Direction</th>
+          <th>Referrer</th>
+          <th>Referee</th>
+          <th>Financial</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${combined.length > 0
+          ? combined.map(r => `
+              <tr>
+                <td>${escapeHtml(r.direction)}</td>
+                <td>${escapeHtml(r.referrer)}</td>
+                <td>${escapeHtml(r.referee)}</td>
+                <td>${r.financial ? "✅" : ""}</td>
+                <td>${formatDateTime(r.created)}</td>
+              </tr>
+            `).join("")
+          : `<tr><td colspan="5">(no referrals)</td></tr>`
         }
       </tbody>
     </table>
