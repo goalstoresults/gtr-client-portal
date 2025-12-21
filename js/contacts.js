@@ -964,6 +964,8 @@ async function renderContactRelationshipsReferralSummary(container, portalState,
 
 // 🔧 Relationship Form (Add/Edit)
 // Full, drop-in relationship form (mirrors Notes pattern)
+// 🔧 Relationship Form (Add/Edit)
+// Full, drop-in relationship form (mirrors Notes pattern)
 async function openRelationshipForm(container, portalState, { mode, contactId, relationshipId, fixedSide }) {
   const projectId = portalState.project;
   if (!projectId) {
@@ -989,10 +991,10 @@ async function openRelationshipForm(container, portalState, { mode, contactId, r
       { cache: "no-cache" }
     );
     const rows = await res.json().catch(() => []);
-    relationship = Array.isArray(rows) ? rows[0] : rows; // handle array or single object
+    relationship = Array.isArray(rows) ? rows[0] : rows;
   }
 
-  // Step 2: fetch contacts for name resolution (same approach as Notes)
+  // Step 2: fetch contacts for name resolution
   const contactsRes = await fetch(
     `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${encodeURIComponent(projectId)}&limit=500`,
     { cache: "no-cache" }
@@ -1010,104 +1012,111 @@ async function openRelationshipForm(container, portalState, { mode, contactId, r
   const sourceName  = contactMap[sourceId]  || sourceId || "(unknown)";
   const relatedName = contactMap[relatedId] || relatedId || "(unknown)";
 
- // Step 4: build form HTML
-container.innerHTML = `
-  <section class="card">
-    <h3>${mode === "edit" ? "Edit Relationship" : "Add Relationship"}</h3>
-    <form id="relationshipForm">
-      <div class="row" style="gap:12px; align-items:center;">
-        <label style="min-width:160px;">Source contact</label>
-        <input type="hidden" name="source_contact_id" value="${escapeHtml(sourceId)}">
-        <span class="muted">${escapeHtml(sourceName)}</span>
-      </div>
+  // Step 4: build form HTML
+  container.innerHTML = `
+    <section class="card">
+      <h3>${mode === "edit" ? "Edit Relationship" : "Add Relationship"}</h3>
+      <form id="relationshipForm">
+        <div class="row" style="gap:12px; align-items:center;">
+          <label style="min-width:160px;">Source contact</label>
+          <input type="hidden" name="source_contact_id" value="${escapeHtml(sourceId)}">
+          <span class="muted">${escapeHtml(sourceName)}</span>
+        </div>
 
-      <div class="row" style="gap:12px; align-items:center;">
-        <label style="min-width:160px;">Related contact</label>
-        <input type="hidden" name="related_contact_id" value="${escapeHtml(relatedId)}">
-        <span class="muted">${escapeHtml(relatedName)}</span>
-        <button type="button" class="secondary" id="btnPickRelated">Pick</button>
-      </div>
+        <div class="row" style="gap:12px; align-items:center;">
+          <label style="min-width:160px;">Related contact</label>
+          <input type="hidden" name="related_contact_id" value="${escapeHtml(relatedId)}">
+          <span class="muted">${escapeHtml(relatedName)}</span>
+          <button type="button" class="secondary" id="btnPickRelated">Pick</button>
+        </div>
 
-      <div class="row" style="gap:12px;">
-        <label style="min-width:160px;">Relationship type</label>
-        <select name="relationship_type" id="relTypeSelect" class="form-control">
-          <option value="">-- Select Type --</option>
-        </select>
-      </div>
+        <div class="row" style="gap:12px;">
+          <label style="min-width:160px;">Relationship type</label>
+          <select name="relationship_type" id="relTypeSelect" class="form-control">
+            <option value="">-- Select Type --</option>
+          </select>
+        </div>
 
-      <div class="row" style="gap:12px;">
-        <label style="min-width:160px;">Relationship role</label>
-        <select name="relationship_role" id="relRoleSelect" class="form-control">
-          <option value="">-- Select Role --</option>
-        </select>
-      </div>
+        <div class="row" style="gap:12px;">
+          <label style="min-width:160px;">Relationship role</label>
+          <select name="relationship_role" id="relRoleSelect" class="form-control">
+            <option value="">-- Select Role --</option>
+          </select>
+        </div>
 
-      <div class="row" style="gap:12px; align-items:center;">
-        <label style="min-width:160px;">Financial referral</label>
-        <input type="checkbox" name="financial_referral" ${relationship?.financial_referral ? "checked" : ""}>
-      </div>
+        <div class="row" style="gap:12px; align-items:center;">
+          <label style="min-width:160px;">Financial referral</label>
+          <input type="checkbox" name="financial_referral" ${relationship?.financial_referral ? "checked" : ""}>
+        </div>
 
-      <div class="row" style="gap:12px;">
-        <label style="min-width:160px;">Notes</label>
-        <textarea name="notes" rows="3" style="width:100%;">${escapeHtml(relationship?.notes || "")}</textarea>
-      </div>
+        <div class="row" style="gap:12px;">
+          <label style="min-width:160px;">Notes</label>
+          <textarea name="notes" rows="3" style="width:100%;">${escapeHtml(relationship?.notes || "")}</textarea>
+        </div>
 
-      <div style="margin-top:16px; display:flex; gap:12px;">
-        <button type="submit" class="btn-primary">${mode === "edit" ? "Save changes" : "Add relationship"}</button>
-        <button type="button" class="btn-secondary" id="btnCancel">Cancel</button>
-      </div>
-    </form>
+        <div style="margin-top:16px; display:flex; gap:12px;">
+          <button type="submit" class="btn-primary">${mode === "edit" ? "Save changes" : "Add relationship"}</button>
+          <button type="button" class="btn-secondary" id="btnCancel">Cancel</button>
+        </div>
+      </form>
 
-    <section id="relatedPicker" class="card" style="display:none; margin-top:16px;">
-      <h4>Find related contact</h4>
-      <div class="row" style="gap:8px; margin-bottom:8px;">
-        <input id="rel-first" placeholder="First name">
-        <input id="rel-last" placeholder="Last name">
-        <button id="btnFindRel" class="primary">Find</button>
-      </div>
-      <div id="relResults" class="muted">(enter a name and click Find)</div>
+      <section id="relatedPicker" class="card" style="display:none; margin-top:16px;">
+        <h4>Find related contact</h4>
+        <div class="row" style="gap:8px; margin-bottom:8px;">
+          <input id="rel-first" placeholder="First name">
+          <input id="rel-last" placeholder="Last name">
+          <button id="btnFindRel" class="primary">Find</button>
+        </div>
+        <div id="relResults" class="muted">(enter a name and click Find)</div>
+      </section>
     </section>
-  </section>
-`;
+  `;
 
-// Populate Relationship Type dropdown
-const typeSelect = document.getElementById("relTypeSelect");
-fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=relationship_type&project=${projectId}`)
-  .then(r => r.json())
-  .then(values => {
-    if (!Array.isArray(values)) return;
-    values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
-    values.forEach(v => {
-      const opt = document.createElement("option");
-      opt.value = v.value;
-      opt.textContent = v.label || v.value;
-      if (v.value === relationship?.relationship_type) opt.selected = true;
-      typeSelect.appendChild(opt);
+  // Populate Relationship Type dropdown
+  const typeSelect = document.getElementById("relTypeSelect");
+  fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=relationship_type&project=${projectId}`)
+    .then(r => r.json())
+    .then(values => {
+      if (!Array.isArray(values)) return;
+      values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
+      values.forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = v.value;
+        opt.textContent = v.label || v.value;
+        if (v.value === relationship?.relationship_type) opt.selected = true;
+        typeSelect.appendChild(opt);
+      });
     });
+
+  // ✅ AUTO‑CHECK FINANCIAL REFERRAL WHEN TYPE = REFERRAL
+  typeSelect.addEventListener("change", () => {
+    if (typeSelect.value === "Referral") {
+      document.querySelector('input[name="financial_referral"]').checked = true;
+    }
   });
 
-// Populate Relationship Role dropdown
-const roleSelect = document.getElementById("relRoleSelect");
-fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=relationship_role&project=${projectId}`)
-  .then(r => r.json())
-  .then(values => {
-    if (!Array.isArray(values)) return;
-    values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
-    values.forEach(v => {
-      const opt = document.createElement("option");
-      opt.value = v.value;
-      opt.textContent = v.label || v.value;
-      if (v.value === relationship?.relationship_role) opt.selected = true;
-      roleSelect.appendChild(opt);
+  // Populate Relationship Role dropdown
+  const roleSelect = document.getElementById("relRoleSelect");
+  fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=relationship_role&project=${projectId}`)
+    .then(r => r.json())
+    .then(values => {
+      if (!Array.isArray(values)) return;
+      values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
+      values.forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = v.value;
+        opt.textContent = v.label || v.value;
+        if (v.value === relationship?.relationship_role) opt.selected = true;
+        roleSelect.appendChild(opt);
+      });
     });
-  });
 
   // Step 5: wire cancel
   document.getElementById("btnCancel")?.addEventListener("click", () => {
     renderContactRelationships(container, portalState, contactId);
   });
 
-  // Step 6: wire pick related (inline search like Notes)
+  // Step 6: wire pick related
   document.getElementById("btnPickRelated")?.addEventListener("click", () => {
     const picker = document.getElementById("relatedPicker");
     picker.style.display = picker.style.display === "none" ? "block" : "none";
@@ -1147,7 +1156,6 @@ fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=relatio
           }).join("")
         : "<div class='muted'>No contacts found.</div>";
 
-      // attach pick handlers
       relResults.querySelectorAll(".contact-result").forEach(el => {
         el.addEventListener("click", () => {
           const id = el.dataset.id;
@@ -1167,7 +1175,7 @@ fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=relatio
     }
   });
 
-  // Step 7: submit handler (POST for add, PATCH for edit)
+  // Step 7: submit handler
   document.getElementById("relationshipForm")?.addEventListener("submit", async e => {
     e.preventDefault();
     const form = e.currentTarget;
@@ -1204,16 +1212,17 @@ fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=relatio
         return;
       }
 
-        alert("✅ Relationship saved.");
-        container.innerHTML = ""; // clear form layout
-        await renderContactRelationships(container, portalState, contactId);
-        container.scrollIntoView({ behavior: "smooth", block: "start" });
+      alert("✅ Relationship saved.");
+      container.innerHTML = "";
+      await renderContactRelationships(container, portalState, contactId);
+      container.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
       alert("Error saving relationship: " + err.message);
       console.error(err);
     }
   });
 }
+
 
 async function renderContactNotes(container, portalState, contactId) {
   if (!portalState.project || !contactId) {
