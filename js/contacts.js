@@ -859,7 +859,7 @@ async function renderContactRelationshipsRelated(container, portalState, contact
 async function renderContactRelationshipsReferralSummary(container, portalState, contactId) {
   const base = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${portalState.project}`;
 
-  // Fetch referrals where this contact is the source OR the related contact
+  // Fetch relationships where this contact is the source OR the related contact
   const [asSourceRes, asRelatedRes] = await Promise.all([
     fetch(`${base}&source_contact_id=${contactId}`, { cache: "no-cache" }),
     fetch(`${base}&related_contact_id=${contactId}`, { cache: "no-cache" })
@@ -875,19 +875,20 @@ async function renderContactRelationshipsReferralSummary(container, portalState,
   asSource = asSource.filter(r => (r.relationship_type || "").toLowerCase() === "referral");
   asRelated = asRelated.filter(r => (r.relationship_type || "").toLowerCase() === "referral");
 
-  // ✅ Normalize into a single unified list
+  // ✅ OUTBOUND: this contact is the source (referred BY this contact)
   const outbound = asSource.map(r => ({
     direction: "Outbound",
+    referredBy: r.source_contact_name || r.source_contact_id,
     referredTo: r.related_contact_name || r.related_contact_id,
-    referredBy: portalState.selectedContactName,
     financial: r.financial_referral,
     created: r.created_at
   }));
 
+  // ✅ INBOUND: this contact is the related (referred TO this contact)
   const inbound = asRelated.map(r => ({
     direction: "Inbound",
-    referredTo: portalState.selectedContactName,
     referredBy: r.source_contact_name || r.source_contact_id,
+    referredTo: r.related_contact_name || r.related_contact_id,
     financial: r.financial_referral,
     created: r.created_at
   }));
@@ -925,8 +926,8 @@ async function renderContactRelationshipsReferralSummary(container, portalState,
           ? combined.map(r => `
               <tr>
                 <td>${escapeHtml(r.direction)}</td>
-                <td>${escapeHtml(r.referredTo)}</td>
                 <td>${escapeHtml(r.referredBy)}</td>
+                <td>${escapeHtml(r.referredTo)}</td>
                 <td>${r.financial ? "✅" : ""}</td>
                 <td>${formatDateTime(r.created)}</td>
               </tr>
