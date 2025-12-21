@@ -855,11 +855,9 @@ async function renderContactRelationshipsRelated(container, portalState, contact
   `;
 }
 
-
 async function renderContactRelationshipsReferralSummary(container, portalState, contactId) {
   const base = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${portalState.project}`;
 
-  // Fetch relationships where this contact is either source or related
   const [asSourceRes, asRelatedRes] = await Promise.all([
     fetch(`${base}&source_contact_id=${contactId}`, { cache: "no-cache" }),
     fetch(`${base}&related_contact_id=${contactId}`, { cache: "no-cache" })
@@ -871,56 +869,41 @@ async function renderContactRelationshipsReferralSummary(container, portalState,
   if (!Array.isArray(asSource)) asSource = [];
   if (!Array.isArray(asRelated)) asRelated = [];
 
-  // Merge and keep only referrals
-  let all = [...asSource, ...asRelated];
-  all = all.filter(r => (r.relationship_type || "").toLowerCase() === "referral");
+  // ✅ Only referrals
+  let all = [...asSource, ...asRelated].filter(
+    r => (r.relationship_type || "").toLowerCase() === "referral"
+  );
 
   const combined = [];
 
   for (const r of all) {
-    const role = (r.relationship_role || "").toLowerCase();
+    const sourceId = r.source_contact_id;
+    const relatedId = r.related_contact_id;
 
-    // Determine who actually referred whom
-    let referrerId, referrerName, refereeId, refereeName;
+    const sourceName = r.source_contact_name || sourceId;
+    const relatedName = r.related_contact_name || relatedId;
 
-    if (role === "referred by") {
-      // Sentence: "This contact was referred by related contact"
-      // => Referrer = related, Referred To = source
-      referrerId = r.related_contact_id;
-      referrerName = r.related_contact_name || r.related_contact_id;
-      refereeId = r.source_contact_id;
-      refereeName = r.source_contact_name || r.source_contact_id;
-    } else if (role === "referred to") {
-      // Sentence: "This contact referred to related contact"
-      // => Referrer = source, Referred To = related
-      referrerId = r.source_contact_id;
-      referrerName = r.source_contact_name || r.source_contact_id;
-      refereeId = r.related_contact_id;
-      refereeName = r.related_contact_name || r.related_contact_id;
-    } else {
-      // Fallback: assume source = referrer, related = referred to
-      referrerId = r.source_contact_id;
-      referrerName = r.source_contact_name || r.source_contact_id;
-      refereeId = r.related_contact_id;
-      refereeName = r.related_contact_name || r.related_contact_id;
-    }
+    // ✅ Your rules:
+    // Referred By = related_contact
+    // Referred To = source_contact
+    const referredBy = relatedName;
+    const referredTo = sourceName;
 
-    // Classify direction from the perspective of the *current* contact
     let direction;
 
-    if (String(contactId) === String(referrerId)) {
-      direction = "Outbound"; // this contact did the referring
-    } else if (String(contactId) === String(refereeId)) {
-      direction = "Inbound"; // this contact was referred by someone
+    // ✅ Direction based ONLY on which column the current contact is in
+    if (String(contactId) === String(sourceId)) {
+      direction = "Inbound";   // this contact was referred TO
+    } else if (String(contactId) === String(relatedId)) {
+      direction = "Outbound";  // this contact referred someone else
     } else {
-      // Safety: skip rows that don't actually involve this contact as referrer or referee
-      continue;
+      continue; // shouldn't happen, but safety
     }
 
     combined.push({
       direction,
-      referredBy: referrerName,
-      referredTo: refereeName,
+      referredBy,
+      referredTo,
       financial: r.financial_referral,
       created: r.created_at
     });
@@ -938,8 +921,8 @@ async function renderContactRelationshipsReferralSummary(container, portalState,
     </h3>
 
     <div style="font-size:0.85em; color:#666; margin-bottom:10px;">
-      Inbound = referrals made <strong>to</strong> this contact.  
-      Outbound = referrals made <strong>by</strong> this contact.
+      Inbound = this contact was <strong>referred to</strong> by someone.<br>
+      Outbound = this contact <strong>referred someone else</strong>.
     </div>
 
     <table class="notes-table">
@@ -969,6 +952,7 @@ async function renderContactRelationshipsReferralSummary(container, portalState,
     </table>
   `;
 }
+
 
 
 
