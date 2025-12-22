@@ -108,7 +108,11 @@ async function renderFinancialAdd(container, portalState) {
 async function renderAddPaymentForm(formArea, portalState, contact) {
   formArea.innerHTML = `
     <section class="card">
-      <h3>Add Payment for ${escapeHtml(contact.search_name || contact.contact_id)}</h3>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+        <h3 style="margin:0;">Add Payment for ${escapeHtml(contact.search_name || contact.contact_id)}</h3>
+        <button id="btnSavePayment" class="btn-primary">Save</button>
+      </div>
+
       <div class="notes-row">
         <label class="notes-label">Amount</label>
         <input id="paymentAmount" class="form-control" type="number" step="0.01" />
@@ -121,7 +125,6 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
         <label class="notes-label">Invoice #</label>
         <input id="invoiceNumber" class="form-control" />
       </div>
-      <button id="btnSavePayment" class="btn-primary">Save</button>
     </section>
   `;
 
