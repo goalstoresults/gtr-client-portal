@@ -8,6 +8,13 @@ window.autoMatchContact = async function(id) {
   loadStagingData();
 };
 
+window.loadStagingData = async function() {
+  const res = await fetch(`https://financials-module.dennis-e64.workers.dev/staging/list?project=snf`);
+  const rows = await res.json();
+  renderStagingGrid(rows);
+};
+
+
 export async function loadFinancialsTab({ portalState, tabContent }) {
   // Load base HTML template
   const res = await fetch("./components/financials.html", { cache: "no-cache" });
