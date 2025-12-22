@@ -470,22 +470,43 @@ function renderStagingGrid(rows) {
   const container = document.getElementById("stagingGrid");
   container.innerHTML = "";
 
-  rows.forEach(row => {
-    const div = document.createElement("div");
-    div.className = "staging-row";
+  if (!rows.length) {
+    container.innerHTML = "<p>No staging rows found.</p>";
+    return;
+  }
 
-    div.innerHTML = `
-      <div>${row.customer_name}</div>
-      <div>${row.invoice_number || ""}</div>
-      <div>${row.payment_date || ""}</div>
-      <div>${row.payment_amount || ""}</div>
-      <div>${row.contact_id || "(none)"}</div>
-      <button onclick="autoMatchContact('${row.id}')">Populate</button>
-    `;
+  const table = document.createElement("table");
+  table.style = "width:100%; border-collapse:collapse; margin-top:12px;";
+  table.innerHTML = `
+    <thead>
+      <tr style="background:#f0f0f0;">
+        <th style="text-align:left; padding:6px;">Customer Name</th>
+        <th style="text-align:left; padding:6px;">Invoice #</th>
+        <th style="text-align:left; padding:6px;">Date</th>
+        <th style="text-align:left; padding:6px;">Amount</th>
+        <th style="text-align:left; padding:6px;">Contact ID</th>
+        <th style="text-align:left; padding:6px;">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows.map(row => `
+        <tr>
+          <td style="padding:6px;">${row.customer_name}</td>
+          <td style="padding:6px;">${row.invoice_number || ""}</td>
+          <td style="padding:6px;">${row.payment_date || ""}</td>
+          <td style="padding:6px;">${row.payment_amount || ""}</td>
+          <td style="padding:6px;">${row.contact_id || "(none)"}</td>
+          <td style="padding:6px;">
+            <button onclick="autoMatchContact('${row.id}')">Populate</button>
+          </td>
+        </tr>
+      `).join("")}
+    </tbody>
+  `;
 
-    container.appendChild(div);
-  });
+  container.appendChild(table);
 }
+
 
 async function autoMatchContact(id) {
   const res = await fetch(`https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=snf`);
