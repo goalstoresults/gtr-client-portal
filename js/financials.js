@@ -14,6 +14,30 @@ window.loadStagingData = async function() {
   renderStagingGrid(rows);
 };
 
+// ------------------------------------------------------------
+// FRONTEND: Canonical call to backend payment insert
+// ------------------------------------------------------------
+async function addPaymentWithReferral({ project, contact_id, payment_amount, payment_date, invoice_number }) {
+  const res = await fetch(`https://financials-module.dennis-e64.workers.dev/payments/add`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      project,
+      contact_id,
+      payment_amount,
+      payment_date,
+      invoice_number
+    })
+  });
+
+  if (!res.ok) {
+    throw new Error("Payment insert failed");
+  }
+
+  return await res.json();
+}
+
+
 
 export async function loadFinancialsTab({ portalState, tabContent }) {
   // Load base HTML template
