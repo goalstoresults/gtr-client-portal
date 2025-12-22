@@ -208,6 +208,17 @@ window.fixRow = async function(id) {
   };
 };
 
+function closeModal(modal) {
+  if (modal && modal.remove) {
+    modal.remove();
+  }
+}
+
+
+window.refreshStagingGrid = function() {
+  loadStagingData();
+};
+
 
 window.loadStagingData = async function() {
   const container = document.getElementById("stagingGrid");
