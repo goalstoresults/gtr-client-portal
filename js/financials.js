@@ -162,19 +162,20 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
       return;
     }
 
-    await fetch(`https://financials-module.dennis-e64.workers.dev/payments/add?project=${portalState.project}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    try {
+      await addPaymentWithReferral({
+        project: portalState.project,
         contact_id: contact.contact_id,
         payment_amount: parseFloat(amount),
         payment_date: date,
-        invoice_number: invoice || null,
-        project: portalState.project
-      })
-    });
+        invoice_number: invoice || null
+      });
 
-    alert("Payment added");
+      alert("Payment added");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to add payment");
+    }
   });
 }
 
