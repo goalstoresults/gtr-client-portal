@@ -749,24 +749,25 @@ function renderStagingGrid(rows) {
 
   const table = document.createElement("table");
   table.style = "width:100%; border-collapse:collapse; margin-top:12px;";
+
   table.innerHTML = `
     <thead>
-      <tr style="background:#f0f0f0;">
-        <th style="padding:6px;">Customer</th>
-        <th style="padding:6px;">Invoice #</th>
-        <th style="padding:6px;">Date</th>
-        <th style="padding:6px;">Amount</th>
-        <th style="padding:6px;">Contact ID</th>
-        <th style="padding:6px;">Status</th>
-        <th style="padding:6px;">Error</th>
-        <th style="padding:6px;">Action</th>
+      <tr style="background:#f0f0f0; cursor:pointer;">
+        <th data-col="customer_name" class="sortable">Customer <span class="arrow">↕</span></th>
+        <th data-col="invoice_number" class="sortable">Invoice # <span class="arrow">↕</span></th>
+        <th data-col="payment_date" class="sortable">Date <span class="arrow">↕</span></th>
+        <th data-col="payment_amount" class="sortable">Amount <span class="arrow">↕</span></th>
+        <th data-col="contact_id" class="sortable">Contact ID <span class="arrow">↕</span></th>
+        <th data-col="status" class="sortable">Status <span class="arrow">↕</span></th>
+        <th>Error</th>
+        <th>Action</th>
       </tr>
     </thead>
     <tbody>
       ${rows
         .map(
-          (row) => `
-        <tr id="row-${row.id}">
+          (row, i) => `
+        <tr id="row-${row.id}" style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};">
           <td style="padding:6px;">${row.customer_name || ""}</td>
           <td style="padding:6px;">${row.invoice_number || ""}</td>
           <td style="padding:6px;">${row.payment_date || ""}</td>
@@ -789,7 +790,33 @@ function renderStagingGrid(rows) {
   document
     .getElementById("refreshStagingGrid")
     .addEventListener("click", loadStagingData);
+
+  // Sorting logic
+  const headers = table.querySelectorAll("th.sortable");
+  headers.forEach((header) => {
+    header.addEventListener("click", () => {
+      const col = header.getAttribute("data-col");
+      const arrow = header.querySelector(".arrow");
+      const isAsc = arrow.textContent === "↑";
+
+      // Flip arrow
+      arrow.textContent = isAsc ? "↓" : "↑";
+
+      // Sort rows
+      rows.sort((a, b) => {
+        const valA = a[col] || "";
+        const valB = b[col] || "";
+        return isAsc
+          ? String(valB).localeCompare(String(valA))
+          : String(valA).localeCompare(String(valB));
+      });
+
+      // Re-render
+      renderStagingGrid(rows);
+    });
+  });
 }
+
 
 function renderStagingActionButton(row) {
   switch (row.status) {
