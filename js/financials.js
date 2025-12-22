@@ -105,8 +105,6 @@ async function renderFinancialAdd(container, portalState) {
   });
 }
 
-
-
 async function renderAddPaymentForm(formArea, portalState, contact) {
   formArea.innerHTML = `
     <section class="card">
@@ -127,10 +125,10 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
     </section>
   `;
 
-  document.getElementById("btnSavePayment").addEventListener("click", async () => {
-    const amount = document.getElementById("paymentAmount").value.trim();
-    const date = document.getElementById("paymentDate").value.trim();
-    const invoice = document.getElementById("invoiceNumber").value.trim();
+  formArea.querySelector("#btnSavePayment").addEventListener("click", async () => {
+    const amount = formArea.querySelector("#paymentAmount").value.trim();
+    const date = formArea.querySelector("#paymentDate").value.trim();
+    const invoice = formArea.querySelector("#invoiceNumber").value.trim();
 
     if (!amount || !date) {
       alert("Amount and Date are required");
@@ -152,6 +150,9 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
     alert("Payment added");
   });
 }
+
+
+
 
 
 /* ---------- Bulk Add ---------- */
