@@ -4,15 +4,231 @@
 import { escapeHtml, renderContactPicker } from "./utilities.js";
 
 window.autoMatchContact = async function(id) {
-  await fetch(`https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=snf`);
-  loadStagingData();
+  const btn = document.querySelector(`#row-${id} .action-cell button`);
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Matching...";
+  }
+
+  const res = await fetch(
+    `https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=snf`
+  );
+  const data = await res.json();
+
+  // Find the row in the DOM
+  const rowEl = document.querySelector(`#row-${id}`);
+  if (!rowEl) return;
+
+  const actionCell = rowEl.querySelector(".action-cell");
+  const contactCell = rowEl.querySelector(".contact-cell");
+  const statusCell = rowEl.querySelector(".status-cell");
+
+  if (res.ok && data?.contact_id) {
+    // Update contact_id cell
+    if (contactCell) contactCell.textContent = data.contact_id;
+
+    // Update status cell
+    if (statusCell) {
+      statusCell.textContent = "matched";
+      statusCell.style.color = "green";
+    }
+
+    // Replace action button with Insert
+    if (actionCell) {
+      actionCell.innerHTML = `
+        <button onclick="insertStagingRow('${id}')">Insert</button>
+      `;
+    }
+  } else {
+    // No match found
+    if (statusCell) {
+      statusCell.textContent = "no match";
+      statusCell.style.color = "red";
+    }
+
+    if (actionCell) {
+      actionCell.innerHTML = `
+        <span style="color:red;">No match found</span>
+      `;
+    }
+  }
 };
 
+window.insertStagingRow = async function(id) {
+  const rowEl = document.querySelector(`#row-${id}`);
+  if (!rowEl) return;
+
+  const actionCell = rowEl.querySelector(".action-cell");
+  const statusCell = rowEl.querySelector(".status-cell");
+  const errorCell = rowEl.querySelector(".error-cell");
+
+  if (actionCell) {
+    actionCell.innerHTML = `<span style="color:#555;">Inserting...</span>`;
+  }
+
+  // Call backend to insert this staging row
+  const res = await fetch(
+    `https://financials-module.dennis-e64.workers.dev/payments/add-from-staging?id=${id}&project=snf`,
+    { method: "POST" }
+  );
+
+  let data = {};
+  try {
+    data = await res.json();
+  } catch {
+    data = {};
+  }
+
+  if (res.ok) {
+    // SUCCESS
+    if (statusCell) {
+      statusCell.textContent = "imported";
+      statusCell.style.color = "green";
+    }
+
+    if (errorCell) {
+      errorCell.textContent = "";
+    }
+
+    if (actionCell) {
+      actionCell.innerHTML = `<span style="color:green;">Imported</span>`;
+    }
+  } else {
+    // FAILURE
+    const msg = data.error || "Insert failed";
+
+    if (statusCell) {
+      statusCell.textContent = "error";
+      statusCell.style.color = "red";
+    }
+
+    if (errorCell) {
+      errorCell.textContent = msg;
+    }
+
+    if (actionCell) {
+      actionCell.innerHTML = `
+        <button onclick="fixRow('${id}')">Fix Row</button>
+      `;
+    }
+  }
+};
+
+window.fixRow = async function(id) {
+  const rowEl = document.querySelector(`#row-${id}`);
+  if (!rowEl) return;
+
+  const customer = rowEl.children[0].textContent.trim();
+  const invoice = rowEl.children[1].textContent.trim();
+  const date = rowEl.children[2].textContent.trim();
+  const amount = rowEl.children[3].textContent.trim();
+  const contact = rowEl.querySelector(".contact-cell").textContent.trim();
+
+  // Build modal
+  const modal = document.createElement("div");
+  modal.style = `
+    position:fixed; top:0; left:0; width:100%; height:100%;
+    background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center;
+    z-index:9999;
+  `;
+
+  modal.innerHTML = `
+    <div style="background:white; padding:20px; width:360px; border-radius:6px;">
+      <h3>Fix Row</h3>
+
+      <label>Customer Name</label>
+      <input id="fix_customer" class="form-control" value="${customer}" />
+
+      <label style="margin-top:10px;">Invoice #</label>
+      <input id="fix_invoice" class="form-control" value="${invoice}" />
+
+      <label style="margin-top:10px;">Payment Date</label>
+      <input id="fix_date" class="form-control" type="date" value="${date}" />
+
+      <label style="margin-top:10px;">Amount</label>
+      <input id="fix_amount" class="form-control" type="number" step="0.01" value="${amount}" />
+
+      <label style="margin-top:10px;">Contact ID</label>
+      <input id="fix_contact" class="form-control" value="${contact === "(none)" ? "" : contact}" />
+
+      <div style="margin-top:16px; display:flex; justify-content:flex-end; gap:10px;">
+        <button id="fix_cancel">Cancel</button>
+        <button id="fix_save" class="btn-primary">Save</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  // Cancel
+  modal.querySelector("#fix_cancel").onclick = () => modal.remove();
+
+  // Save
+  modal.querySelector("#fix_save").onclick = async () => {
+    const updated = {
+      id,
+      customer_name: document.getElementById("fix_customer").value.trim(),
+      invoice_number: document.getElementById("fix_invoice").value.trim(),
+      payment_date: document.getElementById("fix_date").value.trim(),
+      payment_amount: document.getElementById("fix_amount").value.trim(),
+      contact_id: document.getElementById("fix_contact").value.trim() || null,
+      status: "ready",
+      error_message: ""
+    };
+
+    // Send update to backend
+    await fetch(
+      `https://financials-module.dennis-e64.workers.dev/staging/update?project=snf`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated)
+      }
+    );
+
+    // Update row inline
+    rowEl.children[0].textContent = updated.customer_name;
+    rowEl.children[1].textContent = updated.invoice_number;
+    rowEl.children[2].textContent = updated.payment_date;
+    rowEl.children[3].textContent = updated.payment_amount;
+    rowEl.querySelector(".contact-cell").textContent =
+      updated.contact_id || "(none)";
+
+    const statusCell = rowEl.querySelector(".status-cell");
+    statusCell.textContent = "ready";
+    statusCell.style.color = "orange";
+
+    const errorCell = rowEl.querySelector(".error-cell");
+    errorCell.textContent = "";
+
+    const actionCell = rowEl.querySelector(".action-cell");
+    actionCell.innerHTML = `<button onclick="insertStagingRow('${id}')">Insert</button>`;
+
+    modal.remove();
+  };
+};
+
+
 window.loadStagingData = async function() {
-  const res = await fetch(`https://financials-module.dennis-e64.workers.dev/staging/list?project=snf`);
-  const rows = await res.json();
+  const container = document.getElementById("stagingGrid");
+  if (container) {
+    container.innerHTML = `<p style="padding:8px;">Loading staging data...</p>`;
+  }
+
+  const res = await fetch(
+    `https://financials-module.dennis-e64.workers.dev/staging/list?project=snf`
+  );
+
+  let rows = [];
+  try {
+    rows = await res.json();
+  } catch {
+    rows = [];
+  }
+
   renderStagingGrid(rows);
 };
+
 
 // ------------------------------------------------------------
 // FRONTEND: Canonical call to backend payment insert
@@ -509,10 +725,14 @@ async function renderFinancialSummary(container, portalState) {
 
 function renderStagingGrid(rows) {
   const container = document.getElementById("stagingGrid");
-  container.innerHTML = "";
+  container.innerHTML = `
+    <div style="margin-bottom:10px;">
+      <button id="refreshStagingGrid" class="btn-primary">Refresh Grid</button>
+    </div>
+  `;
 
   if (!rows.length) {
-    container.innerHTML = "<p>No staging rows found.</p>";
+    container.innerHTML += "<p>No staging rows found.</p>";
     return;
   }
 
@@ -521,31 +741,61 @@ function renderStagingGrid(rows) {
   table.innerHTML = `
     <thead>
       <tr style="background:#f0f0f0;">
-        <th style="text-align:left; padding:6px;">Customer Name</th>
-        <th style="text-align:left; padding:6px;">Invoice #</th>
-        <th style="text-align:left; padding:6px;">Date</th>
-        <th style="text-align:left; padding:6px;">Amount</th>
-        <th style="text-align:left; padding:6px;">Contact ID</th>
-        <th style="text-align:left; padding:6px;">Action</th>
+        <th style="padding:6px;">Customer</th>
+        <th style="padding:6px;">Invoice #</th>
+        <th style="padding:6px;">Date</th>
+        <th style="padding:6px;">Amount</th>
+        <th style="padding:6px;">Contact ID</th>
+        <th style="padding:6px;">Status</th>
+        <th style="padding:6px;">Error</th>
+        <th style="padding:6px;">Action</th>
       </tr>
     </thead>
     <tbody>
-      ${rows.map(row => `
-        <tr>
-          <td style="padding:6px;">${row.customer_name}</td>
+      ${rows
+        .map(
+          (row) => `
+        <tr id="row-${row.id}">
+          <td style="padding:6px;">${row.customer_name || ""}</td>
           <td style="padding:6px;">${row.invoice_number || ""}</td>
           <td style="padding:6px;">${row.payment_date || ""}</td>
           <td style="padding:6px;">${row.payment_amount || ""}</td>
-          <td style="padding:6px;">${row.contact_id || "(none)"}</td>
-          <td style="padding:6px;">
-            <button onclick="autoMatchContact('${row.id}')">Populate</button>
+          <td class="contact-cell" style="padding:6px;">${row.contact_id || "(none)"}</td>
+          <td class="status-cell" style="padding:6px;">${row.status || ""}</td>
+          <td class="error-cell" style="padding:6px; color:red;">${row.error_message || ""}</td>
+          <td class="action-cell" style="padding:6px;">
+            ${renderStagingActionButton(row)}
           </td>
         </tr>
-      `).join("")}
+      `
+        )
+        .join("")}
     </tbody>
   `;
 
   container.appendChild(table);
+
+  document
+    .getElementById("refreshStagingGrid")
+    .addEventListener("click", loadStagingData);
+}
+
+function renderStagingActionButton(row) {
+  switch (row.status) {
+    case "uploaded":
+      return `<button onclick="autoMatchContact('${row.id}')">Populate</button>`;
+    case "matched":
+    case "ready":
+      return `<button onclick="insertStagingRow('${row.id}')">Insert</button>`;
+    case "error":
+      return `<button onclick="fixRow('${row.id}')">Fix Row</button>`;
+    case "imported":
+      return `<span style="color:green;">Imported</span>`;
+    case "skipped":
+      return `<span style="color:gray;">Skipped</span>`;
+    default:
+      return "";
+  }
 }
 
 
