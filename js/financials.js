@@ -68,20 +68,18 @@ async function renderFinancialAdd(container, portalState) {
       <div id="contactPickerArea"></div>
     </section>
 
-    <!-- ✅ Add Bulk button placed AFTER the card -->
+    <!-- ✅ Review Bulk Data button -->
     <div style="margin-top:16px;">
-      <button id="btnBulkAdd" class="btn-primary" style="background-color:#007bff;">Add Bulk</button>
+      <button id="btnLoadStaging" class="btn-primary" style="background-color:#007bff;">
+        Review Bulk Data
+      </button>
     </div>
 
-    <!-- Bulk import area (initially hidden) -->
-    <div id="bulkAddArea" style="display:none; margin-top:12px;">
-      <p>Upload a CSV file with columns: Customer Name, Invoice Number, Payment Date, Payment Amount.</p>
-      <input id="bulkFileInput" type="file" accept=".csv,.json" />
-      <button id="btnStartBulk" class="btn-primary">Start Import</button>
-    </div>
+    <!-- ✅ Staging grid area -->
+    <div id="stagingGrid" style="margin-top:16px;"></div>
   `;
 
-  // Render contact picker inside the card
+  // ✅ Render contact picker inside the card (unchanged)
   const pickerArea = document.getElementById("contactPickerArea");
   await renderContactPicker(pickerArea, portalState, async (contact) => {
     const formArea = document.createElement("div");
@@ -89,18 +87,12 @@ async function renderFinancialAdd(container, portalState) {
     container.appendChild(formArea);
   });
 
-  // Wire up Add Bulk button
-  document.getElementById("btnBulkAdd").addEventListener("click", () => {
-    const bulkArea = document.getElementById("bulkAddArea");
-    bulkArea.style.display = bulkArea.style.display === "none" ? "block" : "none";
-    bulkArea.scrollIntoView({ behavior: "smooth" });
-  });
-
-  // Wire up Start Import button
-  document.getElementById("btnStartBulk").addEventListener("click", () => {
-    startBulkImport(portalState);
+  // ✅ Wire up Review Bulk Data button
+  document.getElementById("btnLoadStaging").addEventListener("click", () => {
+    loadStagingData();
   });
 }
+
 
 
 async function renderAddPaymentForm(formArea, portalState, contact) {
@@ -473,6 +465,43 @@ async function renderFinancialSummary(container, portalState) {
 
   renderTable();
 }
+
+function renderStagingGrid(rows) {
+  const container = document.getElementById("stagingGrid");
+  container.innerHTML = "";
+
+  rows.forEach(row => {
+    const div = document.createElement("div");
+    div.className = "staging-row";
+
+    div.innerHTML = `
+      <div>${row.customer_name}</div>
+      <div>${row.invoice_number || ""}</div>
+      <div>${row.payment_date || ""}</div>
+      <div>${row.payment_amount || ""}</div>
+      <div>${row.contact_id || "(none)"}</div>
+      <button onclick="autoMatchContact('${row.id}')">Populate</button>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+async function autoMatchContact(id) {
+  const res = await fetch(`https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=snf`);
+  const data = await res.json();
+
+  // Reload grid to show updated contact_id
+  loadStagingData();
+}
+
+
+async function loadStagingData() {
+  const res = await fetch(`https://financials-module.dennis-e64.workers.dev/staging/list?project=snf`);
+  const rows = await res.json();
+  renderStagingGrid(rows);
+}
+
 
 
 function formatDateTimeFull(value) {
