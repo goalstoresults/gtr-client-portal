@@ -3,6 +3,11 @@
 
 import { escapeHtml, renderContactPicker } from "./utilities.js";
 
+window.autoMatchContact = async function(id) {
+  await fetch(`https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=snf`);
+  loadStagingData();
+};
+
 export async function loadFinancialsTab({ portalState, tabContent }) {
   // Load base HTML template
   const res = await fetch("./components/financials.html", { cache: "no-cache" });
