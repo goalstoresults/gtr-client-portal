@@ -636,7 +636,10 @@ async function renderFinancialList(container, portalState) {
 
 
 
-/* ---------- Summary ---------- */
+/* =========================================================
+   SUMMARY MODULE (FULL REPLACEMENT)
+========================================================= */
+
 async function renderFinancialSummary(container, portalState) {
   container.innerHTML = `
     <section class="card">
@@ -665,7 +668,6 @@ async function renderFinancialSummary(container, portalState) {
   await loadSummaryYears(portalState);
   await loadSummaryData(portalState);
 
-  // Wire filter changes
   document.getElementById("summaryType").addEventListener("change", () => {
     loadSummaryData(portalState);
   });
@@ -674,6 +676,10 @@ async function renderFinancialSummary(container, portalState) {
     loadSummaryData(portalState);
   });
 }
+
+/* =========================================================
+   LOAD YEARS
+========================================================= */
 
 async function loadSummaryYears(portalState) {
   const yearSelect = document.getElementById("summaryYear");
@@ -693,8 +699,7 @@ async function loadSummaryYears(portalState) {
   const years = new Set();
   for (const p of payments) {
     if (p.payment_date) {
-      const y = new Date(p.payment_date).getFullYear();
-      years.add(y);
+      years.add(new Date(p.payment_date).getFullYear());
     }
   }
 
@@ -706,23 +711,44 @@ async function loadSummaryYears(portalState) {
   });
 }
 
+/* =========================================================
+   LOAD SUMMARY DATA
+========================================================= */
+
 async function loadSummaryData(portalState) {
   const type = document.getElementById("summaryType").value;
   const year = document.getElementById("summaryYear").value;
 
-  const res = await fetch(
+  // Fetch payments
+  const payRes = await fetch(
     `https://financials-module.dennis-e64.workers.dev/payments/list?project=${portalState.project}&limit=2000`,
     { cache: "no-cache" }
   );
-
   let payments = [];
   try {
-    payments = await res.json();
+    payments = await payRes.json();
   } catch {
     payments = [];
   }
 
-  // Filter by year if needed
+  // Fetch contacts for name lookup
+  const contactsRes = await fetch(
+    `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}&limit=2000`,
+    { cache: "no-cache" }
+  );
+  let contacts = [];
+  try {
+    contacts = await contactsRes.json();
+  } catch {
+    contacts = [];
+  }
+
+  const nameById = new Map();
+  for (const c of contacts) {
+    nameById.set(c.contact_id, c.search_name || c.contact_name || c.contact_id);
+  }
+
+  // Filter by year
   if (year !== "all") {
     payments = payments.filter(p => {
       if (!p.payment_date) return false;
@@ -734,36 +760,40 @@ async function loadSummaryData(portalState) {
 
   switch (type) {
     case "client":
-      summaryRows = summarizeByClient(payments);
+      summaryRows = summarizeByClient(payments, nameById);
       break;
     case "referral":
-      summaryRows = summarizeByReferral(payments);
+      summaryRows = summarizeByReferral(payments, nameById);
       break;
     case "year":
       summaryRows = summarizeByYear(payments);
       break;
     case "year_client":
-      summaryRows = summarizeByYearClient(payments);
+      summaryRows = summarizeByYearClient(payments, nameById);
       break;
     case "year_referral":
-      summaryRows = summarizeByYearReferral(payments);
+      summaryRows = summarizeByYearReferral(payments, nameById);
       break;
   }
 
   renderSummaryGrid(summaryRows, type);
 }
 
-function summarizeByClient(payments) {
+/* =========================================================
+   SUMMARY LOGIC
+========================================================= */
+
+function summarizeByClient(payments, nameById) {
   const map = new Map();
 
   for (const p of payments) {
     const key = p.contact_id;
     if (!map.has(key)) {
       map.set(key, {
-        contact_id: p.contact_id,
+        client_name: nameById.get(p.contact_id) || "(unknown)",
+        referral_name: nameById.get(p.referral_id) || "(none)",
         total_amount: 0,
-        count: 0,
-        referral_id: p.referral_id
+        count: 0
       });
     }
     const row = map.get(key);
@@ -774,14 +804,14 @@ function summarizeByClient(payments) {
   return [...map.values()];
 }
 
-function summarizeByReferral(payments) {
+function summarizeByReferral(payments, nameById) {
   const map = new Map();
 
   for (const p of payments) {
     const key = p.referral_id;
     if (!map.has(key)) {
       map.set(key, {
-        referral_id: p.referral_id,
+        referral_name: nameById.get(p.referral_id) || "(none)",
         total_amount: 0,
         count: 0,
         clients: new Set()
@@ -830,7 +860,7 @@ function summarizeByYear(payments) {
   }));
 }
 
-function summarizeByYearClient(payments) {
+function summarizeByYearClient(payments, nameById) {
   const map = new Map();
 
   for (const p of payments) {
@@ -841,33 +871,8 @@ function summarizeByYearClient(payments) {
     if (!map.has(key)) {
       map.set(key, {
         year,
-        contact_id: p.contact_id,
-        total_amount: 0,
-        count: 0,
-        referral_id: p.referral_id
-      });
-    }
-
-    const row = map.get(key);
-    row.total_amount += Number(p.payment_amount) || 0;
-    row.count++;
-  }
-
-  return [...map.values()];
-}
-
-function summarizeByYearReferral(payments) {
-  const map = new Map();
-
-  for (const p of payments) {
-    if (!p.payment_date) continue;
-    const year = new Date(p.payment_date).getFullYear();
-    const key = `${year}-${p.referral_id}`;
-
-    if (!map.has(key)) {
-      map.set(key, {
-        year,
-        referral_id: p.referral_id,
+        client_name: nameById.get(p.contact_id) || "(unknown)",
+        referral_name: nameById.get(p.referral_id) || "(none)",
         total_amount: 0,
         count: 0
       });
@@ -881,6 +886,35 @@ function summarizeByYearReferral(payments) {
   return [...map.values()];
 }
 
+function summarizeByYearReferral(payments, nameById) {
+  const map = new Map();
+
+  for (const p of payments) {
+    if (!p.payment_date) continue;
+    const year = new Date(p.payment_date).getFullYear();
+    const key = `${year}-${p.referral_id}`;
+
+    if (!map.has(key)) {
+      map.set(key, {
+        year,
+        referral_name: nameById.get(p.referral_id) || "(none)",
+        total_amount: 0,
+        count: 0
+      });
+    }
+
+    const row = map.get(key);
+    row.total_amount += Number(p.payment_amount) || 0;
+    row.count++;
+  }
+
+  return [...map.values()];
+}
+
+/* =========================================================
+   RENDER SUMMARY GRID (SORTABLE)
+========================================================= */
+
 function renderSummaryGrid(rows, type) {
   const container = document.getElementById("summaryGrid");
 
@@ -889,38 +923,128 @@ function renderSummaryGrid(rows, type) {
     return;
   }
 
-  let columns = [];
+  // Column definitions
+  const columnSets = {
+    client: [
+      { key: "client_name", label: "Client" },
+      { key: "total_amount", label: "Total Amount", numeric: true },
+      { key: "count", label: "Count", numeric: true },
+      { key: "referral_name", label: "Referral" }
+    ],
+    referral: [
+      { key: "referral_name", label: "Referral" },
+      { key: "total_amount", label: "Total Amount", numeric: true },
+      { key: "count", label: "Count", numeric: true },
+      { key: "clients", label: "Clients", numeric: true }
+    ],
+    year: [
+      { key: "year", label: "Year", numeric: true },
+      { key: "total_amount", label: "Total Amount", numeric: true },
+      { key: "count", label: "Count", numeric: true },
+      { key: "clients", label: "Clients", numeric: true },
+      { key: "referrals", label: "Referrals", numeric: true }
+    ],
+    year_client: [
+      { key: "year", label: "Year", numeric: true },
+      { key: "client_name", label: "Client" },
+      { key: "total_amount", label: "Total Amount", numeric: true },
+      { key: "count", label: "Count", numeric: true },
+      { key: "referral_name", label: "Referral" }
+    ],
+    year_referral: [
+      { key: "year", label: "Year", numeric: true },
+      { key: "referral_name", label: "Referral" },
+      { key: "total_amount", label: "Total Amount", numeric: true },
+      { key: "count", label: "Count", numeric: true }
+    ]
+  };
 
-  switch (type) {
-    case "client":
-      columns = ["Client", "Total Amount", "Count", "Referral"];
-      break;
-    case "referral":
-      columns = ["Referral", "Total Amount", "Count", "Clients"];
-      break;
-    case "year":
-      columns = ["Year", "Total Amount", "Count", "Clients", "Referrals"];
-      break;
-    case "year_client":
-      columns = ["Year", "Client", "Total Amount", "Count", "Referral"];
-      break;
-    case "year_referral":
-      columns = ["Year", "Referral", "Total Amount", "Count"];
-      break;
+  const columns = columnSets[type];
+
+  // Sorting state
+  let currentSortField = columns[0].key;
+  let currentSortDirection = "asc";
+
+  function sortRows() {
+    rows.sort((a, b) => {
+      let A = a[currentSortField];
+      let B = b[currentSortField];
+
+      if (columns.find(c => c.key === currentSortField)?.numeric) {
+        A = Number(A) || 0;
+        B = Number(B) || 0;
+      } else {
+        A = (A || "").toString().toLowerCase();
+        B = (B || "").toString().toLowerCase();
+      }
+
+      if (A < B) return currentSortDirection === "asc" ? -1 : 1;
+      if (A > B) return currentSortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
   }
 
-  // TODO: Replace with your sortable grid renderer
-  container.innerHTML = `
-    <table class="notes-table">
-      <thead>
-        <tr>${columns.map(c => `<th>${c}</th>`).join("")}</tr>
-      </thead>
-      <tbody>
-        ${rows.map(r => `<tr>${Object.values(r).map(v => `<td>${v}</td>`).join("")}</tr>`).join("")}
-      </tbody>
-    </table>
-  `;
+  function formatCurrency(n) {
+    return `$${Number(n).toFixed(2)}`;
+  }
+
+  function render() {
+    sortRows();
+
+    const headerHtml = columns.map(col => {
+      const isSorted = currentSortField === col.key;
+      const upArrow = isSorted && currentSortDirection === "asc" ? "▲" : "△";
+      const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+
+      return `
+        <th class="sortable" data-field="${col.key}">
+          ${col.label}
+          <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+            <span class="sort-up">${upArrow}</span>
+            <span class="sort-down">${downArrow}</span>
+          </span>
+        </th>
+      `;
+    }).join("");
+
+    const rowsHtml = rows.map((r, i) => `
+      <tr style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};">
+        ${columns.map(col => {
+          let val = r[col.key];
+          if (col.numeric && col.key === "total_amount") {
+            val = formatCurrency(val);
+          }
+          return `<td style="${col.numeric ? "text-align:right;" : ""}">${val}</td>`;
+        }).join("")}
+      </tr>
+    `).join("");
+
+    container.innerHTML = `
+      <table class="notes-table" style="width:100%; border-collapse:collapse;">
+        <thead><tr>${headerHtml}</tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    `;
+
+    container.querySelectorAll("th.sortable").forEach(th => {
+      th.addEventListener("click", () => {
+        const field = th.dataset.field;
+
+        if (currentSortField === field) {
+          currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+        } else {
+          currentSortField = field;
+          currentSortDirection = "asc";
+        }
+
+        render();
+      });
+    });
+  }
+
+  render();
 }
+
 
 
 
