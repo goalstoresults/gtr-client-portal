@@ -914,7 +914,6 @@ function summarizeByYearReferral(payments, nameById) {
 /* =========================================================
    RENDER SUMMARY GRID (SORTABLE)
 ========================================================= */
-
 function renderSummaryGrid(rows, type) {
   const container = document.getElementById("summaryGrid");
 
@@ -923,45 +922,49 @@ function renderSummaryGrid(rows, type) {
     return;
   }
 
-  // Column definitions
+  /* =========================================================
+     COLUMN DEFINITIONS (UPDATED LABELS)
+  ========================================================= */
   const columnSets = {
     client: [
       { key: "client_name", label: "Client" },
       { key: "total_amount", label: "Total Amount", numeric: true },
-      { key: "count", label: "Count", numeric: true },
+      { key: "count", label: "# of Payments", numeric: true },
       { key: "referral_name", label: "Referral" }
     ],
     referral: [
       { key: "referral_name", label: "Referral" },
       { key: "total_amount", label: "Total Amount", numeric: true },
-      { key: "count", label: "Count", numeric: true },
-      { key: "clients", label: "Clients", numeric: true }
+      { key: "count", label: "# of Payments", numeric: true },
+      { key: "clients", label: "# of Clients", numeric: true }
     ],
     year: [
       { key: "year", label: "Year", numeric: true },
       { key: "total_amount", label: "Total Amount", numeric: true },
-      { key: "count", label: "Count", numeric: true },
-      { key: "clients", label: "Clients", numeric: true },
-      { key: "referrals", label: "Referrals", numeric: true }
+      { key: "count", label: "# of Payments", numeric: true },
+      { key: "clients", label: "# of Clients", numeric: true },
+      { key: "referrals", label: "# of Referrals", numeric: true }
     ],
     year_client: [
       { key: "year", label: "Year", numeric: true },
       { key: "client_name", label: "Client" },
       { key: "total_amount", label: "Total Amount", numeric: true },
-      { key: "count", label: "Count", numeric: true },
+      { key: "count", label: "# of Payments", numeric: true },
       { key: "referral_name", label: "Referral" }
     ],
     year_referral: [
       { key: "year", label: "Year", numeric: true },
       { key: "referral_name", label: "Referral" },
       { key: "total_amount", label: "Total Amount", numeric: true },
-      { key: "count", label: "Count", numeric: true }
+      { key: "count", label: "# of Payments", numeric: true }
     ]
   };
 
   const columns = columnSets[type];
 
-  // Sorting state
+  /* =========================================================
+     SORTING STATE
+  ========================================================= */
   let currentSortField = columns[0].key;
   let currentSortDirection = "asc";
 
@@ -970,7 +973,9 @@ function renderSummaryGrid(rows, type) {
       let A = a[currentSortField];
       let B = b[currentSortField];
 
-      if (columns.find(c => c.key === currentSortField)?.numeric) {
+      const col = columns.find(c => c.key === currentSortField);
+
+      if (col?.numeric) {
         A = Number(A) || 0;
         B = Number(B) || 0;
       } else {
@@ -984,13 +989,44 @@ function renderSummaryGrid(rows, type) {
     });
   }
 
+  /* =========================================================
+     CURRENCY FORMATTER
+  ========================================================= */
   function formatCurrency(n) {
-    return `$${Number(n).toFixed(2)}`;
+    return Number(n).toLocaleString("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
   }
 
+  /* =========================================================
+     TOTALS CALCULATION (ONLY NUMERIC EXCEPT YEAR)
+  ========================================================= */
+  function computeTotals(rows, columns) {
+    const totals = {};
+
+    for (const col of columns) {
+      if (col.numeric && col.key !== "year") {
+        totals[col.key] = rows.reduce((sum, r) => {
+          return sum + (Number(r[col.key]) || 0);
+        }, 0);
+      }
+    }
+
+    return totals;
+  }
+
+  /* =========================================================
+     RENDER FUNCTION
+  ========================================================= */
   function render() {
     sortRows();
 
+    const totals = computeTotals(rows, columns);
+
+    /* ---------- HEADER ---------- */
     const headerHtml = columns.map(col => {
       const isSorted = currentSortField === col.key;
       const upArrow = isSorted && currentSortDirection === "asc" ? "▲" : "△";
@@ -1007,25 +1043,49 @@ function renderSummaryGrid(rows, type) {
       `;
     }).join("");
 
+    /* ---------- BODY ROWS ---------- */
     const rowsHtml = rows.map((r, i) => `
       <tr style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};">
         ${columns.map(col => {
           let val = r[col.key];
+
           if (col.numeric && col.key === "total_amount") {
             val = formatCurrency(val);
           }
+
           return `<td style="${col.numeric ? "text-align:right;" : ""}">${val}</td>`;
         }).join("")}
       </tr>
     `).join("");
 
+    /* ---------- TOTALS ROW ---------- */
+    const totalsRowHtml = `
+      <tr style="background:#e8f0fe; font-weight:bold;">
+        ${columns.map(col => {
+          if (col.numeric && col.key !== "year") {
+            const val = col.key === "total_amount"
+              ? formatCurrency(totals[col.key])
+              : totals[col.key].toLocaleString("en-US");
+
+            return `<td style="text-align:right;">${val}</td>`;
+          }
+          return `<td></td>`;
+        }).join("")}
+      </tr>
+    `;
+
+    /* ---------- FINAL TABLE ---------- */
     container.innerHTML = `
       <table class="notes-table" style="width:100%; border-collapse:collapse;">
         <thead><tr>${headerHtml}</tr></thead>
-        <tbody>${rowsHtml}</tbody>
+        <tbody>
+          ${rowsHtml}
+          ${totalsRowHtml}
+        </tbody>
       </table>
     `;
 
+    /* ---------- SORT EVENTS ---------- */
     container.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
@@ -1044,9 +1104,6 @@ function renderSummaryGrid(rows, type) {
 
   render();
 }
-
-
-
 
 
 
