@@ -747,74 +747,113 @@ function renderStagingGrid(rows) {
     return;
   }
 
-  const table = document.createElement("table");
-  table.style = "width:100%; border-collapse:collapse; margin-top:12px;";
+  // Sorting state
+  let currentSortField = "payment_date";
+  let currentSortDirection = "asc";
 
-  table.innerHTML = `
-    <thead>
-      <tr style="background:#f0f0f0; cursor:pointer;">
-        <th data-col="customer_name" class="sortable">Customer <span class="arrow">↕</span></th>
-        <th data-col="invoice_number" class="sortable">Invoice # <span class="arrow">↕</span></th>
-        <th data-col="payment_date" class="sortable">Date <span class="arrow">↕</span></th>
-        <th data-col="payment_amount" class="sortable">Amount <span class="arrow">↕</span></th>
-        <th data-col="contact_id" class="sortable">Contact ID <span class="arrow">↕</span></th>
-        <th data-col="status" class="sortable">Status <span class="arrow">↕</span></th>
-        <th>Error</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${rows
-        .map(
-          (row, i) => `
-        <tr id="row-${row.id}" style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};">
-          <td style="padding:6px;">${row.customer_name || ""}</td>
-          <td style="padding:6px;">${row.invoice_number || ""}</td>
-          <td style="padding:6px;">${row.payment_date || ""}</td>
-          <td style="padding:6px;">${row.payment_amount || ""}</td>
-          <td class="contact-cell" style="padding:6px;">${row.contact_id || "(none)"}</td>
-          <td class="status-cell" style="padding:6px;">${row.status || ""}</td>
-          <td class="error-cell" style="padding:6px; color:red;">${row.error_message || ""}</td>
-          <td class="action-cell" style="padding:6px;">
-            ${renderStagingActionButton(row)}
-          </td>
-        </tr>
-      `
-        )
-        .join("")}
-    </tbody>
-  `;
+  const columns = [
+    { key: "customer_name", label: "Customer" },
+    { key: "invoice_number", label: "Invoice #" },
+    { key: "payment_date", label: "Date", isDate: true },
+    { key: "payment_amount", label: "Amount", numeric: true },
+    { key: "contact_id", label: "Contact ID" },
+    { key: "status", label: "Status" }
+  ];
 
-  container.appendChild(table);
+  function sortRows() {
+    rows.sort((a, b) => {
+      let A = a[currentSortField];
+      let B = b[currentSortField];
 
-  document
-    .getElementById("refreshStagingGrid")
-    .addEventListener("click", loadStagingData);
+      if (columns.find(c => c.key === currentSortField)?.isDate) {
+        A = new Date(A);
+        B = new Date(B);
+      } else if (columns.find(c => c.key === currentSortField)?.numeric) {
+        A = Number(A) || 0;
+        B = Number(B) || 0;
+      } else {
+        A = (A || "").toString().toLowerCase();
+        B = (B || "").toString().toLowerCase();
+      }
 
-  // Sorting logic
-  const headers = table.querySelectorAll("th.sortable");
-  headers.forEach((header) => {
-    header.addEventListener("click", () => {
-      const col = header.getAttribute("data-col");
-      const arrow = header.querySelector(".arrow");
-      const isAsc = arrow.textContent === "↑";
-
-      // Flip arrow
-      arrow.textContent = isAsc ? "↓" : "↑";
-
-      // Sort rows
-      rows.sort((a, b) => {
-        const valA = a[col] || "";
-        const valB = b[col] || "";
-        return isAsc
-          ? String(valB).localeCompare(String(valA))
-          : String(valA).localeCompare(String(valB));
-      });
-
-      // Re-render
-      renderStagingGrid(rows);
+      if (A < B) return currentSortDirection === "asc" ? -1 : 1;
+      if (A > B) return currentSortDirection === "asc" ? 1 : -1;
+      return 0;
     });
-  });
+  }
+
+  function renderTable() {
+    sortRows();
+
+    const headerHtml = columns.map(col => {
+      const isSorted = currentSortField === col.key;
+      const upArrow   = isSorted && currentSortDirection === "asc"  ? "▲" : "△";
+      const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+
+      return `
+        <th class="sortable" data-field="${col.key}">
+          ${escapeHtml(col.label)}
+          <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+            <span class="sort-up">${upArrow}</span>
+            <span class="sort-down">${downArrow}</span>
+          </span>
+        </th>
+      `;
+    }).join("");
+
+    const rowsHtml = rows.map((row, i) => `
+      <tr id="row-${row.id}" style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};">
+        <td style="padding:6px;">${escapeHtml(row.customer_name || "")}</td>
+        <td style="padding:6px;">${escapeHtml(row.invoice_number || "")}</td>
+        <td style="padding:6px;">${escapeHtml(row.payment_date || "")}</td>
+        <td style="padding:6px;">${escapeHtml((Number(row.payment_amount) || 0).toFixed(2))}</td>
+        <td class="contact-cell" style="padding:6px;">${escapeHtml(row.contact_id || "(none)")}</td>
+        <td class="status-cell" style="padding:6px;">${escapeHtml(row.status || "")}</td>
+        <td class="error-cell" style="padding:6px; color:red;">${escapeHtml(row.error_message || "")}</td>
+        <td class="action-cell" style="padding:6px;">
+          ${renderStagingActionButton(row)}
+        </td>
+      </tr>
+    `).join("");
+
+    container.innerHTML += `
+      <table class="notes-table" style="width:100%; border-collapse:collapse; margin-top:12px;">
+        <thead>
+          <tr>
+            ${headerHtml}
+            <th>Error</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+    `;
+
+    // Wire sorting
+    container.querySelectorAll("th.sortable").forEach(th => {
+      th.addEventListener("click", () => {
+        const field = th.dataset.field;
+
+        if (currentSortField === field) {
+          currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+        } else {
+          currentSortField = field;
+          currentSortDirection = "asc";
+        }
+
+        renderTable();
+      });
+    });
+
+    // Wire refresh
+    document
+      .getElementById("refreshStagingGrid")
+      .addEventListener("click", loadStagingData);
+  }
+
+  renderTable();
 }
 
 
