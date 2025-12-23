@@ -736,18 +736,8 @@ async function renderFinancialSummary(container, portalState) {
 
 function renderStagingGrid(rows) {
   const container = document.getElementById("stagingGrid");
-  container.innerHTML = `
-    <div style="margin-bottom:10px;">
-      <button id="refreshStagingGrid" class="btn-primary">Refresh Grid</button>
-    </div>
-  `;
 
-  if (!rows.length) {
-    container.innerHTML += "<p>No staging rows found.</p>";
-    return;
-  }
-
-  // Sorting state
+  // Sorting state (persistent across re-renders)
   let currentSortField = "payment_date";
   let currentSortDirection = "asc";
 
@@ -803,20 +793,22 @@ function renderStagingGrid(rows) {
 
     const rowsHtml = rows.map((row, i) => `
       <tr id="row-${row.id}" style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};">
-        <td style="padding:6px;">${escapeHtml(row.customer_name || "")}</td>
-        <td style="padding:6px;">${escapeHtml(row.invoice_number || "")}</td>
-        <td style="padding:6px;">${escapeHtml(row.payment_date || "")}</td>
-        <td style="padding:6px;">${escapeHtml((Number(row.payment_amount) || 0).toFixed(2))}</td>
-        <td class="contact-cell" style="padding:6px;">${escapeHtml(row.contact_id || "(none)")}</td>
-        <td class="status-cell" style="padding:6px;">${escapeHtml(row.status || "")}</td>
-        <td class="error-cell" style="padding:6px; color:red;">${escapeHtml(row.error_message || "")}</td>
-        <td class="action-cell" style="padding:6px;">
-          ${renderStagingActionButton(row)}
-        </td>
+        <td>${escapeHtml(row.customer_name || "")}</td>
+        <td>${escapeHtml(row.invoice_number || "")}</td>
+        <td>${escapeHtml(row.payment_date || "")}</td>
+        <td>${escapeHtml((Number(row.payment_amount) || 0).toFixed(2))}</td>
+        <td class="contact-cell">${escapeHtml(row.contact_id || "(none)")}</td>
+        <td class="status-cell">${escapeHtml(row.status || "")}</td>
+        <td class="error-cell" style="color:red;">${escapeHtml(row.error_message || "")}</td>
+        <td class="action-cell">${renderStagingActionButton(row)}</td>
       </tr>
     `).join("");
 
-    container.innerHTML += `
+    container.innerHTML = `
+      <div style="margin-bottom:10px;">
+        <button id="refreshStagingGrid" class="btn-primary">Refresh Grid</button>
+      </div>
+
       <table class="notes-table" style="width:100%; border-collapse:collapse; margin-top:12px;">
         <thead>
           <tr>
@@ -831,7 +823,7 @@ function renderStagingGrid(rows) {
       </table>
     `;
 
-    // Wire sorting
+    // Sorting events
     container.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
@@ -847,7 +839,7 @@ function renderStagingGrid(rows) {
       });
     });
 
-    // Wire refresh
+    // Refresh button
     document
       .getElementById("refreshStagingGrid")
       .addEventListener("click", loadStagingData);
@@ -855,6 +847,7 @@ function renderStagingGrid(rows) {
 
   renderTable();
 }
+
 
 
 function renderStagingActionButton(row) {
