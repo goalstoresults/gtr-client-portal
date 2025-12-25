@@ -276,20 +276,31 @@ function formatDateTimeSafe(value) {
 
 /* Add (POST /notes-history-module) */
 function renderAdd(container, portalState) {
-  container.innerHTML = `<h4>Add Note (v1.2.7)</h4>
+  container.innerHTML = `
+    <h4>Add Note (v1.2.8)</h4>
+
+    <label>Date:</label>
+    <input type="date" id="noteDate" style="width:200px;margin-bottom:8px;" />
+
     <textarea id="noteContent" placeholder="Enter note text..." style="width:100%;min-height:100px;"></textarea>
     <div style="margin-top:8px;"><button id="btnSaveNote" class="primary">Save</button></div>
-    <div id="noteAddResult" style="margin-top:8px;"></div>`;
+    <div id="noteAddResult" style="margin-top:8px;"></div>
+  `;
+
   document.getElementById("btnSaveNote").addEventListener("click", async () => {
     const content = document.getElementById("noteContent").value.trim();
+    const noteDate = document.getElementById("noteDate").value; // YYYY-MM-DD
+
     if (!content) return;
+
     try {
       const res = await fetch("https://add-note-module.dennis-e64.workers.dev", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           project: portalState.project,
-          raw_text: content
+          raw_text: content,
+          note_date: noteDate || null   // send null if empty
         })
       });
 
