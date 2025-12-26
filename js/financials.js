@@ -948,7 +948,7 @@ function summarizeByGroup(payments, groupByContactId, nameById) {
   const map = new Map();
 
   for (const p of payments) {
-    const groupId = groupByContactId.get(p.referral_id) || null;
+    const groupId = groupByContactId.get(p.contact_id) || null;
     const key = groupId || "(none)";
 
     if (!map.has(key)) {
@@ -983,7 +983,7 @@ function summarizeByGroupYear(payments, groupByContactId, nameById) {
     if (!p.payment_date) continue;
 
     const year = new Date(p.payment_date).getFullYear();
-    const groupId = groupByContactId.get(p.referral_id) || null;
+    const groupId = groupByContactId.get(p.contact_id) || null;
     const key = `${groupId || "(none)"}-${year}`;
 
     if (!map.has(key)) {
