@@ -640,7 +640,7 @@ async function renderFinancialList(container, portalState) {
 async function renderFinancialSummary(container, portalState) {
   container.innerHTML = `
     <section class="card">
-      <h3>Financial Summary 4</h3>
+      <h3>Financial Summary</h3>
 
       <div id="summaryFilters" style="margin-bottom: 12px;">
         <label>Summary Type:</label>
