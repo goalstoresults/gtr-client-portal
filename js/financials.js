@@ -634,8 +634,6 @@ async function renderFinancialList(container, portalState) {
 }
 
 
-
-
 /* =========================================================
    SUMMARY MODULE (FULL REPLACEMENT)
 ========================================================= */
@@ -738,9 +736,17 @@ async function loadSummaryData(portalState) {
 
   // ============================================================
   // Fetch contacts for name + group lookup
+  //   - Non-group summaries: /contacts/list
+  //   - Group summaries:     /contacts/list-with-groups
   // ============================================================
+  const isGroupSummary = type === "group" || type === "group_year";
+
+  const contactsEndpointPath = isGroupSummary
+    ? "/contacts/list-with-groups"
+    : "/contacts/list";
+
   const contactsRes = await fetch(
-    `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}&limit=2000`,
+    `https://contacts-module.dennis-e64.workers.dev${contactsEndpointPath}?project=${portalState.project}&limit=2000`,
     { cache: "no-cache" }
   );
 
@@ -756,8 +762,18 @@ async function loadSummaryData(portalState) {
   const groupByContactId = new Map();
 
   for (const c of contacts) {
-    nameById.set(c.contact_id, c.search_name || c.contact_name || c.contact_id);
-    groupByContactId.set(c.contact_id, c.group_id || null);
+    nameById.set(
+      c.contact_id,
+      c.search_name || c.contact_name || c.contact_id
+    );
+
+    const groupId = c.group_id || null;
+    const groupName = c.group_name || (groupId || "(none)");
+
+    groupByContactId.set(c.contact_id, {
+      group_id: groupId,
+      group_name: groupName
+    });
   }
 
   // ============================================================
@@ -797,7 +813,7 @@ async function loadSummaryData(portalState) {
       break;
 
     // ============================================================
-    // ⭐ NEW: GROUP SUMMARIES
+    // GROUP SUMMARIES
     // ============================================================
     case "group":
       summaryRows = summarizeByGroup(payments, groupByContactId, nameById);
@@ -948,13 +964,15 @@ function summarizeByGroup(payments, groupByContactId, nameById) {
   const map = new Map();
 
   for (const p of payments) {
-    const groupId = groupByContactId.get(p.contact_id) || null;
-    const key = groupId || "(none)";
+    const groupInfo =
+      groupByContactId.get(p.contact_id) || { group_id: null, group_name: "(none)" };
+
+    const key = groupInfo.group_id || "(none)";
 
     if (!map.has(key)) {
       map.set(key, {
-        group_id: groupId,
-        group_name: groupId || "(none)",
+        group_id: groupInfo.group_id,
+        group_name: groupInfo.group_name,
         total_amount: 0,
         count: 0,
         clients: new Set(),
@@ -983,14 +1001,16 @@ function summarizeByGroupYear(payments, groupByContactId, nameById) {
     if (!p.payment_date) continue;
 
     const year = new Date(p.payment_date).getFullYear();
-    const groupId = groupByContactId.get(p.contact_id) || null;
-    const key = `${groupId || "(none)"}-${year}`;
+    const groupInfo =
+      groupByContactId.get(p.contact_id) || { group_id: null, group_name: "(none)" };
+
+    const key = `${groupInfo.group_id || "(none)"}-${year}`;
 
     if (!map.has(key)) {
       map.set(key, {
         year,
-        group_id: groupId,
-        group_name: groupId || "(none)",
+        group_id: groupInfo.group_id,
+        group_name: groupInfo.group_name,
         total_amount: 0,
         count: 0,
         clients: new Set(),
@@ -1181,9 +1201,10 @@ function renderSummaryGrid(rows, type) {
       <tr style="background:#e8f0fe; font-weight:bold;">
         ${columns.map(col => {
           if (col.numeric && col.key !== "year") {
+            const raw = totals[col.key] || 0;
             const val = col.key === "total_amount"
-              ? formatCurrency(totals[col.key])
-              : totals[col.key].toLocaleString("en-US");
+              ? formatCurrency(raw)
+              : raw.toLocaleString("en-US");
 
             return `<td style="text-align:right;">${val}</td>`;
           }
@@ -1222,6 +1243,7 @@ function renderSummaryGrid(rows, type) {
 
   render();
 }
+
 
 
 
