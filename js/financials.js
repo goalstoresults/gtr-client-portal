@@ -633,11 +633,12 @@ async function renderFinancialList(container, portalState) {
   renderTable();
 }
 
-/* =========================================================
-   SUMMARY MODULE
-   (Updated: group-aware contacts endpoint for group summaries)
-========================================================= */
 
+
+
+/* =========================================================
+   SUMMARY MODULE (FULL REPLACEMENT)
+========================================================= */
 async function renderFinancialSummary(container, portalState) {
   container.innerHTML = `
     <section class="card">
@@ -678,6 +679,7 @@ async function renderFinancialSummary(container, portalState) {
 }
 
 
+
 /* =========================================================
    LOAD YEARS
 ========================================================= */
@@ -712,11 +714,9 @@ async function loadSummaryYears(portalState) {
   });
 }
 
-
 /* =========================================================
    LOAD SUMMARY DATA
 ========================================================= */
-
 async function loadSummaryData(portalState) {
   const type = document.getElementById("summaryType").value;
   const year = document.getElementById("summaryYear").value;
@@ -738,17 +738,9 @@ async function loadSummaryData(portalState) {
 
   // ============================================================
   // Fetch contacts for name + group lookup
-  //   - Non-group summaries: /contacts/list
-  //   - Group summaries:     /contacts/list-with-groups
   // ============================================================
-  const isGroupSummary = type === "group" || type === "group_year";
-
-  const contactsEndpointPath = isGroupSummary
-    ? "/contacts/list-with-groups"
-    : "/contacts/list";
-
   const contactsRes = await fetch(
-    `https://contacts-module.dennis-e64.workers.dev${contactsEndpointPath}?project=${portalState.project}&limit=2000`,
+    `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}&limit=2000`,
     { cache: "no-cache" }
   );
 
@@ -764,21 +756,8 @@ async function loadSummaryData(portalState) {
   const groupByContactId = new Map();
 
   for (const c of contacts) {
-    const fullName = `${c.first_name || ""} ${c.last_name || ""}`.trim();
-    const displayName =
-      c.search_name ||
-      c.contact_name ||
-      fullName ||
-      c.contact_id ||
-      "(unknown)";
-
-    nameById.set(c.contact_id, displayName);
-
-    const groupInfo = {
-      group_id: c.group_id || null,
-      group_name: c.group_name || "(none)"
-    };
-    groupByContactId.set(c.contact_id, groupInfo);
+    nameById.set(c.contact_id, c.search_name || c.contact_name || c.contact_id);
+    groupByContactId.set(c.contact_id, c.group_id || null);
   }
 
   // ============================================================
@@ -817,6 +796,9 @@ async function loadSummaryData(portalState) {
       summaryRows = summarizeByYearReferral(payments, nameById);
       break;
 
+    // ============================================================
+    // ⭐ NEW: GROUP SUMMARIES
+    // ============================================================
     case "group":
       summaryRows = summarizeByGroup(payments, groupByContactId, nameById);
       break;
@@ -962,19 +944,17 @@ function summarizeByYearReferral(payments, nameById) {
   return [...map.values()];
 }
 
-function summarizeByGroup(payments, groupByContactId) {
+function summarizeByGroup(payments, groupByContactId, nameById) {
   const map = new Map();
 
   for (const p of payments) {
-    const groupInfo =
-      groupByContactId.get(p.contact_id) || { group_id: null, group_name: "(none)" };
-
-    const key = groupInfo.group_id || "(none)";
+    const groupId = groupByContactId.get(p.contact_id) || null;
+    const key = groupId || "(none)";
 
     if (!map.has(key)) {
       map.set(key, {
-        group_id: groupInfo.group_id,
-        group_name: groupInfo.group_name,
+        group_id: groupId,
+        group_name: groupId || "(none)",
         total_amount: 0,
         count: 0,
         clients: new Set(),
@@ -996,23 +976,21 @@ function summarizeByGroup(payments, groupByContactId) {
   }));
 }
 
-function summarizeByGroupYear(payments, groupByContactId) {
+function summarizeByGroupYear(payments, groupByContactId, nameById) {
   const map = new Map();
 
   for (const p of payments) {
     if (!p.payment_date) continue;
 
     const year = new Date(p.payment_date).getFullYear();
-    const groupInfo =
-      groupByContactId.get(p.contact_id) || { group_id: null, group_name: "(none)" };
-
-    const key = `${groupInfo.group_id || "(none)"}-${year}`;
+    const groupId = groupByContactId.get(p.contact_id) || null;
+    const key = `${groupId || "(none)"}-${year}`;
 
     if (!map.has(key)) {
       map.set(key, {
         year,
-        group_id: groupInfo.group_id,
-        group_name: groupInfo.group_name,
+        group_id: groupId,
+        group_name: groupId || "(none)",
         total_amount: 0,
         count: 0,
         clients: new Set(),
@@ -1035,10 +1013,10 @@ function summarizeByGroupYear(payments, groupByContactId) {
 }
 
 
+
 /* =========================================================
    RENDER SUMMARY GRID (SORTABLE)
 ========================================================= */
-
 function renderSummaryGrid(rows, type) {
   const container = document.getElementById("summaryGrid");
 
@@ -1047,6 +1025,9 @@ function renderSummaryGrid(rows, type) {
     return;
   }
 
+  /* =========================================================
+     COLUMN DEFINITIONS (UPDATED LABELS)
+  ========================================================= */
   const columnSets = {
     client: [
       { key: "client_name", label: "Client" },
@@ -1098,6 +1079,10 @@ function renderSummaryGrid(rows, type) {
   };
 
   const columns = columnSets[type];
+
+  /* =========================================================
+     SORTING STATE
+  ========================================================= */
   let currentSortField = columns[0].key;
   let currentSortDirection = "asc";
 
@@ -1108,7 +1093,7 @@ function renderSummaryGrid(rows, type) {
 
       const col = columns.find(c => c.key === currentSortField);
 
-      if (col && col.numeric) {
+      if (col?.numeric) {
         A = Number(A) || 0;
         B = Number(B) || 0;
       } else {
@@ -1121,99 +1106,6 @@ function renderSummaryGrid(rows, type) {
       return 0;
     });
   }
-
-  sortRows();
-
-  const table = document.createElement("table");
-  table.className = "summary-table";
-
-  const thead = document.createElement("thead");
-  const headerRow = document.createElement("tr");
-
-  columns.forEach(col => {
-    const th = document.createElement("th");
-    th.textContent = col.label;
-    th.style.cursor = "pointer";
-
-    th.addEventListener("click", () => {
-      if (currentSortField === col.key) {
-        currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
-      } else {
-        currentSortField = col.key;
-        currentSortDirection = "asc";
-      }
-      sortRows();
-      renderBody();
-    });
-
-    headerRow.appendChild(th);
-  });
-
-  thead.appendChild(headerRow);
-  table.appendChild(thead);
-
-  const tbody = document.createElement("tbody");
-
-  function renderBody() {
-    tbody.innerHTML = "";
-
-    let totalAmount = 0;
-    let totalCount = 0;
-
-    rows.forEach(row => {
-      const tr = document.createElement("tr");
-
-      columns.forEach(col => {
-        const td = document.createElement("td");
-        let value = row[col.key];
-
-        if (col.numeric && col.key === "total_amount") {
-          value = typeof value === "number" ? value.toFixed(2) : "0.00";
-          td.textContent = `$${value}`;
-        } else {
-          td.textContent = value != null ? value : "";
-        }
-
-        tr.appendChild(td);
-      });
-
-      totalAmount += Number(row.total_amount) || 0;
-      totalCount += Number(row.count) || 0;
-
-      tbody.appendChild(tr);
-    });
-
-    const totalRow = document.createElement("tr");
-    totalRow.className = "totals-row";
-
-    columns.forEach((col, index) => {
-      const td = document.createElement("td");
-
-      if (col.key === "total_amount") {
-        td.textContent = `$${(totalAmount || 0).toFixed(2)}`;
-      } else if (col.key === "count") {
-        td.textContent = totalCount;
-      } else if (index === 0) {
-        td.textContent = "Totals";
-      } else {
-        td.textContent = "";
-      }
-
-      totalRow.appendChild(td);
-    });
-
-    tbody.appendChild(totalRow);
-  }
-
-  renderBody();
-
-  table.appendChild(tbody);
-  container.innerHTML = "";
-  container.appendChild(table);
-}
-
-
-
 
   /* =========================================================
      CURRENCY FORMATTER
