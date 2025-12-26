@@ -639,7 +639,6 @@ async function renderFinancialList(container, portalState) {
 /* =========================================================
    SUMMARY MODULE (FULL REPLACEMENT)
 ========================================================= */
-
 async function renderFinancialSummary(container, portalState) {
   container.innerHTML = `
     <section class="card">
@@ -653,6 +652,10 @@ async function renderFinancialSummary(container, portalState) {
           <option value="year">By Year</option>
           <option value="year_client">By Year + Client</option>
           <option value="year_referral">By Year + Referral</option>
+
+          <!-- ⭐ NEW OPTIONS ⭐ -->
+          <option value="group">By Group</option>
+          <option value="group_year">By Group + Year</option>
         </select>
 
         <label style="margin-left: 20px;">Year:</label>
@@ -676,6 +679,8 @@ async function renderFinancialSummary(container, portalState) {
     loadSummaryData(portalState);
   });
 }
+
+
 
 /* =========================================================
    LOAD YEARS
@@ -714,16 +719,18 @@ async function loadSummaryYears(portalState) {
 /* =========================================================
    LOAD SUMMARY DATA
 ========================================================= */
-
 async function loadSummaryData(portalState) {
   const type = document.getElementById("summaryType").value;
   const year = document.getElementById("summaryYear").value;
 
-  // Fetch payments
+  // ============================================================
+  // Fetch payments (unfiltered except project + limit)
+  // ============================================================
   const payRes = await fetch(
     `https://financials-module.dennis-e64.workers.dev/payments/list?project=${portalState.project}&limit=2000`,
     { cache: "no-cache" }
   );
+
   let payments = [];
   try {
     payments = await payRes.json();
@@ -731,11 +738,14 @@ async function loadSummaryData(portalState) {
     payments = [];
   }
 
-  // Fetch contacts for name lookup
+  // ============================================================
+  // Fetch contacts for name + group lookup
+  // ============================================================
   const contactsRes = await fetch(
     `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}&limit=2000`,
     { cache: "no-cache" }
   );
+
   let contacts = [];
   try {
     contacts = await contactsRes.json();
@@ -743,12 +753,18 @@ async function loadSummaryData(portalState) {
     contacts = [];
   }
 
+  // Build lookup maps
   const nameById = new Map();
+  const groupByContactId = new Map();
+
   for (const c of contacts) {
     nameById.set(c.contact_id, c.search_name || c.contact_name || c.contact_id);
+    groupByContactId.set(c.contact_id, c.group_id || null);
   }
 
-  // Filter by year
+  // ============================================================
+  // Filter by year (UI-level filter)
+  // ============================================================
   if (year !== "all") {
     payments = payments.filter(p => {
       if (!p.payment_date) return false;
@@ -756,28 +772,47 @@ async function loadSummaryData(portalState) {
     });
   }
 
+  // ============================================================
+  // Summary selection
+  // ============================================================
   let summaryRows = [];
 
   switch (type) {
     case "client":
       summaryRows = summarizeByClient(payments, nameById);
       break;
+
     case "referral":
       summaryRows = summarizeByReferral(payments, nameById);
       break;
+
     case "year":
       summaryRows = summarizeByYear(payments);
       break;
+
     case "year_client":
       summaryRows = summarizeByYearClient(payments, nameById);
       break;
+
     case "year_referral":
       summaryRows = summarizeByYearReferral(payments, nameById);
+      break;
+
+    // ============================================================
+    // ⭐ NEW: GROUP SUMMARIES
+    // ============================================================
+    case "group":
+      summaryRows = summarizeByGroup(payments, groupByContactId, nameById);
+      break;
+
+    case "group_year":
+      summaryRows = summarizeByGroupYear(payments, groupByContactId, nameById);
       break;
   }
 
   renderSummaryGrid(summaryRows, type);
 }
+
 
 /* =========================================================
    SUMMARY LOGIC
@@ -910,6 +945,76 @@ function summarizeByYearReferral(payments, nameById) {
 
   return [...map.values()];
 }
+
+function summarizeByGroup(payments, groupByContactId, nameById) {
+  const map = new Map();
+
+  for (const p of payments) {
+    const groupId = groupByContactId.get(p.referral_id) || null;
+    const key = groupId || "(none)";
+
+    if (!map.has(key)) {
+      map.set(key, {
+        group_id: groupId,
+        group_name: groupId || "(none)",
+        total_amount: 0,
+        count: 0,
+        clients: new Set(),
+        referrals: new Set()
+      });
+    }
+
+    const row = map.get(key);
+    row.total_amount += Number(p.payment_amount) || 0;
+    row.count++;
+    row.clients.add(p.contact_id);
+    row.referrals.add(p.referral_id);
+  }
+
+  return [...map.values()].map(r => ({
+    ...r,
+    clients: r.clients.size,
+    referrals: r.referrals.size
+  }));
+}
+
+function summarizeByGroupYear(payments, groupByContactId, nameById) {
+  const map = new Map();
+
+  for (const p of payments) {
+    if (!p.payment_date) continue;
+
+    const year = new Date(p.payment_date).getFullYear();
+    const groupId = groupByContactId.get(p.referral_id) || null;
+    const key = `${groupId || "(none)"}-${year}`;
+
+    if (!map.has(key)) {
+      map.set(key, {
+        year,
+        group_id: groupId,
+        group_name: groupId || "(none)",
+        total_amount: 0,
+        count: 0,
+        clients: new Set(),
+        referrals: new Set()
+      });
+    }
+
+    const row = map.get(key);
+    row.total_amount += Number(p.payment_amount) || 0;
+    row.count++;
+    row.clients.add(p.contact_id);
+    row.referrals.add(p.referral_id);
+  }
+
+  return [...map.values()].map(r => ({
+    ...r,
+    clients: r.clients.size,
+    referrals: r.referrals.size
+  }));
+}
+
+
 
 /* =========================================================
    RENDER SUMMARY GRID (SORTABLE)
