@@ -1060,6 +1060,21 @@ function renderSummaryGrid(rows, type) {
       { key: "referral_name", label: "Referral" },
       { key: "total_amount", label: "Total Amount", numeric: true },
       { key: "count", label: "# of Payments", numeric: true }
+    ],
+    group: [
+      { key: "group_name", label: "Group" },
+      { key: "total_amount", label: "Total Amount", numeric: true },
+      { key: "count", label: "# of Payments", numeric: true },
+      { key: "clients", label: "# of Clients", numeric: true },
+      { key: "referrals", label: "# of Referrals", numeric: true }
+    ],
+    group_year: [
+      { key: "year", label: "Year", numeric: true },
+      { key: "group_name", label: "Group" },
+      { key: "total_amount", label: "Total Amount", numeric: true },
+      { key: "count", label: "# of Payments", numeric: true },
+      { key: "clients", label: "# of Clients", numeric: true },
+      { key: "referrals", label: "# of Referrals", numeric: true }
     ]
   };
 
