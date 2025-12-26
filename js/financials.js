@@ -679,7 +679,6 @@ async function renderFinancialSummary(container, portalState) {
 }
 
 
-
 /* =========================================================
    LOAD YEARS
 ========================================================= */
@@ -714,9 +713,11 @@ async function loadSummaryYears(portalState) {
   });
 }
 
+
 /* =========================================================
    LOAD SUMMARY DATA
 ========================================================= */
+
 async function loadSummaryData(portalState) {
   const type = document.getElementById("summaryType").value;
   const year = document.getElementById("summaryYear").value;
@@ -738,8 +739,8 @@ async function loadSummaryData(portalState) {
 
   // ============================================================
   // Fetch contacts for name + group lookup
-  //  - Non-group summaries: use /contacts/list (original behavior)
-  //  - Group summaries: use /contacts/list-with-groups (includes group_id + group_name)
+  //   - Non-group summaries: /contacts/list
+  //   - Group summaries:     /contacts/list-with-groups
   // ============================================================
   const isGroupSummary = type === "group" || type === "group_year";
 
@@ -764,8 +765,6 @@ async function loadSummaryData(portalState) {
   const groupByContactId = new Map();
 
   for (const c of contacts) {
-    // Robust name resolution:
-    // search_name → contact_name → "first last" → contact_id → "(unknown)"
     const fullName = `${c.first_name || ""} ${c.last_name || ""}`.trim();
     const displayName =
       c.search_name ||
@@ -776,7 +775,6 @@ async function loadSummaryData(portalState) {
 
     nameById.set(c.contact_id, displayName);
 
-    // For group summaries, we may have group_id and group_name (from /contacts/list-with-groups)
     const groupInfo = {
       group_id: c.group_id || null,
       group_name: c.group_name || "(none)"
@@ -820,9 +818,6 @@ async function loadSummaryData(portalState) {
       summaryRows = summarizeByYearReferral(payments, nameById);
       break;
 
-    // ============================================================
-    // GROUP SUMMARIES
-    // ============================================================
     case "group":
       summaryRows = summarizeByGroup(payments, groupByContactId, nameById);
       break;
@@ -968,7 +963,7 @@ function summarizeByYearReferral(payments, nameById) {
   return [...map.values()];
 }
 
-function summarizeByGroup(payments, groupByContactId, nameById) {
+function summarizeByGroup(payments, groupByContactId) {
   const map = new Map();
 
   for (const p of payments) {
@@ -1002,7 +997,7 @@ function summarizeByGroup(payments, groupByContactId, nameById) {
   }));
 }
 
-function summarizeByGroupYear(payments, groupByContactId, nameById) {
+function summarizeByGroupYear(payments, groupByContactId) {
   const map = new Map();
 
   for (const p of payments) {
@@ -1041,10 +1036,10 @@ function summarizeByGroupYear(payments, groupByContactId, nameById) {
 }
 
 
-
 /* =========================================================
    RENDER SUMMARY GRID (SORTABLE)
 ========================================================= */
+
 function renderSummaryGrid(rows, type) {
   const container = document.getElementById("summaryGrid");
 
@@ -1053,9 +1048,6 @@ function renderSummaryGrid(rows, type) {
     return;
   }
 
-  /* =========================================================
-     COLUMN DEFINITIONS (UPDATED LABELS)
-  ========================================================= */
   const columnSets = {
     client: [
       { key: "client_name", label: "Client" },
@@ -1107,10 +1099,6 @@ function renderSummaryGrid(rows, type) {
   };
 
   const columns = columnSets[type];
-
-  /* =========================================================
-     SORTING STATE
-  ========================================================= */
   let currentSortField = columns[0].key;
   let currentSortDirection = "asc";
 
@@ -1121,7 +1109,7 @@ function renderSummaryGrid(rows, type) {
 
       const col = columns.find(c => c.key === currentSortField);
 
-      if (col?.numeric) {
+      if (col && col.numeric) {
         A = Number(A) || 0;
         B = Number(B) || 0;
       } else {
@@ -1196,7 +1184,6 @@ function renderSummaryGrid(rows, type) {
       tbody.appendChild(tr);
     });
 
-    // Totals row (no year column total)
     const totalRow = document.createElement("tr");
     totalRow.className = "totals-row";
 
