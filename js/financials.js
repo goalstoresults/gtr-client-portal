@@ -652,8 +652,6 @@ async function renderFinancialSummary(container, portalState) {
           <option value="year">By Year</option>
           <option value="year_client">By Year + Client</option>
           <option value="year_referral">By Year + Referral</option>
-
-          <!-- ⭐ NEW OPTIONS ⭐ -->
           <option value="group">By Group</option>
           <option value="group_year">By Group + Year</option>
         </select>
