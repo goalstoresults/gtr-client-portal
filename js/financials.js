@@ -640,7 +640,7 @@ async function renderFinancialList(container, portalState) {
 async function renderFinancialSummary(container, portalState) {
   container.innerHTML = `
     <section class="card">
-      <h3>Financial Summary</h3>
+      <h3>Financial Summary 2</h3>
 
       <div id="summaryFilters" style="margin-bottom: 12px;">
         <label>Summary Type:</label>
@@ -965,7 +965,7 @@ function summarizeByGroup(payments, groupByContactId, nameById) {
 
   for (const p of payments) {
     const groupInfo =
-      groupByContactId.get(p.contact_id) || { group_id: null, group_name: "(none)" };
+      groupByContactId.get(p.referral_id) || { group_id: null, group_name: "(none)" };
 
     const key = groupInfo.group_id || "(none)";
 
@@ -1002,7 +1002,7 @@ function summarizeByGroupYear(payments, groupByContactId, nameById) {
 
     const year = new Date(p.payment_date).getFullYear();
     const groupInfo =
-      groupByContactId.get(p.contact_id) || { group_id: null, group_name: "(none)" };
+      groupByContactId.get(p.referral_id) || { group_id: null, group_name: "(none)" };
 
     const key = `${groupInfo.group_id || "(none)"}-${year}`;
 
