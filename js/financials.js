@@ -1,4 +1,4 @@
-// js/financials.js v2.2
+// js/financials.js v4
 // Load Financials Tab with subtab switching + tab-level context bar
 
 import { escapeHtml, renderContactPicker } from "./utilities.js";
