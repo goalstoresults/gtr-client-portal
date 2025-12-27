@@ -581,7 +581,7 @@ async function renderFinancialList(container, portalState) {
             <label>Invoice #:
               <input type="text" class="edit-invoice" value="${p.invoice_number || ""}">
             </label>
-            <button class="btn-secondary btn-save" data-id="${p.payment_id}">Save</button>
+            <button class="btn-primary btn-save" data-id="${p.payment_id}">Save</button>
             <button class="btn-tertiary btn-cancel" data-id="${p.payment_id}">Cancel</button>
           </div>
         </td>
