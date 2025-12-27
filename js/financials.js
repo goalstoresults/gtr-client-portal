@@ -1,7 +1,7 @@
 // js/financials.js v4
 // Load Financials Tab with subtab switching + tab-level context bar
 
-import { escapeHtml, renderContactPicker } from "./utilities.js";
+import { escapeHtml, renderContactPicker, formatCurrency } from "./utilities.js";
 
 window.autoMatchContact = async function(id) {
   const btn = document.querySelector(`#row-${id} .action-cell button`);
@@ -561,7 +561,7 @@ async function renderFinancialList(container, portalState) {
       <tr data-id="${p.payment_id}">
         <td>${escapeHtml(formatDateTimeFull(p.payment_date))}</td>
         <td>${escapeHtml(p.contact_name)}</td>
-        <td>${escapeHtml(p.payment_amount.toFixed(2))}</td>
+        <td>${escapeHtml(formatCurrency(p.payment_amount))}</td>
         <td>${escapeHtml(p.invoice_number || "")}</td>
         <td>${escapeHtml(p.referral_name || "")}</td>
         <td>
