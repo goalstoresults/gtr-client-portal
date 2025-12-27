@@ -8,6 +8,29 @@ export function escapeHtml(str) {
   }[c]));
 }
 
+// Format currency consistently across the portal
+export function formatCurrency(value) {
+  const num = Number(value) || 0;
+  return `$${num.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })}`;
+}
+
+// Format date/time consistently across the portal
+export function formatDateTime(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  return d.toLocaleString("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  });
+}
+
 // Shared Contact Picker
 export async function renderContactPicker(container, portalState, onContactSelected) {
   container.innerHTML = `
@@ -29,11 +52,16 @@ export async function renderContactPicker(container, portalState, onContactSelec
   const grid = container.querySelector("#contactPickerGrid");
 
   // Populate contact type dropdown
-  const resTypes = await fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=contact_type&project=${portalState.project}`);
+  const resTypes = await fetch(
+    `https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=contact_type&project=${portalState.project}`
+  );
   const values = await resTypes.json();
   const typeSelect = document.getElementById("filter-contact-type");
+
   if (Array.isArray(values)) {
-    values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
+    values.sort((a, b) =>
+      (a.label || a.value || "").localeCompare(b.label || b.value || "")
+    );
     values.forEach(v => {
       const opt = document.createElement("option");
       opt.value = v.value;
@@ -48,7 +76,13 @@ export async function renderContactPicker(container, portalState, onContactSelec
     const business = document.getElementById("filter-business").value.trim();
     const type     = document.getElementById("filter-contact-type").value;
 
-    const params = new URLSearchParams({ project: portalState.project, first, last, business });
+    const params = new URLSearchParams({
+      project: portalState.project,
+      first,
+      last,
+      business
+    });
+
     const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
     const res = await fetch(url, { cache: "no-cache" });
     let contacts = await res.json();
@@ -88,6 +122,7 @@ export async function renderContactPicker(container, portalState, onContactSelec
   }
 
   document.getElementById("btnApplyContactsFilter").addEventListener("click", applyFilter);
+
   document.getElementById("btnClearContactsFilter").addEventListener("click", () => {
     document.getElementById("filter-first").value = "";
     document.getElementById("filter-last").value = "";
