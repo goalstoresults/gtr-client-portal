@@ -10,8 +10,18 @@ window.autoMatchContact = async function(id) {
     btn.textContent = "Matching...";
   }
 
+  const project = window.portalState?.project;
+  if (!project) {
+    alert("No project selected.");
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Auto Match";
+    }
+    return;
+  }
+
   const res = await fetch(
-    `https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=snf`
+    `https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=${project}`
   );
   const data = await res.json();
 
@@ -58,6 +68,12 @@ window.insertStagingRow = async function(id) {
   const rowEl = document.querySelector(`#row-${id}`);
   if (!rowEl) return;
 
+  const project = window.portalState?.project;
+  if (!project) {
+    alert("No project selected.");
+    return;
+  }
+
   const actionCell = rowEl.querySelector(".action-cell");
   const statusCell = rowEl.querySelector(".status-cell");
   const errorCell = rowEl.querySelector(".error-cell");
@@ -68,7 +84,7 @@ window.insertStagingRow = async function(id) {
 
   // Call backend to insert this staging row
   const res = await fetch(
-    `https://financials-module.dennis-e64.workers.dev/payments/add-from-staging?id=${id}&project=snf`,
+    `https://financials-module.dennis-e64.workers.dev/payments/add-from-staging?id=${id}&project=${project}`,
     { method: "POST" }
   );
 
@@ -176,13 +192,18 @@ window.fixRow = async function(id) {
       error_message: ""
     };
 
-    // Send update to backend
+    // Send update to backend (align with PATCH /staging/update)
     await fetch(
-      `https://financials-module.dennis-e64.workers.dev/staging/update?project=snf`,
+      `https://financials-module.dennis-e64.workers.dev/staging/update`,
       {
-        method: "POST",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updated)
+        body: JSON.stringify({
+          id,
+          contact_id: updated.contact_id,
+          needs_review: updated.contact_id ? false : true,
+          notes: ""
+        })
       }
     );
 
@@ -214,11 +235,9 @@ function closeModal(modal) {
   }
 }
 
-
 window.refreshStagingGrid = function() {
   loadStagingData();
 };
-
 
 window.loadStagingData = async function() {
   const container = document.getElementById("stagingGrid");
@@ -226,8 +245,16 @@ window.loadStagingData = async function() {
     container.innerHTML = `<p style="padding:8px;">Loading staging data...</p>`;
   }
 
+  const project = window.portalState?.project;
+  if (!project) {
+    if (container) {
+      container.innerHTML = `<p style="padding:8px; color:red;">No project selected.</p>`;
+    }
+    return;
+  }
+
   const res = await fetch(
-    `https://financials-module.dennis-e64.workers.dev/staging/list?project=snf`
+    `https://financials-module.dennis-e64.workers.dev/staging/list?project=${project}`
   );
 
   let rows = [];
@@ -240,22 +267,30 @@ window.loadStagingData = async function() {
   renderStagingGrid(rows);
 };
 
-
 // ------------------------------------------------------------
 // FRONTEND: Canonical call to backend payment insert
 // ------------------------------------------------------------
-async function addPaymentWithReferral({ project, contact_id, payment_amount, payment_date, invoice_number }) {
-  const res = await fetch(`https://financials-module.dennis-e64.workers.dev/payments/add`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      project,
-      contact_id,
-      payment_amount,
-      payment_date,
-      invoice_number
-    })
-  });
+async function addPaymentWithReferral({
+  project,
+  contact_id,
+  payment_amount,
+  payment_date,
+  invoice_number
+}) {
+  const res = await fetch(
+    `https://financials-module.dennis-e64.workers.dev/payments/add`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        project,
+        contact_id,
+        payment_amount,
+        payment_date,
+        invoice_number
+      })
+    }
+  );
 
   if (!res.ok) {
     throw new Error("Payment insert failed");
@@ -263,7 +298,6 @@ async function addPaymentWithReferral({ project, contact_id, payment_amount, pay
 
   return await res.json();
 }
-
 
 
 export async function loadFinancialsTab({ portalState, tabContent }) {
