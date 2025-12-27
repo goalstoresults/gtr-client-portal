@@ -96,7 +96,7 @@ async function renderGroupList(container, portalState) {
 
   const tableDiv = container.querySelector("#groupTable");
 
-  // ⭐ NEW: Fetch ROI summary view instead of raw groups
+  // Fetch ROI summary view
   const url = `https://groups-module.dennis-e64.workers.dev/groups/roi-list?project=${portalState.project}&limit=500`;
   const res = await fetch(url, { cache: "no-cache" });
   let groups = await res.json();
@@ -113,12 +113,11 @@ async function renderGroupList(container, portalState) {
   let currentSortField = "group_name";
   let currentSortDirection = "asc";
 
-  // ⭐ NEW: Updated column definitions
   const columns = [
     { key: "group_name", label: "Name" },
     { key: "renewal_amount", label: "Total Amount", numeric: true },
     { key: "referral_amount", label: "Total Referral Amount", numeric: true },
-    { key: "roi", label: "ROI", numeric: true },
+    { key: "roi", label: "ROI (%)", numeric: true },
     { key: "created_at", label: "Created" }
   ];
 
@@ -168,7 +167,7 @@ async function renderGroupList(container, portalState) {
         <td>${escapeHtml(g.group_name || "")}</td>
         <td class="amount">${formatCurrency(g.renewal_amount)}</td>
         <td class="amount">${formatCurrency(g.referral_amount)}</td>
-        <td class="amount">${Number(g.roi || 0).toFixed(4)}</td>
+        <td class="amount">${(Number(g.roi || 0) * 100).toFixed(2)}%</td>
         <td>${formatDateTime(g.created_at)}</td>
         <td><button class="btn-primary btn-select" data-id="${g.group_id}">Select</button></td>
       </tr>
@@ -233,6 +232,9 @@ async function renderGroupList(container, portalState) {
     renderGroupList(container, portalState);
   });
 }
+
+
+
 
 // -----------------------------------------------------------------------------
 // GROUP DETAILS
