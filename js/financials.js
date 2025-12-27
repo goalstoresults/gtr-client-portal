@@ -499,7 +499,6 @@ async function renderFinancialList(container, portalState) {
   let currentSortField = "payment_date";
   let currentSortDirection = "desc";
 
-  // Columns definition
   const columns = [
     { key: "payment_date", label: "Date", isDate: true },
     { key: "contact_name", label: "Contact" },
@@ -509,7 +508,6 @@ async function renderFinancialList(container, portalState) {
     { key: "actions", label: "Actions" }
   ];
 
-  // Preprocess rows
   payments = payments.map(p => ({
     ...p,
     contact_name: nameById.get(p.contact_id) || "",
@@ -567,28 +565,24 @@ async function renderFinancialList(container, portalState) {
         <td>${escapeHtml(p.invoice_number || "")}</td>
         <td>${escapeHtml(p.referral_name || "")}</td>
         <td>
-          <button class="btn-edit" data-id="${p.payment_id}">Edit</button>
-          <button class="btn-delete" data-id="${p.payment_id}">Delete</button>
+          <button class="btn-secondary btn-edit" data-id="${p.payment_id}">Edit</button>
+          <button class="btn-danger btn-delete" data-id="${p.payment_id}">Delete</button>
         </td>
       </tr>
-
       <tr class="edit-row" id="edit-${p.payment_id}" style="display:none;">
         <td colspan="6">
-          <div class="edit-container">
+          <div class="edit-container" style="display:flex; gap:1rem; align-items:center;">
             <label>Date:
               <input type="date" class="edit-date" value="${p.payment_date.split('T')[0]}">
             </label>
-
             <label>Amount:
               <input type="number" class="edit-amount" value="${p.payment_amount}">
             </label>
-
             <label>Invoice #:
               <input type="text" class="edit-invoice" value="${p.invoice_number || ""}">
             </label>
-
-            <button class="btn-save" data-id="${p.payment_id}">Save</button>
-            <button class="btn-cancel" data-id="${p.payment_id}">Cancel</button>
+            <button class="btn-secondary btn-save" data-id="${p.payment_id}">Save</button>
+            <button class="btn-tertiary btn-cancel" data-id="${p.payment_id}">Cancel</button>
           </div>
         </td>
       </tr>
@@ -598,56 +592,40 @@ async function renderFinancialList(container, portalState) {
       <section class="card">
         <h3>Payments List</h3>
         <table class="notes-table">
-          <thead>
-            <tr>${headerHtml}</tr>
-          </thead>
-          <tbody>
-            ${rowsHtml || `<tr><td colspan="6">(no payments found)</td></tr>`}
-          </tbody>
+          <thead><tr>${headerHtml}</tr></thead>
+          <tbody>${rowsHtml || `<tr><td colspan="6">(no payments found)</td></tr>`}</tbody>
         </table>
       </section>
     `;
 
-    // Sorting
     container.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
-
-        if (currentSortField === field) {
-          currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
-        } else {
-          currentSortField = field;
-          currentSortDirection = "asc";
-        }
-
+        currentSortDirection = currentSortField === field
+          ? (currentSortDirection === "asc" ? "desc" : "asc")
+          : "asc";
+        currentSortField = field;
         renderTable();
       });
     });
 
-    // Edit button
     container.querySelectorAll(".btn-edit").forEach(btn => {
       btn.addEventListener("click", () => {
-        const id = btn.dataset.id;
-        const row = container.querySelector(`#edit-${id}`);
+        const row = container.querySelector(`#edit-${btn.dataset.id}`);
         row.style.display = row.style.display === "none" ? "table-row" : "none";
       });
     });
 
-    // Cancel button
     container.querySelectorAll(".btn-cancel").forEach(btn => {
       btn.addEventListener("click", () => {
-        const id = btn.dataset.id;
-        const row = container.querySelector(`#edit-${id}`);
-        row.style.display = "none";
+        container.querySelector(`#edit-${btn.dataset.id}`).style.display = "none";
       });
     });
 
-    // Save button
     container.querySelectorAll(".btn-save").forEach(btn => {
       btn.addEventListener("click", async () => {
         const id = btn.dataset.id;
         const row = container.querySelector(`#edit-${id}`);
-
         const date = row.querySelector(".edit-date").value;
         const amount = Number(row.querySelector(".edit-amount").value);
         const invoice = row.querySelector(".edit-invoice").value;
@@ -668,11 +646,9 @@ async function renderFinancialList(container, portalState) {
       });
     });
 
-    // Delete button
     container.querySelectorAll(".btn-delete").forEach(btn => {
       btn.addEventListener("click", async () => {
         const id = btn.dataset.id;
-
         if (!confirm("Delete this payment? This cannot be undone.")) return;
 
         await fetch(`https://financials-module.dennis-e64.workers.dev/payments/delete`, {
