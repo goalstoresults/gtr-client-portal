@@ -218,6 +218,10 @@ button {
 }
 .notes-table button.btn-secondary:hover { background: #777; }
 
+.notes-table td.right {
+  text-align: right;
+}
+
 .contact-result {
   cursor: pointer;
 }
