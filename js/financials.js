@@ -1454,7 +1454,15 @@ function renderStagingActionButton(row) {
 
 
 async function autoMatchContact(id) {
-  const res = await fetch(`https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=snf`);
+  const project = window.portalState?.project;
+  if (!project) {
+    alert("No project selected.");
+    return;
+  }
+
+  const res = await fetch(
+    `https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=${project}`
+  );
   const data = await res.json();
 
   // Reload grid to show updated contact_id
@@ -1463,12 +1471,26 @@ async function autoMatchContact(id) {
 
 
 async function loadStagingData() {
-  const res = await fetch(`https://financials-module.dennis-e64.workers.dev/staging/list?project=snf`);
-  const rows = await res.json();
+  const project = window.portalState?.project;
+  if (!project) {
+    console.error("No project selected.");
+    renderStagingGrid([]); // clear grid instead of showing stale SNF data
+    return;
+  }
+
+  const res = await fetch(
+    `https://financials-module.dennis-e64.workers.dev/staging/list?project=${project}`
+  );
+
+  let rows = [];
+  try {
+    rows = await res.json();
+  } catch {
+    rows = [];
+  }
+
   renderStagingGrid(rows);
 }
-
-
 
 function formatDateTimeFull(value) {
   if (!value) return "";
