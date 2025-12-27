@@ -3,86 +3,66 @@
 
 import { escapeHtml, renderContactPicker, formatCurrency } from "./utilities.js";
 
-window.autoMatchContact = async function(id) {
-  const btn = document.querySelector(`#row-${id} .action-cell button`);
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = "Matching...";
-  }
+/* =========================================================
+   STAGING — TOP BLOCK (window.* functions)
+   Updated for referral_id + group_id + filters
+========================================================= */
 
+window.autoMatchContact = async function(id) {
   const project = window.portalState?.project;
   if (!project) {
     alert("No project selected.");
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = "Auto Match";
-    }
     return;
   }
 
+  // Call backend auto-match (now resolves contact, referral, group)
   const res = await fetch(
     `https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=${project}`
   );
-  const data = await res.json();
 
-  // Find the row in the DOM
-  const rowEl = document.querySelector(`#row-${id}`);
-  if (!rowEl) return;
+  let data = {};
+  try {
+    data = await res.json();
+  } catch {}
 
-  const actionCell = rowEl.querySelector(".action-cell");
-  const contactCell = rowEl.querySelector(".contact-cell");
-  const statusCell = rowEl.querySelector(".status-cell");
-
-  if (res.ok && data?.contact_id) {
-    // Update contact_id cell
-    if (contactCell) contactCell.textContent = data.contact_id;
-
-    // Update status cell
-    if (statusCell) {
-      statusCell.textContent = "matched";
-      statusCell.style.color = "green";
-    }
-
-    // Replace action button with Insert
-    if (actionCell) {
-      actionCell.innerHTML = `
-        <button onclick="insertStagingRow('${id}')">Insert</button>
-      `;
-    }
-  } else {
-    // No match found
-    if (statusCell) {
-      statusCell.textContent = "no match";
-      statusCell.style.color = "red";
-    }
-
-    if (actionCell) {
-      actionCell.innerHTML = `
-        <span style="color:red;">No match found</span>
-      `;
-    }
-  }
+  // Always reload grid to reflect updated contact/referral/group
+  loadStagingData();
 };
 
-window.insertStagingRow = async function(id) {
-  const rowEl = document.querySelector(`#row-${id}`);
-  if (!rowEl) return;
 
+window.insertStagingRow = async function(id) {
   const project = window.portalState?.project;
   if (!project) {
     alert("No project selected.");
     return;
   }
 
-  const actionCell = rowEl.querySelector(".action-cell");
-  const statusCell = rowEl.querySelector(".status-cell");
-  const errorCell = rowEl.querySelector(".error-cell");
+  // Fetch the row so we can validate referral/group before calling backend
+  const rowEl = document.querySelector(`#row-${id}`);
+  if (!rowEl) return;
 
+  const contact = rowEl.querySelector(".contact-cell")?.textContent.trim();
+  const referral = rowEl.querySelector(".referral-cell")?.textContent.trim();
+  const group = rowEl.querySelector(".group-cell")?.textContent.trim();
+
+  // Block insert if referral or group missing
+  if (!referral || referral === "(none)") {
+    alert("Cannot import: missing referral_id. Fix in Contact Relationships.");
+    return;
+  }
+
+  if (!group || group === "(none)") {
+    alert("Cannot import: missing group_id. Fix in Referral Contact Profile.");
+    return;
+  }
+
+  // Show inserting state
+  const actionCell = rowEl.querySelector(".action-cell");
   if (actionCell) {
     actionCell.innerHTML = `<span style="color:#555;">Inserting...</span>`;
   }
 
-  // Call backend to insert this staging row
+  // Call backend to insert
   const res = await fetch(
     `https://financials-module.dennis-e64.workers.dev/payments/add-from-staging?id=${id}&project=${project}`,
     { method: "POST" }
@@ -91,44 +71,28 @@ window.insertStagingRow = async function(id) {
   let data = {};
   try {
     data = await res.json();
-  } catch {
-    data = {};
-  }
+  } catch {}
 
   if (res.ok) {
-    // SUCCESS
-    if (statusCell) {
-      statusCell.textContent = "imported";
-      statusCell.style.color = "green";
-    }
-
-    if (errorCell) {
-      errorCell.textContent = "";
-    }
-
-    if (actionCell) {
-      actionCell.innerHTML = `<span style="color:green;">Imported</span>`;
-    }
+    // Success — reload grid
+    loadStagingData();
   } else {
-    // FAILURE
-    const msg = data.error || "Insert failed";
-
+    // Failure — show Fix Row button
+    if (actionCell) {
+      actionCell.innerHTML = `<button onclick="fixRow('${id}')">Fix Row</button>`;
+    }
+    const statusCell = rowEl.querySelector(".status-cell");
     if (statusCell) {
       statusCell.textContent = "error";
       statusCell.style.color = "red";
     }
-
+    const errorCell = rowEl.querySelector(".error-cell");
     if (errorCell) {
-      errorCell.textContent = msg;
-    }
-
-    if (actionCell) {
-      actionCell.innerHTML = `
-        <button onclick="fixRow('${id}')">Fix Row</button>
-      `;
+      errorCell.textContent = data.error || "Insert failed";
     }
   }
 };
+
 
 window.fixRow = async function(id) {
   const rowEl = document.querySelector(`#row-${id}`);
@@ -176,10 +140,8 @@ window.fixRow = async function(id) {
 
   document.body.appendChild(modal);
 
-  // Cancel
   modal.querySelector("#fix_cancel").onclick = () => modal.remove();
 
-  // Save
   modal.querySelector("#fix_save").onclick = async () => {
     const updated = {
       id,
@@ -192,7 +154,7 @@ window.fixRow = async function(id) {
       error_message: ""
     };
 
-    // Send update to backend (align with PATCH /staging/update)
+    // Update staging row (contact_id only — referral/group are canonical)
     await fetch(
       `https://financials-module.dennis-e64.workers.dev/staging/update`,
       {
@@ -207,65 +169,44 @@ window.fixRow = async function(id) {
       }
     );
 
-    // Update row inline
-    rowEl.children[0].textContent = updated.customer_name;
-    rowEl.children[1].textContent = updated.invoice_number;
-    rowEl.children[2].textContent = updated.payment_date;
-    rowEl.children[3].textContent = updated.payment_amount;
-    rowEl.querySelector(".contact-cell").textContent =
-      updated.contact_id || "(none)";
-
-    const statusCell = rowEl.querySelector(".status-cell");
-    statusCell.textContent = "ready";
-    statusCell.style.color = "orange";
-
-    const errorCell = rowEl.querySelector(".error-cell");
-    errorCell.textContent = "";
-
-    const actionCell = rowEl.querySelector(".action-cell");
-    actionCell.innerHTML = `<button onclick="insertStagingRow('${id}')">Insert</button>`;
-
     modal.remove();
+    loadStagingData();
   };
 };
 
-function closeModal(modal) {
-  if (modal && modal.remove) {
-    modal.remove();
-  }
-}
 
 window.refreshStagingGrid = function() {
   loadStagingData();
 };
 
-window.loadStagingData = async function() {
-  const container = document.getElementById("stagingGrid");
-  if (container) {
-    container.innerHTML = `<p style="padding:8px;">Loading staging data...</p>`;
-  }
 
+window.loadStagingData = async function() {
   const project = window.portalState?.project;
   if (!project) {
-    if (container) {
-      container.innerHTML = `<p style="padding:8px; color:red;">No project selected.</p>`;
-    }
+    renderStagingGrid([]);
     return;
   }
 
-  const res = await fetch(
-    `https://financials-module.dennis-e64.workers.dev/staging/list?project=${project}`
-  );
+  const filter = document.getElementById("stagingFilter")?.value || "";
+  let url = `https://financials-module.dennis-e64.workers.dev/staging/list?project=${project}`;
+
+  if (filter === "missing_contact") url += "&contact_missing=true";
+  if (filter === "missing_referral") url += "&referral_missing=true";
+  if (filter === "missing_group") url += "&group_missing=true";
+  if (filter === "ready") url += "&status=ready";
+  if (filter === "error") url += "&status=error";
+  if (filter === "imported") url += "&status=imported";
+
+  const res = await fetch(url);
 
   let rows = [];
   try {
     rows = await res.json();
-  } catch {
-    rows = [];
-  }
+  } catch {}
 
   renderStagingGrid(rows);
 };
+
 
 // ------------------------------------------------------------
 // FRONTEND: Canonical call to backend payment insert
@@ -1311,26 +1252,27 @@ function renderSummaryGrid(rows, type) {
   render();
 }
 
+/* =========================================================
+   STAGING — BOTTOM BLOCK (Rendering)
+   Updated for referral_id + group_id + filters
+========================================================= */
 
-
-
-
-
-
-/* ---------- Staging ---------- */
 function renderStagingGrid(rows) {
   const container = document.getElementById("stagingGrid");
 
-  // Sorting state (persistent across re-renders)
+  // Sorting state
   let currentSortField = "payment_date";
   let currentSortDirection = "asc";
 
+  // Columns including new referral/group
   const columns = [
     { key: "customer_name", label: "Customer" },
     { key: "invoice_number", label: "Invoice #" },
     { key: "payment_date", label: "Date", isDate: true },
     { key: "payment_amount", label: "Amount", numeric: true },
     { key: "contact_id", label: "Contact ID" },
+    { key: "referral_id", label: "Referral ID" },   // NEW
+    { key: "group_id", label: "Group ID" },         // NEW
     { key: "status", label: "Status" }
   ];
 
@@ -1339,10 +1281,12 @@ function renderStagingGrid(rows) {
       let A = a[currentSortField];
       let B = b[currentSortField];
 
-      if (columns.find(c => c.key === currentSortField)?.isDate) {
+      const col = columns.find(c => c.key === currentSortField);
+
+      if (col?.isDate) {
         A = new Date(A);
         B = new Date(B);
-      } else if (columns.find(c => c.key === currentSortField)?.numeric) {
+      } else if (col?.numeric) {
         A = Number(A) || 0;
         B = Number(B) || 0;
       } else {
@@ -1359,38 +1303,73 @@ function renderStagingGrid(rows) {
   function renderTable() {
     sortRows();
 
-    const headerHtml = columns.map(col => {
-      const isSorted = currentSortField === col.key;
-      const upArrow   = isSorted && currentSortDirection === "asc"  ? "▲" : "△";
-      const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+    // Header
+    const headerHtml = columns
+      .map(col => {
+        const isSorted = currentSortField === col.key;
+        const upArrow = isSorted && currentSortDirection === "asc" ? "▲" : "△";
+        const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
 
-      return `
-        <th class="sortable" data-field="${col.key}">
-          ${escapeHtml(col.label)}
-          <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-            <span class="sort-up">${upArrow}</span>
-            <span class="sort-down">${downArrow}</span>
-          </span>
-        </th>
-      `;
-    }).join("");
+        return `
+          <th class="sortable" data-field="${col.key}">
+            ${escapeHtml(col.label)}
+            <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+              <span class="sort-up">${upArrow}</span>
+              <span class="sort-down">${downArrow}</span>
+            </span>
+          </th>
+        `;
+      })
+      .join("");
 
-    const rowsHtml = rows.map((row, i) => `
+    // Rows
+    const rowsHtml = rows
+      .map(
+        (row, i) => `
       <tr id="row-${row.id}" style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};">
         <td>${escapeHtml(row.customer_name || "")}</td>
         <td>${escapeHtml(row.invoice_number || "")}</td>
         <td>${escapeHtml(row.payment_date || "")}</td>
         <td>${escapeHtml((Number(row.payment_amount) || 0).toFixed(2))}</td>
-        <td class="contact-cell">${escapeHtml(row.contact_id || "(none)")}</td>
-        <td class="status-cell">${escapeHtml(row.status || "")}</td>
-        <td class="error-cell" style="color:red;">${escapeHtml(row.error_message || "")}</td>
-        <td class="action-cell">${renderStagingActionButton(row)}</td>
-      </tr>
-    `).join("");
 
+        <td class="contact-cell">${escapeHtml(row.contact_id || "(none)")}</td>
+
+        <td class="referral-cell" style="color:${row.referral_id ? "#000" : "red"};">
+          ${escapeHtml(row.referral_id || "(none)")}
+        </td>
+
+        <td class="group-cell" style="color:${row.group_id ? "#000" : "red"};">
+          ${escapeHtml(row.group_id || "(none)")}
+        </td>
+
+        <td class="status-cell">${escapeHtml(row.status || "")}</td>
+
+        <td class="error-cell" style="color:red;">
+          ${escapeHtml(row.error_message || "")}
+        </td>
+
+        <td class="action-cell">
+          ${renderStagingActionButton(row)}
+        </td>
+      </tr>
+    `
+      )
+      .join("");
+
+    // Full grid HTML
     container.innerHTML = `
-      <div style="margin-bottom:10px;">
+      <div style="margin-bottom:10px; display:flex; gap:12px; align-items:center;">
         <button id="refreshStagingGrid" class="btn-primary">Refresh Grid</button>
+
+        <select id="stagingFilter" style="padding:4px 6px;">
+          <option value="">All</option>
+          <option value="missing_contact">Missing Contact</option>
+          <option value="missing_referral">Missing Referral</option>
+          <option value="missing_group">Missing Group</option>
+          <option value="ready">Ready</option>
+          <option value="error">Error</option>
+          <option value="imported">Imported</option>
+        </select>
       </div>
 
       <table class="notes-table" style="width:100%; border-collapse:collapse; margin-top:12px;">
@@ -1427,14 +1406,29 @@ function renderStagingGrid(rows) {
     document
       .getElementById("refreshStagingGrid")
       .addEventListener("click", loadStagingData);
+
+    // Filter dropdown
+    document
+      .getElementById("stagingFilter")
+      .addEventListener("change", loadStagingData);
   }
 
   renderTable();
 }
 
 
-
+/* =========================================================
+   ACTION BUTTON LOGIC (Insert gating)
+========================================================= */
 function renderStagingActionButton(row) {
+  const missingReferral = !row.referral_id;
+  const missingGroup = !row.group_id;
+
+  // Block insert if referral/group missing
+  if (missingReferral || missingGroup) {
+    return `<span style="color:red;">Fix referral/group</span>`;
+  }
+
   switch (row.status) {
     case "uploaded":
       return `<button onclick="autoMatchContact('${row.id}')">Populate</button>`;
@@ -1445,52 +1439,17 @@ function renderStagingActionButton(row) {
       return `<button onclick="fixRow('${row.id}')">Fix Row</button>`;
     case "imported":
       return `<span style="color:green;">Imported</span>`;
-    case "skipped":
-      return `<span style="color:gray;">Skipped</span>`;
     default:
       return "";
   }
 }
 
 
-async function autoMatchContact(id) {
-  const project = window.portalState?.project;
-  if (!project) {
-    alert("No project selected.");
-    return;
-  }
-
-  const res = await fetch(
-    `https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=${project}`
-  );
-  const data = await res.json();
-
-  // Reload grid to show updated contact_id
-  loadStagingData();
-}
 
 
-async function loadStagingData() {
-  const project = window.portalState?.project;
-  if (!project) {
-    console.error("No project selected.");
-    renderStagingGrid([]); // clear grid instead of showing stale SNF data
-    return;
-  }
 
-  const res = await fetch(
-    `https://financials-module.dennis-e64.workers.dev/staging/list?project=${project}`
-  );
 
-  let rows = [];
-  try {
-    rows = await res.json();
-  } catch {
-    rows = [];
-  }
 
-  renderStagingGrid(rows);
-}
 
 function formatDateTimeFull(value) {
   if (!value) return "";
