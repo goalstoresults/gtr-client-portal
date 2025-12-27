@@ -167,11 +167,17 @@ async function renderGroupList(container, portalState) {
         <td>${escapeHtml(g.group_name || "")}</td>
         <td class="amount">${formatCurrency(g.renewal_amount)}</td>
         <td class="amount">${formatCurrency(g.referral_amount)}</td>
-        <td class="amount">${(Number(g.roi || 0) * 100).toFixed(2)}%</td>
+        <td class="amount">
+          ${(Number(g.roi || 0) * 100).toLocaleString("en-US", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          })}%
+        </td>
         <td>${formatDateTime(g.created_at)}</td>
         <td><button class="btn-primary btn-select" data-id="${g.group_id}">Select</button></td>
       </tr>
     `).join("");
+
 
     tableDiv.innerHTML = `
       <h4>Showing ${groups.length} ${prevName ? "filtered" : "recent"} groups</h4>
