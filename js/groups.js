@@ -1,5 +1,11 @@
-// js/groups.js v7.0
+// js/groups.js v8.0
 console.log("[Groups.js] loaded");
+
+import {
+  escapeHtml,
+  formatCurrency,
+  formatDateTime
+} from "./utilities.js";
 
 export async function loadGroupsTab({ portalState, tabContent }) {
   tabContent.innerHTML = `
@@ -62,7 +68,9 @@ export async function loadGroupsTab({ portalState, tabContent }) {
   }
 }
 
-// Group List with unified grid sorting (matches Contacts look & feel)
+// -----------------------------------------------------------------------------
+// GROUP LIST (now powered by group_roi_summary view)
+// -----------------------------------------------------------------------------
 async function renderGroupList(container, portalState) {
   const prevName = document.getElementById("filter-group-name")?.value.trim() || "";
 
@@ -88,8 +96,8 @@ async function renderGroupList(container, portalState) {
 
   const tableDiv = container.querySelector("#groupTable");
 
-  // Fetch groups
-  const url = `https://groups-module.dennis-e64.workers.dev/groups/list?project=${portalState.project}&limit=500`;
+  // ⭐ NEW: Fetch ROI summary view instead of raw groups
+  const url = `https://groups-module.dennis-e64.workers.dev/groups/roi-list?project=${portalState.project}&limit=500`;
   const res = await fetch(url, { cache: "no-cache" });
   let groups = await res.json();
   if (!Array.isArray(groups)) groups = groups.rows || [];
@@ -105,12 +113,12 @@ async function renderGroupList(container, portalState) {
   let currentSortField = "group_name";
   let currentSortDirection = "asc";
 
-  // Columns definition
+  // ⭐ NEW: Updated column definitions
   const columns = [
     { key: "group_name", label: "Name" },
-    { key: "total_amount", label: "Total Amount", numeric: true },
-    { key: "total_referral_amount", label: "Total Referral Amount", numeric: true },
-    { key: "total_roi", label: "ROI", numeric: true },
+    { key: "renewal_amount", label: "Total Amount", numeric: true },
+    { key: "referral_amount", label: "Total Referral Amount", numeric: true },
+    { key: "roi", label: "ROI", numeric: true },
     { key: "created_at", label: "Created" }
   ];
 
@@ -122,14 +130,12 @@ async function renderGroupList(container, portalState) {
       if (A == null) A = "";
       if (B == null) B = "";
 
-      // Numeric sort
       if (columns.find(c => c.key === currentSortField)?.numeric) {
         const numA = Number(A) || 0;
         const numB = Number(B) || 0;
         return currentSortDirection === "asc" ? numA - numB : numB - numA;
       }
 
-      // String/date sort
       const strA = String(A).toLowerCase();
       const strB = String(B).toLowerCase();
       return currentSortDirection === "asc"
@@ -160,9 +166,9 @@ async function renderGroupList(container, portalState) {
     const rowsHtml = groups.map(g => `
       <tr>
         <td>${escapeHtml(g.group_name || "")}</td>
-        <td class="amount">${formatCurrency(g.total_amount)}</td>
-        <td class="amount">${formatCurrency(g.total_referral_amount)}</td>
-        <td class="amount">${escapeHtml(g.total_roi || "0.0000")}</td>
+        <td class="amount">${formatCurrency(g.renewal_amount)}</td>
+        <td class="amount">${formatCurrency(g.referral_amount)}</td>
+        <td class="amount">${Number(g.roi || 0).toFixed(4)}</td>
         <td>${formatDateTime(g.created_at)}</td>
         <td><button class="btn-primary btn-select" data-id="${g.group_id}">Select</button></td>
       </tr>
@@ -183,7 +189,7 @@ async function renderGroupList(container, portalState) {
       </table>
     `;
 
-    // Wire sorting
+    // Sorting
     tableDiv.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
@@ -199,7 +205,7 @@ async function renderGroupList(container, portalState) {
       });
     });
 
-    // Wire Select buttons
+    // Select buttons
     tableDiv.querySelectorAll(".btn-select").forEach(btn => {
       btn.addEventListener("click", async () => {
         const groupId = btn.dataset.id;
@@ -216,10 +222,8 @@ async function renderGroupList(container, portalState) {
     });
   }
 
-  // Initial render
   renderTable();
 
-  // Filter buttons
   document.getElementById("btnApplyGroupsFilter").addEventListener("click", () => {
     renderGroupList(container, portalState);
   });
@@ -230,8 +234,9 @@ async function renderGroupList(container, portalState) {
   });
 }
 
-
-// Group Details view
+// -----------------------------------------------------------------------------
+// GROUP DETAILS
+// -----------------------------------------------------------------------------
 async function renderGroupDetails(container, portalState, groupId) {
   container.innerHTML = `<section class="card"><p>Loading group details...</p></section>`;
   const url = `https://groups-module.dennis-e64.workers.dev/groups/details/${groupId}?project=${portalState.project}`;
@@ -259,18 +264,6 @@ async function renderGroupDetails(container, portalState, groupId) {
         <input id="groupNameInput" class="form-control" value="${escapeHtml(group.group_name || "")}" />
       </div>
       <div class="notes-row">
-        <label class="notes-label">Total Amount</label>
-        <input class="form-control amount" value="${formatCurrency(group.total_amount)}" readonly />
-      </div>
-      <div class="notes-row">
-        <label class="notes-label">Total Referral Amount</label>
-        <input class="form-control amount" value="${formatCurrency(group.total_referral_amount)}" readonly />
-      </div>
-      <div class="notes-row">
-        <label class="notes-label">ROI</label>
-        <input class="form-control amount" value="${escapeHtml(group.total_roi || "0.0000")}" readonly />
-      </div>
-      <div class="notes-row">
         <label class="notes-label">Date Started</label>
         <input class="form-control" value="${formatDateTime(group.date_started)}" readonly />
       </div>
@@ -281,7 +274,7 @@ async function renderGroupDetails(container, portalState, groupId) {
     </section>
   `;
 
-  // Wire Save
+  // Save
   document.getElementById("btnSaveGroup").addEventListener("click", async () => {
     const newName = document.getElementById("groupNameInput").value.trim();
     if (!newName) {
@@ -296,7 +289,7 @@ async function renderGroupDetails(container, portalState, groupId) {
     alert("Group name updated");
   });
 
-  // Wire Delete
+  // Delete
   document.getElementById("btnDeleteGroup").addEventListener("click", async () => {
     if (!confirm("Delete this group?")) return;
     await fetch(`https://groups-module.dennis-e64.workers.dev/groups/delete/${group.group_id}?project=${portalState.project}`, {
@@ -304,7 +297,7 @@ async function renderGroupDetails(container, portalState, groupId) {
       headers: { "Content-Type": "application/json" }
     });
     alert("Group deleted");
-    // Return to list view
+
     const listBtn = document.querySelector('#groups-subtabs button[data-subtab="list"]');
     if (listBtn) {
       listBtn.classList.add("active");
@@ -314,14 +307,15 @@ async function renderGroupDetails(container, portalState, groupId) {
   });
 }
 
-// Group Members view with unified grid sorting (matches Contacts + Groups + Notes)
+// -----------------------------------------------------------------------------
+// GROUP MEMBERS
+// -----------------------------------------------------------------------------
 async function renderGroupMembers(container, portalState, groupId) {
   if (!portalState.project || !groupId) {
     container.innerHTML = `<section class="card"><p>Select a group to view members.</p></section>`;
     return;
   }
 
-  // Fetch the group details to get its name
   const groupRes = await fetch(
     `https://groups-module.dennis-e64.workers.dev/groups/details/${groupId}?project=${portalState.project}`,
     { cache: "no-cache" }
@@ -347,13 +341,11 @@ async function renderGroupMembers(container, portalState, groupId) {
 
   const tableDiv = container.querySelector("#groupMemberTable");
 
-  // Fetch members
   const url = `https://groups-module.dennis-e64.workers.dev/groups/members/${groupId}?project=${portalState.project}&limit=500`;
   const membersRes = await fetch(url, { cache: "no-cache" });
   let contacts = await membersRes.json();
   if (!Array.isArray(contacts)) contacts = [];
 
-  // Apply filters
   if (prevName && prevName.length >= 3) {
     const term = prevName.toLowerCase();
     contacts = contacts.filter(c => (c.contact_name || "").toLowerCase().includes(term));
@@ -363,11 +355,9 @@ async function renderGroupMembers(container, portalState, groupId) {
     contacts = contacts.filter(c => (c.business_name || "").toLowerCase().includes(term));
   }
 
-  // --- Sorting state ---
   let currentSortField = "contact_name";
   let currentSortDirection = "asc";
 
-  // --- Columns definition ---
   const columns = [
     { key: "contact_name", label: "Name" },
     { key: "business_name", label: "Business Name" },
@@ -427,7 +417,6 @@ async function renderGroupMembers(container, portalState, groupId) {
       </table>
     `;
 
-    // Wire sorting
     tableDiv.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
@@ -444,10 +433,8 @@ async function renderGroupMembers(container, portalState, groupId) {
     });
   }
 
-  // ✅ Initial render
   renderMembersTable();
 
-  // Wire up filter buttons
   document.getElementById("btnApplyMemberFilter").addEventListener("click", () => {
     renderGroupMembers(container, portalState, groupId);
   });
@@ -459,8 +446,9 @@ async function renderGroupMembers(container, portalState, groupId) {
   });
 }
 
-
-// Add Group view
+// -----------------------------------------------------------------------------
+// ADD GROUP
+// -----------------------------------------------------------------------------
 async function renderGroupAdd(container, portalState) {
   container.innerHTML = `
     <section class="card">
@@ -468,6 +456,7 @@ async function renderGroupAdd(container, portalState) {
         <h3>Add Group</h3>
         <button id="btnSaveNewGroup" class="btn-primary">Save</button>
       </div>
+
       <div class="notes-row">
         <label class="notes-label">Name</label>
         <input id="newGroupName" class="form-control" placeholder="Enter group name" />
@@ -482,11 +471,14 @@ async function renderGroupAdd(container, portalState) {
       return;
     }
 
-    await fetch(`https://groups-module.dennis-e64.workers.dev/groups/add?project=${portalState.project}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ group_name: name })
-    });
+    await fetch(
+      `https://groups-module.dennis-e64.workers.dev/groups/add?project=${portalState.project}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group_name: name })
+      }
+    );
 
     alert("Group added");
 
@@ -498,30 +490,3 @@ async function renderGroupAdd(container, portalState) {
     }
   });
 }
-
-// Helpers
-function formatDateTime(value) {
-  if (!value) return "";
-  const d = new Date(value);
-  return d.toLocaleString("en-US", {
-    month: "2-digit",
-    day: "2-digit",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true
-  });
-}
-
-function escapeHtml(str) {
-  const s = String(str ?? "");
-  return s.replace(/[&<>"']/g, c => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-  }[c]));
-}
-
-function formatCurrency(value) {
-  const num = Number(value) || 0;
-  return `$${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-                                                                   
