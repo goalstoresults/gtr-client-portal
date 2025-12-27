@@ -71,6 +71,10 @@
     import { loadSetupTab } from "./js/setup.js";
 
     const portalState = { project: "", contactId: "" };
+
+    /* ⭐ CRITICAL FIX — make global staging functions see the same object */
+    window.portalState = portalState;
+
     const portalTitle = document.getElementById("portal-title");
     const pageTitle = document.getElementById("page-title");
     const selectorRow = document.getElementById("project-selector-row");
@@ -219,3 +223,4 @@
   </script>
 </body>
 </html>
+
