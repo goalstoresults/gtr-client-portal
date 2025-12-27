@@ -463,7 +463,6 @@ async function startBulkImport(portalState) {
 
 
 /* ---------- List ---------- */
-
 async function renderFinancialList(container, portalState) {
   // 1) Fetch payments
   const paymentsRes = await fetch(
@@ -506,7 +505,8 @@ async function renderFinancialList(container, portalState) {
     { key: "contact_name", label: "Contact" },
     { key: "payment_amount", label: "Amount", numeric: true },
     { key: "invoice_number", label: "Invoice #" },
-    { key: "referral_name", label: "Referral" }
+    { key: "referral_name", label: "Referral" },
+    { key: "actions", label: "Actions" }
   ];
 
   // Preprocess rows
@@ -548,28 +548,48 @@ async function renderFinancialList(container, portalState) {
       const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
 
       return `
-        <th class="sortable" data-field="${col.key}">
+        <th class="${col.key !== 'actions' ? 'sortable' : ''}" data-field="${col.key}">
           ${escapeHtml(col.label)}
-          <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-            <span class="sort-up">${upArrow}</span>
-            <span class="sort-down">${downArrow}</span>
-          </span>
+          ${col.key !== 'actions' ? `
+            <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+              <span class="sort-up">${upArrow}</span>
+              <span class="sort-down">${downArrow}</span>
+            </span>` : ""}
         </th>
       `;
     }).join("");
 
     const rowsHtml = payments.map(p => `
-      <tr>
+      <tr data-id="${p.payment_id}">
         <td>${escapeHtml(formatDateTimeFull(p.payment_date))}</td>
         <td>${escapeHtml(p.contact_name)}</td>
         <td>${escapeHtml(p.payment_amount.toFixed(2))}</td>
         <td>${escapeHtml(p.invoice_number || "")}</td>
         <td>${escapeHtml(p.referral_name || "")}</td>
         <td>
-          <input type="checkbox"
-                 class="needsReviewCheckbox"
-                 data-id="${p.payment_id}"
-                 ${p.needs_review ? "checked" : ""} />
+          <button class="btn-edit" data-id="${p.payment_id}">Edit</button>
+          <button class="btn-delete" data-id="${p.payment_id}">Delete</button>
+        </td>
+      </tr>
+
+      <tr class="edit-row" id="edit-${p.payment_id}" style="display:none;">
+        <td colspan="6">
+          <div class="edit-container">
+            <label>Date:
+              <input type="date" class="edit-date" value="${p.payment_date.split('T')[0]}">
+            </label>
+
+            <label>Amount:
+              <input type="number" class="edit-amount" value="${p.payment_amount}">
+            </label>
+
+            <label>Invoice #:
+              <input type="text" class="edit-invoice" value="${p.invoice_number || ""}">
+            </label>
+
+            <button class="btn-save" data-id="${p.payment_id}">Save</button>
+            <button class="btn-cancel" data-id="${p.payment_id}">Cancel</button>
+          </div>
         </td>
       </tr>
     `).join("");
@@ -579,10 +599,7 @@ async function renderFinancialList(container, portalState) {
         <h3>Payments List</h3>
         <table class="notes-table">
           <thead>
-            <tr>
-              ${headerHtml}
-              <th>Needs Review</th>
-            </tr>
+            <tr>${headerHtml}</tr>
           </thead>
           <tbody>
             ${rowsHtml || `<tr><td colspan="6">(no payments found)</td></tr>`}
@@ -591,7 +608,7 @@ async function renderFinancialList(container, portalState) {
       </section>
     `;
 
-    // Wire sorting
+    // Sorting
     container.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
@@ -607,31 +624,71 @@ async function renderFinancialList(container, portalState) {
       });
     });
 
-    // Wire checkbox updates
-    container.querySelectorAll(".needsReviewCheckbox").forEach(cb => {
-      cb.addEventListener("change", async (e) => {
-        const paymentId = e.target.dataset.id;
-        const checked = e.target.checked;
-        try {
-          await fetch(`https://financials-module.dennis-e64.workers.dev/payments/updateNeedsReview`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              payment_id: paymentId,
-              needs_review: checked,
-              project: portalState.project
-            })
-          });
-        } catch (err) {
-          e.target.checked = !checked;
-          alert("Update failed. Please try again.");
-        }
+    // Edit button
+    container.querySelectorAll(".btn-edit").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id;
+        const row = container.querySelector(`#edit-${id}`);
+        row.style.display = row.style.display === "none" ? "table-row" : "none";
+      });
+    });
+
+    // Cancel button
+    container.querySelectorAll(".btn-cancel").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id;
+        const row = container.querySelector(`#edit-${id}`);
+        row.style.display = "none";
+      });
+    });
+
+    // Save button
+    container.querySelectorAll(".btn-save").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id;
+        const row = container.querySelector(`#edit-${id}`);
+
+        const date = row.querySelector(".edit-date").value;
+        const amount = Number(row.querySelector(".edit-amount").value);
+        const invoice = row.querySelector(".edit-invoice").value;
+
+        await fetch(`https://financials-module.dennis-e64.workers.dev/payments/update`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            payment_id: id,
+            payment_date: date,
+            payment_amount: amount,
+            invoice_number: invoice,
+            project: portalState.project
+          })
+        });
+
+        renderFinancialList(container, portalState);
+      });
+    });
+
+    // Delete button
+    container.querySelectorAll(".btn-delete").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id;
+
+        if (!confirm("Delete this payment? This cannot be undone.")) return;
+
+        await fetch(`https://financials-module.dennis-e64.workers.dev/payments/delete`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ payment_id: id, project: portalState.project })
+        });
+
+        renderFinancialList(container, portalState);
       });
     });
   }
 
   renderTable();
 }
+
 
 
 /* =========================================================
