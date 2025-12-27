@@ -109,10 +109,9 @@ async function renderGroupList(container, portalState) {
 
   const tableDiv = container.querySelector("#groupTable");
 
-  // ⭐ NEW: Fetch ALL groups, not just ROI view
-  const url = `https://groups-module.dennis-e64.workers.dev/groups/list?project=${portalState.project}&limit=1000`;
+  // Fetch ROI summary view
+  const url = `https://groups-module.dennis-e64.workers.dev/groups/roi-list?project=${portalState.project}&limit=500`;
   const res = await fetch(url, { cache: "no-cache" });
-
   let groups = await res.json();
   if (!Array.isArray(groups)) groups = groups.rows || [];
   if (!Array.isArray(groups)) groups = [];
@@ -191,6 +190,7 @@ async function renderGroupList(container, portalState) {
         <td><button class="btn-primary btn-select" data-id="${g.group_id}">Select</button></td>
       </tr>
     `).join("");
+
 
     tableDiv.innerHTML = `
       <h4>Showing ${groups.length} ${prevName ? "filtered" : "recent"} groups</h4>
