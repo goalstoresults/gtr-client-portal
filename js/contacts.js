@@ -752,6 +752,7 @@ async function renderContactRelationships(container, portalState, contactId) {
 
 
 // ✅ SOURCE GRID — FULLY EDITABLE
+// ✅ SOURCE GRID — FULLY EDITABLE
 async function renderContactRelationshipsSource(container, portalState, contactId) {
   const url = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${portalState.project}&source_contact_id=${contactId}`;
   const res = await fetch(url, { cache: "no-cache" });
@@ -780,7 +781,13 @@ async function renderContactRelationshipsSource(container, portalState, contactI
                 <td>${r.financial_referral ? "✅" : ""}</td>
                 <td>${formatDateTime(r.created_at)}</td>
                 <td>
-                  <button class="btn-secondary btn-edit" data-id="${r.id}">Edit</button>
+                  <button 
+                    class="btn-secondary btn-edit" 
+                    data-id="${r.id}"
+                    data-related-name="${escapeHtml(r.related_contact_name || "")}"
+                  >
+                    Edit
+                  </button>
                   <button class="btn-danger btn-delete" data-id="${r.id}">Delete</button>
                 </td>
               </tr>
@@ -798,7 +805,8 @@ async function renderContactRelationshipsSource(container, portalState, contactI
       openRelationshipForm(content, portalState, {
         mode: "edit",
         relationshipId: btn.dataset.id,
-        contactId
+        contactId,
+        relatedName: btn.dataset.relatedName   // ⭐ THIS IS THE KEY
       });
     });
   });
@@ -966,7 +974,7 @@ async function renderContactRelationshipsReferralSummary(container, portalState,
 // Full, drop-in relationship form (mirrors Notes pattern)
 // 🔧 Relationship Form (Add/Edit)
 // Full, drop-in relationship form (mirrors Notes pattern)
-async function openRelationshipForm(container, portalState, { mode, contactId, relationshipId, fixedSide }) {
+async function openRelationshipForm(container, portalState, { mode, contactId, relationshipId, fixedSide, relatedName }) {
   const projectId = portalState.project;
   if (!projectId) {
     container.innerHTML = `<section class="card"><p>Missing project.</p></section>`;
@@ -1010,26 +1018,15 @@ async function openRelationshipForm(container, portalState, { mode, contactId, r
   const sourceId  = relationship?.source_contact_id  || contactId || "";
   const relatedId = relationship?.related_contact_id || "";
 
-  // ⭐ NEW: fallback lookup if relatedId not found in the 500-row list
-  if (relatedId && !contactMap[relatedId]) {
-    try {
-      const res = await fetch(
-        `https://contacts-module.dennis-e64.workers.dev/contacts/details/${relatedId}?project=${encodeURIComponent(projectId)}`,
-        { cache: "no-cache" }
-      );
-      const c = await res.json();
-      if (c && c.contact_id) {
-        const name = c.contact_name || `${c.first_name || ""} ${c.last_name || ""}`.trim();
-        contactMap[c.contact_id] = name || c.contact_id;
-      }
-    } catch (err) {
-      console.warn("Fallback contact lookup failed", err);
-    }
-  }
-
   // Step 4: resolve names
-  const sourceName  = contactMap[sourceId]  || sourceId  || "(unknown)";
-  const relatedName = contactMap[relatedId] || relatedId || "(unknown)";
+  const sourceName = contactMap[sourceId] || sourceId || "(unknown)";
+
+  // ⭐ Key part: prefer the passed-in relatedName, fall back to map, then id
+  const resolvedRelatedName =
+    relatedName ||
+    contactMap[relatedId] ||
+    relatedId ||
+    "(unknown)";
 
   // Step 5: build form HTML
   container.innerHTML = `
@@ -1045,7 +1042,7 @@ async function openRelationshipForm(container, portalState, { mode, contactId, r
         <div class="row" style="gap:12px; align-items:center;">
           <label style="min-width:160px;">Related contact</label>
           <input type="hidden" name="related_contact_id" value="${escapeHtml(relatedId)}">
-          <span class="muted">${escapeHtml(relatedName)}</span>
+          <span class="muted">${escapeHtml(resolvedRelatedName)}</span>
           <button type="button" class="secondary" id="btnPickRelated">Pick</button>
         </div>
 
