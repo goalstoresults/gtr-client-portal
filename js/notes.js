@@ -335,10 +335,8 @@ async function renderReview(container, portalState, noteId) {
     const note = data.note;
     const relationships = data.relationships || [];
 
-    // Hydrate clientId
     portalState.clientId = note.client_id || note.contact_id || null;
 
-    // Update context bar
     const contextBar = document.getElementById("contact-context-bar");
     if (contextBar) {
       contextBar.textContent = note.contact_name
@@ -348,10 +346,10 @@ async function renderReview(container, portalState, noteId) {
 
     container.innerHTML = `
       <section class="card">
-        <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+        <div class="row" style="gap:12px; margin-bottom:12px;">
           <h2 style="margin:0;">Notes Review: ${escapeHtml(note.subject || "(no subject)")}</h2>
           <button id="btnSetClient" class="primary">Set Client</button>
-          <button id="btnDeleteNote" class="primary" style="background:#e53935;">Delete</button>
+          <button id="btnDeleteNote" class="danger">Delete</button>
         </div>
 
         <section id="setClientForm" class="card" style="display:none; margin-bottom:16px;">
@@ -369,20 +367,20 @@ async function renderReview(container, portalState, noteId) {
         <p><strong>Created:</strong> ${note.created}</p>
         <p><strong>Client:</strong> ${note.contact_name || "(unknown)"} (${note.contact_email || ""})</p>
 
-        <label>Status:
-          <select id="noteStatus">
-            <option value="pending">Pending</option>
-            <option value="important">Important</option>
-            <option value="not_important">Not Important</option>
-          </select>
-        </label>
+        <div class="row" style="gap:12px; margin-top:12px; align-items:center;">
+          <label>Status:
+            <select id="noteStatus" class="form-control" style="min-width:160px;">
+              <option value="pending">Pending</option>
+              <option value="important">Important</option>
+              <option value="not_important">Not Important</option>
+            </select>
+          </label>
 
-        <label style="margin-left:12px;">
-          <input type="checkbox" id="noteNeedsReview" />
-          Needs Review
-        </label>
+          <label>
+            <input type="checkbox" id="noteNeedsReview" />
+            Needs Review
+          </label>
 
-        <div style="margin-top:12px;">
           <button id="btnSaveNoteMeta" class="primary">Save</button>
         </div>
 
@@ -397,12 +395,12 @@ async function renderReview(container, portalState, noteId) {
         ` : ""}
 
         ${Array.isArray(relationships) && relationships.length > 0 ? `
-          <div style="display:flex; align-items:center; gap:12px; margin-top:20px;">
+          <div class="row" style="gap:12px; margin-top:20px;">
             <h3 style="margin:0;">Relationships Detected in Note</h3>
             ${
               note.contact_id
                 ? `<button id="btnRelationships" class="primary">Notes Relationships</button>`
-                : `<span style="color:#999;">(need to set client to continue)</span>`
+                : `<span class="muted">(need to set client to continue)</span>`
             }
           </div>
           <table class="notes-table" style="margin-top:12px;">
@@ -431,11 +429,9 @@ async function renderReview(container, portalState, noteId) {
       </section>
     `;
 
-    // Pre-fill editable fields
     document.getElementById("noteStatus").value = note.status || "pending";
     document.getElementById("noteNeedsReview").checked = !!note.needs_review;
 
-    // Save handler
     document.getElementById("btnSaveNoteMeta").addEventListener("click", async () => {
       const status = document.getElementById("noteStatus").value;
       const needsReview = document.getElementById("noteNeedsReview").checked;
@@ -463,13 +459,11 @@ async function renderReview(container, portalState, noteId) {
       }
     });
 
-    // Toggle Set Client form
     document.getElementById("btnSetClient").addEventListener("click", () => {
       const form = document.getElementById("setClientForm");
       form.style.display = form.style.display === "none" ? "block" : "none";
     });
 
-    // Relationships button
     const relBtn = document.getElementById("btnRelationships");
     if (relBtn) {
       relBtn.addEventListener("click", () => {
@@ -479,7 +473,6 @@ async function renderReview(container, portalState, noteId) {
       });
     }
 
-    // Delete handler (unchanged)
     document.getElementById("btnDeleteNote").addEventListener("click", async () => {
       if (!confirm("Are you sure you want to delete this note and all its relationships?")) return;
 
@@ -510,9 +503,8 @@ async function renderReview(container, portalState, noteId) {
       }
     });
 
-    // Set Client search logic (unchanged)
     document.getElementById("btnFindClient").addEventListener("click", async () => {
-      // ... existing search logic ...
+      // Your existing search logic goes here
     });
 
   } catch (err) {
@@ -520,7 +512,6 @@ async function renderReview(container, portalState, noteId) {
     console.error(err);
   }
 }
-
 
 
 
