@@ -1144,10 +1144,6 @@ async function openRelationshipForm(container, portalState, { mode, contactId, r
     const last  = document.getElementById("rel-last").value.trim();
 
     if (!first && !last) { alert("Enter at least a first or last name."); return; }
-    if ((first && first.length < 3) || (last && last.length < 3)) {
-      alert("Names must be at least 3 characters.");
-      return;
-    }
 
     const filters = [`project.eq.${projectId}`];
     if (first) filters.push(`first_name.ilike.*${first}*`);
