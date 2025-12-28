@@ -1006,13 +1006,32 @@ async function openRelationshipForm(container, portalState, { mode, contactId, r
     if (c.contact_id) contactMap[c.contact_id] = name || c.contact_id;
   });
 
-  // Step 3: resolve IDs and names
+  // Step 3: resolve IDs
   const sourceId  = relationship?.source_contact_id  || contactId || "";
   const relatedId = relationship?.related_contact_id || "";
-  const sourceName  = contactMap[sourceId]  || sourceId || "(unknown)";
+
+  // ⭐ NEW: fallback lookup if relatedId not found in the 500-row list
+  if (relatedId && !contactMap[relatedId]) {
+    try {
+      const res = await fetch(
+        `https://contacts-module.dennis-e64.workers.dev/contacts/details/${relatedId}?project=${encodeURIComponent(projectId)}`,
+        { cache: "no-cache" }
+      );
+      const c = await res.json();
+      if (c && c.contact_id) {
+        const name = c.contact_name || `${c.first_name || ""} ${c.last_name || ""}`.trim();
+        contactMap[c.contact_id] = name || c.contact_id;
+      }
+    } catch (err) {
+      console.warn("Fallback contact lookup failed", err);
+    }
+  }
+
+  // Step 4: resolve names
+  const sourceName  = contactMap[sourceId]  || sourceId  || "(unknown)";
   const relatedName = contactMap[relatedId] || relatedId || "(unknown)";
 
-  // Step 4: build form HTML
+  // Step 5: build form HTML
   container.innerHTML = `
     <section class="card">
       <h3>${mode === "edit" ? "Edit Relationship" : "Add Relationship"}</h3>
@@ -1088,7 +1107,7 @@ async function openRelationshipForm(container, portalState, { mode, contactId, r
       });
     });
 
-  // ✅ AUTO‑CHECK FINANCIAL REFERRAL WHEN TYPE = REFERRAL
+  // Auto-check financial referral when type = Referral
   typeSelect.addEventListener("change", () => {
     if (typeSelect.value === "Referral") {
       document.querySelector('input[name="financial_referral"]').checked = true;
@@ -1111,17 +1130,18 @@ async function openRelationshipForm(container, portalState, { mode, contactId, r
       });
     });
 
-  // Step 5: wire cancel
+  // Cancel
   document.getElementById("btnCancel")?.addEventListener("click", () => {
     renderContactRelationships(container, portalState, contactId);
   });
 
-  // Step 6: wire pick related
+  // Toggle related picker
   document.getElementById("btnPickRelated")?.addEventListener("click", () => {
     const picker = document.getElementById("relatedPicker");
     picker.style.display = picker.style.display === "none" ? "block" : "none";
   });
 
+  // Find related contact
   document.getElementById("btnFindRel")?.addEventListener("click", async () => {
     const first = document.getElementById("rel-first").value.trim();
     const last  = document.getElementById("rel-last").value.trim();
@@ -1175,7 +1195,7 @@ async function openRelationshipForm(container, portalState, { mode, contactId, r
     }
   });
 
-  // Step 7: submit handler
+  // Submit handler
   document.getElementById("relationshipForm")?.addEventListener("submit", async e => {
     e.preventDefault();
     const form = e.currentTarget;
