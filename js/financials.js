@@ -15,17 +15,10 @@ window.autoMatchContact = async function(id) {
     return;
   }
 
-  // Call backend auto-match (now resolves contact, referral, group)
-  const res = await fetch(
+  await fetch(
     `https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=${project}`
   );
 
-  let data = {};
-  try {
-    data = await res.json();
-  } catch {}
-
-  // Always reload grid to reflect updated contact/referral/group
   loadStagingData();
 };
 
@@ -37,47 +30,33 @@ window.insertStagingRow = async function(id) {
     return;
   }
 
-  // Fetch the row so we can validate referral/group before calling backend
   const rowEl = document.querySelector(`#row-${id}`);
   if (!rowEl) return;
 
   const contact = rowEl.querySelector(".contact-cell")?.textContent.trim();
-  const referral = rowEl.querySelector(".referral-cell")?.textContent.trim();
-  const group = rowEl.querySelector(".group-cell")?.textContent.trim();
 
-  // Block insert if referral or group missing
-  if (!referral || referral === "(none)") {
-    alert("Cannot import: missing referral_id. Fix in Contact Relationships.");
+  // Only block if contact missing
+  if (!contact || contact === "(none)") {
+    alert("Cannot import: missing contact_id.");
     return;
   }
 
-  if (!group || group === "(none)") {
-    alert("Cannot import: missing group_id. Fix in Referral Contact Profile.");
-    return;
-  }
-
-  // Show inserting state
   const actionCell = rowEl.querySelector(".action-cell");
   if (actionCell) {
     actionCell.innerHTML = `<span style="color:#555;">Inserting...</span>`;
   }
 
-  // Call backend to insert
   const res = await fetch(
     `https://financials-module.dennis-e64.workers.dev/payments/add-from-staging?id=${id}&project=${project}`,
     { method: "POST" }
   );
 
   let data = {};
-  try {
-    data = await res.json();
-  } catch {}
+  try { data = await res.json(); } catch {}
 
   if (res.ok) {
-    // Success — reload grid
     loadStagingData();
   } else {
-    // Failure — show Fix Row button
     if (actionCell) {
       actionCell.innerHTML = `<button onclick="fixRow('${id}')">Fix Row</button>`;
     }
@@ -104,7 +83,6 @@ window.fixRow = async function(id) {
   const amount = rowEl.children[3].textContent.trim();
   const contact = rowEl.querySelector(".contact-cell").textContent.trim();
 
-  // Build modal
   const modal = document.createElement("div");
   modal.style = `
     position:fixed; top:0; left:0; width:100%; height:100%;
@@ -143,18 +121,8 @@ window.fixRow = async function(id) {
   modal.querySelector("#fix_cancel").onclick = () => modal.remove();
 
   modal.querySelector("#fix_save").onclick = async () => {
-    const updated = {
-      id,
-      customer_name: document.getElementById("fix_customer").value.trim(),
-      invoice_number: document.getElementById("fix_invoice").value.trim(),
-      payment_date: document.getElementById("fix_date").value.trim(),
-      payment_amount: document.getElementById("fix_amount").value.trim(),
-      contact_id: document.getElementById("fix_contact").value.trim() || null,
-      status: "ready",
-      error_message: ""
-    };
+    const updatedContact = document.getElementById("fix_contact").value.trim() || null;
 
-    // Update staging row (contact_id only — referral/group are canonical)
     await fetch(
       `https://financials-module.dennis-e64.workers.dev/staging/update`,
       {
@@ -162,8 +130,8 @@ window.fixRow = async function(id) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id,
-          contact_id: updated.contact_id,
-          needs_review: updated.contact_id ? false : true,
+          contact_id: updatedContact,
+          needs_review: updatedContact ? false : true,
           notes: ""
         })
       }
@@ -201,6 +169,44 @@ async function loadStagingData() {
 
   const res = await fetch(url);
 
+  let rows = [];
+  try { rows = await res.json(); } catch {}
+
+  renderStagingGrid(rows);
+}
+
+
+// ------------------------------------------------------------
+// FRONTEND: Canonical call to backend payment insert
+// ------------------------------------------------------------
+async function addPaymentWithReferral({
+  project,
+  contact_id,
+  payment_amount,
+  payment_date,
+ invoice_number
+}) {
+  const res = await fetch(
+    `https://financials-module.dennis-e64.workers.dev/payments/add`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        project,
+        contact_id,
+        payment_amount,
+        payment_date,
+        invoice_number
+      })
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error("Payment insert failed");
+  }
+
+  return await res.json();
+}
 
 // ------------------------------------------------------------
 // FRONTEND: Canonical call to backend payment insert
