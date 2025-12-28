@@ -1146,8 +1146,8 @@ async function openRelationshipForm(container, portalState, { mode, contactId, r
     if (!first && !last) { alert("Enter at least a first or last name."); return; }
 
     const filters = [`project.eq.${projectId}`];
-    if (first) filters.push(`first_name.ilike.*${first}*`);
-    if (last)  filters.push(`last_name.ilike.*${last}*`);
+    if (first) filters.push(`first_name.ilike.${first}*`);
+    if (last)  filters.push(`last_name.ilike.${last}*`);
 
     const query = filters.length > 1 ? `and=(${filters.join(",")})` : filters[0];
     const url = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${query}&select=contact_id,first_name,last_name,email,contact_type`;
