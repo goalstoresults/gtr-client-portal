@@ -180,32 +180,26 @@ window.refreshStagingGrid = function() {
 };
 
 
-window.loadStagingData = async function() {
+// ------------------------------------------------------------
+// load staging data
+// ------------------------------------------------------------
+async function loadStagingData() {
   const project = window.portalState?.project;
   if (!project) {
+    console.error("No project selected.");
     renderStagingGrid([]);
     return;
   }
 
+  // Default filter: exclude imported
   const filter = document.getElementById("stagingFilter")?.value || "";
-  let url = `https://financials-module.dennis-e64.workers.dev/staging/list?project=${project}`;
+  const isDefault = filter === "";
 
-  if (filter === "missing_contact") url += "&contact_missing=true";
-  if (filter === "missing_referral") url += "&referral_missing=true";
-  if (filter === "missing_group") url += "&group_missing=true";
-  if (filter === "ready") url += "&status=ready";
-  if (filter === "error") url += "&status=error";
-  if (filter === "imported") url += "&status=imported";
+  const url = isDefault
+    ? `https://financials-module.dennis-e64.workers.dev/staging/list?project=${project}&status=neq.imported`
+    : `https://financials-module.dennis-e64.workers.dev/staging/list?project=${project}&status=${filter}`;
 
   const res = await fetch(url);
-
-  let rows = [];
-  try {
-    rows = await res.json();
-  } catch {}
-
-  renderStagingGrid(rows);
-};
 
 
 // ------------------------------------------------------------
@@ -1421,30 +1415,31 @@ function renderStagingGrid(rows) {
    ACTION BUTTON LOGIC (Insert gating)
 ========================================================= */
 function renderStagingActionButton(row) {
-  const missingReferral = !row.referral_id;
-  const missingGroup = !row.group_id;
+  const hasContact = !!row.contact_id;
 
-  // Block insert if referral/group missing
-  if (missingReferral || missingGroup) {
-    return `<span style="color:red;">Fix referral/group</span>`;
+  // Only block insert if contact is missing
+  if (!hasContact) {
+    return `<span style="color:red;">Missing contact</span>`;
   }
 
   switch (row.status) {
     case "uploaded":
       return `<button onclick="autoMatchContact('${row.id}')">Populate</button>`;
+
     case "matched":
     case "ready":
       return `<button onclick="insertStagingRow('${row.id}')">Insert</button>`;
+
     case "error":
       return `<button onclick="fixRow('${row.id}')">Fix Row</button>`;
+
     case "imported":
       return `<span style="color:green;">Imported</span>`;
+
     default:
       return "";
   }
 }
-
-
 
 
 
