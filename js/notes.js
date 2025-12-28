@@ -348,8 +348,8 @@ async function renderReview(container, portalState, noteId) {
       <section class="card">
         <div class="row" style="gap:12px; margin-bottom:12px;">
           <h2 style="margin:0;">Notes Review: ${escapeHtml(note.subject || "(no subject)")}</h2>
-          <button id="btnSetClient" class="primary">Set Client</button>
-          <button id="btnDeleteNote" class="danger">Delete</button>
+          <button id="btnSetClient" class="btn-secondary btn-edit">Set Client</button>
+          <button id="btnDeleteNote" class="btn-danger btn-delete">Delete</button>
         </div>
 
         <section id="setClientForm" class="card" style="display:none; margin-bottom:16px;">
@@ -357,7 +357,7 @@ async function renderReview(container, portalState, noteId) {
           <div class="row" style="gap:12px; margin-bottom:12px;">
             <input id="filter-first" placeholder="First name" />
             <input id="filter-last" placeholder="Last name" />
-            <button id="btnFindClient" class="primary">Find</button>
+            <button id="btnFindClient" class="btn-primary">Find</button>
           </div>
           <div id="clientSearchResults" class="muted">Enter criteria and click Find.</div>
         </section>
@@ -381,7 +381,7 @@ async function renderReview(container, portalState, noteId) {
             Needs Review
           </label>
 
-          <button id="btnSaveNoteMeta" class="primary">Save</button>
+          <button id="btnSaveNoteMeta" class="btn-primary">Save</button>
         </div>
 
         <p><strong>Summary:</strong></p>
@@ -399,7 +399,7 @@ async function renderReview(container, portalState, noteId) {
             <h3 style="margin:0;">Relationships Detected in Note</h3>
             ${
               note.contact_id
-                ? `<button id="btnRelationships" class="primary">Notes Relationships</button>`
+                ? `<button id="btnRelationships" class="btn-primary">Notes Relationships</button>`
                 : `<span class="muted">(need to set client to continue)</span>`
             }
           </div>
