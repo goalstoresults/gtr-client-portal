@@ -1,6 +1,10 @@
 // /api/create-note.js
 // Node-compatible GitHub Worker (serverless function)
 
+if (req.method === "GET") {
+  return res.status(200).send("✅ create-note Worker is alive. POST to this endpoint.");
+}
+
 import { DateTime } from "luxon";
 import OpenAI from "openai";
 
