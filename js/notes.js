@@ -87,7 +87,7 @@ async function loadNotesSubtab(subtab, portalState) {
 /* Notes History (GET /notes-history-module) */
 async function renderHistory(container, portalState) {
   try {
-    const reviewOnly = !!document.getElementById("filter-review-only")?.checked;
+    const reviewOnly = document.getElementById("filter-review-only")?.checked ?? true;
     const name = document.getElementById("filter-name")?.value.trim() || "";
 
     // Fetch notes
