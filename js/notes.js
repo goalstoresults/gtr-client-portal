@@ -529,18 +529,98 @@ async function renderReview(container, portalState, noteId) {
       }
     });
 
-    // --------------------------
-    // FIND CLIENT (existing logic)
-    // --------------------------
-    document.getElementById("btnFindClient").addEventListener("click", async () => {
-      // existing search logic stays untouched
-    });
+// --------------------------
+// FIND CLIENT (FULLY FIXED VERSION)
+// --------------------------
+document.getElementById("btnFindClient").addEventListener("click", async () => {
+  const first = document.getElementById("filter-first").value.trim();
+  const last = document.getElementById("filter-last").value.trim();
+  const resultsDiv = document.getElementById("clientSearchResults");
 
-  } catch (err) {
-    container.innerHTML = `<p>Error loading note review: ${err.message}</p>`;
-    console.error(err);
+  // Reset results area
+  resultsDiv.innerHTML = "Searching...";
+
+  // Require at least one field
+  if (!first && !last) {
+    resultsDiv.textContent = "❌ Enter at least a first or last name.";
+    return;
   }
-}
+
+  // Build filters
+  const filters = [`project.eq.${portalState.project}`];
+  if (first) filters.push(`first_name.ilike.${first}*`);
+  if (last)  filters.push(`last_name.ilike.${last}*`);
+
+  const query =
+    filters.length > 1
+      ? `and=(${filters.join(",")})`
+      : filters[0];
+
+  const url = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${query}&select=contact_id,first_name,last_name,email,contact_type`;
+
+  console.log("[FindClient] URL:", url);
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      const msg = await res.text().catch(() => "");
+      resultsDiv.textContent = `❌ Search failed (${res.status}). ${msg}`;
+      return;
+    }
+
+    const contacts = await res.json();
+
+    if (!Array.isArray(contacts) || contacts.length === 0) {
+      resultsDiv.innerHTML = "<div class='muted'>No contacts found.</div>";
+      return;
+    }
+
+    // Render results
+    resultsDiv.innerHTML = contacts
+      .map(
+        c => `
+        <div class="contact-result"
+             data-id="${c.contact_id}"
+             data-name="${c.first_name} ${c.last_name}"
+             data-type="${c.contact_type || ""}"
+             data-email="${c.email || ""}">
+          <strong>${c.first_name} ${c.last_name}</strong> (${c.contact_type || "No type"})<br/>
+          <small>${c.email || "No email"}</small>
+        </div>
+      `
+      )
+      .join("");
+
+    // Wire click handlers
+    resultsDiv.querySelectorAll(".contact-result").forEach(el => {
+      el.addEventListener("click", async () => {
+        const contactId = el.dataset.id;
+        const contactName = el.dataset.name;
+        const contactType = el.dataset.type;
+        const contactEmail = el.dataset.email;
+
+        console.log("[FindClient] Selected:", {
+          contactId,
+          contactName,
+          contactType,
+          contactEmail
+        });
+
+        await attachClientToNote(
+          contactId,
+          contactName,
+          contactType,
+          contactEmail,
+          portalState
+        );
+      });
+    });
+  } catch (err) {
+    console.error("[FindClient] Error:", err);
+    resultsDiv.textContent = "❌ Network error searching contacts.";
+  }
+});
+
 
 
       
