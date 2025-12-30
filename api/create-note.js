@@ -1,14 +1,15 @@
 // /api/create_note.js
-// Cloudflare Worker version — full, copy‑paste‑safe
+// Cloudflare Worker — full, clean, no Luxon
 
-import { DateTime } from "luxon";
 import OpenAI from "openai";
 
 /* ============================================================
-   EXTRACTION PROMPT (unchanged)
+   EXTRACTION PROMPT (YOUR FULL PROMPT GOES HERE)
 ============================================================ */
-const EXTRACTION_PROMPT = `...`;
-// (KEEP YOUR FULL PROMPT HERE — unchanged)
+const EXTRACTION_PROMPT = `
+You are an AI that extracts structured data from a note.
+... (KEEP YOUR FULL PROMPT EXACTLY AS YOU HAVE IT)
+`;
 
 /* ============================================================
    SAFE JSON PARSER
@@ -51,7 +52,7 @@ function safeParseExtraction(text) {
 }
 
 /* ============================================================
-   CANONICAL createNote() FUNCTION
+   CANONICAL createNote()
 ============================================================ */
 async function createNote({
   project,
@@ -68,22 +69,14 @@ async function createNote({
       throw new Error("Missing required fields: project or note");
     }
 
-    // 1. Fetch project timezone
-    const { data: tzData, error: tzError } = await supabase
-      .from("projects_config")
-      .select("timezone")
-      .eq("project", project)
-      .single();
+    // ----------------------------------------
+    // 1. Determine final note_date (simple UTC)
+    // ----------------------------------------
+    const finalNoteDate = note_date || new Date().toISOString().slice(0, 10);
 
-    if (tzError) throw tzError;
-
-    const timezone = tzData?.timezone || "UTC";
-
-    // 2. Determine final note_date
-    const todayInTZ = DateTime.now().setZone(timezone).toISODate();
-    const finalNoteDate = note_date || todayInTZ;
-
-    // 3. Insert note
+    // ----------------------------------------
+    // 2. Insert note into notes_history
+    // ----------------------------------------
     const { data: noteInsert, error: noteError } = await supabase
       .from("notes_history")
       .insert([
@@ -106,7 +99,9 @@ async function createNote({
 
     const note_id = noteInsert.id;
 
-    // 4. AI extraction
+    // ----------------------------------------
+    // 3. AI extraction
+    // ----------------------------------------
     const client = new OpenAI({ apiKey: openaiApiKey });
 
     const aiResponse = await client.responses.create({
@@ -128,7 +123,9 @@ async function createNote({
     const todos = extraction.todos || [];
     const followups_raw = extraction.followups_raw || [];
 
-    // 5. Patch summary
+    // ----------------------------------------
+    // 4. Patch summary
+    // ----------------------------------------
     if (summary) {
       await supabase
         .from("notes_history")
@@ -136,7 +133,9 @@ async function createNote({
         .eq("id", note_id);
     }
 
-    // 6. Insert relationships
+    // ----------------------------------------
+    // 5. Insert relationships
+    // ----------------------------------------
     let relationshipsCreated = 0;
 
     for (const rel of relationships) {
@@ -162,7 +161,9 @@ async function createNote({
       if (!relError) relationshipsCreated++;
     }
 
-    // 7. Insert todos
+    // ----------------------------------------
+    // 6. Insert todos
+    // ----------------------------------------
     let todosCreated = 0;
 
     for (const todo of todos) {
@@ -187,6 +188,9 @@ async function createNote({
       if (!todoError) todosCreated++;
     }
 
+    // ----------------------------------------
+    // 7. Return results
+    // ----------------------------------------
     return {
       success: true,
       note_id,
@@ -204,11 +208,10 @@ async function createNote({
 }
 
 /* ============================================================
-   WORKER ENTRYPOINT (REQUIRED)
+   WORKER ENTRYPOINT
 ============================================================ */
 export default {
   async fetch(request, env) {
-    // CORS
     const cors = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
