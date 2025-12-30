@@ -110,7 +110,15 @@ async function renderContactList(container, portalState) {
         <h2>Contact List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
 
         <div id="contactsFilters" style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-          <label>First: <input type="text" id="filter-first" value="${escapeHtml(prevFirst)}" /></label>
+
+          <label>
+            First:
+            <input type="text" id="filter-first" value="${escapeHtml(prevFirst)}" />
+            <div style="font-size:0.75em; color:#666; margin-top:2px;">
+              Tip: Type “ALL” for full list, or “A-J” for a range.
+            </div>
+          </label>
+
           <label>Last: <input type="text" id="filter-last" value="${escapeHtml(prevLast)}" /></label>
           <label>Business: <input type="text" id="filter-business" value="${escapeHtml(prevBusiness)}" /></label>
 
@@ -159,29 +167,52 @@ async function renderContactList(container, portalState) {
       const last     = document.getElementById("filter-last").value.trim();
       const business = document.getElementById("filter-business").value.trim();
       const type     = document.getElementById("filter-contact-type").value;
-    
-      // ✅ Allow search if first OR last has at least 1 character
-      const hasMinimumInput = first.length >= 1 || last.length >= 1 || business.length >= 1 || type;
-    
+
+      // --- NEW: detect special patterns ---
+      const isAll = first.toUpperCase() === "ALL";
+      const rangeMatch = first.match(/^([A-Za-z])-([A-Za-z])$/);
+
+      // --- Minimum input rule ---
+      const hasMinimumInput =
+        first.length >= 1 ||
+        last.length >= 1 ||
+        business.length >= 1 ||
+        type.length >= 1;
+
       if (!hasMinimumInput) {
-        tableDiv.innerHTML = `<p>(no contacts found — enter at least 1 character in First or Last)</p>`;
+        tableDiv.innerHTML = `<p>(no contacts found — enter a filter or use “ALL”)</p>`;
         return;
       }
-    
+
+      // --- Build params ---
       const params = new URLSearchParams({
         project: portalState.project,
-        first,
+        first: isAll || rangeMatch ? "" : first,
         last,
         business
       });
-    
+
       const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
       const resList = await fetch(url, { cache: "no-cache" });
       contacts = await resList.json();
       if (!Array.isArray(contacts)) contacts = [];
-    
+
+      // --- Type filter ---
       if (type) contacts = contacts.filter(c => c.contact_type === type);
-    
+
+      // --- NEW: Apply A-J range filtering ---
+      if (rangeMatch) {
+        const start = rangeMatch[1].toUpperCase();
+        const end   = rangeMatch[2].toUpperCase();
+
+        contacts = contacts.filter(c => {
+          const letter = (c.first_name || "").charAt(0).toUpperCase();
+          return letter >= start && letter <= end;
+        });
+      }
+
+      // --- “ALL” means no first-name filtering (already handled) ---
+
       // Fetch dynamic field config
       const fieldsRes = await fetch(
         `https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${portalState.project}`,
@@ -190,123 +221,117 @@ async function renderContactList(container, portalState) {
       const fieldsData = await fieldsRes.json();
       const fields = Array.isArray(fieldsData.rows) ? fieldsData.rows : [];
       fields.sort((a, b) => a.sort_order - b.sort_order);
-    
+
       listFields = fields.filter(f => f.contact_tab === "list");
-    
+
       renderSortedTable();
     }
 
-
     // --- Step 5: Render sorted table ---
-function renderSortedTable() {
-  const sorted = [...contacts];
+    function renderSortedTable() {
+      const sorted = [...contacts];
 
-  if (currentSortField) {
-    sorted.sort((a, b) => {
-      const valA = (a[currentSortField] || "").toLowerCase();
-      const valB = (b[currentSortField] || "").toLowerCase();
-      return currentSortDirection === "asc"
-        ? valA.localeCompare(valB)
-        : valB.localeCompare(valA);
-    });
-  }
-
-  // ✅ Always show both arrows (△▽), bold the active one (▲▼)
-  const headers = listFields.map(f => {
-    const isSorted = currentSortField === f.field_key;
-
-    const upArrow   = isSorted && currentSortDirection === "asc"  ? "▲" : "△";
-    const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
-
-    return `
-      <th class="sortable" data-field="${f.field_key}">
-        ${escapeHtml(f.label || f.field_key)}
-        <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-          <span class="sort-up">${upArrow}</span>
-          <span class="sort-down">${downArrow}</span>
-        </span>
-      </th>
-    `;
-  }).join("");
-
-  // ✅ ROW RENDERER — THIS IS WHERE updated_at GETS FORMATTED
-  const rows = sorted.map(c => {
-    const cells = listFields.map(f => {
-      const key = f.field_key;
-
-      // ✅ Format updated_at using your helper
-      if (key === "updated_at") {
-        return `<td>${formatDateTime(c.updated_at)}</td>`;
+      if (currentSortField) {
+        sorted.sort((a, b) => {
+          const valA = (a[currentSortField] || "").toLowerCase();
+          const valB = (b[currentSortField] || "").toLowerCase();
+          return currentSortDirection === "asc"
+            ? valA.localeCompare(valB)
+            : valB.localeCompare(valA);
+        });
       }
 
-      // ✅ Default: escape and print normally
-      return `<td>${escapeHtml(c[key] || "")}</td>`;
-    }).join("");
+      const headers = listFields.map(f => {
+        const isSorted = currentSortField === f.field_key;
 
-    return `
-      <tr>
-        ${cells}
-        <td><button class="btn-primary btn-select" data-id="${c.contact_id}">Select</button></td>
-      </tr>
-    `;
-  }).join("");
+        const upArrow   = isSorted && currentSortDirection === "asc"  ? "▲" : "△";
+        const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
 
-  tableDiv.innerHTML = `
-    <h4>Showing ${sorted.length} contacts</h4>
-    <table class="notes-table">
-      <thead><tr>${headers}<th>Actions</th></tr></thead>
-      <tbody>
-        ${rows || `<tr><td colspan="${listFields.length + 1}">(no contacts found)</td></tr>`}
-      </tbody>
-    </table>
-  `;
+        return `
+          <th class="sortable" data-field="${f.field_key}">
+            ${escapeHtml(f.label || f.field_key)}
+            <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+              <span class="sort-up">${upArrow}</span>
+              <span class="sort-down">${downArrow}</span>
+            </span>
+          </th>
+        `;
+      }).join("");
 
-  // ✅ Wire select buttons
-  tableDiv.querySelectorAll(".btn-select").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const contactId = btn.dataset.id;
-      portalState.selectedContactId = contactId;
+      const rows = sorted.map(c => {
+        const cells = listFields.map(f => {
+          const key = f.field_key;
 
-      const res = await fetch(
-        `https://contacts-module.dennis-e64.workers.dev/contacts/details/${contactId}`,
-        { cache: "no-cache" }
-      );
-      const data = await res.json();
-      const contact = Array.isArray(data) ? data[0] : data;
+          if (key === "updated_at") {
+            return `<td>${formatDateTime(c.updated_at)}</td>`;
+          }
 
-      portalState.selectedContactName =
-        contact.search_name ||
-        `${contact.first_name || ""} ${contact.last_name || ""}`.trim();
+          return `<td>${escapeHtml(c[key] || "")}</td>`;
+        }).join("");
 
-      const contextBar = document.getElementById("contact-context-bar");
-      if (contextBar) contextBar.textContent = `Contact: ${portalState.selectedContactName}`;
+        return `
+          <tr>
+            ${cells}
+            <td><button class="btn-primary btn-select" data-id="${c.contact_id}">Select</button></td>
+          </tr>
+        `;
+      }).join("");
 
-      document.querySelectorAll("#contacts-subtabs button").forEach(b => b.classList.remove("active"));
-      const detailsBtn = document.querySelector('#contacts-subtabs button[data-subtab="details"]');
-      if (detailsBtn) detailsBtn.classList.add("active");
+      tableDiv.innerHTML = `
+        <h4>Showing ${sorted.length} contacts</h4>
+        <table class="notes-table">
+          <thead><tr>${headers}<th>Actions</th></tr></thead>
+          <tbody>
+            ${rows || `<tr><td colspan="${listFields.length + 1}">(no contacts found)</td></tr>`}
+          </tbody>
+        </table>
+      `;
 
-      const content = document.querySelector("#contactsContent");
-      await renderContactDetails(content, portalState, contactId);
-    });
-  });
+      // Wire select buttons
+      tableDiv.querySelectorAll(".btn-select").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const contactId = btn.dataset.id;
+          portalState.selectedContactId = contactId;
 
-  // ✅ Wire sortable headers
-  tableDiv.querySelectorAll("th.sortable").forEach(th => {
-    th.addEventListener("click", () => {
-      const field = th.dataset.field;
+          const res = await fetch(
+            `https://contacts-module.dennis-e64.workers.dev/contacts/details/${contactId}`,
+            { cache: "no-cache" }
+          );
+          const data = await res.json();
+          const contact = Array.isArray(data) ? data[0] : data;
 
-      if (currentSortField === field) {
-        currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
-      } else {
-        currentSortField = field;
-        currentSortDirection = "asc";
-      }
+          portalState.selectedContactName =
+            contact.search_name ||
+            `${contact.first_name || ""} ${contact.last_name || ""}`.trim();
 
-      renderSortedTable();
-    });
-  });
-}
+          const contextBar = document.getElementById("contact-context-bar");
+          if (contextBar) contextBar.textContent = `Contact: ${portalState.selectedContactName}`;
 
+          document.querySelectorAll("#contacts-subtabs button").forEach(b => b.classList.remove("active"));
+          const detailsBtn = document.querySelector('#contacts-subtabs button[data-subtab="details"]');
+          if (detailsBtn) detailsBtn.classList.add("active");
+
+          const content = document.querySelector("#contactsContent");
+          await renderContactDetails(content, portalState, contactId);
+        });
+      });
+
+      // Wire sortable headers
+      tableDiv.querySelectorAll("th.sortable").forEach(th => {
+        th.addEventListener("click", () => {
+          const field = th.dataset.field;
+
+          if (currentSortField === field) {
+            currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+          } else {
+            currentSortField = field;
+            currentSortDirection = "asc";
+          }
+
+          renderSortedTable();
+        });
+      });
+    }
 
     // --- Step 6: Wire filter buttons ---
     document.getElementById("btnApplyContactsFilter").addEventListener("click", applyFilter);
@@ -328,166 +353,6 @@ function renderSortedTable() {
   }
 }
 
-
-
-// 🔧 Add Contact Form (same structure as Details, but POST + new contact_id)
-async function renderAddContactForm(container, portalState) {
-  const projectId = portalState.project;
-  if (!projectId) {
-    container.innerHTML = `<section class="card"><p>No project selected.</p></section>`;
-    return;
-  }
-
-  // Fetch configured fields
-  const fieldsRes = await fetch(
-    `https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${projectId}`,
-    { cache: "no-cache" }
-  );
-  const fieldsData = await fieldsRes.json();
-  let fields = Array.isArray(fieldsData.rows) ? fieldsData.rows : [];
-  fields.sort((a, b) => a.sort_order - b.sort_order);
-
-  // Use Add tab fields for consistency
-  fields = fields.filter(f => f.contact_tab === "add");
-
-  // Header and Save button moved inside the form, top-aligned
-  container.innerHTML = `
-      <section class="card">
-        <form id="addContactForm" class="notes-form">
-          <div class="form-header" style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-            <h2 style="margin:0;">Add Contact for ${escapeHtml(portalState.display_name || projectId)}</h2>
-            <button type="submit" class="btn-primary">Save Contact</button>
-          </div>
-          <!-- fields will be appended here -->
-        </form>
-      </section>
-
-  `;
-
-  const form = container.querySelector("#addContactForm");
-
-  // Group fields by section
-  const grouped = fields.reduce((acc, f) => {
-    const section = f.section || "General";
-    if (!acc[section]) acc[section] = [];
-    acc[section].push(f);
-    return acc;
-  }, {});
-
-  // Render each section
-  for (const [section, sectionFields] of Object.entries(grouped)) {
-    const sectionHeader = document.createElement("h3");
-    sectionHeader.textContent = section;
-    sectionHeader.className = "section-title";
-    form.appendChild(sectionHeader);
-
-    for (const f of sectionFields) {
-      const wrapper = document.createElement("div");
-      wrapper.className = "notes-row";
-
-      const label = document.createElement("label");
-      label.textContent = f.label || f.field_key;
-      label.className = "notes-label";
-
-      let input;
-
-      if (f.field_key === "group_id") {
-        input = document.createElement("select");
-        input.name = "group_id";
-        input.className = "form-control";
-
-        fetch(`https://groups-module.dennis-e64.workers.dev/groups/list?project=${projectId}`)
-          .then(r => r.json())
-          .then(data => {
-            const rows = Array.isArray(data.rows) ? data.rows : Array.isArray(data) ? data : [];
-            rows.sort((a, b) => (a.group_name || "").localeCompare(b.group_name || ""));
-            const placeholder = document.createElement("option");
-            placeholder.value = "";
-            placeholder.textContent = "-- Select Group --";
-            input.appendChild(placeholder);
-            rows.forEach(g => {
-              const opt = document.createElement("option");
-              opt.value = g.group_id; // full UUID
-              opt.textContent = g.group_name;
-              input.appendChild(opt);
-            });
-          });
-      } else if (f.lookup_type) {
-        input = document.createElement("select");
-        input.name = f.field_key;
-        input.className = "form-control";
-
-        fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=${f.lookup_type}&project=${projectId}`)
-          .then(r => r.json())
-          .then(values => {
-            if (!Array.isArray(values)) return;
-            values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
-            const placeholder = document.createElement("option");
-            placeholder.value = "";
-            placeholder.textContent = "-- Select --";
-            input.appendChild(placeholder);
-            values.forEach(v => {
-              const opt = document.createElement("option");
-              opt.value = v.value;
-              opt.textContent = v.label || v.value;
-              input.appendChild(opt);
-            });
-          });
-      } else {
-        input = document.createElement("input");
-        input.type = "text";
-        input.name = f.field_key;
-        input.className = "form-control";
-      }
-
-      wrapper.appendChild(label);
-      wrapper.appendChild(input);
-      form.appendChild(wrapper);
-    }
-  }
-
-  // Handle form submission with normalization
-  form.addEventListener("submit", async e => {
-    e.preventDefault();
-    const formData = new FormData(form);
-    const payload = {};
-
-    fields.forEach(f => {
-      let val = formData.get(f.field_key);
-
-      if (val === "") {
-        payload[f.field_key] = null;
-      } else if (f.data_type === "integer") {
-        const parsed = parseInt(val, 10);
-        payload[f.field_key] = isNaN(parsed) ? null : parsed;
-      } else {
-        payload[f.field_key] = val; // preserve UUIDs and strings
-      }
-    });
-
-    payload.contact_id = crypto.randomUUID();
-    payload.project = projectId;
-    payload.created_at = new Date().toISOString();
-
-    // Build contact_name consistently
-    const first = formData.get("first_name") || "";
-    const last = formData.get("last_name") || "";
-    payload.contact_name = `${first} ${last}`.trim();
-
-    try {
-      const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      const result = await res.json();
-      container.innerHTML = `<section class="card"><p>${escapeHtml(result.message || "Contact saved.")}</p></section>`;
-    } catch (err) {
-      container.innerHTML = `<section class="card"><p>Error saving contact: ${escapeHtml(err.message)}</p></section>`;
-    }
-  });
-}
 
 
 
