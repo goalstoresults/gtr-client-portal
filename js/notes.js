@@ -277,7 +277,7 @@ function formatDateTimeSafe(value) {
 /* Add (POST /notes-history-module) */
 function renderAdd(container, portalState) {
   container.innerHTML = `
-    <h4>Add Note (v2.0.0)</h4>
+    <h4>Add Note (v1.2.8)</h4>
 
     <label>Date:</label>
     <input type="date" id="noteDate" style="width:200px;margin-bottom:8px;" />
@@ -289,53 +289,24 @@ function renderAdd(container, portalState) {
 
   document.getElementById("btnSaveNote").addEventListener("click", async () => {
     const content = document.getElementById("noteContent").value.trim();
-    const noteDate = document.getElementById("noteDate").value;
+    const noteDate = document.getElementById("noteDate").value; // YYYY-MM-DD
 
-    if (!content) {
-      document.getElementById("noteAddResult").textContent = "Please enter a note.";
-      return;
-    }
+    if (!content) return;
 
     try {
-      const res = await fetch(
-        "https://notes-history-module.dennis-e64.workers.dev/notes/add",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            project: portalState.project,
-            contact_id: portalState.contactId || null,
-            note_date: noteDate || null,
-            content: content,     // Worker expects "content" or "raw_text"
-            raw_text: content,    // send both for safety
-            source: "manual",
-            metadata: {}
-          })
-        }
-      );
+      const res = await fetch("https://add-note-module.dennis-e64.workers.dev", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project: portalState.project,
+          raw_text: content,
+          note_date: noteDate || null   // send null if empty
+        })
+      });
 
       const data = await res.json();
-
-      if (data.status !== "ok") {
-        document.getElementById("noteAddResult").textContent =
-          `Error: ${data.error || "Unknown error"}`;
-        return;
-      }
-
-      document.getElementById("noteAddResult").textContent = "Note saved!";
-
-      console.log("Summary:", data.note.summary);
-      console.log("Relationships:", data.relationships);
-      console.log("Todos:", data.todos);
-      console.log("Followups:", data.followups_raw);
-
-      document.getElementById("noteContent").value = "";
-      document.getElementById("noteDate").value = "";
-
-      if (typeof renderHistory === "function") {
-        renderHistory(document.getElementById("notes-history"), portalState);
-      }
-
+      document.getElementById("noteAddResult").textContent =
+        data.success || data.status === "ok" ? "Note saved!" : `Error: ${data.error||"Unknown error"}`;
     } catch (err) {
       document.getElementById("noteAddResult").textContent = `Error: ${err.message}`;
     }
