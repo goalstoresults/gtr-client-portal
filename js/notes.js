@@ -277,7 +277,7 @@ function formatDateTimeSafe(value) {
 /* Add (POST /notes-history-module) */
 function renderAdd(container, portalState) {
   container.innerHTML = `
-    <h4>Add Note (v1.2.8)</h4>
+    <h4>Add Note (v2.0.0)</h4>
 
     <label>Date:</label>
     <input type="date" id="noteDate" style="width:200px;margin-bottom:8px;" />
@@ -291,22 +291,51 @@ function renderAdd(container, portalState) {
     const content = document.getElementById("noteContent").value.trim();
     const noteDate = document.getElementById("noteDate").value; // YYYY-MM-DD
 
-    if (!content) return;
+    if (!content) {
+      document.getElementById("noteAddResult").textContent = "Please enter a note.";
+      return;
+    }
 
     try {
-      const res = await fetch("https://add-note-module.dennis-e64.workers.dev", {
+      const res = await fetch("/api/create_note", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           project: portalState.project,
-          raw_text: content,
-          note_date: noteDate || null   // send null if empty
+          contact_id: portalState.contactId || null,   // may be null
+          note_date: noteDate || null,
+          note: content,
+          source: "manual",
+          metadata: {}
         })
       });
 
       const data = await res.json();
-      document.getElementById("noteAddResult").textContent =
-        data.success || data.status === "ok" ? "Note saved!" : `Error: ${data.error||"Unknown error"}`;
+
+      if (!data.success) {
+        document.getElementById("noteAddResult").textContent =
+          `Error: ${data.error || "Unknown error"}`;
+        return;
+      }
+
+      // Show success
+      document.getElementById("noteAddResult").textContent = "Note saved!";
+
+      // Optional: log AI extraction for now
+      console.log("Summary:", data.summary);
+      console.log("Relationships:", data.relationships);
+      console.log("Todos:", data.todos);
+      console.log("Followups:", data.followups_raw);
+
+      // Clear form
+      document.getElementById("noteContent").value = "";
+      document.getElementById("noteDate").value = "";
+
+      // Refresh history
+      if (typeof renderHistory === "function") {
+        renderHistory(document.getElementById("notes-history"), portalState);
+      }
+
     } catch (err) {
       document.getElementById("noteAddResult").textContent = `Error: ${err.message}`;
     }
