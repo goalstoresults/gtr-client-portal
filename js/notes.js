@@ -289,7 +289,7 @@ function renderAdd(container, portalState) {
 
   document.getElementById("btnSaveNote").addEventListener("click", async () => {
     const content = document.getElementById("noteContent").value.trim();
-    const noteDate = document.getElementById("noteDate").value; // YYYY-MM-DD
+    const noteDate = document.getElementById("noteDate").value;
 
     if (!content) {
       document.getElementById("noteAddResult").textContent = "Please enter a note.";
@@ -297,41 +297,41 @@ function renderAdd(container, portalState) {
     }
 
     try {
-      const res = await fetch("/api/create_note", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          project: portalState.project,
-          contact_id: portalState.contactId || null,   // may be null
-          note_date: noteDate || null,
-          note: content,
-          source: "manual",
-          metadata: {}
-        })
-      });
+      const res = await fetch(
+        "https://notes-history-module.dennis-e64.workers.dev/notes/add",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project: portalState.project,
+            contact_id: portalState.contactId || null,
+            note_date: noteDate || null,
+            content: content,     // Worker expects "content" or "raw_text"
+            raw_text: content,    // send both for safety
+            source: "manual",
+            metadata: {}
+          })
+        }
+      );
 
       const data = await res.json();
 
-      if (!data.success) {
+      if (data.status !== "ok") {
         document.getElementById("noteAddResult").textContent =
           `Error: ${data.error || "Unknown error"}`;
         return;
       }
 
-      // Show success
       document.getElementById("noteAddResult").textContent = "Note saved!";
 
-      // Optional: log AI extraction for now
-      console.log("Summary:", data.summary);
+      console.log("Summary:", data.note.summary);
       console.log("Relationships:", data.relationships);
       console.log("Todos:", data.todos);
       console.log("Followups:", data.followups_raw);
 
-      // Clear form
       document.getElementById("noteContent").value = "";
       document.getElementById("noteDate").value = "";
 
-      // Refresh history
       if (typeof renderHistory === "function") {
         renderHistory(document.getElementById("notes-history"), portalState);
       }
@@ -341,6 +341,10 @@ function renderAdd(container, portalState) {
     }
   });
 }
+
+
+
+
 
 /* Review (GET /note_review) */
 async function renderReview(container, portalState, noteId) {
