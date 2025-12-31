@@ -133,11 +133,16 @@ async function renderContactList(container, portalState) {
         </div>
 
         <div id="contactTable">(no contacts found)</div>
+
+        <!-- ⭐ NEW: Pagination controls placeholder -->
+        <div id="paginationControls" style="margin-top:12px;"></div>
+
       </section>
     `;
 
     const tableDiv   = container.querySelector("#contactTable");
     const typeSelect = document.getElementById("filter-contact-type");
+    const paginationDiv = document.getElementById("paginationControls");
 
     // --- Step 3: Populate Contact Type dropdown ---
     const resTypes = await fetch(
@@ -160,6 +165,10 @@ async function renderContactList(container, portalState) {
     let currentSortDirection = "asc";
     let contacts = [];
     let listFields = [];
+
+    // ⭐ NEW: Pagination state
+    portalState.currentPage = 1;
+    portalState.pageSize = 100;
 
     // --- Step 4: Apply filter ---
     async function applyFilter() {
@@ -184,6 +193,9 @@ async function renderContactList(container, portalState) {
         return;
       }
 
+      // ⭐ NEW: Reset to page 1 on new filter
+      portalState.currentPage = 1;
+
       // --- Build params ---
       const params = new URLSearchParams({
         project: portalState.project,
@@ -191,6 +203,10 @@ async function renderContactList(container, portalState) {
         last,
         business
       });
+
+      // ⭐ NEW: Add pagination params
+      params.set("page", String(portalState.currentPage));
+      params.set("page_size", String(portalState.pageSize));
 
       const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
       const resList = await fetch(url, { cache: "no-cache" });
@@ -211,8 +227,6 @@ async function renderContactList(container, portalState) {
         });
       }
 
-      // --- “ALL” means no first-name filtering (already handled) ---
-
       // Fetch dynamic field config
       const fieldsRes = await fetch(
         `https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${portalState.project}`,
@@ -225,6 +239,27 @@ async function renderContactList(container, portalState) {
       listFields = fields.filter(f => f.contact_tab === "list");
 
       renderSortedTable();
+      renderPaginationControls(params);
+    }
+
+    // ⭐ NEW: Render pagination controls
+    function renderPaginationControls(params) {
+      paginationDiv.innerHTML = `
+        <button id="btnNextPage" class="secondary">Next 100 →</button>
+      `;
+
+      document.getElementById("btnNextPage").addEventListener("click", async () => {
+        portalState.currentPage++;
+
+        params.set("page", String(portalState.currentPage));
+
+        const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
+        const resList = await fetch(url, { cache: "no-cache" });
+        contacts = await resList.json();
+        if (!Array.isArray(contacts)) contacts = [];
+
+        renderSortedTable();
+      });
     }
 
     // --- Step 5: Render sorted table ---
@@ -278,7 +313,7 @@ async function renderContactList(container, portalState) {
       }).join("");
 
       tableDiv.innerHTML = `
-        <h4>Showing ${sorted.length} contacts</h4>
+        <h4>Showing ${sorted.length} contacts (Page ${portalState.currentPage})</h4>
         <table class="notes-table">
           <thead><tr>${headers}<th>Actions</th></tr></thead>
           <tbody>
@@ -342,6 +377,7 @@ async function renderContactList(container, portalState) {
       document.getElementById("filter-business").value = "";
       document.getElementById("filter-contact-type").value = "";
       tableDiv.innerHTML = `(no contacts found)`;
+      paginationDiv.innerHTML = "";
     });
 
   } catch (err) {
