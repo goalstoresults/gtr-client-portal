@@ -107,7 +107,13 @@ async function renderContactList(container, portalState) {
     // --- Step 2: Build UI ---
     container.innerHTML = `
       <section class="card">
-        <h2>Contact List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
+
+        <h2 style="display:flex; justify-content:space-between; align-items:center;">
+          <span>Contact List for ${escapeHtml(portalState.display_name || portalState.project)}</span>
+          <a id="nextPageLink" href="#" style="font-size:0.9em; text-decoration:underline; cursor:pointer;">
+            Next 100 →
+          </a>
+        </h2>
 
         <div id="contactsFilters" style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
 
@@ -134,15 +140,12 @@ async function renderContactList(container, portalState) {
 
         <div id="contactTable">(no contacts found)</div>
 
-        <!-- ⭐ NEW: Pagination controls placeholder -->
-        <div id="paginationControls" style="margin-top:12px;"></div>
-
       </section>
     `;
 
     const tableDiv   = container.querySelector("#contactTable");
     const typeSelect = document.getElementById("filter-contact-type");
-    const paginationDiv = document.getElementById("paginationControls");
+    const nextPageLink = document.getElementById("nextPageLink");
 
     // --- Step 3: Populate Contact Type dropdown ---
     const resTypes = await fetch(
@@ -239,16 +242,16 @@ async function renderContactList(container, portalState) {
       listFields = fields.filter(f => f.contact_tab === "list");
 
       renderSortedTable();
-      renderPaginationControls(params);
+
+      // ⭐ NEW: Wire header-level pagination link
+      wireNextPageLink(params);
     }
 
-    // ⭐ NEW: Render pagination controls
-    function renderPaginationControls(params) {
-      paginationDiv.innerHTML = `
-        <button id="btnNextPage" class="secondary">Next 100 →</button>
-      `;
+    // ⭐ NEW: Header-level pagination link logic
+    function wireNextPageLink(params) {
+      nextPageLink.onclick = async (e) => {
+        e.preventDefault();
 
-      document.getElementById("btnNextPage").addEventListener("click", async () => {
         portalState.currentPage++;
 
         params.set("page", String(portalState.currentPage));
@@ -259,7 +262,7 @@ async function renderContactList(container, portalState) {
         if (!Array.isArray(contacts)) contacts = [];
 
         renderSortedTable();
-      });
+      };
     }
 
     // --- Step 5: Render sorted table ---
@@ -377,7 +380,6 @@ async function renderContactList(container, portalState) {
       document.getElementById("filter-business").value = "";
       document.getElementById("filter-contact-type").value = "";
       tableDiv.innerHTML = `(no contacts found)`;
-      paginationDiv.innerHTML = "";
     });
 
   } catch (err) {
