@@ -271,9 +271,22 @@ async function renderContactList(container, portalState) {
         `;
       }).join("");
 
+      let headerText = "";
+      
+      if (sorted.length >= 1500) {
+        headerText = `
+          <h4>Showing 1,500+ contacts (partial list)</h4>
+          <div style="font-size:0.85em; color:#666; margin-bottom:8px;">
+            Refine your filter to narrow results.
+          </div>
+        `;
+      } else {
+        headerText = `<h4>Showing ${sorted.length} contacts</h4>`;
+      }
+      
       tableDiv.innerHTML = `
-        <h4>Showing ${sorted.length} contacts</h4>
-
+        ${headerText}
+      
         <table class="notes-table">
           <thead><tr>${headers}<th>Actions</th></tr></thead>
           <tbody>
@@ -281,6 +294,7 @@ async function renderContactList(container, portalState) {
           </tbody>
         </table>
       `;
+
 
       // Select button
       tableDiv.querySelectorAll(".btn-select").forEach(btn => {
