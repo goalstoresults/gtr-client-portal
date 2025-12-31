@@ -159,6 +159,8 @@ async function renderContactList(container, portalState) {
 
     portalState.currentPage = 1;
     portalState.pageSize = 100;
+    portalState.totalCount = 0;
+    portalState.totalPages = 1;
 
     async function loadFieldsIfNeeded() {
       if (listFields.length > 0) return;
@@ -176,7 +178,19 @@ async function renderContactList(container, portalState) {
       const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
       const resList = await fetch(url, { cache: "no-cache" });
       const data = await resList.json();
-      contacts = Array.isArray(data) ? data : [];
+
+      // ⭐ SAFE METADATA HANDLING
+      if (Array.isArray(data)) {
+        // backend returned array only
+        contacts = data;
+        portalState.totalCount = data.length;
+        portalState.totalPages = 1;
+      } else {
+        // backend returned metadata
+        contacts = Array.isArray(data.rows) ? data.rows : [];
+        portalState.totalCount = data.total_count || contacts.length;
+        portalState.totalPages = data.total_pages || 1;
+      }
     }
 
     async function applyFilter() {
@@ -274,9 +288,9 @@ async function renderContactList(container, portalState) {
         `;
       }).join("");
 
-      // Pagination logic
+      // ⭐ Pagination logic using totals
       const showPrev = portalState.currentPage > 1;
-      const showNext = contacts.length === portalState.pageSize;
+      const showNext = portalState.currentPage < portalState.totalPages;
 
       const prevLink = showPrev
         ? `<a id="prevPageLink" href="#" style="margin-right:20px;">← Previous</a>`
@@ -287,10 +301,13 @@ async function renderContactList(container, portalState) {
         : `<span style="margin-left:20px; color:#ccc;">Next →</span>`;
 
       tableDiv.innerHTML = `
-        <h4>Showing ${sorted.length} contacts</h4>
+        <h4>
+          Showing ${sorted.length} of ${portalState.totalCount} contacts
+        </h4>
+
         <div style="display:flex; justify-content:center; align-items:center; gap:20px; margin-bottom:8px;">
           ${prevLink}
-          <span>Page ${portalState.currentPage}</span>
+          <span>Page ${portalState.currentPage} of ${portalState.totalPages}</span>
           ${nextLink}
         </div>
 
