@@ -179,20 +179,24 @@ async function renderContactList(container, portalState) {
       const resList = await fetch(url, { cache: "no-cache" });
       const data = await resList.json();
 
-      // Backend returns array only
       if (Array.isArray(data)) {
         contacts = data;
         return;
       }
 
-      // Backend returns metadata (future-proof)
       contacts = Array.isArray(data.rows) ? data.rows : [];
     }
 
     async function fetchCount(params) {
-      const url = `https://contacts-module.dennis-e64.workers.dev/contacts/count?${params}`;
+      // ⭐ Strip pagination params so count is correct
+      const countParams = new URLSearchParams(params);
+      countParams.delete("page");
+      countParams.delete("page_size");
+
+      const url = `https://contacts-module.dennis-e64.workers.dev/contacts/count?${countParams}`;
       const res = await fetch(url, { cache: "no-cache" });
       const data = await res.json();
+
       portalState.totalCount = data.total_count || 0;
       portalState.totalPages = Math.max(1, Math.ceil(portalState.totalCount / portalState.pageSize));
     }
@@ -219,12 +223,18 @@ async function renderContactList(container, portalState) {
 
       portalState.currentPage = 1;
 
-      const params = new URLSearchParams({
-        project: portalState.project,
-        first: isAll || rangeMatch ? "" : first,
-        last,
-        business
-      });
+      // ⭐ Build params WITHOUT empty filters
+      const params = new URLSearchParams({ project: portalState.project });
+
+      if (!isAll && !rangeMatch && first.length >= 1) {
+        params.set("first", first);
+      }
+      if (last.length >= 1) {
+        params.set("last", last);
+      }
+      if (business.length >= 1) {
+        params.set("business", business);
+      }
 
       params.set("page", String(portalState.currentPage));
       params.set("page_size", String(portalState.pageSize));
@@ -235,10 +245,8 @@ async function renderContactList(container, portalState) {
       // ⭐ THEN: get page rows
       await fetchPage(params);
 
-      // Client-side type filter
       if (type) contacts = contacts.filter(c => c.contact_type === type);
 
-      // Client-side range filter
       if (rangeMatch) {
         const start = rangeMatch[1].toUpperCase();
         const end   = rangeMatch[2].toUpperCase();
@@ -328,7 +336,6 @@ async function renderContactList(container, portalState) {
         </table>
       `;
 
-      // Previous page
       const prevPageLink = document.getElementById("prevPageLink");
       if (prevPageLink && showPrev) {
         prevPageLink.addEventListener("click", async (e) => {
@@ -341,7 +348,6 @@ async function renderContactList(container, portalState) {
         });
       }
 
-      // Next page
       const nextPageLink = document.getElementById("nextPageLink");
       if (nextPageLink && showNext) {
         nextPageLink.addEventListener("click", async (e) => {
@@ -354,7 +360,6 @@ async function renderContactList(container, portalState) {
         });
       }
 
-      // Select button
       tableDiv.querySelectorAll(".btn-select").forEach(btn => {
         btn.addEventListener("click", async () => {
           const contactId = btn.dataset.id;
@@ -383,7 +388,6 @@ async function renderContactList(container, portalState) {
         });
       });
 
-      // Sorting
       tableDiv.querySelectorAll("th.sortable").forEach(th => {
         th.addEventListener("click", () => {
           const field = th.dataset.field;
