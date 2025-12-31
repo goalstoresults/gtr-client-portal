@@ -273,9 +273,9 @@ async function renderContactList(container, portalState) {
 
       let headerText = "";
       
-      if (sorted.length >= 1500) {
+      if (sorted.length >= 1000) {
         headerText = `
-          <h4>Showing 1,500+ contacts (partial list)</h4>
+          <h4>Showing 1,000+ contacts (partial list)</h4>
           <div style="font-size:0.85em; color:#666; margin-bottom:8px;">
             Refine your filter to narrow results.
           </div>
