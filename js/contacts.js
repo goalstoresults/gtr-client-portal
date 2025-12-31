@@ -136,6 +136,7 @@ async function renderContactList(container, portalState) {
     const tableDiv   = container.querySelector("#contactTable");
     const typeSelect = document.getElementById("filter-contact-type");
 
+    // Load contact types
     const resTypes = await fetch(
       `https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=contact_type&project=${portalState.project}`
     );
@@ -158,6 +159,25 @@ async function renderContactList(container, portalState) {
 
     portalState.currentPage = 1;
     portalState.pageSize = 100;
+
+    async function loadFieldsIfNeeded() {
+      if (listFields.length > 0) return;
+      const fieldsRes = await fetch(
+        `https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${portalState.project}`,
+        { cache: "no-cache" }
+      );
+      const fieldsData = await fieldsRes.json();
+      const fields = Array.isArray(fieldsData.rows) ? fieldsData.rows : [];
+      fields.sort((a, b) => a.sort_order - b.sort_order);
+      listFields = fields.filter(f => f.contact_tab === "list");
+    }
+
+    async function fetchPage(params) {
+      const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
+      const resList = await fetch(url, { cache: "no-cache" });
+      const data = await resList.json();
+      contacts = Array.isArray(data) ? data : [];
+    }
 
     async function applyFilter() {
       const first    = document.getElementById("filter-first").value.trim();
@@ -191,10 +211,7 @@ async function renderContactList(container, portalState) {
       params.set("page", String(portalState.currentPage));
       params.set("page_size", String(portalState.pageSize));
 
-      const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
-      const resList = await fetch(url, { cache: "no-cache" });
-      contacts = await resList.json();
-      if (!Array.isArray(contacts)) contacts = [];
+      await fetchPage(params);
 
       if (type) contacts = contacts.filter(c => c.contact_type === type);
 
@@ -207,16 +224,7 @@ async function renderContactList(container, portalState) {
         });
       }
 
-      const fieldsRes = await fetch(
-        `https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${portalState.project}`,
-        { cache: "no-cache" }
-      );
-      const fieldsData = await fieldsRes.json();
-      const fields = Array.isArray(fieldsData.rows) ? fieldsData.rows : [];
-      fields.sort((a, b) => a.sort_order - b.sort_order);
-
-      listFields = fields.filter(f => f.contact_tab === "list");
-
+      await loadFieldsIfNeeded();
       renderSortedTable(params);
     }
 
@@ -266,15 +274,26 @@ async function renderContactList(container, portalState) {
         `;
       }).join("");
 
-      const nextLink = (contacts.length === portalState.pageSize)
-        ? `<a id="nextPageLink" href="#" style="margin-left:12px; font-size:0.9em;">Next 100 →</a>`
-        : "";
+      // Pagination logic
+      const showPrev = portalState.currentPage > 1;
+      const showNext = contacts.length === portalState.pageSize;
+
+      const prevLink = showPrev
+        ? `<a id="prevPageLink" href="#" style="margin-right:20px;">← Previous</a>`
+        : `<span style="margin-right:20px; color:#ccc;">← Previous</span>`;
+
+      const nextLink = showNext
+        ? `<a id="nextPageLink" href="#" style="margin-left:20px;">Next →</a>`
+        : `<span style="margin-left:20px; color:#ccc;">Next →</span>`;
 
       tableDiv.innerHTML = `
-        <h4>
-          Showing ${sorted.length} contacts (Page ${portalState.currentPage})
+        <h4>Showing ${sorted.length} contacts</h4>
+        <div style="display:flex; justify-content:center; align-items:center; gap:20px; margin-bottom:8px;">
+          ${prevLink}
+          <span>Page ${portalState.currentPage}</span>
           ${nextLink}
-        </h4>
+        </div>
+
         <table class="notes-table">
           <thead><tr>${headers}<th>Actions</th></tr></thead>
           <tbody>
@@ -283,22 +302,31 @@ async function renderContactList(container, portalState) {
         </table>
       `;
 
-      const nextPageLink = document.getElementById("nextPageLink");
-      if (nextPageLink) {
-        nextPageLink.addEventListener("click", async (e) => {
+      // Previous page
+      const prevPageLink = document.getElementById("prevPageLink");
+      if (prevPageLink && showPrev) {
+        prevPageLink.addEventListener("click", async (e) => {
           e.preventDefault();
-          portalState.currentPage++;
+          portalState.currentPage--;
           params.set("page", String(portalState.currentPage));
-
-          const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
-          const resList = await fetch(url, { cache: "no-cache" });
-          contacts = await resList.json();
-          if (!Array.isArray(contacts)) contacts = [];
-
+          await fetchPage(params);
           renderSortedTable(params);
         });
       }
 
+      // Next page
+      const nextPageLink = document.getElementById("nextPageLink");
+      if (nextPageLink && showNext) {
+        nextPageLink.addEventListener("click", async (e) => {
+          e.preventDefault();
+          portalState.currentPage++;
+          params.set("page", String(portalState.currentPage));
+          await fetchPage(params);
+          renderSortedTable(params);
+        });
+      }
+
+      // Select button
       tableDiv.querySelectorAll(".btn-select").forEach(btn => {
         btn.addEventListener("click", async () => {
           const contactId = btn.dataset.id;
@@ -327,6 +355,7 @@ async function renderContactList(container, portalState) {
         });
       });
 
+      // Sorting
       tableDiv.querySelectorAll("th.sortable").forEach(th => {
         th.addEventListener("click", () => {
           const field = th.dataset.field;
