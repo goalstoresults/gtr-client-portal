@@ -157,9 +157,6 @@ async function renderContactList(container, portalState) {
     let contacts = [];
     let listFields = [];
 
-    portalState.currentPage = 1;
-    portalState.pageSize = 100;
-
     async function loadFieldsIfNeeded() {
       if (listFields.length > 0) return;
       const fieldsRes = await fetch(
@@ -172,7 +169,7 @@ async function renderContactList(container, portalState) {
       listFields = fields.filter(f => f.contact_tab === "list");
     }
 
-    async function fetchPage(params) {
+    async function fetchAll(params) {
       const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
       const resList = await fetch(url, { cache: "no-cache" });
       const data = await resList.json();
@@ -199,19 +196,19 @@ async function renderContactList(container, portalState) {
         return;
       }
 
-      portalState.currentPage = 1;
+      const params = new URLSearchParams({ project: portalState.project });
 
-      const params = new URLSearchParams({
-        project: portalState.project,
-        first: isAll || rangeMatch ? "" : first,
-        last,
-        business
-      });
+      if (!isAll && !rangeMatch && first.length >= 1) {
+        params.set("first", first);
+      }
+      if (last.length >= 1) {
+        params.set("last", last);
+      }
+      if (business.length >= 1) {
+        params.set("business", business);
+      }
 
-      params.set("page", String(portalState.currentPage));
-      params.set("page_size", String(portalState.pageSize));
-
-      await fetchPage(params);
+      await fetchAll(params);
 
       if (type) contacts = contacts.filter(c => c.contact_type === type);
 
@@ -225,10 +222,10 @@ async function renderContactList(container, portalState) {
       }
 
       await loadFieldsIfNeeded();
-      renderSortedTable(params);
+      renderSortedTable();
     }
 
-    function renderSortedTable(params) {
+    function renderSortedTable() {
       const sorted = [...contacts];
 
       if (currentSortField) {
@@ -274,25 +271,8 @@ async function renderContactList(container, portalState) {
         `;
       }).join("");
 
-      // Pagination logic
-      const showPrev = portalState.currentPage > 1;
-      const showNext = contacts.length === portalState.pageSize;
-
-      const prevLink = showPrev
-        ? `<a id="prevPageLink" href="#" style="margin-right:20px;">← Previous</a>`
-        : `<span style="margin-right:20px; color:#ccc;">← Previous</span>`;
-
-      const nextLink = showNext
-        ? `<a id="nextPageLink" href="#" style="margin-left:20px;">Next →</a>`
-        : `<span style="margin-left:20px; color:#ccc;">Next →</span>`;
-
       tableDiv.innerHTML = `
         <h4>Showing ${sorted.length} contacts</h4>
-        <div style="display:flex; justify-content:center; align-items:center; gap:20px; margin-bottom:8px;">
-          ${prevLink}
-          <span>Page ${portalState.currentPage}</span>
-          ${nextLink}
-        </div>
 
         <table class="notes-table">
           <thead><tr>${headers}<th>Actions</th></tr></thead>
@@ -301,30 +281,6 @@ async function renderContactList(container, portalState) {
           </tbody>
         </table>
       `;
-
-      // Previous page
-      const prevPageLink = document.getElementById("prevPageLink");
-      if (prevPageLink && showPrev) {
-        prevPageLink.addEventListener("click", async (e) => {
-          e.preventDefault();
-          portalState.currentPage--;
-          params.set("page", String(portalState.currentPage));
-          await fetchPage(params);
-          renderSortedTable(params);
-        });
-      }
-
-      // Next page
-      const nextPageLink = document.getElementById("nextPageLink");
-      if (nextPageLink && showNext) {
-        nextPageLink.addEventListener("click", async (e) => {
-          e.preventDefault();
-          portalState.currentPage++;
-          params.set("page", String(portalState.currentPage));
-          await fetchPage(params);
-          renderSortedTable(params);
-        });
-      }
 
       // Select button
       tableDiv.querySelectorAll(".btn-select").forEach(btn => {
@@ -367,7 +323,7 @@ async function renderContactList(container, portalState) {
             currentSortDirection = "asc";
           }
 
-          renderSortedTable(params);
+          renderSortedTable();
         });
       });
     }
@@ -390,8 +346,6 @@ async function renderContactList(container, portalState) {
     console.error("[Contacts] Error in renderContactList:", err);
   }
 }
-
-
 
 
 
