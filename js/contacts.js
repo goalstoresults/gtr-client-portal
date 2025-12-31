@@ -179,18 +179,22 @@ async function renderContactList(container, portalState) {
       const resList = await fetch(url, { cache: "no-cache" });
       const data = await resList.json();
 
-      // ⭐ SAFE METADATA HANDLING
+      // Backend returns array only
       if (Array.isArray(data)) {
-        // backend returned array only
         contacts = data;
-        portalState.totalCount = data.length;
-        portalState.totalPages = 1;
-      } else {
-        // backend returned metadata
-        contacts = Array.isArray(data.rows) ? data.rows : [];
-        portalState.totalCount = data.total_count || contacts.length;
-        portalState.totalPages = data.total_pages || 1;
+        return;
       }
+
+      // Backend returns metadata (future-proof)
+      contacts = Array.isArray(data.rows) ? data.rows : [];
+    }
+
+    async function fetchCount(params) {
+      const url = `https://contacts-module.dennis-e64.workers.dev/contacts/count?${params}`;
+      const res = await fetch(url, { cache: "no-cache" });
+      const data = await res.json();
+      portalState.totalCount = data.total_count || 0;
+      portalState.totalPages = Math.max(1, Math.ceil(portalState.totalCount / portalState.pageSize));
     }
 
     async function applyFilter() {
@@ -225,10 +229,16 @@ async function renderContactList(container, portalState) {
       params.set("page", String(portalState.currentPage));
       params.set("page_size", String(portalState.pageSize));
 
+      // ⭐ FIRST: get total count
+      await fetchCount(params);
+
+      // ⭐ THEN: get page rows
       await fetchPage(params);
 
+      // Client-side type filter
       if (type) contacts = contacts.filter(c => c.contact_type === type);
 
+      // Client-side range filter
       if (rangeMatch) {
         const start = rangeMatch[1].toUpperCase();
         const end   = rangeMatch[2].toUpperCase();
@@ -288,7 +298,6 @@ async function renderContactList(container, portalState) {
         `;
       }).join("");
 
-      // ⭐ Pagination logic using totals
       const showPrev = portalState.currentPage > 1;
       const showNext = portalState.currentPage < portalState.totalPages;
 
@@ -326,6 +335,7 @@ async function renderContactList(container, portalState) {
           e.preventDefault();
           portalState.currentPage--;
           params.set("page", String(portalState.currentPage));
+
           await fetchPage(params);
           renderSortedTable(params);
         });
@@ -338,6 +348,7 @@ async function renderContactList(container, portalState) {
           e.preventDefault();
           portalState.currentPage++;
           params.set("page", String(portalState.currentPage));
+
           await fetchPage(params);
           renderSortedTable(params);
         });
@@ -407,7 +418,6 @@ async function renderContactList(container, portalState) {
     console.error("[Contacts] Error in renderContactList:", err);
   }
 }
-
 
 
 
