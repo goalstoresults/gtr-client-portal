@@ -98,25 +98,16 @@ export async function loadContactsTab({ portalState, tabContent }) {
 // 🔧 Contact List with dynamic grid based on project_contact_fields
 async function renderContactList(container, portalState) {
   try {
-    // --- Step 1: Capture previous filter values ---
     const prevFirst    = document.getElementById("filter-first")?.value.trim() || "";
     const prevLast     = document.getElementById("filter-last")?.value.trim() || "";
     const prevBusiness = document.getElementById("filter-business")?.value.trim() || "";
     const prevType     = document.getElementById("filter-contact-type")?.value || "";
 
-    // --- Step 2: Build UI ---
     container.innerHTML = `
       <section class="card">
-
-        <h2 style="display:flex; justify-content:space-between; align-items:center;">
-          <span>Contact List for ${escapeHtml(portalState.display_name || portalState.project)}</span>
-          <a id="nextPageLink" href="#" style="font-size:0.9em; text-decoration:underline; cursor:pointer;">
-            Next 100 →
-          </a>
-        </h2>
+        <h2>Contact List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
 
         <div id="contactsFilters" style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-
           <label>
             First:
             <input type="text" id="filter-first" value="${escapeHtml(prevFirst)}" />
@@ -139,15 +130,12 @@ async function renderContactList(container, portalState) {
         </div>
 
         <div id="contactTable">(no contacts found)</div>
-
       </section>
     `;
 
     const tableDiv   = container.querySelector("#contactTable");
     const typeSelect = document.getElementById("filter-contact-type");
-    const nextPageLink = document.getElementById("nextPageLink");
 
-    // --- Step 3: Populate Contact Type dropdown ---
     const resTypes = await fetch(
       `https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=contact_type&project=${portalState.project}`
     );
@@ -163,28 +151,23 @@ async function renderContactList(container, portalState) {
       });
     }
 
-    // --- Sorting state ---
     let currentSortField = null;
     let currentSortDirection = "asc";
     let contacts = [];
     let listFields = [];
 
-    // ⭐ NEW: Pagination state
     portalState.currentPage = 1;
     portalState.pageSize = 100;
 
-    // --- Step 4: Apply filter ---
     async function applyFilter() {
       const first    = document.getElementById("filter-first").value.trim();
       const last     = document.getElementById("filter-last").value.trim();
       const business = document.getElementById("filter-business").value.trim();
       const type     = document.getElementById("filter-contact-type").value;
 
-      // --- NEW: detect special patterns ---
       const isAll = first.toUpperCase() === "ALL";
       const rangeMatch = first.match(/^([A-Za-z])-([A-Za-z])$/);
 
-      // --- Minimum input rule ---
       const hasMinimumInput =
         first.length >= 1 ||
         last.length >= 1 ||
@@ -196,10 +179,8 @@ async function renderContactList(container, portalState) {
         return;
       }
 
-      // ⭐ NEW: Reset to page 1 on new filter
       portalState.currentPage = 1;
 
-      // --- Build params ---
       const params = new URLSearchParams({
         project: portalState.project,
         first: isAll || rangeMatch ? "" : first,
@@ -207,7 +188,6 @@ async function renderContactList(container, portalState) {
         business
       });
 
-      // ⭐ NEW: Add pagination params
       params.set("page", String(portalState.currentPage));
       params.set("page_size", String(portalState.pageSize));
 
@@ -216,21 +196,17 @@ async function renderContactList(container, portalState) {
       contacts = await resList.json();
       if (!Array.isArray(contacts)) contacts = [];
 
-      // --- Type filter ---
       if (type) contacts = contacts.filter(c => c.contact_type === type);
 
-      // --- NEW: Apply A-J range filtering ---
       if (rangeMatch) {
         const start = rangeMatch[1].toUpperCase();
         const end   = rangeMatch[2].toUpperCase();
-
         contacts = contacts.filter(c => {
           const letter = (c.first_name || "").charAt(0).toUpperCase();
           return letter >= start && letter <= end;
         });
       }
 
-      // Fetch dynamic field config
       const fieldsRes = await fetch(
         `https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${portalState.project}`,
         { cache: "no-cache" }
@@ -241,32 +217,10 @@ async function renderContactList(container, portalState) {
 
       listFields = fields.filter(f => f.contact_tab === "list");
 
-      renderSortedTable();
-
-      // ⭐ NEW: Wire header-level pagination link
-      wireNextPageLink(params);
+      renderSortedTable(params);
     }
 
-    // ⭐ NEW: Header-level pagination link logic
-    function wireNextPageLink(params) {
-      nextPageLink.onclick = async (e) => {
-        e.preventDefault();
-
-        portalState.currentPage++;
-
-        params.set("page", String(portalState.currentPage));
-
-        const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
-        const resList = await fetch(url, { cache: "no-cache" });
-        contacts = await resList.json();
-        if (!Array.isArray(contacts)) contacts = [];
-
-        renderSortedTable();
-      };
-    }
-
-    // --- Step 5: Render sorted table ---
-    function renderSortedTable() {
+    function renderSortedTable(params) {
       const sorted = [...contacts];
 
       if (currentSortField) {
@@ -281,7 +235,6 @@ async function renderContactList(container, portalState) {
 
       const headers = listFields.map(f => {
         const isSorted = currentSortField === f.field_key;
-
         const upArrow   = isSorted && currentSortDirection === "asc"  ? "▲" : "△";
         const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
 
@@ -299,11 +252,9 @@ async function renderContactList(container, portalState) {
       const rows = sorted.map(c => {
         const cells = listFields.map(f => {
           const key = f.field_key;
-
           if (key === "updated_at") {
             return `<td>${formatDateTime(c.updated_at)}</td>`;
           }
-
           return `<td>${escapeHtml(c[key] || "")}</td>`;
         }).join("");
 
@@ -315,8 +266,15 @@ async function renderContactList(container, portalState) {
         `;
       }).join("");
 
+      const nextLink = (contacts.length === portalState.pageSize)
+        ? `<a id="nextPageLink" href="#" style="margin-left:12px; font-size:0.9em;">Next 100 →</a>`
+        : "";
+
       tableDiv.innerHTML = `
-        <h4>Showing ${sorted.length} contacts (Page ${portalState.currentPage})</h4>
+        <h4>
+          Showing ${sorted.length} contacts (Page ${portalState.currentPage})
+          ${nextLink}
+        </h4>
         <table class="notes-table">
           <thead><tr>${headers}<th>Actions</th></tr></thead>
           <tbody>
@@ -325,7 +283,22 @@ async function renderContactList(container, portalState) {
         </table>
       `;
 
-      // Wire select buttons
+      const nextPageLink = document.getElementById("nextPageLink");
+      if (nextPageLink) {
+        nextPageLink.addEventListener("click", async (e) => {
+          e.preventDefault();
+          portalState.currentPage++;
+          params.set("page", String(portalState.currentPage));
+
+          const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
+          const resList = await fetch(url, { cache: "no-cache" });
+          contacts = await resList.json();
+          if (!Array.isArray(contacts)) contacts = [];
+
+          renderSortedTable(params);
+        });
+      }
+
       tableDiv.querySelectorAll(".btn-select").forEach(btn => {
         btn.addEventListener("click", async () => {
           const contactId = btn.dataset.id;
@@ -354,7 +327,6 @@ async function renderContactList(container, portalState) {
         });
       });
 
-      // Wire sortable headers
       tableDiv.querySelectorAll("th.sortable").forEach(th => {
         th.addEventListener("click", () => {
           const field = th.dataset.field;
@@ -366,12 +338,11 @@ async function renderContactList(container, portalState) {
             currentSortDirection = "asc";
           }
 
-          renderSortedTable();
+          renderSortedTable(params);
         });
       });
     }
 
-    // --- Step 6: Wire filter buttons ---
     document.getElementById("btnApplyContactsFilter").addEventListener("click", applyFilter);
 
     document.getElementById("btnClearContactsFilter").addEventListener("click", () => {
@@ -390,7 +361,6 @@ async function renderContactList(container, portalState) {
     console.error("[Contacts] Error in renderContactList:", err);
   }
 }
-
 
 
 
