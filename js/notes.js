@@ -404,17 +404,18 @@ async function renderReview(container, portalState, noteId) {
         <p style="margin-top:16px;"><strong>Summary:</strong></p>
         <p>${note.summary ? escapeHtml(note.summary) : "(no summary available)"}</p>
 
-        <!-- FOLLOWUPS RAW -->
-        ${
-          Array.isArray(note.followups_raw) && note.followups_raw.length > 0
-            ? `
-          <div style="margin-top:20px;">
-            <h3 style="margin:0;">AI‑Detected Follow‑Ups</h3>
-            <ul style="margin-top:8px; padding-left:20px;">
+        <!-- FOLLOWUPS RAW (EXPANDABLE) -->
+        <details style="margin-top:20px;">
+          <summary><strong>AI‑Detected Follow‑Ups</strong></summary>
+
+          ${
+            Array.isArray(note.followups_raw) && note.followups_raw.length > 0
+              ? `
+            <ul style="margin-top:12px; padding-left:20px;">
               ${note.followups_raw
                 .map(
                   f => `
-                <li>
+                <li style="margin-bottom:8px;">
                   <strong>${escapeHtml(f.text || "")}</strong>
                   <br/>
                   <span class="muted" style="font-size:0.9em;">
@@ -425,15 +426,12 @@ async function renderReview(container, portalState, noteId) {
                 )
                 .join("")}
             </ul>
-          </div>
-        `
-            : `
-          <div style="margin-top:20px;">
-            <h3 style="margin:0;">AI‑Detected Follow‑Ups</h3>
-            <p class="muted">(none detected)</p>
-          </div>
-        `
-        }
+          `
+              : `
+            <p class="muted" style="margin-top:12px;">(none detected)</p>
+          `
+          }
+        </details>
 
         <!-- RAW TEXT -->
         ${
@@ -513,9 +511,9 @@ async function renderReview(container, portalState, noteId) {
             id: portalState.selectedNoteId,
             updates: {
               review_status: status,
-              needs_review: needsReview,
-            },
-          }),
+              needs_review: needsReview
+            }
+          })
         });
 
         if (!res.ok) {
@@ -545,12 +543,8 @@ async function renderReview(container, portalState, noteId) {
     const relBtn = document.getElementById("btnRelationships");
     if (relBtn) {
       relBtn.addEventListener("click", () => {
-        document
-          .querySelectorAll("#notes-subtabs button")
-          .forEach(b => b.classList.remove("active"));
-        document
-          .querySelector('#notes-subtabs button[data-subtab="relationships"]')
-          ?.classList.add("active");
+        document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
+        document.querySelector('#notes-subtabs button[data-subtab="relationships"]')?.classList.add("active");
         renderRelationships(container, portalState);
       });
     }
@@ -571,12 +565,9 @@ async function renderReview(container, portalState, noteId) {
         alert("✅ Note and relationships deleted.");
 
         await renderHistory(container, portalState);
-        document
-          .querySelectorAll("#notes-subtabs button")
-          .forEach(b => b.classList.remove("active"));
-        document
-          .querySelector('#notes-subtabs button[data-subtab="history"]')
-          ?.classList.add("active");
+        document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
+        document.querySelector('#notes-subtabs button[data-subtab="history"]')?.classList.add("active");
+
       } catch (err) {
         alert("Error deleting note: " + err.message);
         console.error(err);
@@ -657,7 +648,7 @@ async function renderReview(container, portalState, noteId) {
               contactId,
               contactName,
               contactType,
-              contactEmail,
+              contactEmail
             });
 
             await attachClientToNote(
@@ -674,6 +665,7 @@ async function renderReview(container, portalState, noteId) {
         resultsDiv.textContent = "❌ Network error searching contacts.";
       }
     });
+
   } catch (err) {
     container.innerHTML = `<p>Error loading note review: ${escapeHtml(err.message)}</p>`;
     console.error(err);
