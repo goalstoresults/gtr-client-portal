@@ -178,27 +178,7 @@ async function renderContactList(container, portalState) {
       const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
       const resList = await fetch(url, { cache: "no-cache" });
       const data = await resList.json();
-
-      if (Array.isArray(data)) {
-        contacts = data;
-        return;
-      }
-
-      contacts = Array.isArray(data.rows) ? data.rows : [];
-    }
-
-    async function fetchCount(params) {
-      // ⭐ Strip pagination params so count is correct
-      const countParams = new URLSearchParams(params);
-      countParams.delete("page");
-      countParams.delete("page_size");
-
-      const url = `https://contacts-module.dennis-e64.workers.dev/contacts/count?${countParams}`;
-      const res = await fetch(url, { cache: "no-cache" });
-      const data = await res.json();
-
-      portalState.totalCount = data.total_count || 0;
-      portalState.totalPages = Math.max(1, Math.ceil(portalState.totalCount / portalState.pageSize));
+      contacts = Array.isArray(data) ? data : [];
     }
 
     async function applyFilter() {
@@ -239,10 +219,6 @@ async function renderContactList(container, portalState) {
       params.set("page", String(portalState.currentPage));
       params.set("page_size", String(portalState.pageSize));
 
-      // ⭐ FIRST: get total count
-      await fetchCount(params);
-
-      // ⭐ THEN: get page rows
       await fetchPage(params);
 
       if (type) contacts = contacts.filter(c => c.contact_type === type);
@@ -255,6 +231,9 @@ async function renderContactList(container, portalState) {
           return letter >= start && letter <= end;
         });
       }
+
+      portalState.totalCount = contacts.length;
+      portalState.totalPages = 1;
 
       await loadFieldsIfNeeded();
       renderSortedTable(params);
@@ -306,26 +285,15 @@ async function renderContactList(container, portalState) {
         `;
       }).join("");
 
-      const showPrev = portalState.currentPage > 1;
-      const showNext = portalState.currentPage < portalState.totalPages;
-
-      const prevLink = showPrev
-        ? `<a id="prevPageLink" href="#" style="margin-right:20px;">← Previous</a>`
-        : `<span style="margin-right:20px; color:#ccc;">← Previous</span>`;
-
-      const nextLink = showNext
-        ? `<a id="nextPageLink" href="#" style="margin-left:20px;">Next →</a>`
-        : `<span style="margin-left:20px; color:#ccc;">Next →</span>`;
-
       tableDiv.innerHTML = `
         <h4>
           Showing ${sorted.length} of ${portalState.totalCount} contacts
         </h4>
 
         <div style="display:flex; justify-content:center; align-items:center; gap:20px; margin-bottom:8px;">
-          ${prevLink}
+          <span style="margin-right:20px; color:#ccc;">← Previous</span>
           <span>Page ${portalState.currentPage} of ${portalState.totalPages}</span>
-          ${nextLink}
+          <span style="margin-left:20px; color:#ccc;">Next →</span>
         </div>
 
         <table class="notes-table">
@@ -335,30 +303,6 @@ async function renderContactList(container, portalState) {
           </tbody>
         </table>
       `;
-
-      const prevPageLink = document.getElementById("prevPageLink");
-      if (prevPageLink && showPrev) {
-        prevPageLink.addEventListener("click", async (e) => {
-          e.preventDefault();
-          portalState.currentPage--;
-          params.set("page", String(portalState.currentPage));
-
-          await fetchPage(params);
-          renderSortedTable(params);
-        });
-      }
-
-      const nextPageLink = document.getElementById("nextPageLink");
-      if (nextPageLink && showNext) {
-        nextPageLink.addEventListener("click", async (e) => {
-          e.preventDefault();
-          portalState.currentPage++;
-          params.set("page", String(portalState.currentPage));
-
-          await fetchPage(params);
-          renderSortedTable(params);
-        });
-      }
 
       tableDiv.querySelectorAll(".btn-select").forEach(btn => {
         btn.addEventListener("click", async () => {
