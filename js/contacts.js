@@ -136,6 +136,7 @@ async function renderContactList(container, portalState) {
     const tableDiv   = container.querySelector("#contactTable");
     const typeSelect = document.getElementById("filter-contact-type");
 
+    // Load contact types
     const resTypes = await fetch(
       `https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=contact_type&project=${portalState.project}`
     );
@@ -161,6 +162,9 @@ async function renderContactList(container, portalState) {
     portalState.totalCount = 0;
     portalState.totalPages = 1;
 
+    // ---------------------------
+    // APPLY FILTER
+    // ---------------------------
     async function applyFilter() {
       const first    = document.getElementById("filter-first").value.trim();
       const last     = document.getElementById("filter-last").value.trim();
@@ -187,27 +191,19 @@ async function renderContactList(container, portalState) {
         project: portalState.project,
         first: isAll || rangeMatch ? "" : first,
         last,
-        business,
-        count: "exact"
+        business
       });
 
       params.set("page", String(portalState.currentPage));
       params.set("page_size", String(portalState.pageSize));
 
       const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
-      const resList = await fetch(url, {
-        cache: "no-cache",
-        headers: { Prefer: "count=exact" }
-      });
-
-      const contentRange = resList.headers.get("content-range") || "0/0";
-      const totalCount = parseInt(contentRange.split("/")[1] || "0", 10);
-
+      const resList = await fetch(url, { cache: "no-cache" });
       const data = await resList.json();
-      contacts = Array.isArray(data) ? data : data.rows || [];
 
-      portalState.totalCount = totalCount;
-      portalState.totalPages = Math.max(1, Math.ceil(totalCount / portalState.pageSize));
+      contacts = Array.isArray(data.rows) ? data.rows : [];
+      portalState.totalCount = data.total_count || 0;
+      portalState.totalPages = data.total_pages || 1;
 
       if (type) contacts = contacts.filter(c => c.contact_type === type);
 
@@ -220,6 +216,7 @@ async function renderContactList(container, portalState) {
         });
       }
 
+      // Load list fields
       const fieldsRes = await fetch(
         `https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${portalState.project}`,
         { cache: "no-cache" }
@@ -231,6 +228,19 @@ async function renderContactList(container, portalState) {
       listFields = fields.filter(f => f.contact_tab === "list");
 
       renderSortedTable(params);
+    }
+
+    // ---------------------------
+    // RENDER TABLE
+    // ---------------------------
+    async function fetchPage(params) {
+      const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
+      const resList = await fetch(url, { cache: "no-cache" });
+      const data = await resList.json();
+
+      contacts = Array.isArray(data.rows) ? data.rows : [];
+      portalState.totalCount = data.total_count || 0;
+      portalState.totalPages = data.total_pages || 1;
     }
 
     function renderSortedTable(params) {
@@ -306,26 +316,14 @@ async function renderContactList(container, portalState) {
         </table>
       `;
 
+      // Pagination handlers
       const prevPageLink = document.getElementById("prevPageLink");
       if (prevPageLink) {
         prevPageLink.addEventListener("click", async (e) => {
           e.preventDefault();
           portalState.currentPage--;
           params.set("page", String(portalState.currentPage));
-
-          const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
-          const resList = await fetch(url, {
-            cache: "no-cache",
-            headers: { Prefer: "count=exact" }
-          });
-
-          const contentRange = resList.headers.get("content-range") || "0/0";
-          portalState.totalCount = parseInt(contentRange.split("/")[1] || "0", 10);
-          portalState.totalPages = Math.max(1, Math.ceil(portalState.totalCount / portalState.pageSize));
-
-          const data = await resList.json();
-          contacts = Array.isArray(data) ? data : data.rows || [];
-
+          await fetchPage(params);
           renderSortedTable(params);
         });
       }
@@ -336,24 +334,12 @@ async function renderContactList(container, portalState) {
           e.preventDefault();
           portalState.currentPage++;
           params.set("page", String(portalState.currentPage));
-
-          const url = `https://contacts-module.dennis-e64.workers.dev/contacts/search?${params}`;
-          const resList = await fetch(url, {
-            cache: "no-cache",
-            headers: { Prefer: "count=exact" }
-          });
-
-          const contentRange = resList.headers.get("content-range") || "0/0";
-          portalState.totalCount = parseInt(contentRange.split("/")[1] || "0", 10);
-          portalState.totalPages = Math.max(1, Math.ceil(portalState.totalCount / portalState.pageSize));
-
-          const data = await resList.json();
-          contacts = Array.isArray(data) ? data : data.rows || [];
-
+          await fetchPage(params);
           renderSortedTable(params);
         });
       }
 
+      // Select button
       tableDiv.querySelectorAll(".btn-select").forEach(btn => {
         btn.addEventListener("click", async () => {
           const contactId = btn.dataset.id;
@@ -382,6 +368,7 @@ async function renderContactList(container, portalState) {
         });
       });
 
+      // Sorting
       tableDiv.querySelectorAll("th.sortable").forEach(th => {
         th.addEventListener("click", () => {
           const field = th.dataset.field;
@@ -398,6 +385,7 @@ async function renderContactList(container, portalState) {
       });
     }
 
+    // Button handlers
     document.getElementById("btnApplyContactsFilter").addEventListener("click", applyFilter);
 
     document.getElementById("btnClearContactsFilter").addEventListener("click", () => {
