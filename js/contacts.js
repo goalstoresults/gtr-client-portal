@@ -159,8 +159,6 @@ async function renderContactList(container, portalState) {
 
     portalState.currentPage = 1;
     portalState.pageSize = 100;
-    portalState.totalCount = 0;
-    portalState.totalPages = 1;
 
     async function loadFieldsIfNeeded() {
       if (listFields.length > 0) return;
@@ -203,18 +201,12 @@ async function renderContactList(container, portalState) {
 
       portalState.currentPage = 1;
 
-      // ⭐ Build params WITHOUT empty filters
-      const params = new URLSearchParams({ project: portalState.project });
-
-      if (!isAll && !rangeMatch && first.length >= 1) {
-        params.set("first", first);
-      }
-      if (last.length >= 1) {
-        params.set("last", last);
-      }
-      if (business.length >= 1) {
-        params.set("business", business);
-      }
+      const params = new URLSearchParams({
+        project: portalState.project,
+        first: isAll || rangeMatch ? "" : first,
+        last,
+        business
+      });
 
       params.set("page", String(portalState.currentPage));
       params.set("page_size", String(portalState.pageSize));
@@ -231,9 +223,6 @@ async function renderContactList(container, portalState) {
           return letter >= start && letter <= end;
         });
       }
-
-      portalState.totalCount = contacts.length;
-      portalState.totalPages = 1;
 
       await loadFieldsIfNeeded();
       renderSortedTable(params);
@@ -285,15 +274,24 @@ async function renderContactList(container, portalState) {
         `;
       }).join("");
 
-      tableDiv.innerHTML = `
-        <h4>
-          Showing ${sorted.length} of ${portalState.totalCount} contacts
-        </h4>
+      // Pagination logic
+      const showPrev = portalState.currentPage > 1;
+      const showNext = contacts.length === portalState.pageSize;
 
+      const prevLink = showPrev
+        ? `<a id="prevPageLink" href="#" style="margin-right:20px;">← Previous</a>`
+        : `<span style="margin-right:20px; color:#ccc;">← Previous</span>`;
+
+      const nextLink = showNext
+        ? `<a id="nextPageLink" href="#" style="margin-left:20px;">Next →</a>`
+        : `<span style="margin-left:20px; color:#ccc;">Next →</span>`;
+
+      tableDiv.innerHTML = `
+        <h4>Showing ${sorted.length} contacts</h4>
         <div style="display:flex; justify-content:center; align-items:center; gap:20px; margin-bottom:8px;">
-          <span style="margin-right:20px; color:#ccc;">← Previous</span>
-          <span>Page ${portalState.currentPage} of ${portalState.totalPages}</span>
-          <span style="margin-left:20px; color:#ccc;">Next →</span>
+          ${prevLink}
+          <span>Page ${portalState.currentPage}</span>
+          ${nextLink}
         </div>
 
         <table class="notes-table">
@@ -304,6 +302,31 @@ async function renderContactList(container, portalState) {
         </table>
       `;
 
+      // Previous page
+      const prevPageLink = document.getElementById("prevPageLink");
+      if (prevPageLink && showPrev) {
+        prevPageLink.addEventListener("click", async (e) => {
+          e.preventDefault();
+          portalState.currentPage--;
+          params.set("page", String(portalState.currentPage));
+          await fetchPage(params);
+          renderSortedTable(params);
+        });
+      }
+
+      // Next page
+      const nextPageLink = document.getElementById("nextPageLink");
+      if (nextPageLink && showNext) {
+        nextPageLink.addEventListener("click", async (e) => {
+          e.preventDefault();
+          portalState.currentPage++;
+          params.set("page", String(portalState.currentPage));
+          await fetchPage(params);
+          renderSortedTable(params);
+        });
+      }
+
+      // Select button
       tableDiv.querySelectorAll(".btn-select").forEach(btn => {
         btn.addEventListener("click", async () => {
           const contactId = btn.dataset.id;
@@ -332,6 +355,7 @@ async function renderContactList(container, portalState) {
         });
       });
 
+      // Sorting
       tableDiv.querySelectorAll("th.sortable").forEach(th => {
         th.addEventListener("click", () => {
           const field = th.dataset.field;
@@ -366,6 +390,7 @@ async function renderContactList(container, portalState) {
     console.error("[Contacts] Error in renderContactList:", err);
   }
 }
+
 
 
 
