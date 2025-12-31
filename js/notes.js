@@ -376,10 +376,10 @@ async function renderReview(container, portalState, noteId) {
         </section>
 
         <!-- NOTE METADATA -->
-        <p><strong>Subject:</strong> ${note.subject || "(no subject)"}</p>
-        <p><strong>From:</strong> ${note.from_name || "(unknown)"} (${note.from_email || "no email"})</p>
-        <p><strong>Created:</strong> ${note.created_at || note.note_date || "(unknown)"}</p>
-        <p><strong>Client:</strong> ${note.contact_name || "(unknown)"} (${note.contact_email || ""})</p>
+        <p><strong>Subject:</strong> ${escapeHtml(note.subject || "(no subject)")}</p>
+        <p><strong>From:</strong> ${escapeHtml(note.from_name || "(unknown)")} (${escapeHtml(note.from_email || "no email")})</p>
+        <p><strong>Created:</strong> ${escapeHtml(note.created_at || note.note_date || "(unknown)")}</p>
+        <p><strong>Client:</strong> ${escapeHtml(note.contact_name || "(unknown)")} (${escapeHtml(note.contact_email || "")})</p>
 
         <!-- STATUS + NEEDS REVIEW + SAVE -->
         <div class="row" style="gap:12px; margin-top:12px; align-items:center;">
@@ -401,19 +401,56 @@ async function renderReview(container, portalState, noteId) {
         </div>
 
         <!-- SUMMARY -->
-        <p><strong>Summary:</strong></p>
-        <p>${note.summary || "(no summary available)"}</p>
+        <p style="margin-top:16px;"><strong>Summary:</strong></p>
+        <p>${note.summary ? escapeHtml(note.summary) : "(no summary available)"}</p>
+
+        <!-- FOLLOWUPS RAW -->
+        ${
+          Array.isArray(note.followups_raw) && note.followups_raw.length > 0
+            ? `
+          <div style="margin-top:20px;">
+            <h3 style="margin:0;">AI‑Detected Follow‑Ups</h3>
+            <ul style="margin-top:8px; padding-left:20px;">
+              ${note.followups_raw
+                .map(
+                  f => `
+                <li>
+                  <strong>${escapeHtml(f.text || "")}</strong>
+                  <br/>
+                  <span class="muted" style="font-size:0.9em;">
+                    Source: ${escapeHtml(f.source_text || "")}
+                  </span>
+                </li>
+              `
+                )
+                .join("")}
+            </ul>
+          </div>
+        `
+            : `
+          <div style="margin-top:20px;">
+            <h3 style="margin:0;">AI‑Detected Follow‑Ups</h3>
+            <p class="muted">(none detected)</p>
+          </div>
+        `
+        }
 
         <!-- RAW TEXT -->
-        ${note.raw_text ? `
+        ${
+          note.raw_text
+            ? `
           <details style="margin-top:12px;">
             <summary>Raw Text (click to expand)</summary>
-            <pre style="margin-top:8px;">${note.raw_text}</pre>
+            <pre style="margin-top:8px;">${escapeHtml(note.raw_text)}</pre>
           </details>
-        ` : ""}
+        `
+            : ""
+        }
 
         <!-- RELATIONSHIPS -->
-        ${Array.isArray(relationships) && relationships.length > 0 ? `
+        ${
+          Array.isArray(relationships) && relationships.length > 0
+            ? `
           <div class="row" style="gap:12px; margin-top:20px;">
             <h3 style="margin:0;">Relationships Detected in Note</h3>
             ${
@@ -434,7 +471,9 @@ async function renderReview(container, portalState, noteId) {
               </tr>
             </thead>
             <tbody>
-              ${relationships.map(r => `
+              ${relationships
+                .map(
+                  r => `
                 <tr>
                   <td>${escapeHtml(r.raw_name || "")}</td>
                   <td>${escapeHtml(r.first_name_ai || "")}</td>
@@ -442,10 +481,14 @@ async function renderReview(container, portalState, noteId) {
                   <td>${escapeHtml(r.role_label_ai || "")}</td>
                   <td>${escapeHtml(r.context_description_ai || "")}</td>
                 </tr>
-              `).join("")}
+              `
+                )
+                .join("")}
             </tbody>
           </table>
-        ` : ""}
+        `
+            : ""
+        }
       </section>
     `;
 
@@ -470,9 +513,9 @@ async function renderReview(container, portalState, noteId) {
             id: portalState.selectedNoteId,
             updates: {
               review_status: status,
-              needs_review: needsReview
-            }
-          })
+              needs_review: needsReview,
+            },
+          }),
         });
 
         if (!res.ok) {
@@ -502,8 +545,12 @@ async function renderReview(container, portalState, noteId) {
     const relBtn = document.getElementById("btnRelationships");
     if (relBtn) {
       relBtn.addEventListener("click", () => {
-        document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
-        document.querySelector('#notes-subtabs button[data-subtab="relationships"]')?.classList.add("active");
+        document
+          .querySelectorAll("#notes-subtabs button")
+          .forEach(b => b.classList.remove("active"));
+        document
+          .querySelector('#notes-subtabs button[data-subtab="relationships"]')
+          ?.classList.add("active");
         renderRelationships(container, portalState);
       });
     }
@@ -524,9 +571,12 @@ async function renderReview(container, portalState, noteId) {
         alert("✅ Note and relationships deleted.");
 
         await renderHistory(container, portalState);
-        document.querySelectorAll("#notes-subtabs button").forEach(b => b.classList.remove("active"));
-        document.querySelector('#notes-subtabs button[data-subtab="history"]')?.classList.add("active");
-
+        document
+          .querySelectorAll("#notes-subtabs button")
+          .forEach(b => b.classList.remove("active"));
+        document
+          .querySelector('#notes-subtabs button[data-subtab="history"]')
+          ?.classList.add("active");
       } catch (err) {
         alert("Error deleting note: " + err.message);
         console.error(err);
@@ -540,30 +590,30 @@ async function renderReview(container, portalState, noteId) {
       const first = document.getElementById("filter-first").value.trim();
       const last = document.getElementById("filter-last").value.trim();
       const resultsDiv = document.getElementById("clientSearchResults");
-    
+
       // Reset results area
       resultsDiv.innerHTML = "Searching...";
-    
+
       // Require at least one field
       if (!first && !last) {
         resultsDiv.textContent = "❌ Enter at least a first or last name.";
         return;
       }
-    
+
       // Build filters
       const filters = [`project.eq.${portalState.project}`];
       if (first) filters.push(`first_name.ilike.${first}*`);
-      if (last)  filters.push(`last_name.ilike.${last}*`);
-    
+      if (last) filters.push(`last_name.ilike.${last}*`);
+
       const query =
         filters.length > 1
           ? `and=(${filters.join(",")})`
           : filters[0];
-    
+
       const url = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${query}&select=contact_id,first_name,last_name,email,contact_type`;
-    
+
       console.log("[FindClient] URL:", url);
-    
+
       try {
         const res = await fetch(url);
         if (!res.ok) {
@@ -571,30 +621,30 @@ async function renderReview(container, portalState, noteId) {
           resultsDiv.textContent = `❌ Search failed (${res.status}). ${msg}`;
           return;
         }
-    
+
         const contacts = await res.json();
-    
+
         if (!Array.isArray(contacts) || contacts.length === 0) {
           resultsDiv.innerHTML = "<div class='muted'>No contacts found.</div>";
           return;
         }
-    
+
         // Render results
         resultsDiv.innerHTML = contacts
           .map(
             c => `
             <div class="contact-result"
                  data-id="${c.contact_id}"
-                 data-name="${c.first_name} ${c.last_name}"
-                 data-type="${c.contact_type || ""}"
-                 data-email="${c.email || ""}">
-              <strong>${c.first_name} ${c.last_name}</strong> (${c.contact_type || "No type"})<br/>
-              <small>${c.email || "No email"}</small>
+                 data-name="${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}"
+                 data-type="${escapeHtml(c.contact_type || "")}"
+                 data-email="${escapeHtml(c.email || "")}">
+              <strong>${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}</strong> (${escapeHtml(c.contact_type || "No type")})<br/>
+              <small>${escapeHtml(c.email || "No email")}</small>
             </div>
           `
           )
           .join("");
-    
+
         // Wire click handlers
         resultsDiv.querySelectorAll(".contact-result").forEach(el => {
           el.addEventListener("click", async () => {
@@ -602,14 +652,14 @@ async function renderReview(container, portalState, noteId) {
             const contactName = el.dataset.name;
             const contactType = el.dataset.type;
             const contactEmail = el.dataset.email;
-    
+
             console.log("[FindClient] Selected:", {
               contactId,
               contactName,
               contactType,
-              contactEmail
+              contactEmail,
             });
-    
+
             await attachClientToNote(
               contactId,
               contactName,
@@ -624,9 +674,8 @@ async function renderReview(container, portalState, noteId) {
         resultsDiv.textContent = "❌ Network error searching contacts.";
       }
     });
-
   } catch (err) {
-    container.innerHTML = `<p>Error loading note review: ${err.message}</p>`;
+    container.innerHTML = `<p>Error loading note review: ${escapeHtml(err.message)}</p>`;
     console.error(err);
   }
 }
