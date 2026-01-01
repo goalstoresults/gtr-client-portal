@@ -296,7 +296,10 @@ function renderAdd(container, portalState) {
     try {
       const res = await fetch("https://add-note-module.dennis-e64.workers.dev", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-internal-call": "internal"   // ⭐ ADD THIS LINE ⭐
+        },
         body: JSON.stringify({
           project: portalState.project,
           raw_text: content,
