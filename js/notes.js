@@ -379,6 +379,10 @@ async function renderReview(container, portalState, noteId) {
         <p><strong>Subject:</strong> ${escapeHtml(note.subject || "(no subject)")}</p>
         <p><strong>From:</strong> ${escapeHtml(note.from_name || "(unknown)")} (${escapeHtml(note.from_email || "no email")})</p>
         <p><strong>Created:</strong> ${escapeHtml(note.created_at || note.note_date || "(unknown)")}</p>
+
+        <!-- ⭐ ADDED LINE: NOTE DATE -->
+        <p><strong>Note Date:</strong> ${escapeHtml(note.note_date || "(unknown)")}</p>
+
         <p><strong>Client:</strong> ${escapeHtml(note.contact_name || "(unknown)")} (${escapeHtml(note.contact_email || "")})</p>
 
         <!-- STATUS + NEEDS REVIEW + SAVE -->
@@ -671,6 +675,7 @@ async function renderReview(container, portalState, noteId) {
     console.error(err);
   }
 }
+
 
 
       
