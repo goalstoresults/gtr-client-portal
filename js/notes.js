@@ -277,19 +277,116 @@ function formatDateTimeSafe(value) {
 /* Add (POST /notes-history-module) */
 function renderAdd(container, portalState) {
   container.innerHTML = `
-    <h4>Add Note (v1.2.8)</h4>
+    <h4>Add Note (v1.3.0)</h4>
 
     <label>Date:</label>
     <input type="date" id="noteDate" style="width:200px;margin-bottom:8px;" />
 
+    <label>Contact Name:</label>
+    <div class="row" style="gap:8px; margin-bottom:8px;">
+      <input id="add-first" placeholder="First name" style="width:140px;" />
+      <input id="add-last" placeholder="Last name" style="width:140px;" />
+      <button id="btnAddFindClient" class="btn-primary">Find</button>
+    </div>
+
+    <div id="addClientSearchResults" class="muted" style="margin-bottom:12px;">
+      Enter a first or last name and click Find.
+    </div>
+
     <textarea id="noteContent" placeholder="Enter note text..." style="width:100%;min-height:100px;"></textarea>
-    <div style="margin-top:8px;"><button id="btnSaveNote" class="primary">Save</button></div>
+
+    <div style="margin-top:8px;">
+      <button id="btnSaveNote" class="primary">Save</button>
+    </div>
+
     <div id="noteAddResult" style="margin-top:8px;"></div>
   `;
 
+  // Track selected client
+  portalState.clientId = null;
+  portalState.clientName = null;
+
+  // --------------------------
+  // FIND CLIENT LOGIC (same as Review)
+  // --------------------------
+  document.getElementById("btnAddFindClient").addEventListener("click", async () => {
+    const first = document.getElementById("add-first").value.trim();
+    const last = document.getElementById("add-last").value.trim();
+    const resultsDiv = document.getElementById("addClientSearchResults");
+
+    resultsDiv.innerHTML = "Searching...";
+
+    if (!first && !last) {
+      resultsDiv.textContent = "❌ Enter at least a first or last name.";
+      return;
+    }
+
+    const filters = [`project.eq.${portalState.project}`];
+    if (first) filters.push(`first_name.ilike.${first}*`);
+    if (last) filters.push(`last_name.ilike.${last}*`);
+
+    const query =
+      filters.length > 1
+        ? `and=(${filters.join(",")})`
+        : filters[0];
+
+    const url = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${query}&select=contact_id,first_name,last_name,email,contact_type`;
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        const msg = await res.text().catch(() => "");
+        resultsDiv.textContent = `❌ Search failed (${res.status}). ${msg}`;
+        return;
+      }
+
+      const contacts = await res.json();
+
+      if (!Array.isArray(contacts) || contacts.length === 0) {
+        resultsDiv.innerHTML = "<div class='muted'>No contacts found.</div>";
+        return;
+      }
+
+      // Render results
+      resultsDiv.innerHTML = contacts
+        .map(
+          c => `
+          <div class="contact-result"
+               data-id="${c.contact_id}"
+               data-name="${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}"
+               data-email="${escapeHtml(c.email || "")}">
+            <strong>${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}</strong>
+            (${escapeHtml(c.contact_type || "No type")})<br/>
+            <small>${escapeHtml(c.email || "No email")}</small>
+          </div>
+        `
+        )
+        .join("");
+
+      // Wire click handlers
+      resultsDiv.querySelectorAll(".contact-result").forEach(el => {
+        el.addEventListener("click", () => {
+          portalState.clientId = el.dataset.id;
+          portalState.clientName = el.dataset.name;
+
+          resultsDiv.innerHTML = `
+            <div class="success">
+              Selected: <strong>${escapeHtml(el.dataset.name)}</strong>
+            </div>
+          `;
+        });
+      });
+    } catch (err) {
+      resultsDiv.textContent = "❌ Network error searching contacts.";
+    }
+  });
+
+  // --------------------------
+  // SAVE NOTE
+  // --------------------------
   document.getElementById("btnSaveNote").addEventListener("click", async () => {
     const content = document.getElementById("noteContent").value.trim();
-    const noteDate = document.getElementById("noteDate").value; // YYYY-MM-DD
+    const noteDate = document.getElementById("noteDate").value;
 
     if (!content) return;
 
@@ -298,12 +395,14 @@ function renderAdd(container, portalState) {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "x-internal-call": "internal"   // ⭐ ADD THIS LINE ⭐
+          "x-internal-call": "internal"
         },
         body: JSON.stringify({
           project: portalState.project,
           raw_text: content,
-          note_date: noteDate || null   // send null if empty
+          note_date: noteDate || null,
+          client_id: portalState.clientId || null,
+          client_name: portalState.clientName || null
         })
       });
 
@@ -315,6 +414,7 @@ function renderAdd(container, portalState) {
     }
   });
 }
+
 
 
 
