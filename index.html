@@ -45,14 +45,18 @@
 
 <body>
   <header>
+
     <!-- Logo container only used when no project -->
     <div id="logo-container" style="text-align:center; margin:20px 0;"></div>
 
-    <!-- ⭐ Updated header with inline umbrella logo -->
-    <h1 id="portal-title" style="text-align:center;">
+    <!-- ⭐ Updated header with perfectly proportioned inline umbrella logo -->
+    <h1 id="portal-title"
+        style="text-align:center; display:flex; justify-content:center; align-items:center; gap:8px;">
+
       <img src="./RedUmbrellaPro_black.png"
            alt="Portal Logo"
-           style="height:32px; vertical-align:middle; margin-right:8px;" />
+           style="height:26px; width:auto;" />
+
       <span id="portal-title-text"></span>
     </h1>
 
@@ -110,8 +114,12 @@
         let projectParam = projectParamRaw ? projectParamRaw.trim() : "";
 
         if (!projectParam) {
-          // ⭐ Show new Red Umbrella waiting logo
-          logoContainer.innerHTML = `<img src="./RedUmbrellaPro Header2.png" alt="Red Umbrella Pro" class="logo-waiting" />`;
+
+          /* ⭐ Show new Red Umbrella waiting logo */
+          logoContainer.innerHTML =
+            `<img src="./RedUmbrellaPro Header2.png"
+                  alt="Red Umbrella Pro"
+                  class="logo-waiting" />`;
 
           selectorRow.style.display = "block";
           selectorRow.className = "project-entry";
@@ -135,7 +143,8 @@
 
             const match = projects.find(p => String(p.project).toLowerCase() === projectName.toLowerCase());
             if (!match) {
-              tabContent.innerHTML = `<section class="card"><p>Invalid project specified. No UI available.</p></section>`;
+              tabContent.innerHTML =
+                `<section class="card"><p>Invalid project specified. No UI available.</p></section>`;
               return;
             }
 
