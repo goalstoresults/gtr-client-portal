@@ -498,7 +498,7 @@ async function renderReview(container, portalState, noteId) {
 
         <!-- ⭐ EDITABLE DATE-ONLY FIELD -->
         <div class="row" style="gap:12px; align-items:center; margin-bottom:8px;">
-          <label>Edit Date:</label>
+          <label>Edit Note Date:</label>
           <input type="date" id="editNoteDate" style="min-width:180px;" />
         </div>
 
