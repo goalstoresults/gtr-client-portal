@@ -282,12 +282,13 @@ function renderAdd(container, portalState) {
     <label>Date:</label>
     <input type="date" id="noteDate" style="width:200px;margin-bottom:8px;" />
 
-    <label>Contact Name:</label>
-    <div class="row" style="gap:8px; margin-bottom:8px;">
+    <div class="row" style="gap:8px; align-items:center; margin-bottom:8px;">
+      <label style="min-width:120px;">Contact Name:</label>
       <input id="add-first" placeholder="First name" style="width:140px;" />
       <input id="add-last" placeholder="Last name" style="width:140px;" />
       <button id="btnAddFindClient" class="btn-primary">Find</button>
     </div>
+
 
     <div id="addClientSearchResults" class="muted" style="margin-bottom:12px;">
       Enter a first or last name and click Find.
