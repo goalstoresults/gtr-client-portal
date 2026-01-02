@@ -118,7 +118,7 @@ async function renderHistory(container, portalState) {
       { key: "created_at", label: "Created", isDate: true },
       { key: "subject", label: "Subject" },
       { key: "from_name", label: "From" },
-      { key: "contact_name", label: "Client" },
+      { key: "contact_name", label: "Contact" },
       { key: "needs_review", label: "Needs Review" }
     ];
 
@@ -463,7 +463,7 @@ async function renderReview(container, portalState, noteId) {
         <div class="row" style="gap:12px; margin-bottom:12px;">
           <h2 style="margin:0;">Notes Review: ${escapeHtml(note.subject || "(no subject)")}</h2>
 
-          <button id="btnSetClient" class="btn-secondary btn-edit">Set Client</button>
+          <button id="btnSetClient" class="btn-secondary btn-edit">Set Contact</button>
           <button id="btnDeleteNote" class="btn-danger btn-delete">Delete</button>
         </div>
 
@@ -502,7 +502,7 @@ async function renderReview(container, portalState, noteId) {
           <input type="date" id="editNoteDate" style="min-width:180px;" />
         </div>
 
-        <p><strong>Client:</strong> ${escapeHtml(note.contact_name || "(unknown)")} (${escapeHtml(note.contact_email || "")})</p>
+        <p><strong>Contact:</strong> ${escapeHtml(note.contact_name || "(unknown)")} (${escapeHtml(note.contact_email || "")})</p>
 
         <!-- STATUS + NEEDS REVIEW + SAVE -->
         <div class="row" style="gap:12px; margin-top:12px; align-items:center;">
