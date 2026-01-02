@@ -484,18 +484,18 @@ async function renderReview(container, portalState, noteId) {
         <p><strong>Subject:</strong> ${escapeHtml(note.subject || "(no subject)")}</p>
         <p><strong>From:</strong> ${escapeHtml(note.from_name || "(unknown)")} (${escapeHtml(note.from_email || "no email")})</p>
 
-        <!-- ⭐ UPDATED DATE FORMATTING -->
+        <!-- CREATED DATE (formatted) -->
         <p><strong>Created:</strong> ${
           note.created_at || note.note_date
             ? formatDateTimeSafe(note.created_at || note.note_date)
             : "(unknown)"
         }</p>
 
-        <p><strong>Note Date:</strong> ${
-          note.note_date
-            ? formatDateTimeSafe(note.note_date)
-            : "(unknown)"
-        }</p>
+        <!-- ⭐ EDITABLE NOTE DATE -->
+        <div class="row" style="gap:12px; align-items:center; margin-bottom:8px;">
+          <label><strong>Note Date:</strong></label>
+          <input type="date" id="editNoteDate" style="min-width:180px;" />
+        </div>
 
         <p><strong>Client:</strong> ${escapeHtml(note.contact_name || "(unknown)")} (${escapeHtml(note.contact_email || "")})</p>
 
@@ -614,12 +614,28 @@ async function renderReview(container, portalState, noteId) {
     document.getElementById("noteStatus").value = note.review_status || "pending";
     document.getElementById("noteNeedsReview").checked = !!note.needs_review;
 
+    // ⭐ Prefill editable Note Date
+    if (note.note_date) {
+      const dt = new Date(note.note_date);
+      document.getElementById("editNoteDate").value = dt.toISOString().slice(0, 10);
+    }
+
     // --------------------------
     // SAVE HANDLER
     // --------------------------
     document.getElementById("btnSaveNoteMeta").addEventListener("click", async () => {
       const status = document.getElementById("noteStatus").value;
       const needsReview = document.getElementById("noteNeedsReview").checked;
+      const newNoteDate = document.getElementById("editNoteDate").value;
+
+      const updates = {
+        review_status: status,
+        needs_review: needsReview
+      };
+
+      if (newNoteDate) {
+        updates.note_date = new Date(newNoteDate).toISOString();
+      }
 
       try {
         const res = await fetch("https://notes-history-module.dennis-e64.workers.dev/notes_history", {
@@ -627,10 +643,7 @@ async function renderReview(container, portalState, noteId) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             id: portalState.selectedNoteId,
-            updates: {
-              review_status: status,
-              needs_review: needsReview
-            }
+            updates
           })
         });
 
