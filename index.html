@@ -5,6 +5,10 @@
   <title id="page-title"></title>
   <link rel="stylesheet" href="style.css" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- ⭐ New Portal Favicon -->
+  <link rel="icon" type="image/png" href="./redumbrella_black.png" />
+
   <style>
     .logo-waiting {
       display: block;
@@ -27,10 +31,6 @@
     .project-entry button {
       padding: 6px 12px;
     }
-    .footer-logo {
-      height: 28px;
-      opacity: 0.85;
-    }
     footer {
       margin-top: 20px;
       text-align: left;
@@ -42,11 +42,20 @@
     }
   </style>
 </head>
+
 <body>
   <header>
     <!-- Logo container only used when no project -->
     <div id="logo-container" style="text-align:center; margin:20px 0;"></div>
-    <h1 id="portal-title"></h1>
+
+    <!-- ⭐ Updated header with inline umbrella logo -->
+    <h1 id="portal-title" style="text-align:center;">
+      <img src="./RedUmbrellaPro_black.png"
+           alt="Portal Logo"
+           style="height:32px; vertical-align:middle; margin-right:8px;" />
+      <span id="portal-title-text"></span>
+    </h1>
+
     <div id="project-selector-row" style="display:none;"></div>
   </header>
 
@@ -56,8 +65,7 @@
   <div id="tab-content"></div>
 
   <footer>
-    <img src="./gtrlogo-gold-white.png" alt="Goals To Results" class="footer-logo" />
-    <small style="display:block;">Portal Version: 2.0.0</small>
+    <small style="display:block; opacity:0.7;">Portal Version: 2.0.0</small>
   </footer>
 
   <script type="module">
@@ -71,11 +79,9 @@
     import { loadSetupTab } from "./js/setup.js";
 
     const portalState = { project: "", contactId: "" };
-
-    /* ⭐ CRITICAL FIX — make global staging functions see the same object */
     window.portalState = portalState;
 
-    const portalTitle = document.getElementById("portal-title");
+    const portalTitleText = document.getElementById("portal-title-text");
     const pageTitle = document.getElementById("page-title");
     const selectorRow = document.getElementById("project-selector-row");
     const tabs = document.getElementById("tabs");
@@ -104,8 +110,8 @@
         let projectParam = projectParamRaw ? projectParamRaw.trim() : "";
 
         if (!projectParam) {
-          // 🚨 Show logo + centered text field gate
-          logoContainer.innerHTML = `<img src="./gtrlogo-gold-black.png" alt="Goals To Results" class="logo-waiting" />`;
+          // ⭐ Show new Red Umbrella waiting logo
+          logoContainer.innerHTML = `<img src="./RedUmbrellaPro Header2.png" alt="Red Umbrella Pro" class="logo-waiting" />`;
 
           selectorRow.style.display = "block";
           selectorRow.className = "project-entry";
@@ -116,7 +122,7 @@
           `;
 
           portalState.project = "";
-          portalTitle.textContent = "";
+          portalTitleText.textContent = "";
           pageTitle.textContent = "";
           tabs.style.display = "none";
 
@@ -133,7 +139,6 @@
               return;
             }
 
-            // ✅ Remove logo + project entry once project is valid
             logoContainer.innerHTML = "";
             selectorRow.style.display = "none";
 
@@ -153,7 +158,6 @@
             return;
           }
 
-          // ✅ Hide logo + project entry when project param is present
           logoContainer.innerHTML = "";
           selectorRow.style.display = "none";
 
@@ -182,7 +186,7 @@
       portalState.contact_first_name = config.contact_first_name;
       portalState.contact_last_name = config.contact_last_name;
 
-      portalTitle.textContent = config.display_name || "";
+      portalTitleText.textContent = config.display_name || "";
       pageTitle.textContent = config.display_name || "";
     }
 
@@ -223,4 +227,3 @@
   </script>
 </body>
 </html>
-
