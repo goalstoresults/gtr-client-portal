@@ -419,8 +419,6 @@ function renderAdd(container, portalState) {
 
 
 
-
-
 /* Review (GET /note_review) */
 /* Review (GET /note_review) */
 async function renderReview(container, portalState, noteId) {
@@ -484,16 +482,23 @@ async function renderReview(container, portalState, noteId) {
         <p><strong>Subject:</strong> ${escapeHtml(note.subject || "(no subject)")}</p>
         <p><strong>From:</strong> ${escapeHtml(note.from_name || "(unknown)")} (${escapeHtml(note.from_email || "no email")})</p>
 
-        <!-- CREATED DATE (formatted) -->
+        <!-- CREATED DATE -->
         <p><strong>Created:</strong> ${
-          note.created_at || note.note_date
-            ? formatDateTimeSafe(note.created_at || note.note_date)
+          note.created_at
+            ? formatDateTimeSafe(note.created_at)
             : "(unknown)"
         }</p>
 
-        <!-- ⭐ EDITABLE NOTE DATE -->
+        <!-- ⭐ NOTE DATE DISPLAY (DATETIME) -->
+        <p><strong>Note Date:</strong> ${
+          note.note_date
+            ? formatDateTimeSafe(note.note_date)
+            : "(unknown)"
+        }</p>
+
+        <!-- ⭐ EDITABLE DATE-ONLY FIELD -->
         <div class="row" style="gap:12px; align-items:center; margin-bottom:8px;">
-          <label><strong>Note Date:</strong></label>
+          <label>Edit Date:</label>
           <input type="date" id="editNoteDate" style="min-width:180px;" />
         </div>
 
@@ -522,7 +527,7 @@ async function renderReview(container, portalState, noteId) {
         <p style="margin-top:16px;"><strong>Summary:</strong></p>
         <p>${note.summary ? escapeHtml(note.summary) : "(no summary available)"}</p>
 
-        <!-- FOLLOWUPS RAW (EXPANDABLE) -->
+        <!-- FOLLOWUPS RAW -->
         <details style="margin-top:20px;">
           <summary><strong>AI‑Detected Follow‑Ups</strong></summary>
 
@@ -545,9 +550,7 @@ async function renderReview(container, portalState, noteId) {
                 .join("")}
             </ul>
           `
-              : `
-            <p class="muted" style="margin-top:12px;">(none detected)</p>
-          `
+              : `<p class="muted" style="margin-top:12px;">(none detected)</p>`
           }
         </details>
 
@@ -614,7 +617,7 @@ async function renderReview(container, portalState, noteId) {
     document.getElementById("noteStatus").value = note.review_status || "pending";
     document.getElementById("noteNeedsReview").checked = !!note.needs_review;
 
-    // ⭐ Prefill editable Note Date
+    // ⭐ Prefill editable date-only field
     if (note.note_date) {
       const dt = new Date(note.note_date);
       document.getElementById("editNoteDate").value = dt.toISOString().slice(0, 10);
@@ -626,15 +629,28 @@ async function renderReview(container, portalState, noteId) {
     document.getElementById("btnSaveNoteMeta").addEventListener("click", async () => {
       const status = document.getElementById("noteStatus").value;
       const needsReview = document.getElementById("noteNeedsReview").checked;
-      const newNoteDate = document.getElementById("editNoteDate").value;
+      const newDateOnly = document.getElementById("editNoteDate").value;
 
       const updates = {
         review_status: status,
         needs_review: needsReview
       };
 
-      if (newNoteDate) {
-        updates.note_date = new Date(newNoteDate).toISOString();
+      // ⭐ Merge new date with original time
+      if (newDateOnly && note.note_date) {
+        const old = new Date(note.note_date);
+        const [year, month, day] = newDateOnly.split("-");
+
+        const merged = new Date(
+          Number(year),
+          Number(month) - 1,
+          Number(day),
+          old.getHours(),
+          old.getMinutes(),
+          old.getSeconds()
+        );
+
+        updates.note_date = merged.toISOString();
       }
 
       try {
@@ -706,23 +722,20 @@ async function renderReview(container, portalState, noteId) {
     });
 
     // --------------------------
-    // FIND CLIENT (FULLY FIXED VERSION)
+    // FIND CLIENT
     // --------------------------
     document.getElementById("btnFindClient").addEventListener("click", async () => {
       const first = document.getElementById("filter-first").value.trim();
       const last = document.getElementById("filter-last").value.trim();
       const resultsDiv = document.getElementById("clientSearchResults");
 
-      // Reset results area
       resultsDiv.innerHTML = "Searching...";
 
-      // Require at least one field
       if (!first && !last) {
         resultsDiv.textContent = "❌ Enter at least a first or last name.";
         return;
       }
 
-      // Build filters
       const filters = [`project.eq.${portalState.project}`];
       if (first) filters.push(`first_name.ilike.${first}*`);
       if (last) filters.push(`last_name.ilike.${last}*`);
@@ -751,7 +764,6 @@ async function renderReview(container, portalState, noteId) {
           return;
         }
 
-        // Render results
         resultsDiv.innerHTML = contacts
           .map(
             c => `
@@ -767,7 +779,6 @@ async function renderReview(container, portalState, noteId) {
           )
           .join("");
 
-        // Wire click handlers
         resultsDiv.querySelectorAll(".contact-result").forEach(el => {
           el.addEventListener("click", async () => {
             const contactId = el.dataset.id;
