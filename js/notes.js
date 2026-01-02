@@ -421,6 +421,7 @@ function renderAdd(container, portalState) {
 
 
 /* Review (GET /note_review) */
+/* Review (GET /note_review) */
 async function renderReview(container, portalState, noteId) {
   console.log("[Review] Called with noteId:", noteId);
   if (!noteId) {
@@ -481,10 +482,19 @@ async function renderReview(container, portalState, noteId) {
         <!-- NOTE METADATA -->
         <p><strong>Subject:</strong> ${escapeHtml(note.subject || "(no subject)")}</p>
         <p><strong>From:</strong> ${escapeHtml(note.from_name || "(unknown)")} (${escapeHtml(note.from_email || "no email")})</p>
-        <p><strong>Created:</strong> ${escapeHtml(note.created_at || note.note_date || "(unknown)")}</p>
 
-        <!-- ⭐ ADDED LINE: NOTE DATE -->
-        <p><strong>Note Date:</strong> ${escapeHtml(note.note_date || "(unknown)")}</p>
+        <!-- ⭐ UPDATED DATE FORMATTING -->
+        <p><strong>Created:</strong> ${
+          note.created_at || note.note_date
+            ? formatDateTimeSafe(note.created_at || note.note_date)
+            : "(unknown)"
+        }</p>
+
+        <p><strong>Note Date:</strong> ${
+          note.note_date
+            ? formatDateTimeSafe(note.note_date)
+            : "(unknown)"
+        }</p>
 
         <p><strong>Client:</strong> ${escapeHtml(note.contact_name || "(unknown)")} (${escapeHtml(note.contact_email || "")})</p>
 
@@ -778,7 +788,6 @@ async function renderReview(container, portalState, noteId) {
     console.error(err);
   }
 }
-
 
 
       
