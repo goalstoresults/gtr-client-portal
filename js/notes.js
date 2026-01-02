@@ -471,7 +471,7 @@ async function renderReview(container, portalState, noteId) {
 
         <!-- SET CLIENT FORM -->
         <section id="setClientForm" class="card" style="display:none; margin-bottom:16px;">
-          <h3>Attach Client to Note</h3>
+          <h3>Attach Contact to Note</h3>
           <div class="row" style="gap:12px; margin-bottom:12px;">
             <input id="filter-first" placeholder="First name" />
             <input id="filter-last" placeholder="Last name" />
