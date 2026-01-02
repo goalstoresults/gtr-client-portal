@@ -289,7 +289,6 @@ function renderAdd(container, portalState) {
       <button id="btnAddFindClient" class="btn-primary">Find</button>
     </div>
 
-
     <div id="addClientSearchResults" class="muted" style="margin-bottom:12px;">
       Enter a first or last name and click Find.
     </div>
@@ -306,9 +305,10 @@ function renderAdd(container, portalState) {
   // Track selected client
   portalState.clientId = null;
   portalState.clientName = null;
+  portalState.clientEmail = null;
 
   // --------------------------
-  // FIND CLIENT LOGIC (same as Review)
+  // FIND CLIENT LOGIC
   // --------------------------
   document.getElementById("btnAddFindClient").addEventListener("click", async () => {
     const first = document.getElementById("add-first").value.trim();
@@ -369,6 +369,7 @@ function renderAdd(container, portalState) {
         el.addEventListener("click", () => {
           portalState.clientId = el.dataset.id;
           portalState.clientName = el.dataset.name;
+          portalState.clientEmail = el.dataset.email;
 
           resultsDiv.innerHTML = `
             <div class="success">
@@ -402,8 +403,9 @@ function renderAdd(container, portalState) {
           project: portalState.project,
           raw_text: content,
           note_date: noteDate || null,
-          client_id: portalState.clientId || null,
-          client_name: portalState.clientName || null
+          contact_id: portalState.clientId || null,
+          contact_name: portalState.clientName || null,
+          contact_email: portalState.clientEmail || null
         })
       });
 
