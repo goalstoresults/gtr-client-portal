@@ -145,6 +145,15 @@ window.refreshStagingGrid = function() {
   loadStagingData();
 };
 
+window.reviewBulkData = function () {
+  const filterEl = document.getElementById("stagingFilter");
+  if (filterEl) {
+    filterEl.value = "needs_review";
+  }
+  loadStagingData();
+};
+
+
 /* =========================================================
    LOAD STAGING DATA
 ========================================================= */
