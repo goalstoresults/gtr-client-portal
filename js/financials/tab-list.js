@@ -1,7 +1,7 @@
 // financials/tab-list.js
 // List tab: payment listing, sorting, editing, deleting
 
-import { escapeHtml, formatCurrency, formatDateTimeFull } from "../utilities.js";
+import { escapeHtml, formatCurrency, formatDateTime } from "../utilities.js";
 
 /* =========================================================
    RENDER: Payments List
