@@ -202,9 +202,16 @@ export async function renderHistory(container, portalState) {
               : "Contact not linked yet";
           }
 
-          // Enable subtabs
-          setSubtabEnabled("review", true);
-          setSubtabEnabled("relationships", true);
+          // ✅ Enable Review and Relationships subtabs locally
+          ["review", "relationships"].forEach(subtab => {
+            const btn = document.querySelector(
+              `#notes-subtabs button[data-subtab="${subtab}"]`
+            );
+            if (btn) {
+              btn.disabled = false;
+              btn.classList.remove("disabled");
+            }
+          });
 
           // Switch tab
           document
