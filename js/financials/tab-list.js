@@ -1,15 +1,15 @@
 // financials/tab-list.js
-// List tab: payment listing, sorting, editing, deleting
+// List tab: revenue listing, sorting, editing, deleting
 
 import { escapeHtml, formatCurrency, formatDateTime } from "../utilities.js";
 
 /* =========================================================
-   RENDER: Payments List
+   RENDER: Revenue List
 ========================================================= */
 
 export async function renderFinancialList(container, portalState) {
   /* ---------------------------------------------------------
-     1) Fetch payments
+     1) Fetch revenue rows
   --------------------------------------------------------- */
   const paymentsRes = await fetch(
     `https://financials-module.dennis-e64.workers.dev/payments/list?project=${portalState.project}&limit=500`,
@@ -46,25 +46,27 @@ export async function renderFinancialList(container, portalState) {
   }
 
   /* ---------------------------------------------------------
-     3) Normalize payments
+     3) Normalize revenue rows
   --------------------------------------------------------- */
   payments = payments.map(p => ({
     ...p,
+    revenue_id: p.revenue_id,
+    transaction_date: p.transaction_date,
+    amount: Number(p.amount) || 0,
     contact_name: nameById.get(p.contact_id) || "",
-    referral_name: nameById.get(p.referral_id) || "",
-    payment_amount: Number(p.payment_amount) || 0
+    referral_name: nameById.get(p.referral_id) || ""
   }));
 
   /* ---------------------------------------------------------
      Sorting state
   --------------------------------------------------------- */
-  let currentSortField = "payment_date";
+  let currentSortField = "transaction_date";
   let currentSortDirection = "desc";
 
   const columns = [
-    { key: "payment_date", label: "Date", isDate: true },
+    { key: "transaction_date", label: "Date", isDate: true },
     { key: "contact_name", label: "Contact" },
-    { key: "payment_amount", label: "Amount", numeric: true },
+    { key: "amount", label: "Amount", numeric: true },
     { key: "invoice_number", label: "Invoice #" },
     { key: "referral_name", label: "Referral" },
     { key: "actions", label: "Actions" }
@@ -124,32 +126,32 @@ export async function renderFinancialList(container, portalState) {
     const rowsHtml = payments
       .map(
         p => `
-      <tr data-id="${p.payment_id}">
-        <td>${escapeHtml(formatDateTime(p.payment_date))}</td>
+      <tr data-id="${p.revenue_id}">
+        <td>${escapeHtml(formatDateTime(p.transaction_date))}</td>
         <td>${escapeHtml(p.contact_name)}</td>
-        <td class="right">${escapeHtml(formatCurrency(p.payment_amount))}</td>
+        <td class="right">${escapeHtml(formatCurrency(p.amount))}</td>
         <td>${escapeHtml(p.invoice_number || "")}</td>
         <td>${escapeHtml(p.referral_name || "")}</td>
         <td>
-          <button class="btn-secondary btn-edit" data-id="${p.payment_id}">Edit</button>
-          <button class="btn-danger btn-delete" data-id="${p.payment_id}">Delete</button>
+          <button class="btn-secondary btn-edit" data-id="${p.revenue_id}">Edit</button>
+          <button class="btn-danger btn-delete" data-id="${p.revenue_id}">Delete</button>
         </td>
       </tr>
 
-      <tr class="edit-row" id="edit-${p.payment_id}" style="display:none;">
+      <tr class="edit-row" id="edit-${p.revenue_id}" style="display:none;">
         <td colspan="6">
           <div class="edit-container" style="display:flex; gap:1rem; align-items:center;">
             <label>Date:
-              <input type="date" class="edit-date" value="${p.payment_date.split("T")[0]}">
+              <input type="date" class="edit-date" value="${p.transaction_date?.split("T")[0] || ""}">
             </label>
             <label>Amount:
-              <input type="number" class="edit-amount" value="${p.payment_amount}">
+              <input type="number" class="edit-amount" value="${p.amount}">
             </label>
             <label>Invoice #:
               <input type="text" class="edit-invoice" value="${p.invoice_number || ""}">
             </label>
-            <button class="btn-primary btn-save" data-id="${p.payment_id}">Save</button>
-            <button class="btn-tertiary btn-cancel" data-id="${p.payment_id}">Cancel</button>
+            <button class="btn-primary btn-save" data-id="${p.revenue_id}">Save</button>
+            <button class="btn-tertiary btn-cancel" data-id="${p.revenue_id}">Cancel</button>
           </div>
         </td>
       </tr>
@@ -160,11 +162,11 @@ export async function renderFinancialList(container, portalState) {
     /* ---------- FINAL HTML ---------- */
     container.innerHTML = `
       <section class="card">
-        <h3>Payments List</h3>
+        <h3>Revenue List</h3>
         <table class="notes-table">
           <thead><tr>${headerHtml}</tr></thead>
           <tbody>
-            ${rowsHtml || `<tr><td colspan="6">(no payments found)</td></tr>`}
+            ${rowsHtml || `<tr><td colspan="6">(no revenue found)</td></tr>`}
           </tbody>
         </table>
       </section>
@@ -201,6 +203,7 @@ export async function renderFinancialList(container, portalState) {
       });
     });
 
+    /* ---------- SAVE EVENTS ---------- */
     container.querySelectorAll(".btn-save").forEach(btn => {
       btn.addEventListener("click", async () => {
         const id = btn.dataset.id;
@@ -216,9 +219,9 @@ export async function renderFinancialList(container, portalState) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              payment_id: id,
-              payment_date: date,
-              payment_amount: amount,
+              payment_id: id,            // Worker still expects this external name
+              payment_date: date,        // Worker converts to transaction_date
+              payment_amount: amount,    // Worker converts to amount
               invoice_number: invoice,
               project: portalState.project
             })
@@ -233,7 +236,7 @@ export async function renderFinancialList(container, portalState) {
     container.querySelectorAll(".btn-delete").forEach(btn => {
       btn.addEventListener("click", async () => {
         const id = btn.dataset.id;
-        if (!confirm("Delete this payment? This cannot be undone.")) return;
+        if (!confirm("Delete this revenue entry? This cannot be undone.")) return;
 
         await fetch(
           `https://financials-module.dennis-e64.workers.dev/payments/delete`,
