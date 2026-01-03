@@ -1,7 +1,7 @@
 // financials/tab-add-staging.js
 // Staging subsystem for the Financials "Add" tab
 
-import { escapeHtml } from "./utilities.js";
+import { escapeHtml } from "../utilities.js";
 
 /* =========================================================
    STAGING ACTIONS (window.* so inline buttons still work)
