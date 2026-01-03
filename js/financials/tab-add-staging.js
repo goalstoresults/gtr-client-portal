@@ -163,8 +163,23 @@ export async function loadStagingData() {
 
   switch (filter) {
     case "":
-      // ALL (except imported)
       url += `&status=neq.imported`;
+      break;
+
+    case "uploaded":
+      url += `&status=eq.uploaded`;
+      break;
+
+    case "ready":
+      url += `&status=eq.ready`;
+      break;
+
+    case "error":
+      url += `&status=eq.error`;
+      break;
+
+    case "imported":
+      url += `&status=eq.imported`;
       break;
 
     case "missing_contact":
@@ -179,24 +194,7 @@ export async function loadStagingData() {
       url += `&group_missing=true`;
       break;
 
-    case "ready":
-      url += `&status=eq.ready`;
-      break;
-
-    case "uploaded":
-      url += `&status=eq.uploaded`;
-      break;
-
-    case "error":
-      url += `&status=eq.error`;
-      break;
-
-    case "imported":
-      url += `&status=eq.imported`;
-      break;
-
     case "needs_review":
-      // NEW: rows that need review
       url += `&needs_review=eq.true`;
       break;
 
@@ -327,15 +325,18 @@ function renderStagingGrid(rows) {
       <div style="margin-bottom:10px; display:flex; gap:12px; align-items:center;">
         <button id="refreshStagingGrid" class="btn-primary">Refresh Grid</button>
 
-        <select id="stagingFilter" style="padding:4px 6px;">
-          <option value="">All</option>
-          <option value="missing_contact">Missing Contact</option>
-          <option value="missing_referral">Missing Referral</option>
-          <option value="missing_group">Missing Group</option>
-          <option value="ready">Ready</option>
-          <option value="error">Error</option>
-          <option value="imported">Imported</option>
-        </select>
+      <select id="stagingFilter" style="padding:4px 6px;">
+        <option value="">All (except imported)</option>
+        <option value="uploaded">Uploaded</option>
+        <option value="ready">Ready</option>
+        <option value="error">Error</option>
+        <option value="imported">Imported</option>
+        <option value="missing_contact">Missing Contact</option>
+        <option value="missing_referral">Missing Referral</option>
+        <option value="missing_group">Missing Group</option>
+        <option value="needs_review">Needs Review</option>
+      </select>
+
       </div>
 
       <table class="notes-table" style="width:100%; border-collapse:collapse; margin-top:12px;">
