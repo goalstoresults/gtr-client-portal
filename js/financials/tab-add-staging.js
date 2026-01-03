@@ -157,13 +157,53 @@ export async function loadStagingData() {
     return;
   }
 
-  // Default filter: exclude imported
   const filter = document.getElementById("stagingFilter")?.value || "";
-  const isDefault = filter === "";
 
-  const url = isDefault
-    ? `https://financials-module.dennis-e64.workers.dev/staging/list?project=${project}&status=neq.imported`
-    : `https://financials-module.dennis-e64.workers.dev/staging/list?project=${project}&status=${filter}`;
+  let url = `https://financials-module.dennis-e64.workers.dev/staging/list?project=${project}`;
+
+  switch (filter) {
+    case "":
+      // ALL (except imported)
+      url += `&status=neq.imported`;
+      break;
+
+    case "missing_contact":
+      url += `&contact_missing=true`;
+      break;
+
+    case "missing_referral":
+      url += `&referral_missing=true`;
+      break;
+
+    case "missing_group":
+      url += `&group_missing=true`;
+      break;
+
+    case "ready":
+      url += `&status=eq.ready`;
+      break;
+
+    case "uploaded":
+      url += `&status=eq.uploaded`;
+      break;
+
+    case "error":
+      url += `&status=eq.error`;
+      break;
+
+    case "imported":
+      url += `&status=eq.imported`;
+      break;
+
+    case "needs_review":
+      // NEW: rows that need review
+      url += `&needs_review=eq.true`;
+      break;
+
+    default:
+      url += `&status=neq.imported`;
+      break;
+  }
 
   const res = await fetch(url);
 
@@ -176,6 +216,7 @@ export async function loadStagingData() {
 
   renderStagingGrid(rows);
 }
+
 
 /* =========================================================
    STAGING GRID RENDERING
