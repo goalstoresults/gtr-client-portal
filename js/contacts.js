@@ -1,4 +1,4 @@
-contacts.js
+// js/contacts.js v2.0
 
 import { renderAddContactForm } from "./contacts/tab-add.js";
 import { renderContactList } from "./contacts/tab-list.js";
@@ -7,7 +7,6 @@ import { renderContactRelationships } from "./contacts/tab-relationships.js";
 import { renderContactNotes } from "./contacts/tab-notes.js";
 
 
-// js/contacts.js v2.0
 // 🔧 Load Contacts Tab with subtab switching
 
 export async function loadContactsTab({ portalState, tabContent }) {
