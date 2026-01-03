@@ -332,8 +332,6 @@ function renderStagingGrid(rows) {
     // Full grid HTML
     container.innerHTML = `
       <div style="margin-bottom:10px; display:flex; gap:12px; align-items:center;">
-        <button id="reviewBulkData" class="btn-primary">Review Bulk Data</button>
-        <button id="addBulkUpload" class="btn-secondary">Add Bulk</button>
         <button id="refreshStagingGrid" class="btn-primary">Refresh Grid</button>
       
         <select id="stagingFilter" style="padding:4px 6px;">
