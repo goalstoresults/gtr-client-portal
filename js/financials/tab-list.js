@@ -125,7 +125,7 @@ export async function renderFinancialList(container, portalState) {
       .map(
         p => `
       <tr data-id="${p.payment_id}">
-        <td>${escapeHtml(formatDateTimeFull(p.payment_date))}</td>
+        <td>${escapeHtml(formatDateTime(p.payment_date))}</td>
         <td>${escapeHtml(p.contact_name)}</td>
         <td class="right">${escapeHtml(formatCurrency(p.payment_amount))}</td>
         <td>${escapeHtml(p.invoice_number || "")}</td>
