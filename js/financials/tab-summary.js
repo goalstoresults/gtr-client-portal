@@ -1,7 +1,7 @@
 // financials/tab-summary.js
 // Summary tab: grouped financial summaries with sorting + totals
 
-import { escapeHtml } from "./utilities.js";
+import { escapeHtml } from "../utilities.js";
 
 /* =========================================================
    ENTRY POINT: Render Summary Tab
