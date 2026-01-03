@@ -361,6 +361,7 @@ async function renderContactList(container, portalState) {
   }
 }
 
+
 async function renderAddContactForm(container, portalState) {
   const projectId = portalState.project;
   if (!projectId) {
@@ -383,7 +384,7 @@ async function renderAddContactForm(container, portalState) {
   container.innerHTML = `
     <section class="card">
       <h2>Add New Contact</h2>
-      <form id="addContactForm" class="notes-form"></form>
+      <form id="addContactForm" class="notes-form" onsubmit="return false;"></form>
     </section>
   `;
 
@@ -488,7 +489,7 @@ async function renderAddContactForm(container, portalState) {
 
   // Handle submission
   form.addEventListener("submit", async e => {
-    e.preventDefault();
+    e.preventDefault(); // prevent GET navigation
 
     const formData = new FormData(form);
     const payload = { project: projectId };
@@ -524,7 +525,9 @@ async function renderAddContactForm(container, portalState) {
       // Return to List tab
       const listBtn = document.querySelector('#contacts-subtabs button[data-subtab="list"]');
       if (listBtn) {
+        document.querySelectorAll("#contacts-subtabs button").forEach(b => b.classList.remove("active"));
         listBtn.classList.add("active");
+
         const content = document.querySelector("#contactsContent");
         await renderContactList(content, portalState);
       }
