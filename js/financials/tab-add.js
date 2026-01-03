@@ -49,10 +49,9 @@ export async function renderFinancialAdd(container, portalState) {
       <div id="contactPickerArea"></div>
     </section>
 
-    <div style="margin-top:16px;">
-      <button id="btnLoadStaging" class="btn-primary" style="background-color:#007bff;">
-        Review Bulk Data
-      </button>
+    <div style="margin-top:16px; display:flex; gap:12px;">
+      <button id="btnLoadStaging" class="btn-primary">Review Bulk Data</button>
+      <button id="btnAddBulk" class="btn-secondary">Add Bulk</button>
     </div>
 
     <div id="stagingGrid" style="margin-top:16px;"></div>
@@ -69,6 +68,15 @@ export async function renderFinancialAdd(container, portalState) {
   // Wire staging button
   document.getElementById("btnLoadStaging").addEventListener("click", () => {
     loadStagingData();
+  });
+
+  // Wire bulk upload button
+  document.getElementById("btnAddBulk").addEventListener("click", () => {
+    if (typeof window.showBulkUploadModal === "function") {
+      window.showBulkUploadModal();
+    } else {
+      alert("Bulk upload modal not available.");
+    }
   });
 }
 
