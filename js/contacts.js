@@ -362,10 +362,11 @@ async function renderContactList(container, portalState) {
 }
 
 
+// 🔧 Add Contact Form (same structure as Details, but POST + new contact_id)
 async function renderAddContactForm(container, portalState) {
   const projectId = portalState.project;
   if (!projectId) {
-    container.innerHTML = `<section class="card"><p>Missing project.</p></section>`;
+    container.innerHTML = `<section class="card"><p>No project selected.</p></section>`;
     return;
   }
 
@@ -378,14 +379,20 @@ async function renderAddContactForm(container, portalState) {
   let fields = Array.isArray(fieldsData.rows) ? fieldsData.rows : [];
   fields.sort((a, b) => a.sort_order - b.sort_order);
 
-  // Only fields for the Add tab
+  // Use Add tab fields for consistency
   fields = fields.filter(f => f.contact_tab === "add");
 
+  // Header and Save button moved inside the form, top-aligned
   container.innerHTML = `
-    <section class="card">
-      <h2>Add New Contact</h2>
-      <form id="addContactForm" class="notes-form" onsubmit="return false;"></form>
-    </section>
+      <section class="card">
+        <form id="addContactForm" class="notes-form">
+          <div class="form-header" style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+            <h2 style="margin:0;">Add Contact for ${escapeHtml(portalState.display_name || projectId)}</h2>
+            <button type="submit" class="btn-primary">Save Contact</button>
+          </div>
+          <!-- fields will be appended here -->
+        </form>
+      </section>
   `;
 
   const form = container.querySelector("#addContactForm");
@@ -415,7 +422,6 @@ async function renderAddContactForm(container, portalState) {
 
       let input;
 
-      // Special case: group_id dropdown
       if (f.field_key === "group_id") {
         input = document.createElement("select");
         input.name = "group_id";
@@ -426,21 +432,18 @@ async function renderAddContactForm(container, portalState) {
           .then(data => {
             const rows = Array.isArray(data.rows) ? data.rows : Array.isArray(data) ? data : [];
             rows.sort((a, b) => (a.group_name || "").localeCompare(b.group_name || ""));
-
             const placeholder = document.createElement("option");
             placeholder.value = "";
             placeholder.textContent = "-- Select Group --";
             input.appendChild(placeholder);
-
             rows.forEach(g => {
               const opt = document.createElement("option");
-              opt.value = g.group_id;
+              opt.value = g.group_id; // full UUID
               opt.textContent = g.group_name;
               input.appendChild(opt);
             });
           });
 
-      // Lookup dropdown
       } else if (f.lookup_type) {
         input = document.createElement("select");
         input.name = f.field_key;
@@ -451,12 +454,10 @@ async function renderAddContactForm(container, portalState) {
           .then(values => {
             if (!Array.isArray(values)) return;
             values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
-
             const placeholder = document.createElement("option");
             placeholder.value = "";
             placeholder.textContent = "-- Select --";
             input.appendChild(placeholder);
-
             values.forEach(v => {
               const opt = document.createElement("option");
               opt.value = v.value;
@@ -465,13 +466,11 @@ async function renderAddContactForm(container, portalState) {
             });
           });
 
-      // Default text input
       } else {
         input = document.createElement("input");
         input.type = "text";
         input.name = f.field_key;
         input.className = "form-control";
-        input.value = "";
       }
 
       wrapper.appendChild(label);
@@ -480,19 +479,11 @@ async function renderAddContactForm(container, portalState) {
     }
   }
 
-  // Create button
-  const saveBtn = document.createElement("button");
-  saveBtn.type = "submit";
-  saveBtn.className = "btn-primary";
-  saveBtn.textContent = "Create Contact";
-  form.appendChild(saveBtn);
-
-  // Handle submission
+  // Handle form submission with normalization
   form.addEventListener("submit", async e => {
-    e.preventDefault(); // prevent GET navigation
-
+    e.preventDefault();
     const formData = new FormData(form);
-    const payload = { project: projectId };
+    const payload = {};
 
     fields.forEach(f => {
       let val = formData.get(f.field_key);
@@ -503,26 +494,29 @@ async function renderAddContactForm(container, portalState) {
         const parsed = parseInt(val, 10);
         payload[f.field_key] = isNaN(parsed) ? null : parsed;
       } else {
-        payload[f.field_key] = val;
+        payload[f.field_key] = val; // preserve UUIDs and strings
       }
     });
 
+    payload.contact_id = crypto.randomUUID();
+    payload.project = projectId;
     payload.created_at = new Date().toISOString();
-    payload.updated_at = payload.created_at;
+
+    // Build contact_name consistently
+    const first = formData.get("first_name") || "";
+    const last = formData.get("last_name") || "";
+    payload.contact_name = `${first} ${last}`.trim();
 
     try {
-      const res = await fetch(
-        `https://contacts-module.dennis-e64.workers.dev/contacts/add`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        }
-      );
+      const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
       const result = await res.json();
 
-      // Return to List tab
+      // ⭐ NEW FEATURE: Return to List tab after save
       const listBtn = document.querySelector('#contacts-subtabs button[data-subtab="list"]');
       if (listBtn) {
         document.querySelectorAll("#contacts-subtabs button").forEach(b => b.classList.remove("active"));
@@ -533,7 +527,7 @@ async function renderAddContactForm(container, portalState) {
       }
 
     } catch (err) {
-      container.innerHTML = `<section class="card"><p>Error creating contact: ${escapeHtml(err.message)}</p></section>`;
+      container.innerHTML = `<section class="card"><p>Error saving contact: ${escapeHtml(err.message)}</p></section>`;
     }
   });
 }
