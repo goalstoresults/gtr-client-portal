@@ -332,20 +332,21 @@ function renderStagingGrid(rows) {
     // Full grid HTML
     container.innerHTML = `
       <div style="margin-bottom:10px; display:flex; gap:12px; align-items:center;">
+        <button id="reviewBulkData" class="btn-primary">Review Bulk Data</button>
+        <button id="addBulkUpload" class="btn-secondary">Add Bulk</button>
         <button id="refreshStagingGrid" class="btn-primary">Refresh Grid</button>
-
-      <select id="stagingFilter" style="padding:4px 6px;">
-        <option value="">All (except imported)</option>
-        <option value="uploaded">Uploaded</option>
-        <option value="ready">Ready</option>
-        <option value="error">Error</option>
-        <option value="imported">Imported</option>
-        <option value="missing_contact">Missing Contact</option>
-        <option value="missing_referral">Missing Referral</option>
-        <option value="missing_group">Missing Group</option>
-        <option value="needs_review">Needs Review</option>
-      </select>
-
+      
+        <select id="stagingFilter" style="padding:4px 6px;">
+          <option value="">All (except imported)</option>
+          <option value="uploaded">Uploaded</option>
+          <option value="ready">Ready</option>
+          <option value="error">Error</option>
+          <option value="imported">Imported</option>
+          <option value="missing_contact">Missing Contact</option>
+          <option value="missing_referral">Missing Referral</option>
+          <option value="missing_group">Missing Group</option>
+          <option value="needs_review">Needs Review</option>
+        </select>
       </div>
 
       <table class="notes-table" style="width:100%; border-collapse:collapse; margin-top:12px;">
