@@ -47,7 +47,7 @@ export async function renderFinancialSummary(container, portalState) {
 }
 
 /* =========================================================
-   LOAD YEARS
+   LOAD YEARS (using transaction_date)
 ========================================================= */
 
 async function loadSummaryYears(portalState) {
@@ -67,8 +67,8 @@ async function loadSummaryYears(portalState) {
 
   const years = new Set();
   for (const p of payments) {
-    if (p.payment_date) {
-      years.add(new Date(p.payment_date).getFullYear());
+    if (p.transaction_date) {
+      years.add(new Date(p.transaction_date).getFullYear());
     }
   }
 
@@ -88,7 +88,7 @@ async function loadSummaryData(portalState) {
   const type = document.getElementById("summaryType").value;
   const year = document.getElementById("summaryYear").value;
 
-  // Fetch payments
+  // Fetch revenue rows
   const payRes = await fetch(
     `https://financials-module.dennis-e64.workers.dev/payments/list?project=${portalState.project}&limit=2000`,
     { cache: "no-cache" }
@@ -138,11 +138,11 @@ async function loadSummaryData(portalState) {
     });
   }
 
-  // Filter by year
+  // Filter by year (using transaction_date)
   if (year !== "all") {
     payments = payments.filter(p => {
-      if (!p.payment_date) return false;
-      return new Date(p.payment_date).getFullYear().toString() === year;
+      if (!p.transaction_date) return false;
+      return new Date(p.transaction_date).getFullYear().toString() === year;
     });
   }
 
@@ -183,7 +183,7 @@ async function loadSummaryData(portalState) {
 }
 
 /* =========================================================
-   SUMMARY LOGIC
+   SUMMARY LOGIC (revenue-native)
 ========================================================= */
 
 function summarizeByClient(payments, nameById) {
@@ -200,7 +200,7 @@ function summarizeByClient(payments, nameById) {
       });
     }
     const row = map.get(key);
-    row.total_amount += Number(p.payment_amount) || 0;
+    row.total_amount += Number(p.amount) || 0;
     row.count++;
   }
 
@@ -221,7 +221,7 @@ function summarizeByReferral(payments, nameById) {
       });
     }
     const row = map.get(key);
-    row.total_amount += Number(p.payment_amount) || 0;
+    row.total_amount += Number(p.amount) || 0;
     row.count++;
     row.clients.add(p.contact_id);
   }
@@ -236,8 +236,8 @@ function summarizeByYear(payments) {
   const map = new Map();
 
   for (const p of payments) {
-    if (!p.payment_date) continue;
-    const year = new Date(p.payment_date).getFullYear();
+    if (!p.transaction_date) continue;
+    const year = new Date(p.transaction_date).getFullYear();
 
     if (!map.has(year)) {
       map.set(year, {
@@ -250,7 +250,7 @@ function summarizeByYear(payments) {
     }
 
     const row = map.get(year);
-    row.total_amount += Number(p.payment_amount) || 0;
+    row.total_amount += Number(p.amount) || 0;
     row.count++;
     row.clients.add(p.contact_id);
     row.referrals.add(p.referral_id);
@@ -267,8 +267,8 @@ function summarizeByYearClient(payments, nameById) {
   const map = new Map();
 
   for (const p of payments) {
-    if (!p.payment_date) continue;
-    const year = new Date(p.payment_date).getFullYear();
+    if (!p.transaction_date) continue;
+    const year = new Date(p.transaction_date).getFullYear();
     const key = `${year}-${p.contact_id}`;
 
     if (!map.has(key)) {
@@ -282,7 +282,7 @@ function summarizeByYearClient(payments, nameById) {
     }
 
     const row = map.get(key);
-    row.total_amount += Number(p.payment_amount) || 0;
+    row.total_amount += Number(p.amount) || 0;
     row.count++;
   }
 
@@ -293,8 +293,8 @@ function summarizeByYearReferral(payments, nameById) {
   const map = new Map();
 
   for (const p of payments) {
-    if (!p.payment_date) continue;
-    const year = new Date(p.payment_date).getFullYear();
+    if (!p.transaction_date) continue;
+    const year = new Date(p.transaction_date).getFullYear();
     const key = `${year}-${p.referral_id}`;
 
     if (!map.has(key)) {
@@ -307,7 +307,7 @@ function summarizeByYearReferral(payments, nameById) {
     }
 
     const row = map.get(key);
-    row.total_amount += Number(p.payment_amount) || 0;
+    row.total_amount += Number(p.amount) || 0;
     row.count++;
   }
 
@@ -335,7 +335,7 @@ function summarizeByGroup(payments, groupByContactId) {
     }
 
     const row = map.get(key);
-    row.total_amount += Number(p.payment_amount) || 0;
+    row.total_amount += Number(p.amount) || 0;
     row.count++;
     row.clients.add(p.contact_id);
     row.referrals.add(p.referral_id);
@@ -352,9 +352,9 @@ function summarizeByGroupYear(payments, groupByContactId) {
   const map = new Map();
 
   for (const p of payments) {
-    if (!p.payment_date) continue;
+    if (!p.transaction_date) continue;
 
-    const year = new Date(p.payment_date).getFullYear();
+    const year = new Date(p.transaction_date).getFullYear();
     const groupInfo =
       groupByContactId.get(p.referral_id) || { group_id: null, group_name: "(none)" };
 
@@ -373,7 +373,7 @@ function summarizeByGroupYear(payments, groupByContactId) {
     }
 
     const row = map.get(key);
-    row.total_amount += Number(p.payment_amount) || 0;
+    row.total_amount += Number(p.amount) || 0;
     row.count++;
     row.clients.add(p.contact_id);
     row.referrals.add(p.referral_id);
@@ -568,7 +568,8 @@ function renderSummaryGrid(rows, type) {
         </tbody>
       </table>
     `;
-    container.querySelectorAll("th.sortable").forEach(th => {
+
+      container.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
 
