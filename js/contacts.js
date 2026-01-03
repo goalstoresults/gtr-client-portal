@@ -361,6 +361,179 @@ async function renderContactList(container, portalState) {
   }
 }
 
+async function renderAddContactForm(container, portalState) {
+  const projectId = portalState.project;
+  if (!projectId) {
+    container.innerHTML = `<section class="card"><p>Missing project.</p></section>`;
+    return;
+  }
+
+  // Fetch configured fields
+  const fieldsRes = await fetch(
+    `https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${projectId}`,
+    { cache: "no-cache" }
+  );
+  const fieldsData = await fieldsRes.json();
+  let fields = Array.isArray(fieldsData.rows) ? fieldsData.rows : [];
+  fields.sort((a, b) => a.sort_order - b.sort_order);
+
+  // Only fields for the Add tab
+  fields = fields.filter(f => f.contact_tab === "add");
+
+  container.innerHTML = `
+    <section class="card">
+      <h2>Add New Contact</h2>
+      <form id="addContactForm" class="notes-form"></form>
+    </section>
+  `;
+
+  const form = container.querySelector("#addContactForm");
+
+  // Group fields by section
+  const grouped = fields.reduce((acc, f) => {
+    const section = f.section || "General";
+    if (!acc[section]) acc[section] = [];
+    acc[section].push(f);
+    return acc;
+  }, {});
+
+  // Render each section
+  for (const [section, sectionFields] of Object.entries(grouped)) {
+    const sectionHeader = document.createElement("h3");
+    sectionHeader.textContent = section;
+    sectionHeader.className = "section-title";
+    form.appendChild(sectionHeader);
+
+    for (const f of sectionFields) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "notes-row";
+
+      const label = document.createElement("label");
+      label.textContent = f.label || f.field_key;
+      label.className = "notes-label";
+
+      let input;
+
+      // Special case: group_id dropdown
+      if (f.field_key === "group_id") {
+        input = document.createElement("select");
+        input.name = "group_id";
+        input.className = "form-control";
+
+        fetch(`https://groups-module.dennis-e64.workers.dev/groups/list?project=${projectId}`)
+          .then(r => r.json())
+          .then(data => {
+            const rows = Array.isArray(data.rows) ? data.rows : Array.isArray(data) ? data : [];
+            rows.sort((a, b) => (a.group_name || "").localeCompare(b.group_name || ""));
+
+            const placeholder = document.createElement("option");
+            placeholder.value = "";
+            placeholder.textContent = "-- Select Group --";
+            input.appendChild(placeholder);
+
+            rows.forEach(g => {
+              const opt = document.createElement("option");
+              opt.value = g.group_id;
+              opt.textContent = g.group_name;
+              input.appendChild(opt);
+            });
+          });
+
+      // Lookup dropdown
+      } else if (f.lookup_type) {
+        input = document.createElement("select");
+        input.name = f.field_key;
+        input.className = "form-control";
+
+        fetch(`https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=${f.lookup_type}&project=${projectId}`)
+          .then(r => r.json())
+          .then(values => {
+            if (!Array.isArray(values)) return;
+            values.sort((a, b) => (a.label || a.value || "").localeCompare(b.label || b.value || ""));
+
+            const placeholder = document.createElement("option");
+            placeholder.value = "";
+            placeholder.textContent = "-- Select --";
+            input.appendChild(placeholder);
+
+            values.forEach(v => {
+              const opt = document.createElement("option");
+              opt.value = v.value;
+              opt.textContent = v.label || v.value;
+              input.appendChild(opt);
+            });
+          });
+
+      // Default text input
+      } else {
+        input = document.createElement("input");
+        input.type = "text";
+        input.name = f.field_key;
+        input.className = "form-control";
+        input.value = "";
+      }
+
+      wrapper.appendChild(label);
+      wrapper.appendChild(input);
+      form.appendChild(wrapper);
+    }
+  }
+
+  // Create button
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "submit";
+  saveBtn.className = "btn-primary";
+  saveBtn.textContent = "Create Contact";
+  form.appendChild(saveBtn);
+
+  // Handle submission
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+
+    const formData = new FormData(form);
+    const payload = { project: projectId };
+
+    fields.forEach(f => {
+      let val = formData.get(f.field_key);
+
+      if (val === "") {
+        payload[f.field_key] = null;
+      } else if (f.data_type === "integer") {
+        const parsed = parseInt(val, 10);
+        payload[f.field_key] = isNaN(parsed) ? null : parsed;
+      } else {
+        payload[f.field_key] = val;
+      }
+    });
+
+    payload.created_at = new Date().toISOString();
+    payload.updated_at = payload.created_at;
+
+    try {
+      const res = await fetch(
+        `https://contacts-module.dennis-e64.workers.dev/contacts/add`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }
+      );
+
+      const result = await res.json();
+
+      // Return to List tab
+      const listBtn = document.querySelector('#contacts-subtabs button[data-subtab="list"]');
+      if (listBtn) {
+        listBtn.classList.add("active");
+        const content = document.querySelector("#contactsContent");
+        await renderContactList(content, portalState);
+      }
+
+    } catch (err) {
+      container.innerHTML = `<section class="card"><p>Error creating contact: ${escapeHtml(err.message)}</p></section>`;
+    }
+  });
+}
 
 
 
