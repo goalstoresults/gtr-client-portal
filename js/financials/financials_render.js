@@ -1,178 +1,30 @@
-// js/financials/financials_render.js
-// =========================================================
-// EXPORTED RENDER + UI FUNCTIONS FOR FINANCIALS MODULE
-// =========================================================
+// financials_render.js
+// UI Rendering for Financials (Add, List, Summary, Staging Grid)
 
-import { escapeHtml, renderContactPicker, formatCurrency } from "../utilities.js";
+import {
+  escapeHtml,
+  renderContactPicker,
+  formatCurrency,
+  formatDateTimeFull
+} from "./utilities.js";
 
-/* =========================================================
-   STAGING — TOP BLOCK (window.* functions)
-========================================================= */
+import { addPaymentWithReferral } from "./financials_logic.js";
+import {
+  loadStagingData
+} from "./financials_staging.js";
 
-export async function autoMatchContact(id) {
-  const project = window.portalState?.project;
-  if (!project) {
-    alert("No project selected.");
-    return;
-  }
-
-  await fetch(
-    `https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=${project}`
-  );
-
-  loadStagingData();
-}
-
-export async function insertStagingRow(id) {
-  const project = window.portalState?.project;
-  if (!project) {
-    alert("No project selected.");
-    return;
-  }
-
-  const rowEl = document.querySelector(`#row-${id}`);
-  if (!rowEl) return;
-
-  const contact = rowEl.querySelector(".contact-cell")?.textContent.trim();
-
-  if (!contact || contact === "(none)") {
-    alert("Cannot import: missing contact_id.");
-    return;
-  }
-
-  const actionCell = rowEl.querySelector(".action-cell");
-  if (actionCell) {
-    actionCell.innerHTML = `<span style="color:#555;">Inserting...</span>`;
-  }
-
-  const res = await fetch(
-    `https://financials-module.dennis-e64.workers.dev/payments/add-from-staging?id=${id}&project=${project}`,
-    { method: "POST" }
-  );
-
-  let data = {};
-  try { data = await res.json(); } catch {}
-
-  if (res.ok) {
-    loadStagingData();
-  } else {
-    if (actionCell) {
-      actionCell.innerHTML = `<button onclick="fixRow('${id}')">Fix Row</button>`;
-    }
-    const statusCell = rowEl.querySelector(".status-cell");
-    if (statusCell) {
-      statusCell.textContent = "error";
-      statusCell.style.color = "red";
-    }
-    const errorCell = rowEl.querySelector(".error-cell");
-    if (errorCell) {
-      errorCell.textContent = data.error || "Insert failed";
-    }
-  }
-}
-
-export async function fixRow(id) {
-  const rowEl = document.querySelector(`#row-${id}`);
-  if (!rowEl) return;
-
-  const customer = rowEl.children[0].textContent.trim();
-  const invoice = rowEl.children[1].textContent.trim();
-  const date = rowEl.children[2].textContent.trim();
-  const amount = rowEl.children[3].textContent.trim();
-  const contact = rowEl.querySelector(".contact-cell").textContent.trim();
-
-  const modal = document.createElement("div");
-  modal.style = `
-    position:fixed; top:0; left:0; width:100%; height:100%;
-    background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center;
-    z-index:9999;
-  `;
-
-  modal.innerHTML = `
-    <div style="background:white; padding:20px; width:360px; border-radius:6px;">
-      <h3>Fix Row</h3>
-
-      <label>Customer Name</label>
-      <input id="fix_customer" class="form-control" value="${customer}" />
-
-      <label style="margin-top:10px;">Invoice #</label>
-      <input id="fix_invoice" class="form-control" value="${invoice}" />
-
-      <label style="margin-top:10px;">Payment Date</label>
-      <input id="fix_date" class="form-control" type="date" value="${date}" />
-
-      <label style="margin-top:10px;">Amount</label>
-      <input id="fix_amount" class="form-control" type="number" step="0.01" value="${amount}" />
-
-      <label style="margin-top:10px;">Contact ID</label>
-      <input id="fix_contact" class="form-control" value="${contact === "(none)" ? "" : contact}" />
-
-      <div style="margin-top:16px; display:flex; justify-content:flex-end; gap:10px;">
-        <button id="fix_cancel">Cancel</button>
-        <button id="fix_save" class="btn-primary">Save</button>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(modal);
-
-  modal.querySelector("#fix_cancel").onclick = () => modal.remove();
-
-  modal.querySelector("#fix_save").onclick = async () => {
-    const updatedContact = document.getElementById("fix_contact").value.trim() || null;
-
-    await fetch(
-      `https://financials-module.dennis-e64.workers.dev/staging/update`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id,
-          contact_id: updatedContact,
-          needs_review: updatedContact ? false : true,
-          notes: ""
-        })
-      }
-    );
-
-    modal.remove();
-    loadStagingData();
-  };
-}
-
-export function refreshStagingGrid() {
-  loadStagingData();
-}
+import {
+  summarizeByClient,
+  summarizeByReferral,
+  summarizeByYear,
+  summarizeByYearClient,
+  summarizeByYearReferral,
+  summarizeByGroup,
+  summarizeByGroupYear
+} from "./financials_logic.js";
 
 /* =========================================================
-   LOAD STAGING DATA (UI ENTRY POINT)
-========================================================= */
-
-export async function loadStagingData() {
-  const project = window.portalState?.project;
-  if (!project) {
-    console.error("No project selected.");
-    renderStagingGrid([]);
-    return;
-  }
-
-  const filter = document.getElementById("stagingFilter")?.value || "";
-  const isDefault = filter === "";
-
-  const url = isDefault
-    ? `https://financials-module.dennis-e64.workers.dev/staging/list?project=${project}&status=neq.imported`
-    : `https://financials-module.dennis-e64.workers.dev/staging/list?project=${project}&status=${filter}`;
-
-  const res = await fetch(url);
-
-  let rows = [];
-  try { rows = await res.json(); } catch {}
-
-  renderStagingGrid(rows);
-}
-
-/* =========================================================
-   ADD PAYMENT UI
+   ADD PAYMENT
 ========================================================= */
 
 export async function renderFinancialAdd(container, portalState) {
@@ -203,7 +55,7 @@ export async function renderFinancialAdd(container, portalState) {
   });
 }
 
-export async function renderAddPaymentForm(formArea, portalState, contact) {
+async function renderAddPaymentForm(formArea, portalState, contact) {
   formArea.innerHTML = `
     <section class="card">
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
@@ -237,20 +89,13 @@ export async function renderAddPaymentForm(formArea, portalState, contact) {
     }
 
     try {
-      await fetch(
-        `https://financials-module.dennis-e64.workers.dev/payments/add`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            project: portalState.project,
-            contact_id: contact.contact_id,
-            payment_amount: parseFloat(amount),
-            payment_date: date,
-            invoice_number: invoice || null
-          })
-        }
-      );
+      await addPaymentWithReferral({
+        project: portalState.project,
+        contact_id: contact.contact_id,
+        payment_amount: parseFloat(amount),
+        payment_date: date,
+        invoice_number: invoice || null
+      });
 
       alert("Payment added");
     } catch (err) {
@@ -260,8 +105,9 @@ export async function renderAddPaymentForm(formArea, portalState, contact) {
   });
 }
 
+
 /* =========================================================
-   BULK IMPORT UI
+   BULK IMPORT
 ========================================================= */
 
 export async function startBulkImport(portalState) {
@@ -302,6 +148,7 @@ export async function startBulkImport(portalState) {
 
   if (res.ok) {
     alert("Bulk import complete");
+
     const listBtn = document.querySelector('#financials-subtabs button[data-subtab="list"]');
     if (listBtn) {
       listBtn.classList.add("active");
@@ -313,11 +160,13 @@ export async function startBulkImport(portalState) {
   }
 }
 
+
 /* =========================================================
-   LIST UI
+   LIST VIEW
 ========================================================= */
 
 export async function renderFinancialList(container, portalState) {
+  // fetch payments
   const paymentsRes = await fetch(
     `https://financials-module.dennis-e64.workers.dev/payments/list?project=${portalState.project}&limit=500`,
     { cache: "no-cache" }
@@ -331,6 +180,7 @@ export async function renderFinancialList(container, portalState) {
     payments = [];
   }
 
+  // fetch contacts
   const contactsRes = await fetch(
     `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}&limit=2000`,
     { cache: "no-cache" }
@@ -485,7 +335,7 @@ export async function renderFinancialList(container, portalState) {
         const amount = Number(row.querySelector(".edit-amount").value);
         const invoice = row.querySelector(".edit-invoice").value;
 
-         await fetch(`https://financials-module.dennis-e64.workers.dev/payments/update`, {
+        await fetch(`https://financials-module.dennis-e64.workers.dev/payments/update`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -518,4 +368,182 @@ export async function renderFinancialList(container, portalState) {
   }
 
   renderTable();
+}
+
+
+/* =========================================================
+   SUMMARY VIEW
+========================================================= */
+
+export async function renderFinancialSummary(container, portalState) {
+  container.innerHTML = `
+    <section class="card">
+      <h3>Financial Summary</h3>
+
+      <div id="summaryFilters" style="margin-bottom: 12px;">
+        <label>Summary Type:</label>
+        <select id="summaryType">
+          <option value="client">By Client</option>
+          <option value="referral">By Referral</option>
+          <option value="year">By Year</option>
+          <option value="year_client">By Year + Client</option>
+          <option value="year_referral">By Year + Referral</option>
+          <option value="group">By Group</option>
+          <option value="group_year">By Group + Year</option>
+        </select>
+
+        <label style="margin-left: 20px;">Year:</label>
+        <select id="summaryYear">
+          <option value="all">All</option>
+        </select>
+      </div>
+
+      <div id="summaryGrid"></div>
+    </section>
+  `;
+
+  await loadSummaryYears(portalState);
+  await loadSummaryData(portalState);
+
+  document.getElementById("summaryType").addEventListener("change", () => {
+    loadSummaryData(portalState);
+  });
+
+  document.getElementById("summaryYear").addEventListener("change", () => {
+    loadSummaryData(portalState);
+  });
+}
+
+
+/* =========================================================
+   SUMMARY YEARS
+========================================================= */
+
+async function loadSummaryYears(portalState) {
+  const yearSelect = document.getElementById("summaryYear");
+
+  const res = await fetch(
+    `https://financials-module.dennis-e64.workers.dev/payments/list?project=${portalState.project}&limit=2000`,
+    { cache: "no-cache" }
+  );
+
+  let payments = [];
+  try {
+    payments = await res.json();
+  } catch {
+    payments = [];
+  }
+
+  const years = new Set();
+  for (const p of payments) {
+    if (p.payment_date) {
+      years.add(new Date(p.payment_date).getFullYear());
+    }
+  }
+
+  [...years].sort((a, b) => b - a).forEach(y => {
+    const opt = document.createElement("option");
+    opt.value = y;
+    opt.textContent = y;
+    yearSelect.appendChild(opt);
+  });
+}
+
+
+/* =========================================================
+   SUMMARY DATA
+========================================================= */
+
+async function loadSummaryData(portalState) {
+  const type = document.getElementById("summaryType").value;
+  const year = document.getElementById("summaryYear").value;
+
+  const payRes = await fetch(
+    `https://financials-module.dennis-e64.workers.dev/payments/list?project=${portalState.project}&limit=2000`,
+    { cache: "no-cache" }
+  );
+
+  let payments = [];
+  try {
+    payments = await payRes.json();
+  } catch {
+    payments = [];
+  }
+
+  const isGroupSummary = type === "group" || type === "group_year";
+
+  const contactsEndpointPath = isGroupSummary
+    ? "/contacts/list-with-groups"
+    : "/contacts/list";
+
+  const contactsRes = await fetch(
+    `https://contacts-module.dennis-e64.workers.dev${contactsEndpointPath}?project=${portalState.project}&limit=2000`,
+    { cache: "no-cache" }
+  );
+
+  let contacts = [];
+  try {
+    contacts = await contactsRes.json();
+  } catch {
+    contacts = [];
+  }
+
+  const nameById = new Map();
+  const groupByContactId = new Map();
+
+  for (const c of contacts) {
+    nameById.set(
+      c.contact_id,
+      c.search_name || c.contact_name || c.contact_id
+    );
+
+    const groupId = c.group_id || null;
+    const groupName = c.group_name || (groupId || "(none)");
+
+    groupByContactId.set(c.contact_id, {
+      group_id: groupId,
+      group_name: groupName
+    });
+  }
+
+  if (year !== "all") {
+    payments = payments.filter(p => {
+      if (!p.payment_date) return false;
+      return new Date(p.payment_date).getFullYear().toString() === year;
+    });
+  }
+
+  let summaryRows = [];
+
+  switch (type) {
+    case "client":
+      summaryRows = summarizeByClient(payments, nameById);
+      break;
+
+    case "referral":
+      summaryRows = summarizeByReferral(payments, nameById);
+      break;
+
+    case "year":
+      summaryRows = summarizeByYear(payments);
+      break;
+
+    case "year_client":
+      summaryRows = summarizeByYearClient(payments, nameById);
+      break;
+
+    case "year_referral":
+      summaryRows = summarizeByYearReferral(payments, nameById);
+      break;
+
+    case "group":
+      summaryRows = summarizeByGroup(payments, groupByContactId, nameById);
+      break;
+
+    case "group_year":
+      summaryRows = summarizeByGroupYear(payments, groupByContactId, nameById);
+      break;
+  }
+
+  renderSummaryGrid(summaryRows, type);
 }
