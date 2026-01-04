@@ -14,6 +14,7 @@ const CONTACT_FIELD_OPTIONS = [
   "contact_type",
   "search_name",
   "updated_at",
+  "group_id",
 ];
 
 // ---------- Utils ----------
