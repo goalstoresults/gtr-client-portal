@@ -223,6 +223,7 @@ export async function loadStagingData() {
 
   renderStagingGrid(rows);
 }
+window.loadStagingData = loadStagingData;
 
 
 /* =========================================================
