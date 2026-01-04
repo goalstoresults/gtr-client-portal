@@ -67,7 +67,7 @@ export async function renderFinancialAdd(container, portalState) {
 
   // Wire staging button
   document.getElementById("btnLoadStaging").addEventListener("click", () => {
-    loadStagingData();
+     staging.loadStagingData();
   });
 
   // Wire bulk upload button
