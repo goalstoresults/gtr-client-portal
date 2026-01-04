@@ -2,7 +2,7 @@
 // Add tab: manual payment entry + bulk import + staging trigger
 
 import { escapeHtml, renderContactPicker } from "../utilities.js";
-import { loadStagingData } from "./tab-add-staging.js";
+import * as staging from "./tab-add-staging.js";
 import { renderFinancialList } from "./tab-list.js";
 
 /* =========================================================
