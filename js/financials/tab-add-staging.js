@@ -391,6 +391,45 @@ function renderStagingGrid(rows) {
   renderTable();
 }
 
+window.showBulkUploadModal = function () {
+  const modal = document.createElement("div");
+  modal.style = `
+    position:fixed; top:0; left:0; width:100%; height:100%;
+    background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center;
+    z-index:9999;
+  `;
+
+  modal.innerHTML = `
+    <div style="background:white; padding:20px; width:500px; border-radius:6px;">
+      <h3>Bulk Upload</h3>
+      <p>Paste CSV data below. First row must contain column names.</p>
+
+      <textarea id="bulkCsvInput" style="width:100%; height:200px; margin-top:10px;"></textarea>
+
+      <div style="margin-top:16px; display:flex; justify-content:flex-end; gap:10px;">
+        <button id="bulkCancel">Cancel</button>
+        <button id="bulkUpload" class="btn-primary">Upload</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  modal.querySelector("#bulkCancel").onclick = () => modal.remove();
+
+  modal.querySelector("#bulkUpload").onclick = async () => {
+    const csv = document.getElementById("bulkCsvInput").value.trim();
+    if (!csv) {
+      alert("Please paste CSV data.");
+      return;
+    }
+
+    await window.processBulkUpload(csv);
+    modal.remove();
+  };
+};
+
+
 // =========================================================
 // FLEXIBLE BULK CSV PARSER + UPLOADER
 // =========================================================
