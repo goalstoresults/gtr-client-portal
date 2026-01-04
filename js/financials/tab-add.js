@@ -2,7 +2,7 @@
 // Add tab: manual payment entry + bulk import + staging trigger
 
 import { escapeHtml, renderContactPicker } from "../utilities.js";
-import * as staging from "./tab-add-staging.js";
+import "./tab-add-staging.js";
 import { renderFinancialList } from "./tab-list.js";
 
 /* =========================================================
@@ -45,7 +45,7 @@ export async function addPaymentWithReferral({
 export async function renderFinancialAdd(container, portalState) {
   container.innerHTML = `
     <section class="card">
-      <h3>Financials – Add Payment</h3>
+      <h3>Financials – Add Payment -</h3>
       <div id="contactPickerArea"></div>
     </section>
 
@@ -67,7 +67,7 @@ export async function renderFinancialAdd(container, portalState) {
 
   // Wire staging button
   document.getElementById("btnLoadStaging").addEventListener("click", () => {
-     staging.loadStagingData();
+     window.loadStagingData();
   });
 
   // Wire bulk upload button
