@@ -230,20 +230,19 @@ window.loadStagingData = loadStagingData;
    STAGING GRID RENDERING
    Updated for referral_id + group_id + filters
 ========================================================= */
-
 function renderStagingGrid(rows) {
   const container = document.getElementById("stagingGrid");
 
   // Sorting state
-  let currentSortField = "payment_date";
+  let currentSortField = "transaction_date";
   let currentSortDirection = "asc";
 
   // Columns including new referral/group
   const columns = [
     { key: "customer_name", label: "Customer" },
     { key: "invoice_number", label: "Invoice #" },
-    { key: "payment_date", label: "Date", isDate: true },
-    { key: "payment_amount", label: "Amount", numeric: true },
+    { key: "transaction_date", label: "Date", isDate: true },
+    { key: "amount", label: "Amount", numeric: true },
     { key: "contact_id", label: "Contact ID" },
     { key: "referral_id", label: "Referral ID" },
     { key: "group_id", label: "Group ID" },
@@ -303,8 +302,8 @@ function renderStagingGrid(rows) {
       <tr id="row-${row.id}" style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};">
         <td>${escapeHtml(row.customer_name || "")}</td>
         <td>${escapeHtml(row.invoice_number || "")}</td>
-        <td>${escapeHtml(row.payment_date || "")}</td>
-        <td>${escapeHtml((Number(row.payment_amount) || 0).toFixed(2))}</td>
+        <td>${escapeHtml(row.transaction_date || "")}</td>
+        <td>${escapeHtml((Number(row.amount) || 0).toFixed(2))}</td>
 
         <td class="contact-cell">${escapeHtml(row.contact_id || "(none)")}</td>
 
@@ -391,6 +390,9 @@ function renderStagingGrid(rows) {
 
   renderTable();
 }
+
+
+
 
 /* =========================================================
    BUlk CSV File Upload
