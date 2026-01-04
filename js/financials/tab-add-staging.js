@@ -498,7 +498,7 @@ function renderStagingActionButton(row) {
     case "matched":
       // Contact found but referral missing → Populate + Insert
       return `
-        <button onclick="autoMatchContact('${row.id}')">Populate</button>
+        <button onclick="autoMatchContact('${row.id}')">Populate!</button>
         <button onclick="insertStagingRow('${row.id}')">Insert</button>
       `;
 
