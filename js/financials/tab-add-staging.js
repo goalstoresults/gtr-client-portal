@@ -403,9 +403,9 @@ window.showBulkUploadModal = function () {
   modal.innerHTML = `
     <div style="background:white; padding:20px; width:500px; border-radius:6px;">
       <h3>Bulk Upload</h3>
-      <p>Paste CSV data below. First row must contain column names.</p>
+      <p>Select a CSV file to upload. First row must contain column names.</p>
 
-      <textarea id="bulkCsvInput" style="width:100%; height:200px; margin-top:10px;"></textarea>
+      <input type="file" id="bulkCsvFile" accept=".csv" style="margin-top:10px;" />
 
       <div style="margin-top:16px; display:flex; justify-content:flex-end; gap:10px;">
         <button id="bulkCancel">Cancel</button>
@@ -419,16 +419,19 @@ window.showBulkUploadModal = function () {
   modal.querySelector("#bulkCancel").onclick = () => modal.remove();
 
   modal.querySelector("#bulkUpload").onclick = async () => {
-    const csv = document.getElementById("bulkCsvInput").value.trim();
-    if (!csv) {
-      alert("Please paste CSV data.");
+    const fileInput = document.getElementById("bulkCsvFile");
+    const file = fileInput.files[0];
+    if (!file) {
+      alert("Please select a CSV file.");
       return;
     }
 
-    await window.processBulkUpload(csv);
+    const text = await file.text();
+    await window.processBulkUpload(text);
     modal.remove();
   };
 };
+
 
 
 // =========================================================
