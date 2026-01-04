@@ -76,10 +76,11 @@ window.fixRow = async function(id) {
   const rowEl = document.querySelector(`#row-${id}`);
   if (!rowEl) return;
 
+  // Extract values from the correct columns
   const customer = rowEl.children[0].textContent.trim();
   const invoice = rowEl.children[1].textContent.trim();
-  const date = rowEl.children[2].textContent.trim();
-  const amount = rowEl.children[3].textContent.trim();
+  const date = rowEl.children[2].textContent.trim();     // transaction_date
+  const amount = rowEl.children[3].textContent.trim();   // amount
   const contact = rowEl.querySelector(".contact-cell").textContent.trim();
 
   const modal = document.createElement("div");
@@ -99,7 +100,7 @@ window.fixRow = async function(id) {
       <label style="margin-top:10px;">Invoice #</label>
       <input id="fix_invoice" class="form-control" value="${invoice}" />
 
-      <label style="margin-top:10px;">Payment Date</label>
+      <label style="margin-top:10px;">Transaction Date</label>
       <input id="fix_date" class="form-control" type="date" value="${date}" />
 
       <label style="margin-top:10px;">Amount</label>
@@ -237,7 +238,7 @@ function renderStagingGrid(rows) {
   let currentSortField = "transaction_date";
   let currentSortDirection = "asc";
 
-  // Columns including new referral/group
+  // FINAL column list (group_id removed)
   const columns = [
     { key: "customer_name", label: "Customer" },
     { key: "invoice_number", label: "Invoice #" },
@@ -245,8 +246,11 @@ function renderStagingGrid(rows) {
     { key: "amount", label: "Amount", numeric: true },
     { key: "contact_id", label: "Contact ID" },
     { key: "referral_id", label: "Referral ID" },
-    { key: "group_id", label: "Group ID" },
-    { key: "status", label: "Status" }
+    { key: "status", label: "Status" },
+
+    // Required for alignment
+    { key: "error_message", label: "Error" },
+    { key: "action", label: "Action" }
   ];
 
   function sortRows() {
@@ -311,10 +315,6 @@ function renderStagingGrid(rows) {
           ${escapeHtml(row.referral_id || "(none)")}
         </td>
 
-        <td class="group-cell" style="color:${row.group_id ? "#000" : "red"};">
-          ${escapeHtml(row.group_id || "(none)")}
-        </td>
-
         <td class="status-cell">${escapeHtml(row.status || "")}</td>
 
         <td class="error-cell" style="color:red;">
@@ -329,7 +329,6 @@ function renderStagingGrid(rows) {
       )
       .join("");
 
-    // Full grid HTML
     container.innerHTML = `
       <div style="margin-bottom:10px; display:flex; gap:12px; align-items:center;">
         <button id="refreshStagingGrid" class="btn-primary">Refresh Grid</button>
@@ -342,22 +341,15 @@ function renderStagingGrid(rows) {
           <option value="imported">Imported</option>
           <option value="missing_contact">Missing Contact</option>
           <option value="missing_referral">Missing Referral</option>
-          <option value="missing_group">Missing Group</option>
           <option value="needs_review">Needs Review</option>
         </select>
       </div>
 
       <table class="notes-table" style="width:100%; border-collapse:collapse; margin-top:12px;">
         <thead>
-          <tr>
-            ${headerHtml}
-            <th>Error</th>
-            <th>Action</th>
-          </tr>
+          <tr>${headerHtml}</tr>
         </thead>
-        <tbody>
-          ${rowsHtml}
-        </tbody>
+        <tbody>${rowsHtml}</tbody>
       </table>
     `;
 
@@ -489,23 +481,27 @@ window.showBulkUploadModal = function () {
 function renderStagingActionButton(row) {
   const hasContact = !!row.contact_id;
 
-  // Only block insert if contact is missing
-  if (!hasContact) {
+  // If contact is missing, show message but still allow Populate
+  if (!hasContact && row.status !== "uploaded") {
     return `<span style="color:red;">Missing contact</span>`;
   }
 
   switch (row.status) {
     case "uploaded":
+      // First step: try to populate contact_id
       return `<button onclick="autoMatchContact('${row.id}')">Populate</button>`;
 
     case "matched":
     case "ready":
+      // Contact exists → allow insert
       return `<button onclick="insertStagingRow('${row.id}')">Insert</button>`;
 
     case "error":
+      // Something failed → allow fixing
       return `<button onclick="fixRow('${row.id}')">Fix Row</button>`;
 
     case "imported":
+      // Already imported → no actions
       return `<span style="color:green;">Imported</span>`;
 
     default:
