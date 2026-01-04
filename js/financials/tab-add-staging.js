@@ -45,7 +45,7 @@ window.insertStagingRow = async function(id) {
   }
 
   const res = await fetch(
-    `https://financials-module.dennis-e64.workers.dev/payments/add-from-staging?id=${id}&project=${project}`,
+    `https://financials-module.dennis-e64.workers.dev/staging/insert?id=${id}&project=${project}`,
     { method: "POST" }
   );
 
