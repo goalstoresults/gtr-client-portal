@@ -47,10 +47,11 @@ window.insertStagingRow = async function(id) {
     actionCell.innerHTML = `<span style="color:#555;">Inserting...</span>`;
   }
 
-  const res = await fetch(
-    `https://financials-module.dennis-e64.workers.dev/staging/insert?id=${id}&project=${project}`,
-    { method: "POST" }
-  );
+const res = await fetch(
+  `https://financials-module.dennis-e64.workers.dev/payments/add-from-staging?id=${id}&project=${project}`,
+  { method: "POST" }
+);
+
 
   let data = {};
   try {
@@ -243,7 +244,7 @@ function renderStagingGrid(rows) {
 
   // FINAL column list (group_id removed)
   const columns = [
-    { key: "customer_name", label: "Customer" },
+    { key: "customer_name", label: "Customer Name" },
     { key: "invoice_number", label: "Invoice #" },
     { key: "transaction_date", label: "Date", isDate: true },
     { key: "amount", label: "Amount", numeric: true },
