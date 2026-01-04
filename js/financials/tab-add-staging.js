@@ -97,7 +97,7 @@ window.fixRow = async function(id) {
     <div style="background:white; padding:20px; width:360px; border-radius:6px;">
       <h3>Fix Row</h3>
 
-      <label>Customer Name</label>
+      <label>Customer</label>
       <input id="fix_customer" class="form-control" value="${customer}" />
 
       <label style="margin-top:10px;">Invoice #</label>
