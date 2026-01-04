@@ -45,7 +45,7 @@ export async function addPaymentWithReferral({
 export async function renderFinancialAdd(container, portalState) {
   container.innerHTML = `
     <section class="card">
-      <h3>Financials – Add Payment - </h3>
+      <h3>Financials – Add Payment </h3>
       <div id="contactPickerArea"></div>
     </section>
 
@@ -67,7 +67,7 @@ export async function renderFinancialAdd(container, portalState) {
 
   // Wire staging button
   document.getElementById("btnLoadStaging").addEventListener("click", () => {
-     loadStagingData();
+     window.loadStagingData();
   });
 
   // Wire bulk upload button
