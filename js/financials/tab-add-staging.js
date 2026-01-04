@@ -481,27 +481,31 @@ window.showBulkUploadModal = function () {
 function renderStagingActionButton(row) {
   const hasContact = !!row.contact_id;
 
-  // If contact is missing, show message but still allow Populate
+  // If contact is missing but status isn't uploaded, show message
   if (!hasContact && row.status !== "uploaded") {
     return `<span style="color:red;">Missing contact</span>`;
   }
 
   switch (row.status) {
     case "uploaded":
-      // First step: try to populate contact_id
+      // No contact yet → Populate only
       return `<button onclick="autoMatchContact('${row.id}')">Populate</button>`;
 
     case "matched":
+      // Contact found but referral missing → Populate + Insert
+      return `
+        <button onclick="autoMatchContact('${row.id}')">Populate</button>
+        <button onclick="insertStagingRow('${row.id}')">Insert</button>
+      `;
+
     case "ready":
-      // Contact exists → allow insert
+      // Contact + referral found → Insert only
       return `<button onclick="insertStagingRow('${row.id}')">Insert</button>`;
 
     case "error":
-      // Something failed → allow fixing
       return `<button onclick="fixRow('${row.id}')">Fix Row</button>`;
 
     case "imported":
-      // Already imported → no actions
       return `<span style="color:green;">Imported</span>`;
 
     default:
