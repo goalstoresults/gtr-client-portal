@@ -14,7 +14,7 @@ window.autoMatchContact = async function(id) {
     return;
   }
 
-await fetch("https://financials-module.dennis-e64.workers.dev/staging/insert", {
+await fetch("https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=${project} ", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ id, project })
@@ -498,7 +498,7 @@ function renderStagingActionButton(row) {
     case "matched":
       // Contact found but referral missing → Populate + Insert
       return `
-        <button onclick="autoMatchContact('${row.id}')">Populate!</button>
+        <button onclick="autoMatchContact('${row.id}')">Populate</button>
         <button onclick="insertStagingRow('${row.id}')">Insert</button>
       `;
 
