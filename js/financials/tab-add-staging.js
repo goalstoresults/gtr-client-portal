@@ -14,9 +14,12 @@ window.autoMatchContact = async function(id) {
     return;
   }
 
-  await fetch(
-    `https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=${project}`
-  );
+await fetch("https://financials-module.dennis-e64.workers.dev/staging/insert", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ id, project })
+});
+
 
   loadStagingData();
 };
