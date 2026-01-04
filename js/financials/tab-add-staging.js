@@ -14,15 +14,14 @@ window.autoMatchContact = async function(id) {
     return;
   }
 
-await fetch("https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=${project} ", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ id, project })
-});
-
+  await fetch(
+    `https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=${project}`,
+    { method: "POST" }
+  );
 
   loadStagingData();
 };
+
 
 window.insertStagingRow = async function(id) {
   const project = window.portalState?.project;
