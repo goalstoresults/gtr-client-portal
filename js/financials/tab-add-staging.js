@@ -392,6 +392,10 @@ function renderStagingGrid(rows) {
   renderTable();
 }
 
+/* =========================================================
+   BUlk CSV File Upload
+========================================================= */
+
 window.showBulkUploadModal = function () {
   const modal = document.createElement("div");
   modal.style = `
@@ -421,125 +425,57 @@ window.showBulkUploadModal = function () {
   modal.querySelector("#bulkUpload").onclick = async () => {
     const fileInput = document.getElementById("bulkCsvFile");
     const file = fileInput.files[0];
+
     if (!file) {
       alert("Please select a CSV file.");
       return;
     }
 
-    const text = await file.text();
-    await window.processBulkUpload(text);
-    modal.remove();
+    const project = window.portalState?.project;
+    if (!project) {
+      alert("No project selected.");
+      return;
+    }
+
+    let csvText;
+    try {
+      csvText = await file.text();
+    } catch (err) {
+      console.error("Failed to read file", err);
+      alert("Could not read CSV file.");
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `https://financials-module.dennis-e64.workers.dev/staging/bulk-upload?project=${encodeURIComponent(project)}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/csv"
+          },
+          body: csvText
+        }
+      );
+
+      const text = await res.text();
+
+      if (!res.ok) {
+        console.error("Bulk upload failed:", text);
+        alert("Bulk upload failed. Check console for details.");
+        return;
+      }
+
+      alert("Bulk upload complete.");
+      if (typeof window.loadStagingData === "function") {
+        window.loadStagingData();
+      }
+      modal.remove();
+    } catch (err) {
+      console.error("Bulk upload error:", err);
+      alert("Bulk upload failed due to a network or server error.");
+    }
   };
-};
-
-
-
-// =========================================================
-// FLEXIBLE BULK CSV PARSER + UPLOADER
-// =========================================================
-
-window.processBulkUpload = async function(csvText) {
-  const project = window.portalState?.project;
-  if (!project) {
-    alert("No project selected.");
-    return;
-  }
-
-  // Normalize CSV lines
-  const lines = csvText.trim().split(/\r?\n/);
-  if (lines.length < 2) {
-    alert("CSV must include a header row and at least one data row.");
-    return;
-  }
-
-  // Normalize header row
-  const rawHeaders = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ""));
-  
-  // Flexible column mapping
-  const columnMap = {
-    client: "customer_name",
-    customer: "customer_name",
-    name: "customer_name",
-
-    invoicedate: "transaction_date",
-    date: "transaction_date",
-    paymentdate: "transaction_date",
-
-    invoicenumber: "invoice_number",
-    invoiceno: "invoice_number",
-    number: "invoice_number",
-
-    description: "description",
-    memo: "description",
-    notes: "description",
-
-    quantity: "quantity",
-    qty: "quantity",
-
-    salesprice: "sales_price",
-    price: "sales_price",
-    rate: "sales_price",
-
-    amount: "amount",
-    total: "amount",
-    paymentamount: "amount",
-
-    reftype: "ref_type",
-    type: "ref_type",
-    category: "ref_type"
-  };
-
-  // Map header → staging field
-  const mappedHeaders = rawHeaders.map(h => columnMap[h] || null);
-
-  const rows = [];
-
-  // Parse each row
-  for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(",").map(c => c.trim());
-
-    const row = {
-      project,
-      status: "uploaded",
-      needs_review: true,
-      origin: "csv"
-    };
-
-    for (let j = 0; j < cols.length; j++) {
-      const field = mappedHeaders[j];
-      if (!field) continue; // ignore unmapped columns
-
-      row[field] = cols[j] || null;
-    }
-
-    // Default ref_type if missing
-    if (!row.ref_type) row.ref_type = "payment";
-
-    // Required fields check
-    if (!row.customer_name || !row.amount || !row.transaction_date) {
-      row.error_message = "Missing required fields";
-    }
-
-    rows.push(row);
-  }
-
-  // Send to Worker
-  const res = await fetch(
-    `https://financials-module.dennis-e64.workers.dev/staging/bulk-upload`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(rows)
-    }
-  );
-
-  if (!res.ok) {
-    alert("Bulk upload failed.");
-    return;
-  }
-
-  alert("Bulk upload complete.");
-  loadStagingData();
 };
 
 
