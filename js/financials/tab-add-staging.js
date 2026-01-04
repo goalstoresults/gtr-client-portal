@@ -250,8 +250,6 @@ function renderStagingGrid(rows) {
     { key: "contact_id", label: "Contact ID" },
     { key: "referral_id", label: "Referral ID" },
     { key: "status", label: "Status" },
-
-    // Required for alignment
     { key: "error_message", label: "Error" },
     { key: "action", label: "Action" }
   ];
@@ -372,15 +370,19 @@ function renderStagingGrid(rows) {
       });
     });
 
+    // 🔥 FIX: Remove old listeners by cloning nodes
+
     // Refresh button
-    document
-      .getElementById("refreshStagingGrid")
-      .addEventListener("click", loadStagingData);
+    let refreshBtn = document.getElementById("refreshStagingGrid");
+    refreshBtn.replaceWith(refreshBtn.cloneNode(true));
+    refreshBtn = document.getElementById("refreshStagingGrid");
+    refreshBtn.addEventListener("click", loadStagingData);
 
     // Filter dropdown
-    document
-      .getElementById("stagingFilter")
-      .addEventListener("change", loadStagingData);
+    let filter = document.getElementById("stagingFilter");
+    filter.replaceWith(filter.cloneNode(true));
+    filter = document.getElementById("stagingFilter");
+    filter.addEventListener("change", loadStagingData);
   }
 
   renderTable();
