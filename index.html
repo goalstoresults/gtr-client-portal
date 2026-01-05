@@ -60,7 +60,6 @@
       <span id="portal-title-text"></span>
     </h1>
 
-
     <div id="project-selector-row" style="display:none;"></div>
   </header>
 
@@ -83,6 +82,9 @@
     import { loadGroupsTab } from "./js/groups.js";
     import { loadSetupTab } from "./js/setup.js";
 
+    /* ⭐ NEW IMPORT */
+    import { loadOperationsTab } from "./js/operations.js";
+
     const portalState = { project: "", contactId: "" };
     window.portalState = portalState;
 
@@ -101,7 +103,10 @@
       "5": { label: "Lookups", loader: loadLookupsTab },
       "6": { label: "Dashboard", loader: loadDashboardTab },
       "7": { label: "Groups", loader: loadGroupsTab },
-      "8": { label: "Setup", loader: loadSetupTab }
+      "8": { label: "Setup", loader: loadSetupTab },
+
+      /* ⭐ NEW TAB 9 */
+      "9": { label: "Operations", loader: loadOperationsTab }
     };
 
     async function loadProjects() {
