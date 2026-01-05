@@ -47,38 +47,44 @@ export async function loadRevenueTab({ portalState, content }) {
   }
 
   function renderGrid(data) {
-    if (!data || !data.months) {
-      grid.innerHTML = `<p>No revenue data available for this year.</p>`;
-      return;
-    }
-
-    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-
-    let html = `
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Metric</th>
-            ${months.map(m => `<th>${m}</th>`).join("")}
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>Total Revenue</strong></td>
-            ${months.map((_, idx) => {
-              const key = String(idx + 1).padStart(2, "0");
-              return `<td>${formatCurrency(data.months[key] || 0)}</td>`;
-            }).join("")}
-            <td><strong>${formatCurrency(data.total)}</strong></td>
-          </tr>
-        </tbody>
-      </table>
-    `;
-
-    grid.innerHTML = html;
+  if (!data || !data.months) {
+    grid.innerHTML = `<p>No revenue data available for this year.</p>`;
+    return;
   }
+
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  const headerHtml = months
+    .map(m => `<th>${m}</th>`)
+    .join("");
+
+  const rowHtml = months
+    .map((_, idx) => {
+      const key = String(idx + 1).padStart(2, "0");
+      return `<td>${formatCurrency(data.months[key] || 0)}</td>`;
+    })
+    .join("");
+
+  grid.innerHTML = `
+    <table class="notes-table">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          ${headerHtml}
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Total Revenue</strong></td>
+          ${rowHtml}
+          <td><strong>${formatCurrency(data.total)}</strong></td>
+        </tr>
+      </tbody>
+    </table>
+  `;
 }
+
 
 // -----------------------------
 // API Helpers
