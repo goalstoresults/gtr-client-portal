@@ -46,56 +46,58 @@ export async function loadRevenueTab({ portalState, content }) {
     renderGrid(data);
   }
 
+  // ------------------------------------------------------------
+  // RENDER GRID (striped table using notes-table class)
+  // ------------------------------------------------------------
   function renderGrid(data) {
-  if (!data || !data.months) {
-    grid.innerHTML = `<p>No revenue data available for this year.</p>`;
-    return;
+    if (!data || !data.months) {
+      grid.innerHTML = `<p>No revenue data available for this year.</p>`;
+      return;
+    }
+
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+    const headerHtml = months
+      .map(m => `<th>${m}</th>`)
+      .join("");
+
+    const rowHtml = months
+      .map((_, idx) => {
+        const key = String(idx + 1).padStart(2, "0");
+        return `<td>${formatCurrency(data.months[key] || 0)}</td>`;
+      })
+      .join("");
+
+    grid.innerHTML = `
+      <table class="notes-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            ${headerHtml}
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Total Revenue</strong></td>
+            ${rowHtml}
+            <td><strong>${formatCurrency(data.total)}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    `;
   }
-
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-
-  const headerHtml = months
-    .map(m => `<th>${m}</th>`)
-    .join("");
-
-  const rowHtml = months
-    .map((_, idx) => {
-      const key = String(idx + 1).padStart(2, "0");
-      return `<td>${formatCurrency(data.months[key] || 0)}</td>`;
-    })
-    .join("");
-
-  grid.innerHTML = `
-    <table class="notes-table">
-      <thead>
-        <tr>
-          <th>Metric</th>
-          ${headerHtml}
-          <th>Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><strong>Total Revenue</strong></td>
-          ${rowHtml}
-          <td><strong>${formatCurrency(data.total)}</strong></td>
-        </tr>
-      </tbody>
-    </table>
-  `;
 }
 
-
 // -----------------------------
-// API Helpers
+// API Helpers (Supabase only)
 // -----------------------------
 
+// YEARS
 async function fetchYears(project) {
   try {
-    const res = await fetch(
-      `https://groups-module.dennis-e64.workers.dev/revenue/years?project=${project}`,
-      { cache: "no-cache" }
-    );
+    const url = `https://groups-module.dennis-e64.workers.dev/revenue/years?project=${project}`;
+    const res = await fetch(url, { cache: "no-cache" });
     return await res.json();
   } catch (err) {
     console.error("Failed to fetch revenue years:", err);
@@ -103,12 +105,11 @@ async function fetchYears(project) {
   }
 }
 
+// MONTHLY
 async function fetchMonthlyRevenue(project, year) {
   try {
-    const res = await fetch(
-      `https://groups-module.dennis-e64.workers.dev/revenue/monthly?project=${project}&year=${year}`,
-      { cache: "no-cache" }
-    );
+    const url = `https://groups-module.dennis-e64.workers.dev/revenue/monthly?project=${project}&year=${year}`;
+    const res = await fetch(url, { cache: "no-cache" });
     return await res.json();
   } catch (err) {
     console.error("Failed to fetch monthly revenue:", err);
