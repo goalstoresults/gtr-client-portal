@@ -87,7 +87,7 @@ export async function loadRevenueTab({ portalState, content }) {
 async function fetchYears(project) {
   try {
     const res = await fetch(
-      `https://operations-module.dennis-e64.workers.dev/revenue/years?project=${project}`,
+      `https://groups-module.dennis-e64.workers.dev/revenue/years?project=${project}`,
       { cache: "no-cache" }
     );
     return await res.json();
@@ -100,7 +100,7 @@ async function fetchYears(project) {
 async function fetchMonthlyRevenue(project, year) {
   try {
     const res = await fetch(
-      `https://operations-module.dennis-e64.workers.dev/revenue/monthly?project=${project}&year=${year}`,
+      `https://groups-module.dennis-e64.workers.dev/revenue/monthly?project=${project}&year=${year}`,
       { cache: "no-cache" }
     );
     return await res.json();
