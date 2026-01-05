@@ -5,15 +5,17 @@ import { loadActualsTab } from "./operations/actuals.js";
 import { loadPerformanceTab } from "./operations/performance.js";
 
 export async function loadOperationsTab({ portalState, tabContent }) {
-  tabContent.innerHTML = `
-    <div class="subtabs">
+tabContent.innerHTML = `
+    <section class="card">
+      <nav id="groups-subtabs" class="subtabs" style="margin-bottom:12px;">
       <button data-subtab="services">Services</button>
       <button data-subtab="revenue">Revenue Structure</button>
       <button data-subtab="goals">Goals</button>
       <button data-subtab="actuals">Actuals</button>
       <button data-subtab="performance">Performance</button>
-    </div>
-    <div id="operations-content"></div>
+      </nav>
+      <div id="operations-content"></div>
+    </section>
   `;
 
   const content = document.getElementById("operations-content");
