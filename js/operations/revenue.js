@@ -72,7 +72,7 @@ export async function loadRevenueTab({ portalState, content }) {
       <table class="notes-table">
         <thead>
           <tr>
-            <th>Metric</th>
+            <th></th>
             ${headerHtml}
             <th>Total</th>
           </tr>
@@ -96,7 +96,7 @@ export async function loadRevenueTab({ portalState, content }) {
 // YEARS
 async function fetchYears(project) {
   try {
-    const url = `https://groups-module.dennis-e64.workers.dev/revenue/years?project=${project}`;
+    const url = `https://operations-module.dennis-e64.workers.dev/revenue/years?project=${project}`;
     const res = await fetch(url, { cache: "no-cache" });
     return await res.json();
   } catch (err) {
@@ -108,7 +108,7 @@ async function fetchYears(project) {
 // MONTHLY
 async function fetchMonthlyRevenue(project, year) {
   try {
-    const url = `https://groups-module.dennis-e64.workers.dev/revenue/monthly?project=${project}&year=${year}`;
+    const url = `https://operations-module.dennis-e64.workers.dev/revenue/monthly?project=${project}&year=${year}`;
     const res = await fetch(url, { cache: "no-cache" });
     return await res.json();
   } catch (err) {
