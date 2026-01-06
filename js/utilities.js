@@ -39,6 +39,21 @@ export function formatDateOnly(value) {
   });
 }
 
+export function getEasternDateOnly(value) {
+  if (!value) return "";
+
+  const d = new Date(value);
+
+  const [month, day, year] = d.toLocaleDateString("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).split("/");
+
+  return `${year}-${month}-${day}`;
+}
+
 
 // Format date/time consistently across the portal in Eastern Time
 export function formatDateTime(value) {
