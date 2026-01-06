@@ -17,11 +17,12 @@ export function formatCurrency(value) {
   })}`;
 }
 
-// Format date/time consistently across the portal
+// Format date/time consistently across the portal in Eastern Time
 export function formatDateTime(value) {
   if (!value) return "";
   const d = new Date(value);
   return d.toLocaleString("en-US", {
+    timeZone: "America/New_York",
     month: "2-digit",
     day: "2-digit",
     year: "numeric",
@@ -30,6 +31,7 @@ export function formatDateTime(value) {
     hour12: true
   });
 }
+
 
 // Shared Contact Picker
 export async function renderContactPicker(container, portalState, onContactSelected) {
