@@ -1,7 +1,7 @@
 // financials/tab-list.js
 // List tab: revenue listing, sorting, editing, deleting
 
-import { escapeHtml, formatCurrency, formatDateTime } from "../utilities.js";
+import { escapeHtml, formatCurrency, formatDateTime, formatDateOnly } from "../utilities.js";
 
 /* =========================================================
    RENDER: Revenue List
