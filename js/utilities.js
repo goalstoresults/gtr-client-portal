@@ -18,9 +18,29 @@ export function formatCurrency(value) {
 }
 
 // Format date/time consistently across the portal in Eastern Time
+// If the original value was a date-only (midnight UTC), show only the date.
 export function formatDateTime(value) {
   if (!value) return "";
+
   const d = new Date(value);
+
+  // Detect date-only values (midnight UTC)
+  const isMidnightUTC =
+    d.getUTCHours() === 0 &&
+    d.getUTCMinutes() === 0 &&
+    d.getUTCSeconds() === 0;
+
+  // If it's a date-only field, show only the date (no time)
+  if (isMidnightUTC) {
+    return d.toLocaleDateString("en-US", {
+      timeZone: "America/New_York",
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric"
+    });
+  }
+
+  // Otherwise show full date+time
   return d.toLocaleString("en-US", {
     timeZone: "America/New_York",
     month: "2-digit",
@@ -31,6 +51,7 @@ export function formatDateTime(value) {
     hour12: true
   });
 }
+
 
 
 // Shared Contact Picker
