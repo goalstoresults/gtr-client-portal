@@ -1,7 +1,7 @@
 // /notes/tab-review.js
 // Handles: Note review, metadata editing, client assignment, deletion, relationships navigation
 
-import { escapeHtml, formatDateTime } from "../utilities.js";
+import { escapeHtml, formatDateTime,getEasternDateOnly } from "../utilities.js";
 import { renderRelationships } from "./tab-relationships.js";
 import { renderHistory } from "./tab-history.js";
 
