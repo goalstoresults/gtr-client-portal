@@ -17,6 +17,29 @@ export function formatCurrency(value) {
   })}`;
 }
 
+export function formatDateOnly(value) {
+  if (!value) return "";
+  const str = String(value);
+
+  // If it's already YYYY-MM-DD, reformat it
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const [y, m, d] = str.split("-");
+    return `${m}/${d}/${y}`;
+  }
+
+  // Fallback for full timestamps
+  const d = new Date(str);
+  if (Number.isNaN(d.getTime())) return "";
+
+  return d.toLocaleDateString("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+    timeZone: "America/New_York"
+  });
+}
+
+
 // Format date/time consistently across the portal in Eastern Time
 // If the original value was a date-only (midnight UTC), show only the date.
 export function formatDateTime(value) {
