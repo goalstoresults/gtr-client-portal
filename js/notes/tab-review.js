@@ -191,8 +191,7 @@ export async function renderReview(container, portalState, noteId) {
     document.getElementById("noteNeedsReview").checked = !!note.needs_review;
 
     if (note.note_date) {
-      const dt = new Date(note.note_date);
-      document.getElementById("editNoteDate").value = dt.toISOString().slice(0, 10);
+      document.getElementById("editNoteDate").value = getEasternDateOnly(note.note_date);
     }
 
     // ------------------------------------------------------------
