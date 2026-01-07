@@ -53,47 +53,92 @@ export async function renderEmailAdd(container, portalState) {
       <h3>Email – Add Campaign</h3>
 
       <div class="notes-row">
-        <label class="notes-label">Campaign Name *</label>
-        <input id="emailAdd-campaignName" class="form-control" />
+        <label class="notes-label">Select Client</label>
+        <select id="emailAdd-clientSelect" class="form-control">
+          <option value="">--- Select ---</option>
+        </select>
       </div>
 
-      <div class="notes-row">
-        <label class="notes-label">Subject Line *</label>
-        <input id="emailAdd-subjectLine" class="form-control" />
-      </div>
-
-      <div class="notes-row">
-        <label class="notes-label">Send Date (Eastern)</label>
-        <input id="emailAdd-sendDate" class="form-control" type="datetime-local" />
-      </div>
-
-      <div class="notes-row">
-        <label class="notes-label">Segment Description</label>
-        <input id="emailAdd-segment" class="form-control" />
-      </div>
-
-      <div class="notes-row">
-        <label class="notes-label">Raw Email Text *</label>
-        <textarea id="emailAdd-rawText" class="form-control" rows="10"></textarea>
-      </div>
-
-      <div class="notes-row">
-        <label class="notes-label">Internal Notes</label>
-        <textarea id="emailAdd-notes" class="form-control" rows="4"></textarea>
-      </div>
-
-      <div style="margin-top:16px;">
-        <button id="emailAdd-saveBtn" class="btn-primary">Save Campaign</button>
-        <button id="emailAdd-cancelBtn" class="btn-secondary">Cancel</button>
-      </div>
-
-      <div id="emailAdd-status" class="status-area" style="margin-top:12px;"></div>
+      <div id="emailAdd-formArea" style="margin-top:24px;"></div>
     </section>
   `;
 
-  /* =========================================================
-     SAVE BUTTON HANDLER
-  ========================================================== */
+  const select = container.querySelector("#emailAdd-clientSelect");
+  const formArea = container.querySelector("#emailAdd-formArea");
+
+  // Fetch all project configs
+  const resConfig = await fetch(
+    "https://lookups-module.dennis-e64.workers.dev/api/projects_config",
+    { cache: "no-cache" }
+  );
+  const configRows = await resConfig.json();
+
+  configRows.forEach(row => {
+    const opt = document.createElement("option");
+    opt.value = row.project;
+    opt.textContent = row.display_name;
+    select.appendChild(opt);
+  });
+
+  select.addEventListener("change", () => {
+    const selectedProject = select.value;
+    portalState.selectedProjectId = selectedProject;
+
+    const selectedRow = configRows.find(r => r.project === selectedProject);
+    portalState.selectedProjectName = selectedRow?.display_name || "";
+
+    if (!selectedProject || !selectedRow) {
+      formArea.innerHTML = "";
+      return;
+    }
+
+    renderCampaignForm(formArea, portalState);
+  });
+}
+
+/* =========================================================
+   RENDER: Campaign Form
+========================================================= */
+
+function renderCampaignForm(formArea, portalState) {
+  formArea.innerHTML = `
+    <div class="notes-row">
+      <label class="notes-label">Campaign Name *</label>
+      <input id="emailAdd-campaignName" class="form-control" />
+    </div>
+
+    <div class="notes-row">
+      <label class="notes-label">Subject Line *</label>
+      <input id="emailAdd-subjectLine" class="form-control" />
+    </div>
+
+    <div class="notes-row">
+      <label class="notes-label">Send Date (Eastern)</label>
+      <input id="emailAdd-sendDate" class="form-control" type="datetime-local" />
+    </div>
+
+    <div class="notes-row">
+      <label class="notes-label">Segment Description</label>
+      <input id="emailAdd-segment" class="form-control" />
+    </div>
+
+    <div class="notes-row">
+      <label class="notes-label">Raw Email Text *</label>
+      <textarea id="emailAdd-rawText" class="form-control" rows="10"></textarea>
+    </div>
+
+    <div class="notes-row">
+      <label class="notes-label">Internal Notes</label>
+      <textarea id="emailAdd-notes" class="form-control" rows="4"></textarea>
+    </div>
+
+    <div style="margin-top:16px;">
+      <button id="emailAdd-saveBtn" class="btn-primary">Save Campaign</button>
+      <button id="emailAdd-cancelBtn" class="btn-secondary">Cancel</button>
+    </div>
+
+    <div id="emailAdd-status" class="status-area" style="margin-top:12px;"></div>
+  `;
 
   document.getElementById("emailAdd-saveBtn").addEventListener("click", async () => {
     const status = document.getElementById("emailAdd-status");
@@ -125,7 +170,6 @@ export async function renderEmailAdd(container, portalState) {
 
       status.innerHTML = `<p class="success">Campaign created successfully.</p>`;
 
-      // Reset form
       document.getElementById("emailAdd-campaignName").value = "";
       document.getElementById("emailAdd-subjectLine").value = "";
       document.getElementById("emailAdd-sendDate").value = "";
@@ -139,11 +183,7 @@ export async function renderEmailAdd(container, portalState) {
     }
   });
 
-  /* =========================================================
-     CANCEL BUTTON → Return to List
-  ========================================================== */
-
   document.getElementById("emailAdd-cancelBtn").addEventListener("click", async () => {
-    await renderEmailList(container, portalState);
+    await renderEmailList(formArea.parentElement, portalState);
   });
 }
