@@ -14,9 +14,11 @@ export async function loadEmailsTab({ portalState, tabContent }) {
 
   // Context bar
   const contextBar = document.getElementById("emails-context-bar");
-  contextBar.textContent = portalState.selectedProjectName
-    ? `Project: ${portalState.selectedProjectName}`
-    : "No project selected";
+  if (contextBar) {
+    contextBar.textContent = portalState.selectedProjectName
+      ? `Project: ${portalState.selectedProjectName}`
+      : "No project selected";
+  }
 
   const content = document.getElementById("emailsContent");
   const buttons = tabContent.querySelectorAll("#emails-subtabs button");
@@ -35,18 +37,19 @@ export async function loadEmailsTab({ portalState, tabContent }) {
         return;
       }
 
-      // All other tabs require a project
+      // ⭐ ADD TAB — ALLOWED EVEN WITHOUT A PROJECT
+      if (subtab === "add") {
+        await renderEmailAdd(content, portalState);
+        return;
+      }
+
+      // ⭐ ALL OTHER TABS REQUIRE A PROJECT
       if (!portalState.selectedProjectId) {
         content.innerHTML = `
           <section class="card warning">
             <p>Please select a project to continue.</p>
           </section>
         `;
-        return;
-      }
-
-      if (subtab === "add") {
-        await renderEmailAdd(content, portalState);
         return;
       }
 
@@ -74,7 +77,7 @@ export async function loadEmailsTab({ portalState, tabContent }) {
     });
   });
 
-  // Default to List view
+  // ⭐ DEFAULT TO LIST VIEW — but only if project is selected
   const defaultBtn = tabContent.querySelector(
     '#emails-subtabs button[data-subtab="list"]'
   );
