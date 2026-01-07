@@ -8,20 +8,9 @@ import { renderEmailData } from "./emails/tab-email-data.js";
 import { renderEmailSystem } from "./emails/tab-system.js";
 
 export async function loadEmailsTab({ portalState, tabContent }) {
-  // Build base layout (same pattern as Financials)
-  tabContent.innerHTML = `
-    <div id="emails-context-bar" class="contact-context-bar"></div>
-
-    <div id="emails-subtabs" class="subtabs">
-      <button data-subtab="add">Add</button>
-      <button data-subtab="list">List</button>
-      <button data-subtab="review">Review</button>
-      <button data-subtab="email-data">Email Data</button>
-      <button data-subtab="system">System</button>
-    </div>
-
-    <div id="emailsContent"></div>
-  `;
+  // Load base HTML template
+  const res = await fetch("./components/emails.html", { cache: "no-cache" });
+  tabContent.innerHTML = await res.text();
 
   // Context bar
   const contextBar = document.getElementById("emails-context-bar");
@@ -76,6 +65,7 @@ export async function loadEmailsTab({ portalState, tabContent }) {
         return;
       }
 
+      // Fallback
       content.innerHTML = `
         <section class="card">
           <p>Select a subtab to begin.</p>
