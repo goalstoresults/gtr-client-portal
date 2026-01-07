@@ -85,6 +85,9 @@
     /* ⭐ NEW IMPORT */
     import { loadOperationsTab } from "./js/operations.js";
 
+    /* ⭐ NEW IMPORT FOR EMAILS */
+    import { loadEmailsTab } from "./js/emails.js";
+
     const portalState = { project: "", contactId: "" };
     window.portalState = portalState;
 
@@ -105,7 +108,10 @@
       "7": { label: "Groups", loader: loadGroupsTab },
       "8": { label: "Setup", loader: loadSetupTab },
 
-      /* ⭐ NEW TAB 9 */
+      /* ⭐ NEW TAB 10 */
+      "10": { label: "Emails", loader: loadEmailsTab },
+
+      /* ⭐ Operations stays as 9 */
       "9": { label: "Operations", loader: loadOperationsTab }
     };
 
@@ -242,3 +248,4 @@
   </script>
 </body>
 </html>
+
