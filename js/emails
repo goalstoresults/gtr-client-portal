@@ -1,0 +1,107 @@
+// emails.js
+// Main controller for the Emails module
+
+import { renderEmailAdd } from "./emails/tab-add.js";
+import { renderEmailList } from "./emails/tab-list.js";
+import { renderEmailReview } from "./emails/tab-review.js";
+import { renderEmailData } from "./emails/tab-email-data.js";
+import { renderEmailSystem } from "./emails/tab-system.js";
+
+export async function loadEmailsTab({ portalState, tabContent }) {
+  // Load base HTML template
+  const res = await fetch("./components/emails.html", { cache: "no-cache" });
+  tabContent.innerHTML = await res.text();
+
+  // Inject context bar (same pattern as Financials)
+  let contextBar = document.getElementById("emails-context-bar");
+  if (!contextBar) {
+    contextBar = document.createElement("div");
+    contextBar.id = "emails-context-bar";
+    contextBar.className = "contact-context-bar";
+    tabContent.prepend(contextBar);
+  }
+
+  // Context bar shows selected project
+  contextBar.textContent = portalState.selectedProjectName
+    ? `Project: ${portalState.selectedProjectName}`
+    : "No project selected";
+
+  const content = tabContent.querySelector("#emailsContent");
+  const buttons = tabContent.querySelectorAll("#emails-subtabs button");
+
+  // Wire subtab buttons
+  buttons.forEach(btn => {
+    btn.addEventListener("click", async () => {
+      buttons.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+
+      const subtab = btn.dataset.subtab;
+
+      // SYSTEM TAB — does NOT require project selection
+      if (subtab === "system") {
+        await renderEmailSystem(content, portalState);
+        return;
+      }
+
+      // All other tabs require a project
+      if (!portalState.selectedProjectId) {
+        content.innerHTML = `
+          <section class="card warning">
+            <p>Please select a project to continue.</p>
+          </section>
+        `;
+        return;
+      }
+
+      // ADD
+      if (subtab === "add") {
+        await renderEmailAdd(content, portalState);
+        return;
+      }
+
+      // LIST
+      if (subtab === "list") {
+        await renderEmailList(content, portalState);
+        return;
+      }
+
+      // REVIEW (campaign metadata)
+      if (subtab === "review") {
+        await renderEmailReview(content, portalState);
+        return;
+      }
+
+      // EMAIL DATA (CSV ingestion + staging)
+      if (subtab === "email-data") {
+        await renderEmailData(content, portalState);
+        return;
+      }
+
+      // Fallback
+      content.innerHTML = `
+        <section class="card">
+          <p>Select a subtab to begin.</p>
+        </section>
+      `;
+    });
+  });
+
+  // Default to List view
+  const defaultBtn = tabContent.querySelector(
+    '#emails-subtabs button[data-subtab="list"]'
+  );
+
+  if (defaultBtn) {
+    defaultBtn.classList.add("active");
+
+    if (portalState.selectedProjectId) {
+      await renderEmailList(content, portalState);
+    } else {
+      content.innerHTML = `
+        <section class="card warning">
+          <p>Please select a project to continue.</p>
+        </section>
+      `;
+    }
+  }
+}
