@@ -59,7 +59,7 @@ export async function renderEmailReview(container, portalState) {
     : "";
 
   /* ---------------------------------------------------------
-     3) Render UI
+     3) Render UI (Upload removed)
   --------------------------------------------------------- */
   container.innerHTML = `
     <section class="card">
@@ -75,23 +75,10 @@ export async function renderEmailReview(container, portalState) {
           <button id="review-deleteBtn" class="btn-danger">Delete</button>
         </div>
 
-        <button id="review-uploadToggleBtn" class="btn-secondary">
+        <!-- Redirect to Email Data -->
+        <button id="review-goToUploadBtn" class="btn-secondary">
           Upload File
         </button>
-      </div>
-
-      <!-- UPLOAD AREA (hidden until clicked) -->
-      <div id="review-uploadArea" style="display:none; margin-bottom:20px;">
-        <div class="notes-row">
-          <label class="notes-label">Choose CSV</label>
-          <input type="file" id="review-uploadFile" accept=".csv" class="form-control" />
-        </div>
-
-        <button id="review-uploadBtn" class="btn-primary" style="margin-top:8px;">
-          Upload
-        </button>
-
-        <div id="review-uploadStatus" class="status-area" style="margin-top:8px;"></div>
       </div>
 
       <!-- FORM -->
@@ -211,53 +198,15 @@ export async function renderEmailReview(container, portalState) {
   });
 
   /* =========================================================
-     TOGGLE UPLOAD AREA
+     REDIRECT TO EMAIL DATA TAB
   ========================================================== */
-  document.getElementById("review-uploadToggleBtn").addEventListener("click", () => {
-    const area = document.getElementById("review-uploadArea");
-    area.style.display = area.style.display === "none" ? "block" : "none";
-  });
+  document.getElementById("review-goToUploadBtn").addEventListener("click", () => {
+    const emailDataBtn = document.querySelector(
+      '#emails-subtabs button[data-subtab="email-data"]'
+    );
 
-  /* =========================================================
-     UPLOAD CSV → staging/upload
-  ========================================================== */
-  document.getElementById("review-uploadBtn").addEventListener("click", async () => {
-    const fileInput = document.getElementById("review-uploadFile");
-    const status = document.getElementById("review-uploadStatus");
-
-    status.innerHTML = "";
-
-    if (!fileInput.files.length) {
-      status.innerHTML = `<p class="error">Please choose a CSV file.</p>`;
-      return;
-    }
-
-    const file = fileInput.files[0];
-    const csvText = await file.text();
-
-    try {
-      const res = await fetch(
-        `https://emails-module.dennis-e64.workers.dev/staging/upload?project=${encodeURIComponent(
-          portalState.staffSelectedProjectId
-        )}&campaign_id=${encodeURIComponent(campaignId)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "text/csv" },
-          body: csvText
-        }
-      );
-
-      if (!res.ok) throw new Error("Upload failed");
-
-      status.innerHTML = `<p class="success">Upload successful. Redirecting...</p>`;
-
-      setTimeout(async () => {
-        await renderEmailData(container, portalState);
-      }, 800);
-
-    } catch (err) {
-      console.error(err);
-      status.innerHTML = `<p class="error">Error uploading file.</p>`;
+    if (emailDataBtn) {
+      emailDataBtn.click();
     }
   });
 }
