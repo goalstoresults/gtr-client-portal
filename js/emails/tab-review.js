@@ -30,7 +30,7 @@ export async function renderEmailReview(container, portalState) {
     const res = await fetch(
       `https://emails-module.dennis-e64.workers.dev/campaigns/details/${encodeURIComponent(
         campaignId
-      )}`,
+      )}?project=${encodeURIComponent(portalState.staffSelectedProjectId)}`,
       { cache: "no-cache" }
     );
 
@@ -98,7 +98,7 @@ export async function renderEmailReview(container, portalState) {
       <div class="notes-row">
         <label class="notes-label">Project</label>
         <input class="form-control" value="${escapeHtml(
-          portalState.selectedProjectName
+          portalState.staffSelectedProjectName
         )}" readonly />
       </div>
 
@@ -173,6 +173,7 @@ export async function renderEmailReview(container, portalState) {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            project: portalState.staffSelectedProjectId,
             campaign_name: campaignName,
             subject_line: subjectLine,
             send_date: sendDate ? new Date(sendDate).toISOString() : null,
@@ -202,7 +203,7 @@ export async function renderEmailReview(container, portalState) {
     await fetch(
       `https://emails-module.dennis-e64.workers.dev/campaigns/delete/${encodeURIComponent(
         campaignId
-      )}`,
+      )}?project=${encodeURIComponent(portalState.staffSelectedProjectId)}`,
       { method: "DELETE" }
     );
 
@@ -237,7 +238,7 @@ export async function renderEmailReview(container, portalState) {
     try {
       const res = await fetch(
         `https://emails-module.dennis-e64.workers.dev/staging/upload?project=${encodeURIComponent(
-          portalState.selectedProjectId
+          portalState.staffSelectedProjectId
         )}&campaign_id=${encodeURIComponent(campaignId)}`,
         {
           method: "POST",
@@ -260,3 +261,4 @@ export async function renderEmailReview(container, portalState) {
     }
   });
 }
+
