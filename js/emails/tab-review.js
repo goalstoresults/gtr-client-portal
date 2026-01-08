@@ -3,6 +3,7 @@
 
 import { escapeHtml } from "../utilities.js";
 import { renderEmailList } from "./tab-list.js";
+import { renderEmailData } from "./tab-email-data.js";
 
 /* =========================================================
    RENDER: Review Campaign (Worker-based)
@@ -35,7 +36,6 @@ export async function renderEmailReview(container, portalState) {
 
     const text = await res.text();
     const rows = text ? JSON.parse(text) : [];
-
     campaign = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
   } catch (err) {
     console.error("Review fetch error:", err);
@@ -59,11 +59,48 @@ export async function renderEmailReview(container, portalState) {
     : "";
 
   /* ---------------------------------------------------------
-     3) Render form
+     3) Render UI
   --------------------------------------------------------- */
   container.innerHTML = `
     <section class="card">
-      <h3>Review Campaign</h3>
+
+      <!-- TITLE ROW -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div>
+          <h3 style="display:inline-block; margin-right:12px;">
+            Review Campaign: ${escapeHtml(campaign.campaign_name || "")}
+          </h3>
+
+          <button id="review-saveBtn" class="btn-primary" style="margin-right:8px;">Save</button>
+          <button id="review-deleteBtn" class="btn-danger">Delete</button>
+        </div>
+
+        <button id="review-uploadToggleBtn" class="btn-secondary">
+          Upload File
+        </button>
+      </div>
+
+      <!-- UPLOAD AREA (hidden until clicked) -->
+      <div id="review-uploadArea" style="display:none; margin-bottom:20px;">
+        <div class="notes-row">
+          <label class="notes-label">Choose CSV</label>
+          <input type="file" id="review-uploadFile" accept=".csv" class="form-control" />
+        </div>
+
+        <button id="review-uploadBtn" class="btn-primary" style="margin-top:8px;">
+          Upload
+        </button>
+
+        <div id="review-uploadStatus" class="status-area" style="margin-top:8px;"></div>
+      </div>
+
+      <!-- FORM -->
+      <div class="notes-row">
+        <label class="notes-label">Project</label>
+        <input class="form-control" value="${escapeHtml(
+          portalState.selectedProjectName
+        )}" readonly />
+      </div>
 
       <div class="notes-row">
         <label class="notes-label">Campaign Name *</label>
@@ -98,4 +135,128 @@ export async function renderEmailReview(container, portalState) {
 
       <div class="notes-row">
         <label class="notes-label">Internal Notes</label>
-        <textarea id="review
+        <textarea id="review-notes" class="form-control" rows="4">${escapeHtml(
+          campaign.notes || ""
+        )}</textarea>
+      </div>
+
+      <div id="review-status" class="status-area" style="margin-top:12px;"></div>
+
+    </section>
+  `;
+
+  /* =========================================================
+     SAVE CHANGES
+  ========================================================== */
+  document.getElementById("review-saveBtn").addEventListener("click", async () => {
+    const status = document.getElementById("review-status");
+    status.innerHTML = "";
+
+    const campaignName = document.getElementById("review-campaignName").value.trim();
+    const subjectLine = document.getElementById("review-subjectLine").value.trim();
+    const sendDate = document.getElementById("review-sendDate").value;
+    const segment = document.getElementById("review-segment").value.trim();
+    const rawText = document.getElementById("review-rawText").value.trim();
+    const notes = document.getElementById("review-notes").value.trim();
+
+    if (!campaignName || !subjectLine || !rawText) {
+      status.innerHTML = `<p class="error">Please fill in all required fields.</p>`;
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `https://emails-module.dennis-e64.workers.dev/campaigns/update/${encodeURIComponent(
+          campaignId
+        )}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            campaign_name: campaignName,
+            subject_line: subjectLine,
+            send_date: sendDate ? new Date(sendDate).toISOString() : null,
+            segment_description: segment || null,
+            raw_text: rawText,
+            notes: notes || null,
+            updated_at: new Date().toISOString()
+          })
+        }
+      );
+
+      if (!res.ok) throw new Error("Update failed");
+
+      status.innerHTML = `<p class="success">Campaign updated successfully.</p>`;
+    } catch (err) {
+      console.error(err);
+      status.innerHTML = `<p class="error">Error saving changes.</p>`;
+    }
+  });
+
+  /* =========================================================
+     DELETE CAMPAIGN
+  ========================================================== */
+  document.getElementById("review-deleteBtn").addEventListener("click", async () => {
+    if (!confirm("Are you sure you want to delete this campaign?")) return;
+
+    await fetch(
+      `https://emails-module.dennis-e64.workers.dev/campaigns/delete/${encodeURIComponent(
+        campaignId
+      )}`,
+      { method: "DELETE" }
+    );
+
+    await renderEmailList(container, portalState);
+  });
+
+  /* =========================================================
+     TOGGLE UPLOAD AREA
+  ========================================================== */
+  document.getElementById("review-uploadToggleBtn").addEventListener("click", () => {
+    const area = document.getElementById("review-uploadArea");
+    area.style.display = area.style.display === "none" ? "block" : "none";
+  });
+
+  /* =========================================================
+     UPLOAD CSV → staging/upload
+  ========================================================== */
+  document.getElementById("review-uploadBtn").addEventListener("click", async () => {
+    const fileInput = document.getElementById("review-uploadFile");
+    const status = document.getElementById("review-uploadStatus");
+
+    status.innerHTML = "";
+
+    if (!fileInput.files.length) {
+      status.innerHTML = `<p class="error">Please choose a CSV file.</p>`;
+      return;
+    }
+
+    const file = fileInput.files[0];
+    const csvText = await file.text();
+
+    try {
+      const res = await fetch(
+        `https://emails-module.dennis-e64.workers.dev/staging/upload?project=${encodeURIComponent(
+          portalState.selectedProjectId
+        )}&campaign_id=${encodeURIComponent(campaignId)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "text/csv" },
+          body: csvText
+        }
+      );
+
+      if (!res.ok) throw new Error("Upload failed");
+
+      status.innerHTML = `<p class="success">Upload successful. Redirecting...</p>`;
+
+      setTimeout(async () => {
+        await renderEmailData(container, portalState);
+      }, 800);
+
+    } catch (err) {
+      console.error(err);
+      status.innerHTML = `<p class="error">Error uploading file.</p>`;
+    }
+  });
+}
