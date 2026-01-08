@@ -8,6 +8,12 @@ import { renderEmailData } from "./emails/tab-email-data.js";
 import { renderEmailSystem } from "./emails/tab-system.js";
 
 export async function loadEmailsTab({ portalState, tabContent }) {
+  // Ensure staff project state exists
+  if (!("staffSelectedProjectId" in portalState)) {
+    portalState.staffSelectedProjectId = "";
+    portalState.staffSelectedProjectName = "";
+  }
+
   // Load base HTML template
   const res = await fetch("./components/emails.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
@@ -16,7 +22,7 @@ export async function loadEmailsTab({ portalState, tabContent }) {
   const buttons = tabContent.querySelectorAll("#emails-subtabs button");
 
   // ------------------------------------------------------------
-  // ⭐ STAFF PROJECT SELECTOR (corrected ID)
+  // ⭐ STAFF PROJECT SELECTOR
   // ------------------------------------------------------------
   const selectorRow = document.getElementById("emails-staff-project-selector");
   selectorRow.innerHTML = `
@@ -42,18 +48,18 @@ export async function loadEmailsTab({ portalState, tabContent }) {
     projectSelect.appendChild(opt);
   });
 
-  // Restore previous selection if exists
-  if (portalState.selectedProjectId) {
-    projectSelect.value = portalState.selectedProjectId;
+  // Restore previous staff selection if exists
+  if (portalState.staffSelectedProjectId) {
+    projectSelect.value = portalState.staffSelectedProjectId;
   }
 
   // Handle project selection
   projectSelect.addEventListener("change", () => {
     const selectedProject = projectSelect.value;
-    portalState.selectedProjectId = selectedProject;
+    portalState.staffSelectedProjectId = selectedProject;
 
     const selectedRow = configRows.find(r => r.project === selectedProject);
-    portalState.selectedProjectName = selectedRow?.display_name || "";
+    portalState.staffSelectedProjectName = selectedRow?.display_name || "";
 
     // Clear content until user clicks a tab
     content.innerHTML = `
@@ -79,14 +85,14 @@ export async function loadEmailsTab({ portalState, tabContent }) {
         return;
       }
 
-      // ADD TAB — allowed without project (but will show read-only field)
+      // ADD TAB — will self‑gate if no project
       if (subtab === "add") {
         await renderEmailAdd(content, portalState);
         return;
       }
 
-      // ALL OTHER TABS REQUIRE PROJECT
-      if (!portalState.selectedProjectId) {
+      // ALL OTHER TABS REQUIRE STAFF PROJECT
+      if (!portalState.staffSelectedProjectId) {
         content.innerHTML = `
           <section class="card warning">
             <p>Please select a project to continue.</p>
