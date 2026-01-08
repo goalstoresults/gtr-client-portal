@@ -1,5 +1,5 @@
 // /emails/tab-email-data.js
-// Handles CSV upload, staging preview, and commit (Worker-based)
+// Handles CSV upload, staging preview, auto-match, and commit (Worker-based)
 
 import { escapeHtml } from "../utilities.js";
 
@@ -46,6 +46,11 @@ export async function renderEmailData(container, portalState) {
 
     <section class="card" style="margin-top:16px;">
       <h3>Staging Preview</h3>
+
+      <button id="emailData-matchBtn" class="btn-secondary" style="margin-bottom:12px;">
+        Auto‑Match Contacts
+      </button>
+
       <div id="emailData-stagingGrid"></div>
 
       <div style="margin-top:16px;">
@@ -98,6 +103,38 @@ export async function renderEmailData(container, portalState) {
   });
 
   /* =========================================================
+     AUTO-MATCH CONTACTS (bulk SQL match)
+  ========================================================== */
+
+  document.getElementById("emailData-matchBtn").addEventListener("click", async () => {
+    status.innerHTML = `<p>Matching...</p>`;
+
+    try {
+      const res = await fetch(
+        `https://emails-module.dennis-e64.workers.dev/staging/match`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project: portalState.staffSelectedProjectId,
+            campaign_id: campaignId
+          })
+        }
+      );
+
+      if (!res.ok) throw new Error("Match failed");
+
+      status.innerHTML = `<p class="success">Auto‑match complete.</p>`;
+
+      await loadStagingRows(stagingGrid, portalState, campaignId);
+
+    } catch (err) {
+      console.error(err);
+      status.innerHTML = `<p class="error">Error matching contacts.</p>`;
+    }
+  });
+
+  /* =========================================================
      COMMIT STAGING → Final Table
   ========================================================== */
 
@@ -133,11 +170,13 @@ export async function renderEmailData(container, portalState) {
 }
 
 /* =========================================================
-   LOAD STAGING ROWS (Worker-based)
+   LOAD STAGING ROWS (Worker-based, sortable grid)
 ========================================================= */
 
 async function loadStagingRows(grid, portalState, campaignId) {
   grid.innerHTML = `<p>Loading...</p>`;
+
+  let rows = [];
 
   try {
     const res = await fetch(
@@ -148,44 +187,115 @@ async function loadStagingRows(grid, portalState, campaignId) {
     );
 
     const text = await res.text();
-    const rows = text ? JSON.parse(text) : [];
+    rows = text ? JSON.parse(text) : [];
+  } catch (err) {
+    console.error(err);
+    grid.innerHTML = `<p class="error">Error loading staging rows.</p>`;
+    return;
+  }
 
-    if (!rows || rows.length === 0) {
-      grid.innerHTML = `<p>No staging rows found.</p>`;
-      return;
-    }
+  if (!rows || rows.length === 0) {
+    grid.innerHTML = `<p>No staging rows found.</p>`;
+    return;
+  }
 
-    const htmlRows = rows
-      .map(row => `
-        <tr>
-          <td>${escapeHtml(row.full_name || "")}</td>
-          <td>${escapeHtml(row.email || "")}</td>
-          <td>${escapeHtml(row.status || "")}</td>
-          <td>${escapeHtml(row.event_timestamp_eastern || "")}</td>
-          <td>${escapeHtml(row.match_status || "")}</td>
-          <td>${escapeHtml(row.error_message || "")}</td>
+  /* ---------------------------------------------------------
+     SORTING STATE
+  --------------------------------------------------------- */
+  let sortField = "event_timestamp_eastern";
+  let sortDirection = "desc";
+
+  const columns = [
+    { key: "full_name", label: "Name" },
+    { key: "email", label: "Email" },
+    { key: "status", label: "Status" },
+    { key: "event_timestamp_eastern", label: "Timestamp (ET)", isDate: true },
+    { key: "match_status", label: "Match Status" },
+    { key: "error_message", label: "Error" }
+  ];
+
+  function sortRows() {
+    rows.sort((a, b) => {
+      let A = a[sortField];
+      let B = b[sortField];
+
+      const col = columns.find(c => c.key === sortField);
+
+      if (col?.isDate) {
+        A = A ? new Date(A) : 0;
+        B = B ? new Date(B) : 0;
+      } else {
+        A = (A || "").toString().toLowerCase();
+        B = (B || "").toString().toLowerCase();
+      }
+
+      if (A < B) return sortDirection === "asc" ? -1 : 1;
+      if (A > B) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }
+
+  /* ---------------------------------------------------------
+     RENDER TABLE
+  --------------------------------------------------------- */
+  function renderTable() {
+    sortRows();
+
+    const headerHtml = columns
+      .map(col => {
+        const isSorted = sortField === col.key;
+        const upArrow = isSorted && sortDirection === "asc" ? "▲" : "△";
+        const downArrow = isSorted && sortDirection === "desc" ? "▼" : "▽";
+
+        return `
+          <th class="sortable" data-field="${col.key}">
+            ${col.label}
+            <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+              <span class="sort-up">${upArrow}</span>
+              <span class="sort-down">${downArrow}</span>
+            </span>
+          </th>
+        `;
+      })
+      .join("");
+
+    const rowsHtml = rows
+      .map(r => `
+        <tr class="${r.match_status === 'unmatched' ? 'row-error' : ''}">
+          <td>${escapeHtml(r.full_name || "")}</td>
+          <td>${escapeHtml(r.email || "")}</td>
+          <td>${escapeHtml(r.status || "")}</td>
+          <td>${escapeHtml(r.event_timestamp_eastern || "")}</td>
+          <td>${escapeHtml(r.match_status || "")}</td>
+          <td>${escapeHtml(r.error_message || "")}</td>
         </tr>
       `)
       .join("");
 
     grid.innerHTML = `
-      <table class="simple-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Status</th>
-            <th>Timestamp (ET)</th>
-            <th>Match Status</th>
-            <th>Error</th>
-          </tr>
-        </thead>
-        <tbody>${htmlRows}</tbody>
+      <table class="notes-table">
+        <thead><tr>${headerHtml}</tr></thead>
+        <tbody>${rowsHtml}</tbody>
       </table>
     `;
 
-  } catch (err) {
-    console.error(err);
-    grid.innerHTML = `<p class="error">Error loading staging rows.</p>`;
+    // Sorting events
+    grid.querySelectorAll("th.sortable").forEach(th => {
+      th.addEventListener("click", () => {
+        const field = th.dataset.field;
+
+        sortDirection =
+          sortField === field
+            ? sortDirection === "asc"
+              ? "desc"
+              : "asc"
+            : "asc";
+
+        sortField = field;
+        renderTable();
+      });
+    });
   }
+
+  renderTable();
 }
