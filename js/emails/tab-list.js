@@ -1,5 +1,5 @@
 // /emails/tab-list.js
-// Renders the campaign list for the selected project
+// Renders the campaign list for the staff-selected project
 
 import { escapeHtml, formatDateOnly } from "../utilities.js";
 import { renderEmailReview } from "./tab-review.js";
@@ -11,9 +11,9 @@ import { renderEmailData } from "./tab-email-data.js";
 
 export async function renderEmailList(container, portalState) {
   /* ---------------------------------------------------------
-     1) Require project
+     1) Require staff-selected project
   --------------------------------------------------------- */
-  if (!portalState.selectedProjectId) {
+  if (!portalState.staffSelectedProjectId) {
     container.innerHTML = `
       <section class="card warning">
         <p>Please select a project to continue.</p>
@@ -24,7 +24,7 @@ export async function renderEmailList(container, portalState) {
 
   container.innerHTML = `
     <section class="card">
-      <h3>Email – Campaigns for ${escapeHtml(portalState.selectedProjectName || "")}</h3>
+      <h3>Email – Campaigns for ${escapeHtml(portalState.staffSelectedProjectName || "")}</h3>
       <div id="emailListGrid" style="margin-top:16px;"></div>
     </section>
   `;
@@ -38,7 +38,7 @@ export async function renderEmailList(container, portalState) {
   try {
     const res = await fetch(
       `https://emails-module.dennis-e64.workers.dev/campaigns/list?project=${encodeURIComponent(
-        portalState.selectedProjectId
+        portalState.staffSelectedProjectId
       )}`,
       { cache: "no-cache" }
     );
