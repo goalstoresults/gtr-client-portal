@@ -1,5 +1,5 @@
 // /emails/tab-email-data.js
-// Handles CSV upload, staging, matching, and commit
+// Handles CSV upload, staging preview, and commit (Worker-based)
 
 import { escapeHtml } from "../utilities.js";
 
@@ -14,6 +14,15 @@ export async function renderEmailData(container, portalState) {
     container.innerHTML = `
       <section class="card">
         <p>No campaign selected.</p>
+      </section>
+    `;
+    return;
+  }
+
+  if (!portalState.staffSelectedProjectId) {
+    container.innerHTML = `
+      <section class="card warning">
+        <p>Please select a project to continue.</p>
       </section>
     `;
     return;
@@ -49,7 +58,7 @@ export async function renderEmailData(container, portalState) {
   const stagingGrid = document.getElementById("emailData-stagingGrid");
 
   /* =========================================================
-     UPLOAD CSV → Send to Worker → Populate Staging
+     UPLOAD CSV → Worker → staging_emails_delivered
   ========================================================== */
 
   document.getElementById("emailData-uploadBtn").addEventListener("click", async () => {
@@ -62,23 +71,21 @@ export async function renderEmailData(container, portalState) {
     }
 
     const file = fileInput.files[0];
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("project", portalState.selectedProjectId);
-    formData.append("campaign_id", campaignId);
+    const csvText = await file.text();
 
     try {
       const res = await fetch(
-        `https://emails-module.dennis-e64.workers.dev/staging/upload`,
+        `https://emails-module.dennis-e64.workers.dev/staging/upload?project=${encodeURIComponent(
+          portalState.staffSelectedProjectId
+        )}&campaign_id=${encodeURIComponent(campaignId)}`,
         {
           method: "POST",
-          body: formData
+          headers: { "Content-Type": "text/csv" },
+          body: csvText
         }
       );
 
       if (!res.ok) throw new Error("Upload failed");
-
-      const result = await res.json();
 
       status.innerHTML = `<p class="success">CSV uploaded and staged successfully.</p>`;
 
@@ -104,7 +111,7 @@ export async function renderEmailData(container, portalState) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            project: portalState.selectedProjectId,
+            project: portalState.staffSelectedProjectId,
             campaign_id: campaignId
           })
         }
@@ -113,7 +120,6 @@ export async function renderEmailData(container, portalState) {
       if (!res.ok) throw new Error("Commit failed");
 
       status.innerHTML = `<p class="success">Staging committed to final table.</p>`;
-
       stagingGrid.innerHTML = `<p>Committed. No staging rows remain.</p>`;
 
     } catch (err) {
@@ -122,56 +128,64 @@ export async function renderEmailData(container, portalState) {
     }
   });
 
-  // Load initial staging rows (if any)
+  // Load initial staging rows
   await loadStagingRows(stagingGrid, portalState, campaignId);
 }
 
 /* =========================================================
-   LOAD STAGING ROWS
+   LOAD STAGING ROWS (Worker-based)
 ========================================================= */
 
 async function loadStagingRows(grid, portalState, campaignId) {
-  const { data, error } = await supabase
-    .from("staging_emails_delivered")
-    .select("*")
-    .eq("project", portalState.selectedProjectId)
-    .eq("campaign_id", campaignId)
-    .order("event_timestamp_eastern", { ascending: false });
+  grid.innerHTML = `<p>Loading...</p>`;
 
-  if (error) {
-    grid.innerHTML = `<p class="error">Error loading staging rows.</p>`;
-    return;
-  }
+  try {
+    const res = await fetch(
+      `https://emails-module.dennis-e64.workers.dev/staging/list?project=${encodeURIComponent(
+        portalState.staffSelectedProjectId
+      )}&campaign_id=${encodeURIComponent(campaignId)}`,
+      { cache: "no-cache" }
+    );
 
-  if (!data || data.length === 0) {
-    grid.innerHTML = `<p>No staging rows found.</p>`;
-    return;
-  }
+    const text = await res.text();
+    const rows = text ? JSON.parse(text) : [];
 
-  const rows = data.map(row => `
-    <tr>
-      <td>${escapeHtml(row.full_name || "")}</td>
-      <td>${escapeHtml(row.email || "")}</td>
-      <td>${escapeHtml(row.status || "")}</td>
-      <td>${escapeHtml(row.event_timestamp_eastern || "")}</td>
-      <td>${escapeHtml(row.match_status || "")}</td>
-      <td>${escapeHtml(row.error_message || "")}</td>
-    </tr>
-  `);
+    if (!rows || rows.length === 0) {
+      grid.innerHTML = `<p>No staging rows found.</p>`;
+      return;
+    }
 
-  grid.innerHTML = `
-    <table class="simple-table">
-      <thead>
+    const htmlRows = rows
+      .map(row => `
         <tr>
-          <th>Name</th>
-          <th>Email</th>
-          <th>Status</th>
-          <th>Timestamp (ET)</th>
-          <th>Match Status</th>
-          <th>Error</th>
+          <td>${escapeHtml(row.full_name || "")}</td>
+          <td>${escapeHtml(row.email || "")}</td>
+          <td>${escapeHtml(row.status || "")}</td>
+          <td>${escapeHtml(row.event_timestamp_eastern || "")}</td>
+          <td>${escapeHtml(row.match_status || "")}</td>
+          <td>${escapeHtml(row.error_message || "")}</td>
         </tr>
-      </thead>
-      <tbody>${rows.join("")}</tbody>
-    </table>
-  `;
+      `)
+      .join("");
+
+    grid.innerHTML = `
+      <table class="simple-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Status</th>
+            <th>Timestamp (ET)</th>
+            <th>Match Status</th>
+            <th>Error</th>
+          </tr>
+        </thead>
+        <tbody>${htmlRows}</tbody>
+      </table>
+    `;
+
+  } catch (err) {
+    console.error(err);
+    grid.innerHTML = `<p class="error">Error loading staging rows.</p>`;
+  }
 }
