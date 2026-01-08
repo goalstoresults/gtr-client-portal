@@ -1,7 +1,11 @@
 <!-- components/emails.html -->
 
-<div id="emails-context-bar" class="contact-context-bar"></div>
+<!-- ⭐ Global Project Selector (required by emails.js) -->
+<div id="emails-project-selector"
+     style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+</div>
 
+<!-- Subtabs -->
 <nav class="subtabs" id="emails-subtabs">
   <button data-subtab="add">Add</button>
   <button data-subtab="list">List</button>
@@ -10,6 +14,7 @@
   <button data-subtab="system">System</button>
 </nav>
 
+<!-- Main content area -->
 <div id="emailsContent">
   <section class="card">
     <p>Select a subtab to begin.</p>
