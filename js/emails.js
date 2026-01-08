@@ -16,9 +16,9 @@ export async function loadEmailsTab({ portalState, tabContent }) {
   const buttons = tabContent.querySelectorAll("#emails-subtabs button");
 
   // ------------------------------------------------------------
-  // ⭐ GLOBAL PROJECT SELECTOR (new)
+  // ⭐ STAFF PROJECT SELECTOR (corrected ID)
   // ------------------------------------------------------------
-  const selectorRow = document.getElementById("emails-project-selector");
+  const selectorRow = document.getElementById("emails-staff-project-selector");
   selectorRow.innerHTML = `
     <label style="font-weight:bold; margin-right:8px;">Project:</label>
     <select id="emails-projectSelect" class="form-control" style="width:240px;">
