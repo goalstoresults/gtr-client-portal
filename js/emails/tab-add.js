@@ -5,7 +5,7 @@ import { escapeHtml } from "../utilities.js";
 import { renderEmailList } from "./tab-list.js";
 
 /* =========================================================
-   BACKEND INSERT
+   BACKEND INSERT (Worker-based)
 ========================================================= */
 
 export async function addEmailCampaign({
@@ -49,8 +49,8 @@ export async function addEmailCampaign({
 ========================================================= */
 
 export async function renderEmailAdd(container, portalState) {
-  // Require project selection
-  if (!portalState.selectedProjectId) {
+  // Require staff-selected project
+  if (!portalState.staffSelectedProjectId) {
     container.innerHTML = `
       <section class="card warning">
         <p>Please select a project to continue.</p>
@@ -66,7 +66,7 @@ export async function renderEmailAdd(container, portalState) {
       <div class="notes-row">
         <label class="notes-label">Project</label>
         <input class="form-control" value="${escapeHtml(
-          portalState.selectedProjectName
+          portalState.staffSelectedProjectName
         )}" readonly />
       </div>
 
@@ -124,6 +124,9 @@ function renderCampaignForm(formArea, portalState) {
     <div id="emailAdd-status" class="status-area" style="margin-top:12px;"></div>
   `;
 
+  /* ---------------------------------------------------------
+     SAVE
+  --------------------------------------------------------- */
   document.getElementById("emailAdd-saveBtn").addEventListener("click", async () => {
     const status = document.getElementById("emailAdd-status");
     status.innerHTML = "";
@@ -142,7 +145,7 @@ function renderCampaignForm(formArea, portalState) {
 
     try {
       await addEmailCampaign({
-        project: portalState.selectedProjectId,
+        project: portalState.staffSelectedProjectId,
         campaign_name: campaignName,
         subject_line: subjectLine,
         send_date: sendDate ? new Date(sendDate).toISOString() : null,
@@ -154,6 +157,7 @@ function renderCampaignForm(formArea, portalState) {
 
       status.innerHTML = `<p class="success">Campaign created successfully.</p>`;
 
+      // Reset fields
       document.getElementById("emailAdd-campaignName").value = "";
       document.getElementById("emailAdd-subjectLine").value = "";
       document.getElementById("emailAdd-sendDate").value = "";
@@ -167,6 +171,9 @@ function renderCampaignForm(formArea, portalState) {
     }
   });
 
+  /* ---------------------------------------------------------
+     CANCEL → Back to List
+  --------------------------------------------------------- */
   document.getElementById("emailAdd-cancelBtn").addEventListener("click", async () => {
     await renderEmailList(formArea.parentElement, portalState);
   });
