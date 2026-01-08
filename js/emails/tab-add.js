@@ -5,7 +5,7 @@ import { escapeHtml } from "../utilities.js";
 import { renderEmailList } from "./tab-list.js";
 
 /* =========================================================
-   BACKEND INSERT: Add Email Campaign
+   BACKEND INSERT
 ========================================================= */
 
 export async function addEmailCampaign({
@@ -40,7 +40,8 @@ export async function addEmailCampaign({
     throw new Error("Campaign insert failed");
   }
 
-  return await res.json();
+  const text = await res.text();
+  return text ? JSON.parse(text) : {};
 }
 
 /* =========================================================
@@ -48,52 +49,35 @@ export async function addEmailCampaign({
 ========================================================= */
 
 export async function renderEmailAdd(container, portalState) {
+  // Require project selection
+  if (!portalState.selectedProjectId) {
+    container.innerHTML = `
+      <section class="card warning">
+        <p>Please select a project to continue.</p>
+      </section>
+    `;
+    return;
+  }
+
   container.innerHTML = `
     <section class="card">
       <h3>Email – Add Campaign</h3>
 
       <div class="notes-row">
-        <label class="notes-label">Select Client</label>
-        <select id="emailAdd-clientSelect" class="form-control">
-          <option value="">--- Select ---</option>
-        </select>
+        <label class="notes-label">Project</label>
+        <input class="form-control" value="${escapeHtml(
+          portalState.selectedProjectName
+        )}" readonly />
       </div>
 
       <div id="emailAdd-formArea" style="margin-top:24px;"></div>
     </section>
   `;
 
-  const select = container.querySelector("#emailAdd-clientSelect");
-  const formArea = container.querySelector("#emailAdd-formArea");
-
-  // Fetch all project configs
-  const resConfig = await fetch(
-    "https://lookups-module.dennis-e64.workers.dev/api/projects_config",
-    { cache: "no-cache" }
+  renderCampaignForm(
+    document.getElementById("emailAdd-formArea"),
+    portalState
   );
-  const configRows = await resConfig.json();
-
-  configRows.forEach(row => {
-    const opt = document.createElement("option");
-    opt.value = row.project;
-    opt.textContent = row.display_name;
-    select.appendChild(opt);
-  });
-
-  select.addEventListener("change", () => {
-    const selectedProject = select.value;
-    portalState.selectedProjectId = selectedProject;
-
-    const selectedRow = configRows.find(r => r.project === selectedProject);
-    portalState.selectedProjectName = selectedRow?.display_name || "";
-
-    if (!selectedProject || !selectedRow) {
-      formArea.innerHTML = "";
-      return;
-    }
-
-    renderCampaignForm(formArea, portalState);
-  });
 }
 
 /* =========================================================
