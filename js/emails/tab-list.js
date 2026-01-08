@@ -15,14 +15,29 @@ export async function renderEmailList(container, portalState) {
 
   const grid = document.getElementById("emailListGrid");
 
-  try {
-    const { data, error } = await supabase
-      .from("project_email_campaigns")
-      .select("*")
-      .eq("project", portalState.selectedProjectId)
-      .order("send_date", { ascending: false });
+  // Require project
+  if (!portalState.selectedProjectId) {
+    grid.innerHTML = `
+      <p class="error">Please select a project to continue.</p>
+    `;
+    return;
+  }
 
-    if (error) throw error;
+  try {
+    // ⭐ Worker-based fetch (correct pattern)
+    const res = await fetch(
+      `https://emails-module.dennis-e64.workers.dev/campaigns/list?project=${encodeURIComponent(
+        portalState.selectedProjectId
+      )}`,
+      { cache: "no-cache" }
+    );
+
+    if (!res.ok) {
+      throw new Error("Failed to load campaigns");
+    }
+
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : [];
 
     if (!data || data.length === 0) {
       grid.innerHTML = `<p>No campaigns found for this project.</p>`;
@@ -31,7 +46,9 @@ export async function renderEmailList(container, portalState) {
 
     const rows = data.map(row => {
       const sendDate = row.send_date
-        ? new Date(row.send_date).toLocaleString("en-US", { timeZone: "America/New_York" })
+        ? new Date(row.send_date).toLocaleString("en-US", {
+            timeZone: "America/New_York"
+          })
         : "—";
 
       return `
