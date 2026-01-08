@@ -12,18 +12,60 @@ export async function loadEmailsTab({ portalState, tabContent }) {
   const res = await fetch("./components/emails.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
 
-  // Context bar
-  const contextBar = document.getElementById("emails-context-bar");
-  if (contextBar) {
-    contextBar.textContent = portalState.selectedProjectName
-      ? `Project: ${portalState.selectedProjectName}`
-      : "No project selected";
-  }
-
   const content = document.getElementById("emailsContent");
   const buttons = tabContent.querySelectorAll("#emails-subtabs button");
 
-  // Wire subtab buttons
+  // ------------------------------------------------------------
+  // ⭐ GLOBAL PROJECT SELECTOR (new)
+  // ------------------------------------------------------------
+  const selectorRow = document.getElementById("emails-project-selector");
+  selectorRow.innerHTML = `
+    <label style="font-weight:bold; margin-right:8px;">Project:</label>
+    <select id="emails-projectSelect" class="form-control" style="width:240px;">
+      <option value="">--- Select Project ---</option>
+    </select>
+  `;
+
+  const projectSelect = document.getElementById("emails-projectSelect");
+
+  // Load all clients
+  const resConfig = await fetch(
+    "https://lookups-module.dennis-e64.workers.dev/api/projects_config",
+    { cache: "no-cache" }
+  );
+  const configRows = await resConfig.json();
+
+  configRows.forEach(row => {
+    const opt = document.createElement("option");
+    opt.value = row.project;
+    opt.textContent = row.display_name;
+    projectSelect.appendChild(opt);
+  });
+
+  // Restore previous selection if exists
+  if (portalState.selectedProjectId) {
+    projectSelect.value = portalState.selectedProjectId;
+  }
+
+  // Handle project selection
+  projectSelect.addEventListener("change", () => {
+    const selectedProject = projectSelect.value;
+    portalState.selectedProjectId = selectedProject;
+
+    const selectedRow = configRows.find(r => r.project === selectedProject);
+    portalState.selectedProjectName = selectedRow?.display_name || "";
+
+    // Clear content until user clicks a tab
+    content.innerHTML = `
+      <section class="card">
+        <p>Select a subtab to begin.</p>
+      </section>
+    `;
+  });
+
+  // ------------------------------------------------------------
+  // SUBTAB HANDLERS
+  // ------------------------------------------------------------
   buttons.forEach(btn => {
     btn.addEventListener("click", async () => {
       buttons.forEach(b => b.classList.remove("active"));
@@ -37,13 +79,13 @@ export async function loadEmailsTab({ portalState, tabContent }) {
         return;
       }
 
-      // ⭐ ADD TAB — ALLOWED EVEN WITHOUT A PROJECT
+      // ADD TAB — allowed without project (but will show read-only field)
       if (subtab === "add") {
         await renderEmailAdd(content, portalState);
         return;
       }
 
-      // ⭐ ALL OTHER TABS REQUIRE A PROJECT
+      // ALL OTHER TABS REQUIRE PROJECT
       if (!portalState.selectedProjectId) {
         content.innerHTML = `
           <section class="card warning">
@@ -77,22 +119,10 @@ export async function loadEmailsTab({ portalState, tabContent }) {
     });
   });
 
-  // ⭐ DEFAULT TO LIST VIEW — but only if project is selected
-  const defaultBtn = tabContent.querySelector(
-    '#emails-subtabs button[data-subtab="list"]'
-  );
-
-  if (defaultBtn) {
-    defaultBtn.classList.add("active");
-
-    if (portalState.selectedProjectId) {
-      await renderEmailList(content, portalState);
-    } else {
-      content.innerHTML = `
-        <section class="card warning">
-          <p>Please select a project to continue.</p>
-        </section>
-      `;
-    }
-  }
+  // Default view
+  content.innerHTML = `
+    <section class="card">
+      <p>Select a subtab to begin.</p>
+    </section>
+  `;
 }
