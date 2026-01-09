@@ -1,5 +1,5 @@
 // /emails/tab-email-data.js
-// Handles CSV upload, staging preview, auto-match, import matched, and commit (Worker-based)
+// Handles CSV upload, staging preview, auto-match, and import matched (Worker-based)
 
 import { escapeHtml } from "../utilities.js";
 
@@ -59,16 +59,12 @@ export async function renderEmailData(container, portalState) {
         Auto‑Match Contacts
       </button>
 
-      <!-- ⭐ NEW: Import Matched Button -->
+      <!-- Import Matched Button -->
       <button id="emailData-importMatchedBtn" class="btn-primary" style="margin-bottom:12px;">
         Import Matched
       </button>
 
       <div id="emailData-stagingGrid"></div>
-
-      <div style="margin-top:16px;">
-        <button id="emailData-commitBtn" class="btn-primary">Commit to Final Table</button>
-      </div>
     </section>
   `;
 
@@ -179,7 +175,7 @@ export async function renderEmailData(container, portalState) {
   });
 
   /* =========================================================
-     ⭐ NEW: IMPORT MATCHED → Final Table
+     IMPORT MATCHED → Final Table
   ========================================================== */
 
   document.getElementById("emailData-importMatchedBtn").addEventListener("click", async () => {
@@ -209,39 +205,6 @@ export async function renderEmailData(container, portalState) {
     } catch (err) {
       console.error(err);
       status.innerHTML = `<p class="error">Error importing matched rows.</p>`;
-    }
-  });
-
-  /* =========================================================
-     COMMIT STAGING → Final Table
-  ========================================================== */
-
-  document.getElementById("emailData-commitBtn").addEventListener("click", async () => {
-    status.innerHTML = "";
-
-    try {
-      const res = await fetch(
-        `https://emails-module.dennis-e64.workers.dev/staging/commit`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            project: portalState.staffSelectedProjectId,
-            campaign_id: campaignId
-          })
-        }
-      );
-
-      if (!res.ok) throw new Error("Commit failed");
-
-      status.innerHTML = `<p class="success">Staging committed to final table.</p>`;
-      stagingGrid.innerHTML = `<p>Committed. No staging rows remain.</p>`;
-
-      updateTotalsUI({ total_records: 0, matched_records: 0, unmatched_records: 0, error_records: 0 });
-
-    } catch (err) {
-      console.error(err);
-      status.innerHTML = `<p class="error">Error committing staging data.</p>`;
     }
   });
 
