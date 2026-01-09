@@ -1,5 +1,5 @@
 // /emails/tab-email-data.js
-// Handles CSV upload, staging preview, auto-match, and commit (Worker-based)
+// Handles CSV upload, staging preview, auto-match, import matched, and commit (Worker-based)
 
 import { escapeHtml } from "../utilities.js";
 
@@ -59,6 +59,11 @@ export async function renderEmailData(container, portalState) {
         Auto‑Match Contacts
       </button>
 
+      <!-- ⭐ NEW: Import Matched Button -->
+      <button id="emailData-importMatchedBtn" class="btn-primary" style="margin-bottom:12px;">
+        Import Matched
+      </button>
+
       <div id="emailData-stagingGrid"></div>
 
       <div style="margin-top:16px;">
@@ -71,7 +76,7 @@ export async function renderEmailData(container, portalState) {
   const stagingGrid = document.getElementById("emailData-stagingGrid");
 
   /* =========================================================
-     ⭐ NEW: Fetch totals helper
+     Fetch totals helper
   ========================================================== */
   async function fetchTotals() {
     try {
@@ -130,8 +135,6 @@ export async function renderEmailData(container, portalState) {
       status.innerHTML = `<p class="success">CSV uploaded and staged successfully.</p>`;
 
       await loadStagingRows(stagingGrid, portalState, campaignId);
-
-      // ⭐ NEW: Fetch totals after upload
       await fetchTotals();
 
     } catch (err) {
@@ -141,7 +144,7 @@ export async function renderEmailData(container, portalState) {
   });
 
   /* =========================================================
-     AUTO-MATCH CONTACTS (bulk SQL match)
+     AUTO-MATCH CONTACTS
   ========================================================== */
 
   document.getElementById("emailData-matchBtn").addEventListener("click", async () => {
@@ -163,9 +166,6 @@ export async function renderEmailData(container, portalState) {
       if (!res.ok) throw new Error("Match failed");
 
       const data = await res.json();
-      console.log("Match result:", data);
-
-      // Update totals UI (already correct)
       updateTotalsUI(data.totals);
 
       status.innerHTML = `<p class="success">Auto‑match complete.</p>`;
@@ -175,6 +175,40 @@ export async function renderEmailData(container, portalState) {
     } catch (err) {
       console.error(err);
       status.innerHTML = `<p class="error">Error matching contacts.</p>`;
+    }
+  });
+
+  /* =========================================================
+     ⭐ NEW: IMPORT MATCHED → Final Table
+  ========================================================== */
+
+  document.getElementById("emailData-importMatchedBtn").addEventListener("click", async () => {
+    status.innerHTML = `<p>Importing matched rows...</p>`;
+
+    try {
+      const res = await fetch(
+        `https://emails-module.dennis-e64.workers.dev/staging/import-matched`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project: portalState.staffSelectedProjectId,
+            campaign_id: campaignId
+          })
+        }
+      );
+
+      if (!res.ok) throw new Error("Import failed");
+
+      const data = await res.json();
+      status.innerHTML = `<p class="success">${data.imported} matched rows imported.</p>`;
+
+      await loadStagingRows(stagingGrid, portalState, campaignId);
+      await fetchTotals();
+
+    } catch (err) {
+      console.error(err);
+      status.innerHTML = `<p class="error">Error importing matched rows.</p>`;
     }
   });
 
@@ -203,7 +237,6 @@ export async function renderEmailData(container, portalState) {
       status.innerHTML = `<p class="success">Staging committed to final table.</p>`;
       stagingGrid.innerHTML = `<p>Committed. No staging rows remain.</p>`;
 
-      // Reset totals
       updateTotalsUI({ total_records: 0, matched_records: 0, unmatched_records: 0, error_records: 0 });
 
     } catch (err) {
@@ -215,7 +248,7 @@ export async function renderEmailData(container, portalState) {
   // Load initial staging rows
   await loadStagingRows(stagingGrid, portalState, campaignId);
 
-  // ⭐ NEW: Fetch totals on initial load
+  // Fetch totals on initial load
   await fetchTotals();
 }
 
@@ -262,9 +295,6 @@ async function loadStagingRows(grid, portalState, campaignId) {
     return;
   }
 
-  /* ---------------------------------------------------------
-     SORTING STATE
-  --------------------------------------------------------- */
   let sortField = "event_timestamp_eastern";
   let sortDirection = "desc";
 
@@ -298,9 +328,6 @@ async function loadStagingRows(grid, portalState, campaignId) {
     });
   }
 
-  /* ---------------------------------------------------------
-     RENDER TABLE
-  --------------------------------------------------------- */
   function renderTable() {
     sortRows();
 
@@ -342,7 +369,6 @@ async function loadStagingRows(grid, portalState, campaignId) {
       </table>
     `;
 
-    // Sorting events
     grid.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
