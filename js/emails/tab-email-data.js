@@ -47,7 +47,7 @@ export async function renderEmailData(container, portalState) {
     <section class="card" style="margin-top:16px;">
       <h3>Staging Preview</h3>
 
-      <!-- NEW: Summary Bar -->
+      <!-- Summary Bar -->
       <div id="emailData-summary" class="summary-bar" style="margin-bottom:12px; display:flex; gap:20px;">
         <div>Total: <span id="totalRecords">0</span></div>
         <div>Matched: <span id="matchedRecords">0</span></div>
@@ -69,6 +69,33 @@ export async function renderEmailData(container, portalState) {
 
   const status = document.getElementById("emailData-status");
   const stagingGrid = document.getElementById("emailData-stagingGrid");
+
+  /* =========================================================
+     ⭐ NEW: Fetch totals helper
+  ========================================================== */
+  async function fetchTotals() {
+    try {
+      const res = await fetch(
+        `https://emails-module.dennis-e64.workers.dev/staging/totals`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project: portalState.staffSelectedProjectId,
+            campaign_id: campaignId
+          })
+        }
+      );
+
+      if (!res.ok) throw new Error("Totals fetch failed");
+
+      const totals = await res.json();
+      updateTotalsUI(totals);
+
+    } catch (err) {
+      console.error("Totals fetch error:", err);
+    }
+  }
 
   /* =========================================================
      UPLOAD CSV → Worker → staging_emails_delivered
@@ -104,6 +131,9 @@ export async function renderEmailData(container, portalState) {
 
       await loadStagingRows(stagingGrid, portalState, campaignId);
 
+      // ⭐ NEW: Fetch totals after upload
+      await fetchTotals();
+
     } catch (err) {
       console.error(err);
       status.innerHTML = `<p class="error">Error uploading CSV.</p>`;
@@ -135,7 +165,7 @@ export async function renderEmailData(container, portalState) {
       const data = await res.json();
       console.log("Match result:", data);
 
-      // NEW: Update totals UI
+      // Update totals UI (already correct)
       updateTotalsUI(data.totals);
 
       status.innerHTML = `<p class="success">Auto‑match complete.</p>`;
@@ -184,6 +214,9 @@ export async function renderEmailData(container, portalState) {
 
   // Load initial staging rows
   await loadStagingRows(stagingGrid, portalState, campaignId);
+
+  // ⭐ NEW: Fetch totals on initial load
+  await fetchTotals();
 }
 
 /* =========================================================
