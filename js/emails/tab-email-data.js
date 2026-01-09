@@ -47,6 +47,14 @@ export async function renderEmailData(container, portalState) {
     <section class="card" style="margin-top:16px;">
       <h3>Staging Preview</h3>
 
+      <!-- NEW: Summary Bar -->
+      <div id="emailData-summary" class="summary-bar" style="margin-bottom:12px; display:flex; gap:20px;">
+        <div>Total: <span id="totalRecords">0</span></div>
+        <div>Matched: <span id="matchedRecords">0</span></div>
+        <div>Unmatched: <span id="unmatchedRecords">0</span></div>
+        <div>Errors: <span id="errorRecords">0</span></div>
+      </div>
+
       <button id="emailData-matchBtn" class="btn-secondary" style="margin-bottom:12px;">
         Auto‑Match Contacts
       </button>
@@ -124,6 +132,12 @@ export async function renderEmailData(container, portalState) {
 
       if (!res.ok) throw new Error("Match failed");
 
+      const data = await res.json();
+      console.log("Match result:", data);
+
+      // NEW: Update totals UI
+      updateTotalsUI(data.totals);
+
       status.innerHTML = `<p class="success">Auto‑match complete.</p>`;
 
       await loadStagingRows(stagingGrid, portalState, campaignId);
@@ -159,6 +173,9 @@ export async function renderEmailData(container, portalState) {
       status.innerHTML = `<p class="success">Staging committed to final table.</p>`;
       stagingGrid.innerHTML = `<p>Committed. No staging rows remain.</p>`;
 
+      // Reset totals
+      updateTotalsUI({ total_records: 0, matched_records: 0, unmatched_records: 0, error_records: 0 });
+
     } catch (err) {
       console.error(err);
       status.innerHTML = `<p class="error">Error committing staging data.</p>`;
@@ -167,6 +184,19 @@ export async function renderEmailData(container, portalState) {
 
   // Load initial staging rows
   await loadStagingRows(stagingGrid, portalState, campaignId);
+}
+
+/* =========================================================
+   UPDATE TOTALS UI
+========================================================= */
+
+function updateTotalsUI(totals) {
+  if (!totals) return;
+
+  document.getElementById("totalRecords").textContent = totals.total_records ?? 0;
+  document.getElementById("matchedRecords").textContent = totals.matched_records ?? 0;
+  document.getElementById("unmatchedRecords").textContent = totals.unmatched_records ?? 0;
+  document.getElementById("errorRecords").textContent = totals.error_records ?? 0;
 }
 
 /* =========================================================
