@@ -245,8 +245,12 @@ async function loadStagingRows(grid, portalState, campaignId) {
       { cache: "no-cache" }
     );
 
-    const text = await res.text();
-    rows = text ? JSON.parse(text) : [];
+   const text = await res.text();
+   rows = text ? JSON.parse(text) : [];
+   
+   // Hide imported rows
+   rows = rows.filter(r => r.match_status !== "imported");
+     
   } catch (err) {
     console.error(err);
     grid.innerHTML = `<p class="error">Error loading staging rows.</p>`;
