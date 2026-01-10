@@ -175,7 +175,7 @@ export async function renderEmailData(container, portalState) {
   });
 
   /* =========================================================
-     IMPORT MATCHED → Final Table
+     IMPORT MATCHED → Final Table (NEW WORKER)
   ========================================================== */
 
   document.getElementById("emailData-importMatchedBtn").addEventListener("click", async () => {
@@ -183,13 +183,13 @@ export async function renderEmailData(container, portalState) {
 
     try {
       const res = await fetch(
-        `https://emails-module.dennis-e64.workers.dev/staging/import-matched`,
+        `https://emails-import-module.dennis-e64.workers.dev/emails/import-matched`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             project: portalState.staffSelectedProjectId,
-            campaign_id: campaignId
+            campaignId: campaignId
           })
         }
       );
