@@ -245,12 +245,12 @@ async function loadStagingRows(grid, portalState, campaignId) {
       { cache: "no-cache" }
     );
 
-   const text = await res.text();
-   rows = text ? JSON.parse(text) : [];
-   
-   // Hide imported rows
-   rows = rows.filter(r => r.match_status !== "imported");
-     
+    const text = await res.text();
+    rows = text ? JSON.parse(text) : [];
+
+    // Hide imported rows
+    rows = rows.filter(r => r.match_status !== "imported");
+
   } catch (err) {
     console.error(err);
     grid.innerHTML = `<p class="error">Error loading staging rows.</p>`;
@@ -271,7 +271,8 @@ async function loadStagingRows(grid, portalState, campaignId) {
     { key: "status", label: "Status" },
     { key: "event_timestamp_eastern", label: "Timestamp (ET)", isDate: true },
     { key: "match_status", label: "Match Status" },
-    { key: "error_message", label: "Error" }
+    { key: "error_message", label: "Error" },
+    { key: "actions", label: "Actions" }   // NEW COLUMN
   ];
 
   function sortRows() {
@@ -325,6 +326,13 @@ async function loadStagingRows(grid, portalState, campaignId) {
           <td>${escapeHtml(r.event_timestamp_eastern || "")}</td>
           <td>${escapeHtml(r.match_status || "")}</td>
           <td>${escapeHtml(r.error_message || "")}</td>
+          <td>
+            ${
+              r.match_status === "unmatched"
+                ? `<button class="btn-secondary btn-sm delete-row" data-id="${r.staging_id}">Delete</button>`
+                : ""
+            }
+          </td>
         </tr>
       `)
       .join("");
@@ -336,6 +344,7 @@ async function loadStagingRows(grid, portalState, campaignId) {
       </table>
     `;
 
+    // Sorting handlers
     grid.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
@@ -349,6 +358,33 @@ async function loadStagingRows(grid, portalState, campaignId) {
 
         sortField = field;
         renderTable();
+      });
+    });
+
+    // DELETE HANDLERS
+    grid.querySelectorAll(".delete-row").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id;
+
+        if (!confirm("Delete this unmatched row?")) return;
+
+        try {
+          await fetch(
+            `https://emails-module.dennis-e64.workers.dev/staging/delete`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ staging_id: id })
+            }
+          );
+
+          await loadStagingRows(grid, portalState, campaignId);
+          await fetchTotals();
+
+        } catch (err) {
+          console.error(err);
+          alert("Error deleting row.");
+        }
       });
     });
   }
