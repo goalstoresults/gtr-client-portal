@@ -19,49 +19,20 @@ const columns = [
 export async function renderECCampaigns(container, portalState, selectedYear = null) {
   container.innerHTML = `
     <section class="card">
-      <h3 id="ec-title-bar" style="display:flex; align-items:center; gap:12px;">
-        Email Campaigns
-        <span id="ec-year-container"></span>
-      </h3>
+      <h3>Email Campaigns</h3>
       <p>Loading campaigns...</p>
     </section>
   `;
 
-  // Load available years
-  const yearRes = await fetch(
-    `https://ecampaigns-module.dennis-e64.workers.dev/analytics/campaign-years?project=${portalState.project}`,
-    { cache: "no-cache" }
-  );
-
-  const { years } = await yearRes.json();
-
-  // Default year = most recent
-  if (!selectedYear) {
-    selectedYear = years[0];
-  }
-
-  // Inject year dropdown next to title
-  const yearContainer = container.querySelector("#ec-year-container");
-  yearContainer.innerHTML = `
-    <label><strong>Year:</strong></label>
-    <select id="ec-year-select" style="margin-left:6px;">
-      ${years.map(y => `<option value="${y}" ${y === selectedYear ? "selected" : ""}>${y}</option>`).join("")}
-    </select>
-  `;
-
-  const yearSelect = container.querySelector("#ec-year-select");
-
-  // Fetch campaigns for selected year
   try {
     const res = await fetch(
-      `https://ecampaigns-module.dennis-e64.workers.dev/analytics/campaigns?project=${portalState.project}&year=${selectedYear}`,
+      `https://ecampaigns-module.dennis-e64.workers.dev/analytics/campaigns?project=${portalState.project}&year=${selectedYear || ""}`,
       { cache: "no-cache" }
     );
 
     let rows = await res.json();
     if (!Array.isArray(rows)) rows = [];
 
-    // Map backend fields
     rows.forEach(r => {
       r.delivered = r.delivered_count ?? 0;
       r.opened = r.opened_count ?? 0;
@@ -71,17 +42,10 @@ export async function renderECCampaigns(container, portalState, selectedYear = n
       r.open_rate = r.open_rate ? (Number(r.open_rate) * 100).toFixed(1) : "0.0";
       r.click_rate = r.click_rate ? (Number(r.click_rate) * 100).toFixed(1) : "0.0";
 
-      // Ensure raw_text is present
       r.raw_text = r.raw_text ?? "";
     });
 
     renderTable(rows, container, portalState, selectedYear);
-
-    // Wire year change
-    yearSelect.addEventListener("change", async () => {
-      await renderECCampaigns(container, portalState, yearSelect.value);
-    });
-
   } catch (err) {
     console.error(err);
     container.innerHTML = `
@@ -98,11 +62,7 @@ function renderTable(rows, container, portalState, selectedYear) {
 
   container.innerHTML = `
     <section class="card">
-      <h3 id="ec-title-bar" style="display:flex; align-items:center; gap:12px;">
-        Email Campaigns
-        <span id="ec-year-container"></span>
-      </h3>
-
+      <h3>Email Campaigns</h3>
       <table class="notes-table">
         <thead>
           <tr>${renderHeader()}</tr>
@@ -114,34 +74,9 @@ function renderTable(rows, container, portalState, selectedYear) {
     </section>
   `;
 
-  // Re-inject year dropdown after table re-render
-  reinjectYearDropdown(container, portalState, selectedYear);
-
   attachSortHandlers(rows, container, portalState, selectedYear);
   attachExpandHandlers(rows);
-}
-
-function reinjectYearDropdown(container, portalState, selectedYear) {
-  const yearContainer = container.querySelector("#ec-year-container");
-
-  fetch(
-    `https://ecampaigns-module.dennis-e64.workers.dev/analytics/campaign-years?project=${portalState.project}`,
-    { cache: "no-cache" }
-  )
-    .then(r => r.json())
-    .then(({ years }) => {
-      yearContainer.innerHTML = `
-        <label><strong>Year:</strong></label>
-        <select id="ec-year-select" style="margin-left:6px;">
-          ${years.map(y => `<option value="${y}" ${y === selectedYear ? "selected" : ""}>${y}</option>`).join("")}
-        </select>
-      `;
-
-      const yearSelect = container.querySelector("#ec-year-select");
-      yearSelect.addEventListener("change", async () => {
-        await renderECCampaigns(container, portalState, yearSelect.value);
-      });
-    });
+  attachClickedHandlers(rows, portalState);
 }
 
 function sortCampaigns(rows) {
@@ -196,7 +131,20 @@ function renderRows(rows) {
         <td>${formatDateTime(row.send_date)}</td>
         <td>${row.delivered}</td>
         <td>${row.opened}</td>
-        <td>${row.clicked}</td>
+
+        <!-- ⭐ CLICKED NUMBER IS NOW CLICKABLE -->
+        <td>
+          <button 
+            class="campaign-clicks-link"
+            data-campaign-id="${row.campaign_id}"
+            data-campaign-name="${escapeHtml(row.campaign_name)}"
+            data-year="${row.year}"
+            style="background:none;border:none;color:#0077cc;text-decoration:underline;cursor:pointer;padding:0;"
+          >
+            ${row.clicked}
+          </button>
+        </td>
+
         <td>${row.unsubscribed}</td>
         <td>${row.open_rate}%</td>
         <td>${row.click_rate}%</td>
@@ -206,7 +154,6 @@ function renderRows(rows) {
       <tr class="detail-row" id="detail-${row.campaign_id}" style="display:none;">
         <td colspan="10">
           <div class="detail-box" style="padding: 12px;">
-
             <div class="detail-field">
               <strong>Campaign Name</strong><br>
               <span class="detail-value">${escapeHtml(row.campaign_name)}</span>
@@ -228,7 +175,6 @@ function renderRows(rows) {
 ${escapeHtml(row.raw_text)}
               </pre>
             </div>
-
           </div>
         </td>
       </tr>
@@ -263,12 +209,31 @@ function attachExpandHandlers(rows) {
 
       if (isHidden) {
         detailRow.style.display = "table-row";
-        btn.textContent = "▲"; // collapse
+        btn.textContent = "▲";
       } else {
         detailRow.style.display = "none";
-        btn.textContent = "▼"; // expand
+        btn.textContent = "▼";
       }
     });
   });
 }
 
+//
+// ⭐ STEP 1: CLICKED NUMBER HANDLER
+//
+function attachClickedHandlers(rows, portalState) {
+  document.querySelectorAll(".campaign-clicks-link").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const campaignId = btn.dataset.campaignId;
+      const campaignName = btn.dataset.campaignName;
+      const year = btn.dataset.year;
+
+      portalState.selectedCampaignId = campaignId;
+      portalState.selectedCampaignName = campaignName;
+      portalState.selectedCampaignYear = year;
+
+      const tabButton = document.querySelector('[data-subtab="campaign-clicks"]');
+      if (tabButton) tabButton.click();
+    });
+  });
+}
