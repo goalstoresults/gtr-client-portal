@@ -6,46 +6,31 @@ console.log("[tab-campaigns.js] loaded");
 // ------------------------------------------------------------
 // Fetch campaigns for the selected project
 // ------------------------------------------------------------
-export async function renderECCampaigns(container, portalState, selectedYear = null) {
-  container.innerHTML = `
-    <section class="card">
-      <h3>Email Campaigns</h3>
-      <p>Loading campaigns...</p>
-    </section>
-  `;
-
+async function fetchCampaignsForProject(portalState, selectedYear) {
   try {
-    const res = await fetch(
-      `https://ecampaigns-module.dennis-e64.workers.dev/analytics/campaigns?project=${portalState.project}${selectedYear ? `&year=${selectedYear}` : ""}`,
-      { cache: "no-cache" }
-    );
+    const base = "https://ecampaigns-module.dennis-e64.workers.dev/analytics/campaigns";
+    const project = portalState.project; // or portalState.project.id if that’s what you actually used before
 
-    let rows = await res.json();
-    if (!Array.isArray(rows)) rows = [];
+    const url =
+      `${base}?project=${encodeURIComponent(project)}` +
+      (selectedYear ? `&year=${encodeURIComponent(selectedYear)}` : "");
 
-    rows.forEach(r => {
-      r.delivered = r.delivered_count ?? 0;
-      r.opened = r.opened_count ?? 0;
-      r.clicked = r.clicked_count ?? 0;
-      r.unsubscribed = r.unsubscribed_count ?? 0;
+    console.log("[tab-campaigns] fetching campaigns from:", url);
 
-      r.open_rate = r.open_rate ? (Number(r.open_rate) * 100).toFixed(1) : "0.0";
-      r.click_rate = r.click_rate ? (Number(r.click_rate) * 100).toFixed(1) : "0.0";
-
-      r.raw_text = r.raw_text ?? "";
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
     });
 
-    renderTable(rows, container, portalState, selectedYear);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    return await res.json();
   } catch (err) {
-    console.error(err);
-    container.innerHTML = `
-      <section class="card">
-        <h3>Email Campaigns</h3>
-        <p class="error">Unable to load campaigns.</p>
-      </section>
-    `;
+    console.error("Error fetching campaigns:", err);
+    return [];
   }
 }
+
 
 
 // ------------------------------------------------------------
