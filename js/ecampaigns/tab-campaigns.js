@@ -8,7 +8,7 @@ console.log("[tab-campaigns.js] loaded");
 // ------------------------------------------------------------
 async function fetchCampaignsForProject(projectId) {
   try {
-    const res = await fetch(`/api/ecampaigns/list?project=${projectId}`, {
+    const res = await fetch(`/analytics/campaigns?project=${projectId}`, {
       method: "GET",
       headers: { "Content-Type": "application/json" }
     });
@@ -21,6 +21,7 @@ async function fetchCampaignsForProject(projectId) {
     return [];
   }
 }
+
 
 // ------------------------------------------------------------
 // Render Campaigns table
