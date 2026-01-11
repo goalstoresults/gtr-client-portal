@@ -267,6 +267,10 @@ export async function renderEmailData(container, portalState) {
         Import Matched
       </button>
 
+      <button id="emailData-storeStatsBtn" class="btn-secondary" style="margin-bottom:12px;">
+        Store Stats
+      </button>
+
       <div id="emailData-stagingGrid"></div>
     </section>
   `;
@@ -384,6 +388,44 @@ export async function renderEmailData(container, portalState) {
     }
   });
 
+/* =========================================================
+   STORE CAMPAIGN STATS
+========================================================= */
+
+document.getElementById("emailData-storeStatsBtn").addEventListener("click", async () => {
+  status.innerHTML = `<p>Storing stats...</p>`;
+
+  try {
+    const res = await fetch(
+      `https://emails-module.dennis-e64.workers.dev/campaigns/store-stats`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project: portalState.staffSelectedProjectId,
+          campaign_id: campaignId
+        })
+      }
+    );
+
+    if (!res.ok) throw new Error("Stats store failed");
+
+    const data = await res.json();
+
+    status.innerHTML = `<p class="success">Stats stored successfully.</p>`;
+
+    // Optional: refresh totals UI if backend returns updated stats
+    if (data.stats) {
+      updateTotalsUI(data.stats);
+    }
+
+  } catch (err) {
+    console.error(err);
+    status.innerHTML = `<p class="error">Error storing stats.</p>`;
+  }
+});
+
+   
   // Initial load
   await loadStagingRows(stagingGrid, portalState, campaignId);
   await fetchTotals(portalState.staffSelectedProjectId, campaignId);
