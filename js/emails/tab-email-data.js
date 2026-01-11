@@ -39,6 +39,39 @@ function updateCampaignStats(stats) {
 }
 
 /* =========================================================
+   FETCH CAMPAIGN SNAPSHOT FROM WORKER
+   (will call /campaigns/get)
+========================================================= */
+
+async function fetchCampaignStats(project, campaignId) {
+  if (!project || !campaignId) return;
+
+  try {
+    const res = await fetch(
+      `https://emails-module.dennis-e64.workers.dev/campaigns/get`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project,
+          campaign_id: campaignId
+        })
+      }
+    );
+
+    if (!res.ok) throw new Error("Campaign stats fetch failed");
+
+    const data = await res.json();
+    if (data && data.stats) {
+      updateCampaignStats(data.stats);
+    }
+
+  } catch (err) {
+    console.error("Campaign stats fetch error:", err);
+  }
+}
+
+/* =========================================================
    STABLE fetchTotals() — module-level, never disappears
 ========================================================= */
 
@@ -86,6 +119,7 @@ async function loadStagingRows(grid, portalState, campaignId) {
     const text = await res.text();
     rows = text ? JSON.parse(text) : [];
 
+    // Hide imported rows
     rows = rows.filter(r => r.match_status !== "imported");
 
   } catch (err) {
@@ -181,6 +215,7 @@ async function loadStagingRows(grid, portalState, campaignId) {
       </table>
     `;
 
+    // Sorting handlers
     grid.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
@@ -197,6 +232,7 @@ async function loadStagingRows(grid, portalState, campaignId) {
       });
     });
 
+    // DELETE HANDLERS — now stable
     grid.querySelectorAll(".delete-row").forEach(btn => {
       btn.addEventListener("click", async () => {
         const id = btn.dataset.id;
@@ -468,5 +504,5 @@ export async function renderEmailData(container, portalState) {
   // Initial load
   await loadStagingRows(stagingGrid, portalState, campaignId);
   await fetchTotals(portalState.staffSelectedProjectId, campaignId);
+  await fetchCampaignStats(portalState.staffSelectedProjectId, campaignId);
 }
-
