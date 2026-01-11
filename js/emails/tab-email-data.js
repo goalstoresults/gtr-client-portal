@@ -1,5 +1,5 @@
 // /emails/tab-email-data.js
-// Handles CSV upload, staging preview, auto-match, and import matched (Worker-based)
+// Handles CSV upload, staging preview, auto-match, import matched, and campaign stats snapshot
 
 import { escapeHtml } from "../utilities.js";
 
@@ -14,6 +14,28 @@ function updateTotalsUI(totals) {
   document.getElementById("matchedRecords").textContent = totals.matched_records ?? 0;
   document.getElementById("unmatchedRecords").textContent = totals.unmatched_records ?? 0;
   document.getElementById("errorRecords").textContent = totals.error_records ?? 0;
+}
+
+/* =========================================================
+   UPDATE CAMPAIGN SNAPSHOT UI
+========================================================= */
+
+function updateCampaignStats(stats) {
+  if (!stats) return;
+
+  document.getElementById("deliveredCount").textContent = stats.delivered_count ?? "–";
+  document.getElementById("openedCount").textContent = stats.opened_count ?? "–";
+  document.getElementById("clickedCount").textContent = stats.clicked_count ?? "–";
+  document.getElementById("unsubscribedCount").textContent = stats.unsubscribed_count ?? "–";
+
+  document.getElementById("openRate").textContent =
+    stats.open_rate != null ? `${(stats.open_rate * 100).toFixed(1)}%` : "–";
+
+  document.getElementById("clickRate").textContent =
+    stats.click_rate != null ? `${(stats.click_rate * 100).toFixed(1)}%` : "–";
+
+  document.getElementById("unsubscribeRate").textContent =
+    stats.unsubscribe_rate != null ? `${(stats.unsubscribe_rate * 100).toFixed(1)}%` : "–";
 }
 
 /* =========================================================
@@ -64,7 +86,6 @@ async function loadStagingRows(grid, portalState, campaignId) {
     const text = await res.text();
     rows = text ? JSON.parse(text) : [];
 
-    // Hide imported rows
     rows = rows.filter(r => r.match_status !== "imported");
 
   } catch (err) {
@@ -160,7 +181,6 @@ async function loadStagingRows(grid, portalState, campaignId) {
       </table>
     `;
 
-    // Sorting handlers
     grid.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
@@ -177,7 +197,6 @@ async function loadStagingRows(grid, portalState, campaignId) {
       });
     });
 
-    // DELETE HANDLERS — now stable
     grid.querySelectorAll(".delete-row").forEach(btn => {
       btn.addEventListener("click", async () => {
         const id = btn.dataset.id;
@@ -247,6 +266,28 @@ export async function renderEmailData(container, portalState) {
       </button>
 
       <div id="emailData-status" class="status-area" style="margin-top:12px;"></div>
+
+      <!-- Minimalist Campaign Stats Snapshot -->
+      <table style="width:100%; margin-top:8px; font-size:0.85em; text-align:center;">
+        <tr>
+          <th>Delivered</th>
+          <th>Opened</th>
+          <th>Clicked</th>
+          <th>Unsub</th>
+          <th>Open %</th>
+          <th>Click %</th>
+          <th>Unsub %</th>
+        </tr>
+        <tr>
+          <td id="deliveredCount">–</td>
+          <td id="openedCount">–</td>
+          <td id="clickedCount">–</td>
+          <td id="unsubscribedCount">–</td>
+          <td id="openRate">–</td>
+          <td id="clickRate">–</td>
+          <td id="unsubscribeRate">–</td>
+        </tr>
+      </table>
     </section>
 
     <section class="card" style="margin-top:16px;">
@@ -388,45 +429,44 @@ export async function renderEmailData(container, portalState) {
     }
   });
 
-/* =========================================================
-   STORE CAMPAIGN STATS
-========================================================= */
+  /* =========================================================
+     STORE CAMPAIGN STATS
+  ========================================================== */
 
-document.getElementById("emailData-storeStatsBtn").addEventListener("click", async () => {
-  status.innerHTML = `<p>Storing stats...</p>`;
+  document.getElementById("emailData-storeStatsBtn").addEventListener("click", async () => {
+    status.innerHTML = `<p>Storing stats...</p>`;
 
-  try {
-    const res = await fetch(
-      `https://emails-module.dennis-e64.workers.dev/campaigns/store-stats`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          project: portalState.staffSelectedProjectId,
-          campaign_id: campaignId
-        })
+    try {
+      const res = await fetch(
+        `https://emails-module.dennis-e64.workers.dev/campaigns/store-stats`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project: portalState.staffSelectedProjectId,
+            campaign_id: campaignId
+          })
+        }
+      );
+
+      if (!res.ok) throw new Error("Stats store failed");
+
+      const data = await res.json();
+
+      status.innerHTML = `<p class="success">Stats stored successfully.</p>`;
+
+      if (data.stats) {
+        updateCampaignStats(data.stats);
       }
-    );
 
-    if (!res.ok) throw new Error("Stats store failed");
-
-    const data = await res.json();
-
-    status.innerHTML = `<p class="success">Stats stored successfully.</p>`;
-
-    // Optional: refresh totals UI if backend returns updated stats
-    if (data.stats) {
-      updateTotalsUI(data.stats);
+    } catch (err) {
+      console.error(err);
+      status.innerHTML = `<p class="error">Error storing stats.</p>`;
     }
+  });
 
-  } catch (err) {
-    console.error(err);
-    status.innerHTML = `<p class="error">Error storing stats.</p>`;
-  }
-});
-
-   
   // Initial load
   await loadStagingRows(stagingGrid, portalState, campaignId);
   await fetchTotals(portalState.staffSelectedProjectId, campaignId);
 }
+
