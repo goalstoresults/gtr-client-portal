@@ -1,5 +1,4 @@
 import { escapeHtml, formatDateTime } from "../utilities.js";
-import { showCampaignClicksTab } from "../ecampaigns.js";
 
 let currentSortField = "send_date";
 let currentSortDirection = "desc";
@@ -232,8 +231,6 @@ function attachClickedHandlers(rows, portalState) {
       portalState.selectedCampaignId = campaignId;
       portalState.selectedCampaignName = campaignName;
       portalState.selectedCampaignYear = year;
-
-      showCampaignClicksTab();
 
       const tabButton = document.querySelector('[data-subtab="campaign-clicks"]');
       if (tabButton) tabButton.click();
