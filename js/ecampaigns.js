@@ -29,8 +29,8 @@ export async function loadECCampaignsTab(container, portalState) {
       <button data-subtab="timeline">Timeline</button>
       <button data-subtab="contact-activity">Contact Activity</button>
 
-      <!-- ⭐ NEW HIDDEN TAB BUTTON -->
-      <button data-subtab="campaign-clicks" style="display:none;">Campaign Clicks</button>
+//      <!-- ⭐ NEW HIDDEN TAB BUTTON -->
+//      <button data-subtab="campaign-clicks" style="display:none;">Campaign Clicks</button>
     </div>
 
     <div id="ec-subtab-content"></div>
