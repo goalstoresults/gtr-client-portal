@@ -33,9 +33,14 @@ export async function renderECCampaigns(container, portalState) {
     let rows = await res.json();
     if (!Array.isArray(rows)) rows = [];
 
+    // ✅ Map backend fields to frontend
     rows.forEach(r => {
-      r.open_rate = r.delivered ? ((r.opened / r.delivered) * 100).toFixed(1) : "0.0";
-      r.click_rate = r.delivered ? ((r.clicked / r.delivered) * 100).toFixed(1) : "0.0";
+      r.delivered = r.delivered_count ?? 0;
+      r.opened = r.opened_count ?? 0;
+      r.clicked = r.clicked_count ?? 0;
+      r.unsubscribed = r.unsubscribed_count ?? 0;
+      r.open_rate = r.open_rate ? (Number(r.open_rate) * 100).toFixed(1) : "0.0";
+      r.click_rate = r.click_rate ? (Number(r.click_rate) * 100).toFixed(1) : "0.0";
     });
 
     renderTable(rows, container);
@@ -121,10 +126,10 @@ function renderRows(rows) {
         <td>${escapeHtml(row.campaign_name)}</td>
         <td>${escapeHtml(row.subject_line)}</td>
         <td>${formatDateTime(row.send_date)}</td>
-        <td>${row.delivered ?? ""}</td>
-        <td>${row.opened ?? ""}</td>
-        <td>${row.clicked ?? ""}</td>
-        <td>${row.unsubscribed ?? ""}</td>
+        <td>${row.delivered}</td>
+        <td>${row.opened}</td>
+        <td>${row.clicked}</td>
+        <td>${row.unsubscribed}</td>
         <td>${row.open_rate}%</td>
         <td>${row.click_rate}%</td>
         <td><button class="expand-btn" data-id="${row.campaign_id}">▶</button></td>
