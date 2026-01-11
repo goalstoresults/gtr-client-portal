@@ -7,6 +7,8 @@ import { renderECTopContacts } from "./ecampaigns/tab-top-contacts.js";
 import { renderECSegmentation } from "./ecampaigns/tab-segmentation.js";
 import { renderECTimeline } from "./ecampaigns/tab-timeline.js";
 import { renderECContactActivity } from "./ecampaigns/tab-contact-activity.js";
+import { renderECCampaignClicks } from "./ecampaigns/tab-campaign-clicks.js";
+
 
 export async function loadECCampaignsTab({ portalState, tabContent }) {
   const res = await fetch("./components/ecampaigns.html", { cache: "no-cache" });
@@ -65,6 +67,10 @@ export async function loadECCampaignsTab({ portalState, tabContent }) {
         return;
       }
 
+      else if (subtab === "campaign-clicks") {
+        await renderECCampaignClicks(content, portalState);
+      }
+ 
       // fallback
 
       content.innerHTML = `
