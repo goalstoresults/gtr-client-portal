@@ -1,15 +1,13 @@
 // /ecampaigns/tab-campaigns.js
-// Renders the Campaigns subtab inside E‑Campaigns
 
 console.log("[tab-campaigns.js] loaded");
 
 // ------------------------------------------------------------
-// Fetch campaigns for the selected project
+// Fetch campaigns for a given project + optional year
 // ------------------------------------------------------------
-async function fetchCampaignsForProject(portalState, selectedYear) {
+async function fetchCampaignsForProject(project, selectedYear) {
   try {
     const base = "https://ecampaigns-module.dennis-e64.workers.dev/analytics/campaigns";
-    const project = portalState.project; // or portalState.project.id if that’s what you actually used before
 
     const url =
       `${base}?project=${encodeURIComponent(project)}` +
@@ -31,19 +29,23 @@ async function fetchCampaignsForProject(portalState, selectedYear) {
   }
 }
 
-
-
 // ------------------------------------------------------------
-// Render Campaigns table
+// Render Campaigns subtab
 // ------------------------------------------------------------
 export async function renderECCampaigns(container, portalState) {
   container.innerHTML = `<p>Loading campaigns...</p>`;
 
   try {
-    const campaigns = await fetchCampaignsForProject(portalState.project.id);
+    // Use the same project identifier you used in the original (working) URL
+    const project = portalState.project; // if it used portalState.project.id before, change this line
+    const selectedYear = portalState.selectedCampaignYear || null;
+
+    console.log("[tab-campaigns] renderECCampaigns project:", project, "year:", selectedYear);
+
+    const campaigns = await fetchCampaignsForProject(project, selectedYear);
 
     if (!campaigns || campaigns.length === 0) {
-      container.innerHTML = `<p>No campaigns found.</p>`;
+      container.innerHTML = `<section class="card"><p>No campaigns found.</p></section>`;
       return;
     }
 
@@ -63,18 +65,19 @@ export async function renderECCampaigns(container, portalState) {
           <tbody>
             ${campaigns
               .map(c => {
-                const sent = c.sent_count ?? 0;
+                const sent = c.delivered_count ?? 0; // or whatever you used as "sent" before
                 const delivered = c.delivered_count ?? 0;
                 const opened = c.opened_count ?? 0;
                 const clicked = c.clicked_count ?? 0;
 
+                // use campaign_id / campaign_name from the worker
                 return `
-                  <tr data-campaign-id="${c.id}">
-                    <td>${c.name}</td>
+                  <tr data-campaign-id="${c.campaign_id}">
+                    <td>${c.campaign_name}</td>
                     <td>${sent}</td>
                     <td>${delivered}</td>
                     <td>${opened}</td>
-                    <td class="clickable-clicks" data-campaign-id="${c.id}">
+                    <td class="clickable-clicks" data-campaign-id="${c.campaign_id}">
                       ${clicked}
                     </td>
                   </tr>
@@ -92,11 +95,12 @@ export async function renderECCampaigns(container, portalState) {
     container.querySelectorAll(".clickable-clicks").forEach(cell => {
       cell.addEventListener("click", () => {
         const campaignId = cell.dataset.campaignId;
+        console.log("[tab-campaigns] clicked campaign:", campaignId);
 
-        // Store selected campaign in portalState
+        // Store selected campaign ID for the clicks subtab
         portalState.selectedCampaignId = campaignId;
 
-        // Switch to the Campaign Clicks subtab
+        // Enable and switch to the Campaign Clicks subtab
         const btn = document.querySelector(
           '#ec-subtabs button[data-subtab="campaign-clicks"]'
         );
@@ -111,6 +115,6 @@ export async function renderECCampaigns(container, portalState) {
     });
   } catch (err) {
     console.error("Error loading campaigns:", err);
-    container.innerHTML = `<p>Error loading campaigns.</p>`;
+    container.innerHTML = `<section class="card"><p>Error loading campaigns.</p></section>`;
   }
 }
