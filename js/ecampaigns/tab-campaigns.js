@@ -33,7 +33,7 @@ export async function renderECCampaigns(container, portalState) {
     let rows = await res.json();
     if (!Array.isArray(rows)) rows = [];
 
-    // Map backend fields to frontend
+    // ⭐ Map backend fields to frontend
     rows.forEach(r => {
       r.delivered = r.delivered_count ?? 0;
       r.opened = r.opened_count ?? 0;
@@ -47,6 +47,9 @@ export async function renderECCampaigns(container, portalState) {
       r.click_rate = r.click_rate
         ? (Number(r.click_rate) * 100).toFixed(1)
         : "0.0";
+
+      // ⭐ CRITICAL FIX — ensure raw_text is always present
+      r.raw_text = r.raw_text ?? "";
     });
 
     renderTable(rows, container);
@@ -163,7 +166,7 @@ function renderRows(rows) {
             <div class="detail-field" style="margin-top: 12px;">
               <strong>Raw Email Content</strong><br>
               <pre class="detail-value" style="white-space: pre-wrap; margin: 0;">
-${escapeHtml(row.raw_text || "")}
+${escapeHtml(row.raw_text)}
               </pre>
             </div>
 
