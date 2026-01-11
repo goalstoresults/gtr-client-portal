@@ -195,7 +195,7 @@ async function renderClientSetup(container, portalState) {
       { tab_id: "3", description: "Notes" },
       { tab_id: "4", description: "Tasks" },
       { tab_id: "5", description: "Lookups" },
-      { tab_id: "6", description: "Dashboard" },
+      { tab_id: "6", description: "E-Campaigns" },
       { tab_id: "7", description: "Groups" },
       { tab_id: "9", description: "Operations" },    
       { tab_id: "8", description: "Setup - GTR Project ONLY" },
