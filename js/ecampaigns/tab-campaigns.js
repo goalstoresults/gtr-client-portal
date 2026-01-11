@@ -6,19 +6,44 @@ console.log("[tab-campaigns.js] loaded");
 // ------------------------------------------------------------
 // Fetch campaigns for the selected project
 // ------------------------------------------------------------
-async function fetchCampaignsForProject(projectId) {
+export async function renderECCampaigns(container, portalState, selectedYear = null) {
+  container.innerHTML = `
+    <section class="card">
+      <h3>Email Campaigns</h3>
+      <p>Loading campaigns...</p>
+    </section>
+  `;
+
   try {
-    const res = await fetch(`/analytics/campaigns?project=${projectId}`, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" }
+    const res = await fetch(
+      `https://ecampaigns-module.dennis-e64.workers.dev/analytics/campaigns?project=${portalState.project}${selectedYear ? `&year=${selectedYear}` : ""}`,
+      { cache: "no-cache" }
+    );
+
+    let rows = await res.json();
+    if (!Array.isArray(rows)) rows = [];
+
+    rows.forEach(r => {
+      r.delivered = r.delivered_count ?? 0;
+      r.opened = r.opened_count ?? 0;
+      r.clicked = r.clicked_count ?? 0;
+      r.unsubscribed = r.unsubscribed_count ?? 0;
+
+      r.open_rate = r.open_rate ? (Number(r.open_rate) * 100).toFixed(1) : "0.0";
+      r.click_rate = r.click_rate ? (Number(r.click_rate) * 100).toFixed(1) : "0.0";
+
+      r.raw_text = r.raw_text ?? "";
     });
 
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-    return await res.json();
+    renderTable(rows, container, portalState, selectedYear);
   } catch (err) {
-    console.error("Error fetching campaigns:", err);
-    return [];
+    console.error(err);
+    container.innerHTML = `
+      <section class="card">
+        <h3>Email Campaigns</h3>
+        <p class="error">Unable to load campaigns.</p>
+      </section>
+    `;
   }
 }
 
