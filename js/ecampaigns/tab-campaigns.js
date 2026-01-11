@@ -132,12 +132,34 @@ function renderRows(rows) {
         <td>${row.unsubscribed}</td>
         <td>${row.open_rate}%</td>
         <td>${row.click_rate}%</td>
-        <td><button class="expand-btn" data-id="${row.campaign_id}">▶</button></td>
+        <td><button class="expand-btn" data-id="${row.campaign_id}">▼</button></td>
       </tr>
 
       <tr class="detail-row" id="detail-${row.campaign_id}" style="display:none;">
         <td colspan="10">
-          <div class="detail-box">Loading...</div>
+          <div class="detail-box" style="padding: 12px;">
+            <div class="detail-field">
+              <strong>Campaign Name</strong><br>
+              <span class="detail-value">${escapeHtml(row.campaign_name)}</span>
+            </div>
+
+            <div class="detail-field" style="margin-top: 12px;">
+              <strong>Subject Line</strong><br>
+              <span class="detail-value">${escapeHtml(row.subject_line)}</span>
+            </div>
+
+            <div class="detail-field" style="margin-top: 12px;">
+              <strong>Send Date (Eastern Time)</strong><br>
+              <span class="detail-value">${formatDateTime(row.send_date)}</span>
+            </div>
+
+            <div class="detail-field" style="margin-top: 12px;">
+              <strong>Raw Email Content</strong><br>
+              <pre class="detail-value" style="white-space: pre-wrap; margin: 0;">
+${escapeHtml(row.raw_text || "")}
+              </pre>
+            </div>
+          </div>
         </td>
       </tr>
     `)
