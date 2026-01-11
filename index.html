@@ -15,22 +15,27 @@
       margin: 20px auto;
       height: 80px;
     }
+
     .project-entry {
       text-align: center;
       margin-top: 20px;
     }
+
     .project-entry label {
       display: block;
       margin-bottom: 8px;
       font-weight: bold;
     }
+
     .project-entry input {
       padding: 6px;
       margin-right: 8px;
     }
+
     .project-entry button {
       padding: 6px 12px;
     }
+
     footer {
       margin-top: 20px;
       text-align: left;
@@ -45,18 +50,15 @@
 
 <body>
   <header>
-
     <!-- Logo container only used when no project -->
     <div id="logo-container" style="text-align:center; margin:20px 0;"></div>
 
     <!-- ⭐ Updated header with perfectly proportioned inline umbrella logo -->
     <h1 id="portal-title"
         style="display:flex; align-items:center; gap:8px; margin-left:20px;">
-    
       <img src="./RedUmbrellaPro_black.png"
            alt="Portal Logo"
            style="height:26px; width:auto;" />
-    
       <span id="portal-title-text"></span>
     </h1>
 
@@ -78,15 +80,17 @@
     import { loadNotesTab } from "./js/notes.js";
     import { loadTasksTab } from "./js/tasks.js";
     import { loadLookupsTab } from "./js/lookups.js";
-    import { loadDashboardTab } from "./js/dashboard.js";
     import { loadGroupsTab } from "./js/groups.js";
     import { loadSetupTab } from "./js/setup.js";
 
     /* ⭐ NEW IMPORT */
     import { loadOperationsTab } from "./js/operations.js";
 
-    /* ⭐ NEW IMPORT FOR EMAILS */
+    /* ⭐ NEW IMPORT FOR EMAILS (staff ingestion) */
     import { loadEmailsTab } from "./js/emails.js";
+
+    /* ⭐ NEW IMPORT FOR ECampaigns (client-facing analytics) */
+    import { loadECampaignsTab } from "./js/ecampaigns.js";
 
     const portalState = { project: "", contactId: "" };
     window.portalState = portalState;
@@ -104,11 +108,14 @@
       "3": { label: "Notes", loader: loadNotesTab },
       "4": { label: "Tasks", loader: loadTasksTab },
       "5": { label: "Lookups", loader: loadLookupsTab },
-      "6": { label: "Dashboard", loader: loadDashboardTab },
+
+      /* ⭐ REPLACED DASHBOARD WITH ECampaigns */
+      "6": { label: "ECampaigns", loader: loadECampaignsTab },
+
       "7": { label: "Groups", loader: loadGroupsTab },
       "8": { label: "Setup", loader: loadSetupTab },
 
-      /* ⭐ NEW TAB 10 */
+      /* ⭐ Staff-only Emails ingestion */
       "10": { label: "Emails", loader: loadEmailsTab },
 
       /* ⭐ Operations stays as 9 */
@@ -117,16 +124,20 @@
 
     async function loadProjects() {
       try {
-        const res = await fetch("https://client-portal-api.dennis-e64.workers.dev/api/projects_config", { cache: "no-cache" });
+        const res = await fetch(
+          "https://client-portal-api.dennis-e64.workers.dev/api/projects_config",
+          { cache: "no-cache" }
+        );
         const projects = await res.json();
-        if (!Array.isArray(projects) || projects.length === 0) throw new Error("No projects returned");
+
+        if (!Array.isArray(projects) || projects.length === 0)
+          throw new Error("No projects returned");
 
         const urlParams = new URLSearchParams(window.location.search);
         const projectParamRaw = urlParams.get("project");
         let projectParam = projectParamRaw ? projectParamRaw.trim() : "";
 
         if (!projectParam) {
-
           /* ⭐ Show new Red Umbrella waiting logo */
           logoContainer.innerHTML =
             `<img src="./RedUmbrellaPro Header2.png"
@@ -146,32 +157,42 @@
           pageTitle.textContent = "";
           tabs.style.display = "none";
 
-          document.getElementById("btnSetProject").addEventListener("click", () => {
-            const projectName = document.getElementById("projectInput").value.trim();
-            if (!projectName) {
-              alert("Please enter a project name.");
-              return;
-            }
+          document
+            .getElementById("btnSetProject")
+            .addEventListener("click", () => {
+              const projectName =
+                document.getElementById("projectInput").value.trim();
+              if (!projectName) {
+                alert("Please enter a project name.");
+                return;
+              }
 
-            const match = projects.find(p => String(p.project).toLowerCase() === projectName.toLowerCase());
-            if (!match) {
-              tabContent.innerHTML =
-                `<section class="card"><p>Invalid project specified. No UI available.</p></section>`;
-              return;
-            }
+              const match = projects.find(
+                p =>
+                  String(p.project).toLowerCase() ===
+                  projectName.toLowerCase()
+              );
 
-            logoContainer.innerHTML = "";
-            selectorRow.style.display = "none";
+              if (!match) {
+                tabContent.innerHTML =
+                  `<section class="card"><p>Invalid project specified. No UI available.</p></section>`;
+                return;
+              }
 
-            injectConfig(match);
-            const enabledTabs = normalizeTabs(match.enabled_tabs);
-            renderTabs(enabledTabs);
-            tabs.style.display = "block";
-            tabContent.innerHTML = "";
-          });
+              logoContainer.innerHTML = "";
+              selectorRow.style.display = "none";
 
+              injectConfig(match);
+              const enabledTabs = normalizeTabs(match.enabled_tabs);
+              renderTabs(enabledTabs);
+              tabs.style.display = "block";
+              tabContent.innerHTML = "";
+            });
         } else {
-          const match = projects.find(p => String(p.project).toLowerCase() === projectParam.toLowerCase());
+          const match = projects.find(
+            p => String(p.project).toLowerCase() === projectParam.toLowerCase()
+          );
+
           if (!match) {
             tabs.style.display = "none";
             tabContent.innerHTML =
@@ -187,7 +208,6 @@
           renderTabs(enabledTabs);
           tabs.style.display = "block";
         }
-
       } catch (err) {
         console.error("Failed to load projects:", err);
         selectorRow.style.display = "none";
@@ -214,14 +234,22 @@
     function normalizeTabs(raw) {
       if (Array.isArray(raw)) return raw;
       if (typeof raw === "string") {
-        try { return JSON.parse(raw); } catch { return []; }
+        try {
+          return JSON.parse(raw);
+        } catch {
+          return [];
+        }
       }
       return [];
     }
 
     function renderTabs(enabledTabs) {
       tabs.innerHTML = enabledTabs
-        .map(tabId => tabMap[tabId] ? `<button data-tab="${tabId}">${tabMap[tabId].label}</button>` : "")
+        .map(tabId =>
+          tabMap[tabId]
+            ? `<button data-tab="${tabId}">${tabMap[tabId].label}</button>`
+            : ""
+        )
         .join("");
 
       tabs.querySelectorAll("button[data-tab]").forEach(btn => {
@@ -230,10 +258,13 @@
     }
 
     async function loadTab(tabId) {
-      document.querySelectorAll("#tabs button").forEach(btn =>
-        btn.classList.remove("active")
-      );
-      document.querySelector(`#tabs button[data-tab="${tabId}"]`)?.classList.add("active");
+      document
+        .querySelectorAll("#tabs button")
+        .forEach(btn => btn.classList.remove("active"));
+
+      document
+        .querySelector(`#tabs button[data-tab="${tabId}"]`)
+        ?.classList.add("active");
 
       const tab = tabMap[tabId];
       if (tab && typeof tab.loader === "function") {
@@ -248,4 +279,3 @@
   </script>
 </body>
 </html>
-
