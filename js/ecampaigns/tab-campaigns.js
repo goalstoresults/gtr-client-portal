@@ -1,7 +1,20 @@
-// /js/ecampaigns/tab-campaigns.js
-// Client-facing Campaigns analytics tab
-
 import { escapeHtml, formatDateTime } from "../utilities.js";
+
+let currentSortField = "send_date";
+let currentSortDirection = "desc";
+
+const columns = [
+  { key: "campaign_name", label: "Campaign" },
+  { key: "subject_line", label: "Subject" },
+  { key: "send_date", label: "Send Date" },
+  { key: "delivered", label: "Delivered" },
+  { key: "opened", label: "Opened" },
+  { key: "clicked", label: "Clicked" },
+  { key: "unsubscribed", label: "Unsub" },
+  { key: "open_rate", label: "Open %" },
+  { key: "click_rate", label: "Click %" },
+  { key: "actions", label: "" }
+];
 
 export async function renderECCampaigns(container, portalState) {
   container.innerHTML = `
@@ -12,111 +25,20 @@ export async function renderECCampaigns(container, portalState) {
   `;
 
   try {
-    // ⭐ Fetch campaign analytics from the NEW ecampaigns-module Worker
     const res = await fetch(
       `https://ecampaigns-module.dennis-e64.workers.dev/analytics/campaigns?project=${portalState.project}`,
       { cache: "no-cache" }
     );
 
-    const rows = await res.json();
+    let rows = await res.json();
+    if (!Array.isArray(rows)) rows = [];
 
-    if (!Array.isArray(rows) || rows.length === 0) {
-      container.innerHTML = `
-        <section class="card">
-          <h3>Email Campaigns</h3>
-          <p>No campaigns found.</p>
-        </section>
-      `;
-      return;
-    }
-
-    // ⭐ Build table
-    container.innerHTML = `
-      <section class="card">
-        <h3>Email Campaigns</h3>
-
-        <table class="notes-table">
-          <thead>
-            <tr>
-              <th>Campaign</th>
-              <th>Subject</th>
-              <th>Send Date</th>
-              <th>Delivered</th>
-              <th>Opened</th>
-              <th>Clicked</th>
-              <th>Unsub</th>
-              <th>Open %</th>
-              <th>Click %</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="ecampaigns-campaignRows"></tbody>
-        </table>
-      </section>
-    `;
-
-    const tbody = document.getElementById("ecampaigns-campaignRows");
-
-    rows.forEach(row => {
-      const openRate = row.delivered ? ((row.opened / row.delivered) * 100).toFixed(1) : "0.0";
-      const clickRate = row.delivered ? ((row.clicked / row.delivered) * 100).toFixed(1) : "0.0";
-
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${escapeHtml(row.campaign_name)}</td>
-        <td>${escapeHtml(row.subject_line)}</td>
-        <td>${formatDateTime(row.send_date)}</td>
-        <td>${row.delivered}</td>
-        <td>${row.opened}</td>
-        <td>${row.clicked}</td>
-        <td>${row.unsubscribed}</td>
-        <td>${openRate}%</td>
-        <td>${clickRate}%</td>
-        <td>
-          <button class="expand-btn" data-id="${row.campaign_id}">▶</button>
-        </td>
-      `;
-
-      tbody.appendChild(tr);
-
-      // ⭐ Add expandable detail row
-      const detailRow = document.createElement("tr");
-      detailRow.className = "detail-row";
-      detailRow.style.display = "none";
-      detailRow.innerHTML = `
-        <td colspan="10">
-          <div class="detail-box" id="detail-${row.campaign_id}">
-            <p>Loading details...</p>
-          </div>
-        </td>
-      `;
-      tbody.appendChild(detailRow);
+    rows.forEach(r => {
+      r.open_rate = r.delivered ? ((r.opened / r.delivered) * 100).toFixed(1) : "0.0";
+      r.click_rate = r.delivered ? ((r.clicked / r.delivered) * 100).toFixed(1) : "0.0";
     });
 
-    // ⭐ Expand/collapse handlers
-    tbody.querySelectorAll(".expand-btn").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const id = btn.dataset.id;
-        const detailRow = document.querySelector(`#detail-${id}`).parentElement.parentElement;
-
-        if (detailRow.style.display === "none") {
-          detailRow.style.display = "table-row";
-          btn.textContent = "▼";
-
-          const box = document.getElementById(`detail-${id}`);
-
-          // Load details only once
-          if (!box.dataset.loaded) {
-            await loadCampaignDetails(id, box, portalState);
-            box.dataset.loaded = "1";
-          }
-        } else {
-          detailRow.style.display = "none";
-          btn.textContent = "▶";
-        }
-      });
-    });
-
+    renderTable(rows, container);
   } catch (err) {
     console.error(err);
     container.innerHTML = `
@@ -128,13 +50,139 @@ export async function renderECCampaigns(container, portalState) {
   }
 }
 
-/* ---------------------------------------------------------
-   Load expandable details (metadata, raw text, engagement)
---------------------------------------------------------- */
-async function loadCampaignDetails(campaignId, box, portalState) {
+function renderTable(rows, container) {
+  sortCampaigns(rows);
+
+  container.innerHTML = `
+    <section class="card">
+      <h3>Email Campaigns</h3>
+      <table class="notes-table">
+        <thead>
+          <tr>${renderHeader()}</tr>
+        </thead>
+        <tbody>
+          ${renderRows(rows)}
+        </tbody>
+      </table>
+    </section>
+  `;
+
+  attachSortHandlers(rows, container);
+  attachExpandHandlers(rows);
+}
+
+function sortCampaigns(rows) {
+  rows.sort((a, b) => {
+    const x = a[currentSortField];
+    const y = b[currentSortField];
+
+    if (typeof x === "number" && typeof y === "number") {
+      return currentSortDirection === "asc" ? x - y : y - x;
+    }
+
+    if (currentSortField === "send_date") {
+      return currentSortDirection === "asc"
+        ? new Date(x) - new Date(y)
+        : new Date(y) - new Date(x);
+    }
+
+    return currentSortDirection === "asc"
+      ? String(x).localeCompare(String(y))
+      : String(y).localeCompare(String(x));
+  });
+}
+
+function renderHeader() {
+  return columns
+    .map(col => {
+      const isSorted = currentSortField === col.key;
+      const upArrow = isSorted && currentSortDirection === "asc" ? "▲" : "△";
+      const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+
+      return `
+        <th class="${col.key !== 'actions' ? 'sortable' : ''}" data-field="${col.key}">
+          ${escapeHtml(col.label)}
+          ${col.key !== "actions" ? `
+            <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+              <span class="sort-up">${upArrow}</span>
+              <span class="sort-down">${downArrow}</span>
+            </span>
+          ` : ""}
+        </th>
+      `;
+    })
+    .join("");
+}
+
+function renderRows(rows) {
+  return rows
+    .map(row => `
+      <tr>
+        <td>${escapeHtml(row.campaign_name)}</td>
+        <td>${escapeHtml(row.subject_line)}</td>
+        <td>${formatDateTime(row.send_date)}</td>
+        <td>${row.delivered ?? ""}</td>
+        <td>${row.opened ?? ""}</td>
+        <td>${row.clicked ?? ""}</td>
+        <td>${row.unsubscribed ?? ""}</td>
+        <td>${row.open_rate}%</td>
+        <td>${row.click_rate}%</td>
+        <td><button class="expand-btn" data-id="${row.campaign_id}">▶</button></td>
+      </tr>
+
+      <tr class="detail-row" id="detail-${row.campaign_id}" style="display:none;">
+        <td colspan="10">
+          <div class="detail-box">Loading...</div>
+        </td>
+      </tr>
+    `)
+    .join("");
+}
+
+function attachSortHandlers(rows, container) {
+  container.querySelectorAll("th.sortable").forEach(th => {
+    th.addEventListener("click", () => {
+      const field = th.dataset.field;
+
+      if (currentSortField === field) {
+        currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+      } else {
+        currentSortField = field;
+        currentSortDirection = "asc";
+      }
+
+      renderTable(rows, container);
+    });
+  });
+}
+
+function attachExpandHandlers(rows) {
+  document.querySelectorAll(".expand-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
+      const detailRow = document.getElementById(`detail-${id}`).parentElement.parentElement;
+      const box = document.querySelector(`#detail-${id} .detail-box`);
+
+      if (detailRow.style.display === "none") {
+        detailRow.style.display = "table-row";
+        btn.textContent = "▼";
+
+        if (!box.dataset.loaded) {
+          await loadCampaignDetails(id, box);
+          box.dataset.loaded = "1";
+        }
+      } else {
+        detailRow.style.display = "none";
+        btn.textContent = "▶";
+      }
+    });
+  });
+}
+
+async function loadCampaignDetails(campaignId, box) {
   try {
     const res = await fetch(
-      `https://ecampaigns-module.dennis-e64.workers.dev/analytics/campaign-details?project=${portalState.project}&campaign_id=${campaignId}`,
+      `https://ecampaigns-module.dennis-e64.workers.dev/analytics/campaign-details?campaign_id=${campaignId}`,
       { cache: "no-cache" }
     );
 
@@ -155,28 +203,20 @@ async function loadCampaignDetails(campaignId, box, portalState) {
         <h4>Engagement</h4>
         <table class="notes-table">
           <thead>
-            <tr>
-              <th>Contact</th>
-              <th>Action</th>
-              <th>Date</th>
-            </tr>
+            <tr><th>Contact</th><th>Action</th><th>Date</th></tr>
           </thead>
           <tbody>
-            ${
-              Array.isArray(data.engagement)
-                ? data.engagement
-                    .map(
-                      e => `
-              <tr>
-                <td>${escapeHtml(e.contact_name)}</td>
-                <td>${escapeHtml(e.action)}</td>
-                <td>${formatDateTime(e.action_date)}</td>
-              </tr>
-            `
-                    )
-                    .join("")
-                : ""
-            }
+            ${Array.isArray(data.engagement)
+              ? data.engagement
+                  .map(e => `
+                    <tr>
+                      <td>${escapeHtml(e.contact_name)}</td>
+                      <td>${escapeHtml(e.action)}</td>
+                      <td>${formatDateTime(e.action_date)}</td>
+                    </tr>
+                  `)
+                  .join("")
+              : ""}
           </tbody>
         </table>
       </div>
