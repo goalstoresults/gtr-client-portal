@@ -1,108 +1,123 @@
+// /ecampaigns.js
+// E‑Campaigns module controller — loads HTML, initializes subtabs, routes to subtab modules
+
 import { renderECOverview } from "./ecampaigns/tab-overview.js";
 import { renderECCampaigns } from "./ecampaigns/tab-campaigns.js";
 import { renderECTopContacts } from "./ecampaigns/tab-top-contacts.js";
 import { renderECSegmentation } from "./ecampaigns/tab-segmentation.js";
 import { renderECTimeline } from "./ecampaigns/tab-timeline.js";
 import { renderECContactActivity } from "./ecampaigns/tab-contact-activity.js";
-
-// NEW IMPORT
 import { renderECCampaignClicks } from "./ecampaigns/tab-campaign-clicks.js";
 
-//
-// Helper: reveal the hidden Campaign Clicks tab
-//
-export function showCampaignClicksTab() {
-  const btn = document.querySelector('[data-subtab="campaign-clicks"]');
-  if (btn) btn.style.display = "inline-block";
+console.log("[ECampaigns.js] loaded");
+
+// ------------------------------------------------------------
+// Load E‑Campaigns Tab
+// ------------------------------------------------------------
+export async function loadECCampaignsTab({ portalState, tabContent }) {
+  await loadPartial("/components/ecampaigns.html", tabContent);
+  initECCampaigns(portalState);
 }
 
-//
-// Main loader for the E‑Campaigns module
-//
-export async function loadECCampaignsTab(container, portalState) {
+// ------------------------------------------------------------
+// Load HTML partial
+// ------------------------------------------------------------
+async function loadPartial(url, tabContent) {
+  try {
+    const res = await fetch(url, { cache: "no-cache" });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
-  // ⭐ COMPATIBILITY FIX — allow old usage: loadECCampaignsTab("ecampaigns", portalState)
-  if (typeof container === "string") {
-    container = document.getElementById(container);
+    const html = await res.text();
+    tabContent.innerHTML = html;
+
+    const header = tabContent.querySelector("h2");
+    if (header) header.textContent = "E‑Campaigns";
+  } catch (err) {
+    tabContent.innerHTML = `
+      <section class="card">
+        <p>Error loading partial (${url}): ${err.message}</p>
+      </section>
+    `;
   }
+}
 
-  if (!container) {
-    console.error("loadECCampaignsTab: container not found");
+// ------------------------------------------------------------
+// Initialize E‑Campaigns module
+// ------------------------------------------------------------
+function initECCampaigns(portalState) {
+  window.portalState = portalState;
+
+  // Base message
+  const container = document.getElementById("ec-subtab-content");
+  if (container) container.innerHTML = `<p>Select a subtab to begin.</p>`;
+
+  // Wire subtab buttons
+  document.querySelectorAll("#ec-subtabs button").forEach(btn => {
+    btn.addEventListener("click", () =>
+      loadECSubtab(btn.dataset.subtab, portalState)
+    );
+  });
+
+  // If user clicked a "Clicked" number from Campaigns tab
+  if (portalState.selectedCampaignId) {
+    enableSubtab("campaign-clicks", true);
+    loadECSubtab("campaign-clicks", portalState);
     return;
   }
 
-  container.innerHTML = `
-    <div class="subtabs">
-      <button data-subtab="overview">Overview</button>
-      <button data-subtab="campaigns">Campaigns</button>
-      <button data-subtab="top-contacts">Top Contacts</button>
-      <button data-subtab="segmentation">Segmentation</button>
-      <button data-subtab="timeline">Timeline</button>
-      <button data-subtab="contact-activity">Contact Activity</button>
-
-      <!-- Hidden by default -->
-      <button data-subtab="campaign-clicks" style="display:none;">Campaign Clicks</button>
-    </div>
-
-    <div id="ec-subtab-content"></div>
-  `;
-
-  const content = container.querySelector("#ec-subtab-content");
-
-  //
-  // Default subtab
-  //
-  let activeSubtab = "overview";
-
-  //
-  // If user clicked a "Clicked" number, jump directly to Campaign Clicks
-  //
-  if (portalState.selectedCampaignId) {
-    activeSubtab = "campaign-clicks";
-    showCampaignClicksTab();
-  }
-
-  //
-  // Render initial subtab
-  //
-  await renderSubtab(activeSubtab, content, portalState);
-
-  //
-  // Wire subtab buttons
-  //
-  container.querySelectorAll(".subtabs button").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const subtab = btn.dataset.subtab;
-      await renderSubtab(subtab, content, portalState);
-    });
-  });
+  // Default
+  loadECSubtab("overview", portalState);
 }
 
-//
-// Subtab router
-//
-async function renderSubtab(subtab, content, portalState) {
-  if (subtab === "overview") {
-    await renderECOverview(content, portalState);
+// ------------------------------------------------------------
+// Enable/disable subtabs
+// ------------------------------------------------------------
+function enableSubtab(subtab, enabled) {
+  const btn = document.querySelector(
+    `#ec-subtabs button[data-subtab="${subtab}"]`
+  );
+  if (btn) {
+    btn.disabled = !enabled;
+    btn.classList.toggle("disabled", !enabled);
   }
-  else if (subtab === "campaigns") {
-    await renderECCampaigns(content, portalState);
-  }
-  else if (subtab === "top-contacts") {
-    await renderECTopContacts(content, portalState);
-  }
-  else if (subtab === "segmentation") {
-    await renderECSegmentation(content, portalState);
-  }
-  else if (subtab === "timeline") {
-    await renderECTimeline(content, portalState);
-  }
-  else if (subtab === "contact-activity") {
-    await renderECContactActivity(content, portalState);
+}
+
+// ------------------------------------------------------------
+// Subtab Router
+// ------------------------------------------------------------
+async function loadECSubtab(subtab, portalState) {
+  const container = document.getElementById("ec-subtab-content");
+  if (!container) return;
+
+  if (!portalState.project) {
+    container.innerHTML = `<p>No project selected.</p>`;
+    return;
   }
 
+  container.innerHTML = `<p>Loading ${subtab}...</p>`;
+
+  // Update active UI
+  document
+    .querySelectorAll("#ec-subtabs button")
+    .forEach(btn => btn.classList.remove("active"));
+
+  document
+    .querySelector(`#ec-subtabs button[data-subtab="${subtab}"]`)
+    ?.classList.add("active");
+
+  // Route to subtab modules
+  if (subtab === "overview") return renderECOverview(container, portalState);
+  if (subtab === "campaigns") return renderECCampaigns(container, portalState);
+  if (subtab === "top-contacts") return renderECTopContacts(container, portalState);
+  if (subtab === "segmentation") return renderECSegmentation(container, portalState);
+  if (subtab === "timeline") return renderECTimeline(container, portalState);
+  if (subtab === "contact-activity") return renderECContactActivity(container, portalState);
+
   // ⭐ NEW SUBTAB
-  else if (subtab === "campaign-clicks") {
-    await renderECCampaignClicks(content, portalState);
+  if (subtab === "campaign-clicks") {
+    enableSubtab("campaign-clicks", true);
+    return renderECCampaignClicks(container, portalState);
   }
+
+  container.innerHTML = `<p>Unknown subtab</p>`;
 }
