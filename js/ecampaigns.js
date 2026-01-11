@@ -5,7 +5,7 @@ import { renderECSegmentation } from "./ecampaigns/tab-segmentation.js";
 import { renderECTimeline } from "./ecampaigns/tab-timeline.js";
 import { renderECContactActivity } from "./ecampaigns/tab-contact-activity.js";
 
-// ⭐ NEW IMPORT FOR STEP 5
+// NEW IMPORT
 import { renderECCampaignClicks } from "./ecampaigns/tab-campaign-clicks.js";
 
 //
@@ -20,6 +20,17 @@ export function showCampaignClicksTab() {
 // Main loader for the E‑Campaigns module
 //
 export async function loadECCampaignsTab(container, portalState) {
+
+  // ⭐ COMPATIBILITY FIX — allow old usage: loadECCampaignsTab("ecampaigns", portalState)
+  if (typeof container === "string") {
+    container = document.getElementById(container);
+  }
+
+  if (!container) {
+    console.error("loadECCampaignsTab: container not found");
+    return;
+  }
+
   container.innerHTML = `
     <div class="subtabs">
       <button data-subtab="overview">Overview</button>
@@ -29,8 +40,8 @@ export async function loadECCampaignsTab(container, portalState) {
       <button data-subtab="timeline">Timeline</button>
       <button data-subtab="contact-activity">Contact Activity</button>
 
-//      <!-- ⭐ NEW HIDDEN TAB BUTTON -->
-//      <button data-subtab="campaign-clicks" style="display:none;">Campaign Clicks</button>
+      <!-- Hidden by default -->
+      <button data-subtab="campaign-clicks" style="display:none;">Campaign Clicks</button>
     </div>
 
     <div id="ec-subtab-content"></div>
@@ -90,11 +101,8 @@ async function renderSubtab(subtab, content, portalState) {
     await renderECContactActivity(content, portalState);
   }
 
-  //
-  // ⭐ NEW SUBTAB: Campaign Clicks
-  //
+  // ⭐ NEW SUBTAB
   else if (subtab === "campaign-clicks") {
     await renderECCampaignClicks(content, portalState);
   }
 }
-
