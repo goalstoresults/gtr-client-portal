@@ -33,14 +33,20 @@ export async function renderECCampaigns(container, portalState) {
     let rows = await res.json();
     if (!Array.isArray(rows)) rows = [];
 
-    // ✅ Map backend fields to frontend
+    // Map backend fields to frontend
     rows.forEach(r => {
       r.delivered = r.delivered_count ?? 0;
       r.opened = r.opened_count ?? 0;
       r.clicked = r.clicked_count ?? 0;
       r.unsubscribed = r.unsubscribed_count ?? 0;
-      r.open_rate = r.open_rate ? (Number(r.open_rate) * 100).toFixed(1) : "0.0";
-      r.click_rate = r.click_rate ? (Number(r.click_rate) * 100).toFixed(1) : "0.0";
+
+      r.open_rate = r.open_rate
+        ? (Number(r.open_rate) * 100).toFixed(1)
+        : "0.0";
+
+      r.click_rate = r.click_rate
+        ? (Number(r.click_rate) * 100).toFixed(1)
+        : "0.0";
     });
 
     renderTable(rows, container);
@@ -138,6 +144,7 @@ function renderRows(rows) {
       <tr class="detail-row" id="detail-${row.campaign_id}" style="display:none;">
         <td colspan="10">
           <div class="detail-box" style="padding: 12px;">
+
             <div class="detail-field">
               <strong>Campaign Name</strong><br>
               <span class="detail-value">${escapeHtml(row.campaign_name)}</span>
@@ -159,6 +166,7 @@ function renderRows(rows) {
 ${escapeHtml(row.raw_text || "")}
               </pre>
             </div>
+
           </div>
         </td>
       </tr>
@@ -185,71 +193,19 @@ function attachSortHandlers(rows, container) {
 
 function attachExpandHandlers(rows) {
   document.querySelectorAll(".expand-btn").forEach(btn => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       const id = btn.dataset.id;
-      const detailRow = document.getElementById(`detail-${id}`).parentElement.parentElement;
-      const box = document.querySelector(`#detail-${id} .detail-box`);
+      const detailRow = document.getElementById(`detail-${id}`);
 
-      if (detailRow.style.display === "none") {
+      const isHidden = detailRow.style.display === "none";
+
+      if (isHidden) {
         detailRow.style.display = "table-row";
-        btn.textContent = "▼";
-
-        if (!box.dataset.loaded) {
-          await loadCampaignDetails(id, box);
-          box.dataset.loaded = "1";
-        }
+        btn.textContent = "▲"; // collapse
       } else {
         detailRow.style.display = "none";
-        btn.textContent = "▶";
+        btn.textContent = "▼"; // expand
       }
     });
   });
-}
-
-async function loadCampaignDetails(campaignId, box) {
-  try {
-    const res = await fetch(
-      `https://ecampaigns-module.dennis-e64.workers.dev/analytics/campaign-details?campaign_id=${campaignId}`,
-      { cache: "no-cache" }
-    );
-
-    const data = await res.json();
-
-    box.innerHTML = `
-      <div class="detail-section">
-        <h4>Metadata</h4>
-        <pre>${escapeHtml(JSON.stringify(data.metadata, null, 2))}</pre>
-      </div>
-
-      <div class="detail-section">
-        <h4>Raw Email Text</h4>
-        <pre>${escapeHtml(data.raw_text || "")}</pre>
-      </div>
-
-      <div class="detail-section">
-        <h4>Engagement</h4>
-        <table class="notes-table">
-          <thead>
-            <tr><th>Contact</th><th>Action</th><th>Date</th></tr>
-          </thead>
-          <tbody>
-            ${Array.isArray(data.engagement)
-              ? data.engagement
-                  .map(e => `
-                    <tr>
-                      <td>${escapeHtml(e.contact_name)}</td>
-                      <td>${escapeHtml(e.action)}</td>
-                      <td>${formatDateTime(e.action_date)}</td>
-                    </tr>
-                  `)
-                  .join("")
-              : ""}
-          </tbody>
-        </table>
-      </div>
-    `;
-  } catch (err) {
-    console.error(err);
-    box.innerHTML = `<p class="error">Unable to load details.</p>`;
-  }
 }
