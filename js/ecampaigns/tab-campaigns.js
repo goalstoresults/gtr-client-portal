@@ -1,4 +1,5 @@
 import { escapeHtml, formatDateTime } from "../utilities.js";
+import { showCampaignClicksTab } from "../ecampaigns.js";
 
 let currentSortField = "send_date";
 let currentSortDirection = "desc";
@@ -26,7 +27,7 @@ export async function renderECCampaigns(container, portalState, selectedYear = n
 
   try {
     const res = await fetch(
-      `https://ecampaigns-module.dennis-e64.workers.dev/analytics/campaigns?project=${portalState.project}&year=${selectedYear || ""}`,
+      `https://ecampaigns-module.dennis-e64.workers.dev/analytics/campaigns?project=${portalState.project}${selectedYear ? `&year=${selectedYear}` : ""}`,
       { cache: "no-cache" }
     );
 
@@ -231,6 +232,8 @@ function attachClickedHandlers(rows, portalState) {
       portalState.selectedCampaignId = campaignId;
       portalState.selectedCampaignName = campaignName;
       portalState.selectedCampaignYear = year;
+
+      showCampaignClicksTab();
 
       const tabButton = document.querySelector('[data-subtab="campaign-clicks"]');
       if (tabButton) tabButton.click();
