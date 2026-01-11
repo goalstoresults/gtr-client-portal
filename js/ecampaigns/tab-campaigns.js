@@ -1,239 +1,105 @@
-import { escapeHtml, formatDateTime } from "../utilities.js";
+// /ecampaigns/tab-campaigns.js
+// Renders the Campaigns subtab inside E‑Campaigns
 
-let currentSortField = "send_date";
-let currentSortDirection = "desc";
+console.log("[tab-campaigns.js] loaded");
 
-const columns = [
-  { key: "campaign_name", label: "Campaign" },
-  { key: "subject_line", label: "Subject" },
-  { key: "send_date", label: "Send Date" },
-  { key: "delivered", label: "Delivered" },
-  { key: "opened", label: "Opened" },
-  { key: "clicked", label: "Clicked" },
-  { key: "unsubscribed", label: "Unsub" },
-  { key: "open_rate", label: "Open %" },
-  { key: "click_rate", label: "Click %" },
-  { key: "actions", label: "" }
-];
-
-export async function renderECCampaigns(container, portalState, selectedYear = null) {
-  container.innerHTML = `
-    <section class="card">
-      <h3>Email Campaigns</h3>
-      <p>Loading campaigns...</p>
-    </section>
-  `;
-
+// ------------------------------------------------------------
+// Fetch campaigns for the selected project
+// ------------------------------------------------------------
+async function fetchCampaignsForProject(projectId) {
   try {
-    const res = await fetch(
-      `https://ecampaigns-module.dennis-e64.workers.dev/analytics/campaigns?project=${portalState.project}${selectedYear ? `&year=${selectedYear}` : ""}`,
-      { cache: "no-cache" }
-    );
-
-    let rows = await res.json();
-    if (!Array.isArray(rows)) rows = [];
-
-    rows.forEach(r => {
-      r.delivered = r.delivered_count ?? 0;
-      r.opened = r.opened_count ?? 0;
-      r.clicked = r.clicked_count ?? 0;
-      r.unsubscribed = r.unsubscribed_count ?? 0;
-
-      r.open_rate = r.open_rate ? (Number(r.open_rate) * 100).toFixed(1) : "0.0";
-      r.click_rate = r.click_rate ? (Number(r.click_rate) * 100).toFixed(1) : "0.0";
-
-      r.raw_text = r.raw_text ?? "";
+    const res = await fetch(`/api/ecampaigns/list?project=${projectId}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
     });
 
-    renderTable(rows, container, portalState, selectedYear);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    return await res.json();
   } catch (err) {
-    console.error(err);
-    container.innerHTML = `
-      <section class="card">
-        <h3>Email Campaigns</h3>
-        <p class="error">Unable to load campaigns.</p>
-      </section>
-    `;
+    console.error("Error fetching campaigns:", err);
+    return [];
   }
 }
 
-function renderTable(rows, container, portalState, selectedYear) {
-  sortCampaigns(rows);
+// ------------------------------------------------------------
+// Render Campaigns table
+// ------------------------------------------------------------
+export async function renderECCampaigns(container, portalState) {
+  container.innerHTML = `<p>Loading campaigns...</p>`;
 
-  container.innerHTML = `
-    <section class="card">
-      <h3>Email Campaigns</h3>
-      <table class="notes-table">
-        <thead>
-          <tr>${renderHeader()}</tr>
-        </thead>
-        <tbody>
-          ${renderRows(rows)}
-        </tbody>
-      </table>
-    </section>
-  `;
+  try {
+    const campaigns = await fetchCampaignsForProject(portalState.project.id);
 
-  attachSortHandlers(rows, container, portalState, selectedYear);
-  attachExpandHandlers(rows);
-  attachClickedHandlers(rows, portalState);
-}
-
-function sortCampaigns(rows) {
-  rows.sort((a, b) => {
-    const x = a[currentSortField];
-    const y = b[currentSortField];
-
-    if (typeof x === "number" && typeof y === "number") {
-      return currentSortDirection === "asc" ? x - y : y - x;
+    if (!campaigns || campaigns.length === 0) {
+      container.innerHTML = `<p>No campaigns found.</p>`;
+      return;
     }
 
-    if (currentSortField === "send_date") {
-      return currentSortDirection === "asc"
-        ? new Date(x) - new Date(y)
-        : new Date(y) - new Date(x);
-    }
+    container.innerHTML = `
+      <section class="card">
+        <h3>Campaigns</h3>
+        <table class="striped">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Sent</th>
+              <th>Delivered</th>
+              <th>Opened</th>
+              <th>Clicked</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${campaigns
+              .map(c => {
+                const sent = c.sent_count ?? 0;
+                const delivered = c.delivered_count ?? 0;
+                const opened = c.opened_count ?? 0;
+                const clicked = c.clicked_count ?? 0;
 
-    return currentSortDirection === "asc"
-      ? String(x).localeCompare(String(y))
-      : String(y).localeCompare(String(x));
-  });
-}
+                return `
+                  <tr data-campaign-id="${c.id}">
+                    <td>${c.name}</td>
+                    <td>${sent}</td>
+                    <td>${delivered}</td>
+                    <td>${opened}</td>
+                    <td class="clickable-clicks" data-campaign-id="${c.id}">
+                      ${clicked}
+                    </td>
+                  </tr>
+                `;
+              })
+              .join("")}
+          </tbody>
+        </table>
+      </section>
+    `;
 
-function renderHeader() {
-  return columns
-    .map(col => {
-      const isSorted = currentSortField === col.key;
-      const upArrow = isSorted && currentSortDirection === "asc" ? "▲" : "△";
-      const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+    // ------------------------------------------------------------
+    // Wire click handlers for "Clicked" column
+    // ------------------------------------------------------------
+    container.querySelectorAll(".clickable-clicks").forEach(cell => {
+      cell.addEventListener("click", () => {
+        const campaignId = cell.dataset.campaignId;
 
-      return `
-        <th class="${col.key !== 'actions' ? 'sortable' : ''}" data-field="${col.key}">
-          ${escapeHtml(col.label)}
-          ${col.key !== "actions" ? `
-            <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-              <span class="sort-up">${upArrow}</span>
-              <span class="sort-down">${downArrow}</span>
-            </span>
-          ` : ""}
-        </th>
-      `;
-    })
-    .join("");
-}
+        // Store selected campaign in portalState
+        portalState.selectedCampaignId = campaignId;
 
-function renderRows(rows) {
-  return rows
-    .map(row => `
-      <tr>
-        <td>${escapeHtml(row.campaign_name)}</td>
-        <td>${escapeHtml(row.subject_line)}</td>
-        <td>${formatDateTime(row.send_date)}</td>
-        <td>${row.delivered}</td>
-        <td>${row.opened}</td>
+        // Switch to the Campaign Clicks subtab
+        const btn = document.querySelector(
+          '#ec-subtabs button[data-subtab="campaign-clicks"]'
+        );
 
-        <!-- ⭐ CLICKED NUMBER IS NOW CLICKABLE -->
-        <td>
-          <button 
-            class="campaign-clicks-link"
-            data-campaign-id="${row.campaign_id}"
-            data-campaign-name="${escapeHtml(row.campaign_name)}"
-            data-year="${row.year}"
-            style="background:none;border:none;color:#0077cc;text-decoration:underline;cursor:pointer;padding:0;"
-          >
-            ${row.clicked}
-          </button>
-        </td>
-
-        <td>${row.unsubscribed}</td>
-        <td>${row.open_rate}%</td>
-        <td>${row.click_rate}%</td>
-        <td><button class="expand-btn" data-id="${row.campaign_id}">▼</button></td>
-      </tr>
-
-      <tr class="detail-row" id="detail-${row.campaign_id}" style="display:none;">
-        <td colspan="10">
-          <div class="detail-box" style="padding: 12px;">
-            <div class="detail-field">
-              <strong>Campaign Name</strong><br>
-              <span class="detail-value">${escapeHtml(row.campaign_name)}</span>
-            </div>
-
-            <div class="detail-field" style="margin-top: 12px;">
-              <strong>Subject Line</strong><br>
-              <span class="detail-value">${escapeHtml(row.subject_line)}</span>
-            </div>
-
-            <div class="detail-field" style="margin-top: 12px;">
-              <strong>Send Date (Eastern Time)</strong><br>
-              <span class="detail-value">${formatDateTime(row.send_date)}</span>
-            </div>
-
-            <div class="detail-field" style="margin-top: 12px;">
-              <strong>Raw Email Content</strong><br>
-              <pre class="detail-value" style="white-space: pre-wrap; margin: 0;">
-${escapeHtml(row.raw_text)}
-              </pre>
-            </div>
-          </div>
-        </td>
-      </tr>
-    `)
-    .join("");
-}
-
-function attachSortHandlers(rows, container, portalState, selectedYear) {
-  container.querySelectorAll("th.sortable").forEach(th => {
-    th.addEventListener("click", () => {
-      const field = th.dataset.field;
-
-      if (currentSortField === field) {
-        currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
-      } else {
-        currentSortField = field;
-        currentSortDirection = "asc";
-      }
-
-      renderTable(rows, container, portalState, selectedYear);
+        if (btn) {
+          btn.disabled = false;
+          btn.classList.remove("disabled");
+          btn.style.display = "inline-block";
+          btn.click();
+        }
+      });
     });
-  });
-}
-
-function attachExpandHandlers(rows) {
-  document.querySelectorAll(".expand-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const id = btn.dataset.id;
-      const detailRow = document.getElementById(`detail-${id}`);
-
-      const isHidden = detailRow.style.display === "none";
-
-      if (isHidden) {
-        detailRow.style.display = "table-row";
-        btn.textContent = "▲";
-      } else {
-        detailRow.style.display = "none";
-        btn.textContent = "▼";
-      }
-    });
-  });
-}
-
-//
-// ⭐ STEP 1: CLICKED NUMBER HANDLER
-//
-function attachClickedHandlers(rows, portalState) {
-  document.querySelectorAll(".campaign-clicks-link").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const campaignId = btn.dataset.campaignId;
-      const campaignName = btn.dataset.campaignName;
-      const year = btn.dataset.year;
-
-      portalState.selectedCampaignId = campaignId;
-      portalState.selectedCampaignName = campaignName;
-      portalState.selectedCampaignYear = year;
-
-      const tabButton = document.querySelector('[data-subtab="campaign-clicks"]');
-      if (tabButton) tabButton.click();
-    });
-  });
+  } catch (err) {
+    console.error("Error loading campaigns:", err);
+    container.innerHTML = `<p>Error loading campaigns.</p>`;
+  }
 }
