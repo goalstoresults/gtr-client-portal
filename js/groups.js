@@ -512,9 +512,9 @@ async function renderGroupAdd(container, portalState) {
   });
 }
 
-// -----------------------------------------------------------------------------
-// FEES TAB
-// -----------------------------------------------------------------------------
+// ------------------------------------------------------------
+// FEES TAB (updated for fee_date, fee_amount, description)
+// ------------------------------------------------------------
 
 async function renderGroupFees(container, portalState, groupId) {
   if (!groupId) {
@@ -542,19 +542,20 @@ async function renderGroupFees(container, portalState, groupId) {
 
   // Derive year if missing
   fees = fees.map(f => {
-    const d = f.renewal_date ? new Date(f.renewal_date) : null;
+    const d = f.fee_date ? new Date(f.fee_date) : null;
     const year = f.year || (d ? d.getFullYear() : null);
     return { ...f, year };
   });
 
-  let currentSortField = "renewal_date";
+  let currentSortField = "fee_date";
   let currentSortDirection = "desc";
   let adding = false;
   let editing = null;
 
   const columns = [
-    { key: "renewal_date", label: "Renewal Date" },
-    { key: "renewal_amount", label: "Amount", numeric: true },
+    { key: "fee_date", label: "Fee Date" },
+    { key: "fee_amount", label: "Amount", numeric: true },
+    { key: "description", label: "Description" },
     { key: "year", label: "Year", numeric: true },
     { key: "created_at", label: "Created" }
   ];
@@ -564,7 +565,7 @@ async function renderGroupFees(container, portalState, groupId) {
       let A = a[currentSortField];
       let B = b[currentSortField];
 
-      if (currentSortField === "renewal_date" || currentSortField === "created_at") {
+      if (currentSortField === "fee_date" || currentSortField === "created_at") {
         const dA = A ? new Date(A).getTime() : 0;
         const dB = B ? new Date(B).getTime() : 0;
         return currentSortDirection === "asc" ? dA - dB : dB - dA;
@@ -597,27 +598,29 @@ async function renderGroupFees(container, portalState, groupId) {
   function renderTable() {
     sortFees();
 
-    const headerHtml = columns.map(col => {
-      const isSorted = currentSortField === col.key;
-      const up = isSorted && currentSortDirection === "asc" ? "▲" : "△";
-      const down = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
-
-      return `
-        <th class="sortable" data-field="${col.key}">
-          ${escapeHtml(col.label)}
-          <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-            <span>${up}</span>
-            <span>${down}</span>
-          </span>
-        </th>
-      `;
-    }).join("");
+    const headerHtml = columns
+      .map(col => {
+        const isSorted = currentSortField === col.key;
+        const up = isSorted && currentSortDirection === "asc" ? "▲" : "△";
+        const down = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+        return `
+          <th class="sortable" data-field="${col.key}">
+            ${escapeHtml(col.label)}
+            <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+              <span>${up}</span>
+              <span>${down}</span>
+            </span>
+          </th>
+        `;
+      })
+      .join("");
 
     const addRow = adding
       ? `
         <tr class="editing-row">
           <td><input id="feeAddDate" type="date" class="form-control" /></td>
           <td><input id="feeAddAmount" type="number" step="0.01" class="form-control" /></td>
+          <td><input id="feeAddDesc" type="text" class="form-control" /></td>
           <td>(auto)</td>
           <td>(auto)</td>
           <td>
@@ -628,35 +631,45 @@ async function renderGroupFees(container, portalState, groupId) {
       `
       : "";
 
-    const rowsHtml = fees.map(f => {
-      if (editing === f.fee_id) {
+    const rowsHtml = fees
+      .map(f => {
+        if (editing === f.fee_id) {
+          return `
+            <tr class="editing-row" data-fee-id="${f.fee_id}">
+              <td><input type="date" class="form-control fee-edit-date" value="${escapeHtml(
+                toInputDate(f.fee_date)
+              )}" /></td>
+              <td><input type="number" step="0.01" class="form-control fee-edit-amount" value="${escapeHtml(
+                String(f.fee_amount || "")
+              )}" /></td>
+              <td><input type="text" class="form-control fee-edit-desc" value="${escapeHtml(
+                f.description || ""
+              )}" /></td>
+              <td>${escapeHtml(String(f.year || ""))}</td>
+              <td>${formatDateTime(f.created_at)}</td>
+              <td>
+                <button class="btn-primary btn-save-fee" data-id="${f.fee_id}">Save</button>
+                <button class="btn-secondary btn-cancel-edit" data-id="${f.fee_id}">Cancel</button>
+              </td>
+            </tr>
+          `;
+        }
+
         return `
-          <tr class="editing-row" data-fee-id="${f.fee_id}">
-            <td><input type="date" class="form-control fee-edit-date" value="${escapeHtml(toInputDate(f.renewal_date))}" /></td>
-            <td><input type="number" step="0.01" class="form-control fee-edit-amount" value="${escapeHtml(String(f.renewal_amount || ""))}" /></td>
+          <tr data-fee-id="${f.fee_id}">
+            <td>${formatDateTime(f.fee_date)}</td>
+            <td class="amount">${formatCurrency(f.fee_amount)}</td>
+            <td>${escapeHtml(f.description || "")}</td>
             <td>${escapeHtml(String(f.year || ""))}</td>
             <td>${formatDateTime(f.created_at)}</td>
             <td>
-              <button class="btn-primary btn-save-fee" data-id="${f.fee_id}">Save</button>
-              <button class="btn-secondary btn-cancel-edit" data-id="${f.fee_id}">Cancel</button>
+              <button class="btn-secondary btn-edit-fee" data-id="${f.fee_id}">Edit</button>
+              <button class="btn-danger btn-delete-fee" data-id="${f.fee_id}">Delete</button>
             </td>
           </tr>
         `;
-      }
-
-      return `
-        <tr data-fee-id="${f.fee_id}">
-          <td>${formatDateTime(f.renewal_date)}</td>
-          <td class="amount">${formatCurrency(f.renewal_amount)}</td>
-          <td>${escapeHtml(String(f.year || ""))}</td>
-          <td>${formatDateTime(f.created_at)}</td>
-          <td>
-            <button class="btn-secondary btn-edit-fee" data-id="${f.fee_id}">Edit</button>
-            <button class="btn-danger btn-delete-fee" data-id="${f.fee_id}">Delete</button>
-          </td>
-        </tr>
-      `;
-    }).join("");
+      })
+      .join("");
 
     tableDiv.innerHTML = `
       <h4>Showing ${fees.length} fee ${fees.length === 1 ? "record" : "records"}</h4>
@@ -666,7 +679,10 @@ async function renderGroupFees(container, portalState, groupId) {
         </thead>
         <tbody>
           ${addRow}
-          ${rowsHtml || (!adding ? `<tr><td colspan="5">(no fees recorded)</td></tr>` : "")}
+          ${
+            rowsHtml ||
+            (!adding ? `<tr><td colspan="6">(no fees recorded)</td></tr>` : "")
+          }
         </tbody>
       </table>
     `;
@@ -676,7 +692,8 @@ async function renderGroupFees(container, portalState, groupId) {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
         if (currentSortField === field) {
-          currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+          currentSortDirection =
+            currentSortDirection === "asc" ? "desc" : "asc";
         } else {
           currentSortField = field;
           currentSortDirection = "asc";
@@ -685,11 +702,13 @@ async function renderGroupFees(container, portalState, groupId) {
       });
     });
 
-    // Add row
+    // Add row save
     if (adding) {
       tableDiv.querySelector("#btnSaveNewFee").addEventListener("click", async () => {
         const dateVal = document.getElementById("feeAddDate").value;
         const amountVal = document.getElementById("feeAddAmount").value;
+        const descVal = document.getElementById("feeAddDesc").value;
+
         const amount = Number(amountVal);
 
         if (!dateVal || !amount) {
@@ -704,8 +723,9 @@ async function renderGroupFees(container, portalState, groupId) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               group_id: groupId,
-              renewal_date: dateVal,
-              renewal_amount: amount
+              fee_date: dateVal,
+              fee_amount: amount,
+              description: descVal || ""
             })
           }
         );
@@ -729,6 +749,7 @@ async function renderGroupFees(container, portalState, groupId) {
       });
     });
 
+    // Cancel edit
     tableDiv.querySelectorAll(".btn-cancel-edit").forEach(btn => {
       btn.addEventListener("click", () => {
         editing = null;
@@ -736,6 +757,7 @@ async function renderGroupFees(container, portalState, groupId) {
       });
     });
 
+    // Save edit
     tableDiv.querySelectorAll(".btn-save-fee").forEach(btn => {
       btn.addEventListener("click", async () => {
         const feeId = btn.dataset.id;
@@ -743,6 +765,8 @@ async function renderGroupFees(container, portalState, groupId) {
 
         const dateVal = row.querySelector(".fee-edit-date").value;
         const amountVal = row.querySelector(".fee-edit-amount").value;
+        const descVal = row.querySelector(".fee-edit-desc").value;
+
         const amount = Number(amountVal);
 
         if (!dateVal || !amount) {
@@ -756,8 +780,9 @@ async function renderGroupFees(container, portalState, groupId) {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              renewal_date: dateVal,
-              renewal_amount: amount
+              fee_date: dateVal,
+              fee_amount: amount,
+              description: descVal || ""
             })
           }
         );
