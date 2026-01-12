@@ -128,7 +128,7 @@ async function renderGroupList(container, portalState) {
 
   const columns = [
     { key: "group_name", label: "Name" },
-    { key: "renewal_amount", label: "Total Amount", numeric: true },
+    { key: "fee_amount", label: "Total Amount", numeric: true },
     { key: "referral_amount", label: "Total Referral Amount", numeric: true },
     { key: "roi", label: "ROI (%)", numeric: true },
     { key: "created_at", label: "Created" }
@@ -178,7 +178,7 @@ async function renderGroupList(container, portalState) {
     const rowsHtml = groups.map(g => `
       <tr>
         <td>${escapeHtml(g.group_name || "")}</td>
-        <td class="amount">${formatCurrency(g.renewal_amount)}</td>
+        <td class="amount">${formatCurrency(g.fee_amount)}</td>
         <td class="amount">${formatCurrency(g.referral_amount)}</td>
         <td class="amount">
           ${(Number(g.roi || 0) * 100).toLocaleString("en-US", {
