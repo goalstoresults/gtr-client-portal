@@ -8,13 +8,15 @@ console.log("[tab-campaigns.js] loaded");
 // ------------------------------------------------------------
 // Fetch campaigns for the selected project
 // ------------------------------------------------------------
-async function fetchCampaignsForProject(project, selectedYear) {
+async function fetchCampaignsForProject(project, selectedYear, portalState) {
   try {
+    // 🔥 Fallback: if project is missing, use portalState.project
+    project = project || portalState.project;
+
     const base = "https://ecampaigns-module.dennis-e64.workers.dev/analytics/campaigns";
-    const project = portalState.project;
-    
+
     const url =
-      `${base}?project` +
+      `${base}?project=${encodeURIComponent(project)}` +
       (selectedYear ? `&year=${encodeURIComponent(selectedYear)}` : "");
 
     console.log("[tab-campaigns] fetching campaigns from:", url);
@@ -32,6 +34,7 @@ async function fetchCampaignsForProject(project, selectedYear) {
     return [];
   }
 }
+
 
 
 
