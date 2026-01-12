@@ -5,7 +5,8 @@ import {
   escapeHtml,
   formatCurrency,
   formatDateTime, 
-  getEasternDateOnly
+  getEasternDateOnly,
+  formatDateOnly
 } from "./utilities.js";
 
 // -------------------------------------------------------------
@@ -658,7 +659,7 @@ async function renderGroupFees(container, portalState, groupId) {
 
         return `
           <tr data-fee-id="${f.fee_id}">
-            <td>${getEasternDateOnly(f.fee_date)}</td>
+            <td>${formatDateOnly(f.fee_date)}</td>
             <td class="amount">${formatCurrency(f.fee_amount)}</td>
             <td>${escapeHtml(f.description || "")}</td>
             <td>${escapeHtml(String(f.year || ""))}</td>
