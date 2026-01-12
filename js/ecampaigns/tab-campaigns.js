@@ -30,23 +30,35 @@ async function fetchCampaignsForProject(project, selectedYear) {
 }
 
 // ------------------------------------------------------------
+// Format date to Eastern Time
+// ------------------------------------------------------------
+function formatEastern(dateString) {
+  if (!dateString) return "";
+  const d = new Date(dateString);
+  return d.toLocaleString("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+// ------------------------------------------------------------
 // Render Campaigns subtab
 // ------------------------------------------------------------
 export async function renderECCampaigns(container, portalState) {
   container.innerHTML = `<p>Loading campaigns...</p>`;
 
   try {
-    // USE ONLY WHAT EXISTS ON portalState – NO portalState INSIDE HELPER
     const project = portalState.project;
     const selectedYear = portalState.selectedCampaignYear || null;
 
     if (!project) {
-      console.error("[tab-campaigns] No project found on portalState");
       container.innerHTML = `<section class="card"><p>No project selected.</p></section>`;
       return;
     }
-
-    console.log("[tab-campaigns] renderECCampaigns project:", project, "year:", selectedYear);
 
     const campaigns = await fetchCampaignsForProject(project, selectedYear);
 
@@ -55,12 +67,16 @@ export async function renderECCampaigns(container, portalState) {
       return;
     }
 
+    // ------------------------------------------------------------
+    // Render campaign grid with collapsible detail rows
+    // ------------------------------------------------------------
     container.innerHTML = `
       <section class="card">
         <h3>Campaigns</h3>
         <table class="striped">
           <thead>
             <tr>
+              <th></th>
               <th>Name</th>
               <th>Sent</th>
               <th>Delivered</th>
@@ -71,19 +87,35 @@ export async function renderECCampaigns(container, portalState) {
           <tbody>
             ${campaigns
               .map((c) => {
-                const sent = c.delivered_count ?? 0;      // adjust if you had a dedicated "sent" field
+                const sent = c.delivered_count ?? 0;
                 const delivered = c.delivered_count ?? 0;
                 const opened = c.opened_count ?? 0;
                 const clicked = c.clicked_count ?? 0;
 
+                const sendDate = formatEastern(c.send_date);
+
                 return `
-                  <tr data-campaign-id="${c.campaign_id}">
+                  <tr class="campaign-row" data-campaign-id="${c.campaign_id}">
+                    <td class="toggle-cell" data-campaign-id="${c.campaign_id}">
+                      <span class="toggle-arrow" data-campaign-id="${c.campaign_id}">▼</span>
+                    </td>
                     <td>${c.campaign_name}</td>
                     <td>${sent}</td>
                     <td>${delivered}</td>
                     <td>${opened}</td>
                     <td class="clickable-clicks" data-campaign-id="${c.campaign_id}">
                       ${clicked}
+                    </td>
+                  </tr>
+
+                  <tr class="detail-row" id="detail-${c.campaign_id}" style="display:none;">
+                    <td colspan="6">
+                      <div class="detail-block">
+                        <p><strong>Campaign Name</strong><br>${c.campaign_name}</p>
+                        <p><strong>Subject Line</strong><br>${c.subject_line || ""}</p>
+                        <p><strong>Send Date (Eastern)</strong><br>${sendDate}</p>
+                        <p><strong>Raw Email Text</strong><br><pre>${c.raw_text || ""}</pre></p>
+                      </div>
                     </td>
                   </tr>
                 `;
@@ -94,11 +126,30 @@ export async function renderECCampaigns(container, portalState) {
       </section>
     `;
 
-    // Click handlers for "Clicked" column → go to Campaign Clicks subtab
+    // ------------------------------------------------------------
+    // Expand/collapse logic
+    // ------------------------------------------------------------
+    container.querySelectorAll(".toggle-cell").forEach((cell) => {
+      cell.addEventListener("click", () => {
+        const id = cell.dataset.campaignId;
+        const detailRow = document.getElementById(`detail-${id}`);
+        const arrow = container.querySelector(`.toggle-arrow[data-campaign-id="${id}"]`);
+
+        if (!detailRow) return;
+
+        const isOpen = detailRow.style.display === "table-row";
+
+        detailRow.style.display = isOpen ? "none" : "table-row";
+        arrow.textContent = isOpen ? "▼" : "▲";
+      });
+    });
+
+    // ------------------------------------------------------------
+    // Click-through to Campaign Clicks subtab
+    // ------------------------------------------------------------
     container.querySelectorAll(".clickable-clicks").forEach((cell) => {
       cell.addEventListener("click", () => {
         const campaignId = cell.dataset.campaignId;
-        console.log("[tab-campaigns] clicked campaign:", campaignId);
 
         portalState.selectedCampaignId = campaignId;
 
