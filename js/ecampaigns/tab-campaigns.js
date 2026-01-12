@@ -1,172 +1,239 @@
-// tab-campaigns.js
+import { escapeHtml, formatDateTime } from "../utilities.js";
 
-console.log("[tab-campaigns.js] loaded");
+let currentSortField = "send_date";
+let currentSortDirection = "desc";
 
-// ------------------------------------------------------------
-// Fetch campaigns for a given project + optional year
-// ------------------------------------------------------------
-async function fetchCampaignsForProject(project, selectedYear) {
+const columns = [
+  { key: "campaign_name", label: "Campaign" },
+  { key: "subject_line", label: "Subject" },
+  { key: "send_date", label: "Send Date" },
+  { key: "delivered", label: "Delivered" },
+  { key: "opened", label: "Opened" },
+  { key: "clicked", label: "Clicked" },
+  { key: "unsubscribed", label: "Unsub" },
+  { key: "open_rate", label: "Open %" },
+  { key: "click_rate", label: "Click %" },
+  { key: "actions", label: "" }
+];
+
+export async function renderECCampaigns(container, portalState, selectedYear = null) {
+  container.innerHTML = `
+    <section class="card">
+      <h3>Email Campaigns</h3>
+      <p>Loading campaigns...</p>
+    </section>
+  `;
+
   try {
-    const base = "https://ecampaigns-module.dennis-e64.workers.dev/analytics/campaigns";
+    const res = await fetch(
+      `https://ecampaigns-module.dennis-e64.workers.dev/analytics/campaigns?project=${portalState.project}${selectedYear ? `&year=${selectedYear}` : ""}`,
+      { cache: "no-cache" }
+    );
 
-    const url =
-      `${base}?project=${encodeURIComponent(project)}` +
-      (selectedYear ? `&year=${encodeURIComponent(selectedYear)}` : "");
+    let rows = await res.json();
+    if (!Array.isArray(rows)) rows = [];
 
-    console.log("[tab-campaigns] fetching campaigns from:", url);
+    rows.forEach(r => {
+      r.delivered = r.delivered_count ?? 0;
+      r.opened = r.opened_count ?? 0;
+      r.clicked = r.clicked_count ?? 0;
+      r.unsubscribed = r.unsubscribed_count ?? 0;
 
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" }
+      r.open_rate = r.open_rate ? (Number(r.open_rate) * 100).toFixed(1) : "0.0";
+      r.click_rate = r.click_rate ? (Number(r.click_rate) * 100).toFixed(1) : "0.0";
+
+      r.raw_text = r.raw_text ?? "";
     });
 
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-    return await res.json();
+    renderTable(rows, container, portalState, selectedYear);
   } catch (err) {
-    console.error("Error fetching campaigns:", err);
-    return [];
+    console.error(err);
+    container.innerHTML = `
+      <section class="card">
+        <h3>Email Campaigns</h3>
+        <p class="error">Unable to load campaigns.</p>
+      </section>
+    `;
   }
 }
 
-// ------------------------------------------------------------
-// Format date to Eastern Time
-// ------------------------------------------------------------
-function formatEastern(dateString) {
-  if (!dateString) return "";
-  const d = new Date(dateString);
-  return d.toLocaleString("en-US", {
-    timeZone: "America/New_York",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit"
+function renderTable(rows, container, portalState, selectedYear) {
+  sortCampaigns(rows);
+
+  container.innerHTML = `
+    <section class="card">
+      <h3>Email Campaigns</h3>
+      <table class="notes-table">
+        <thead>
+          <tr>${renderHeader()}</tr>
+        </thead>
+        <tbody>
+          ${renderRows(rows)}
+        </tbody>
+      </table>
+    </section>
+  `;
+
+  attachSortHandlers(rows, container, portalState, selectedYear);
+  attachExpandHandlers(rows);
+  attachClickedHandlers(rows, portalState);
+}
+
+function sortCampaigns(rows) {
+  rows.sort((a, b) => {
+    const x = a[currentSortField];
+    const y = b[currentSortField];
+
+    if (typeof x === "number" && typeof y === "number") {
+      return currentSortDirection === "asc" ? x - y : y - x;
+    }
+
+    if (currentSortField === "send_date") {
+      return currentSortDirection === "asc"
+        ? new Date(x) - new Date(y)
+        : new Date(y) - new Date(x);
+    }
+
+    return currentSortDirection === "asc"
+      ? String(x).localeCompare(String(y))
+      : String(y).localeCompare(String(x));
   });
 }
 
-// ------------------------------------------------------------
-// Render Campaigns subtab
-// ------------------------------------------------------------
-export async function renderECCampaigns(container, portalState) {
-  container.innerHTML = `<p>Loading campaigns...</p>`;
+function renderHeader() {
+  return columns
+    .map(col => {
+      const isSorted = currentSortField === col.key;
+      const upArrow = isSorted && currentSortDirection === "asc" ? "▲" : "△";
+      const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
 
-  try {
-    const project = portalState.project;
-    const selectedYear = portalState.selectedCampaignYear || null;
+      return `
+        <th class="${col.key !== 'actions' ? 'sortable' : ''}" data-field="${col.key}">
+          ${escapeHtml(col.label)}
+          ${col.key !== "actions" ? `
+            <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+              <span class="sort-up">${upArrow}</span>
+              <span class="sort-down">${downArrow}</span>
+            </span>
+          ` : ""}
+        </th>
+      `;
+    })
+    .join("");
+}
 
-    if (!project) {
-      container.innerHTML = `<section class="card"><p>No project selected.</p></section>`;
-      return;
-    }
+function renderRows(rows) {
+  return rows
+    .map(row => `
+      <tr>
+        <td>${escapeHtml(row.campaign_name)}</td>
+        <td>${escapeHtml(row.subject_line)}</td>
+        <td>${formatDateTime(row.send_date)}</td>
+        <td>${row.delivered}</td>
+        <td>${row.opened}</td>
 
-    const campaigns = await fetchCampaignsForProject(project, selectedYear);
+        <!-- ⭐ CLICKED NUMBER IS NOW CLICKABLE -->
+        <td>
+          <button 
+            class="campaign-clicks-link"
+            data-campaign-id="${row.campaign_id}"
+            data-campaign-name="${escapeHtml(row.campaign_name)}"
+            data-year="${row.year}"
+            style="background:none;border:none;color:#0077cc;text-decoration:underline;cursor:pointer;padding:0;"
+          >
+            ${row.clicked}
+          </button>
+        </td>
 
-    if (!campaigns || campaigns.length === 0) {
-      container.innerHTML = `<section class="card"><p>No campaigns found.</p></section>`;
-      return;
-    }
+        <td>${row.unsubscribed}</td>
+        <td>${row.open_rate}%</td>
+        <td>${row.click_rate}%</td>
+        <td><button class="expand-btn" data-id="${row.campaign_id}">▼</button></td>
+      </tr>
 
-    // ------------------------------------------------------------
-    // Render campaign grid with collapsible detail rows
-    // ------------------------------------------------------------
-    container.innerHTML = `
-      <section class="card">
-        <h3>Campaigns</h3>
-        <table class="striped">
-          <thead>
-            <tr>
-              <th></th>
-              <th>Name</th>
-              <th>Sent</th>
-              <th>Delivered</th>
-              <th>Opened</th>
-              <th>Clicked</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${campaigns
-              .map((c) => {
-                const sent = c.delivered_count ?? 0;
-                const delivered = c.delivered_count ?? 0;
-                const opened = c.opened_count ?? 0;
-                const clicked = c.clicked_count ?? 0;
+      <tr class="detail-row" id="detail-${row.campaign_id}" style="display:none;">
+        <td colspan="10">
+          <div class="detail-box" style="padding: 12px;">
+            <div class="detail-field">
+              <strong>Campaign Name</strong><br>
+              <span class="detail-value">${escapeHtml(row.campaign_name)}</span>
+            </div>
 
-                const sendDate = formatEastern(c.send_date);
+            <div class="detail-field" style="margin-top: 12px;">
+              <strong>Subject Line</strong><br>
+              <span class="detail-value">${escapeHtml(row.subject_line)}</span>
+            </div>
 
-                return `
-                  <tr class="campaign-row" data-campaign-id="${c.campaign_id}">
-                    <td class="toggle-cell" data-campaign-id="${c.campaign_id}">
-                      <span class="toggle-arrow" data-campaign-id="${c.campaign_id}">▼</span>
-                    </td>
-                    <td>${c.campaign_name}</td>
-                    <td>${sent}</td>
-                    <td>${delivered}</td>
-                    <td>${opened}</td>
-                    <td class="clickable-clicks" data-campaign-id="${c.campaign_id}">
-                      ${clicked}
-                    </td>
-                  </tr>
+            <div class="detail-field" style="margin-top: 12px;">
+              <strong>Send Date (Eastern Time)</strong><br>
+              <span class="detail-value">${formatDateTime(row.send_date)}</span>
+            </div>
 
-                  <tr class="detail-row" id="detail-${c.campaign_id}" style="display:none;">
-                    <td colspan="6">
-                      <div class="detail-block">
-                        <p><strong>Campaign Name</strong><br>${c.campaign_name}</p>
-                        <p><strong>Subject Line</strong><br>${c.subject_line || ""}</p>
-                        <p><strong>Send Date (Eastern)</strong><br>${sendDate}</p>
-                        <p><strong>Raw Email Text</strong><br><pre>${c.raw_text || ""}</pre></p>
-                      </div>
-                    </td>
-                  </tr>
-                `;
-              })
-              .join("")}
-          </tbody>
-        </table>
-      </section>
-    `;
+            <div class="detail-field" style="margin-top: 12px;">
+              <strong>Raw Email Content</strong><br>
+              <pre class="detail-value" style="white-space: pre-wrap; margin: 0;">
+${escapeHtml(row.raw_text)}
+              </pre>
+            </div>
+          </div>
+        </td>
+      </tr>
+    `)
+    .join("");
+}
 
-    // ------------------------------------------------------------
-    // Expand/collapse logic
-    // ------------------------------------------------------------
-    container.querySelectorAll(".toggle-cell").forEach((cell) => {
-      cell.addEventListener("click", () => {
-        const id = cell.dataset.campaignId;
-        const detailRow = document.getElementById(`detail-${id}`);
-        const arrow = container.querySelector(`.toggle-arrow[data-campaign-id="${id}"]`);
+function attachSortHandlers(rows, container, portalState, selectedYear) {
+  container.querySelectorAll("th.sortable").forEach(th => {
+    th.addEventListener("click", () => {
+      const field = th.dataset.field;
 
-        if (!detailRow) return;
+      if (currentSortField === field) {
+        currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+      } else {
+        currentSortField = field;
+        currentSortDirection = "asc";
+      }
 
-        const isOpen = detailRow.style.display === "table-row";
-
-        detailRow.style.display = isOpen ? "none" : "table-row";
-        arrow.textContent = isOpen ? "▼" : "▲";
-      });
+      renderTable(rows, container, portalState, selectedYear);
     });
+  });
+}
 
-    // ------------------------------------------------------------
-    // Click-through to Campaign Clicks subtab
-    // ------------------------------------------------------------
-    container.querySelectorAll(".clickable-clicks").forEach((cell) => {
-      cell.addEventListener("click", () => {
-        const campaignId = cell.dataset.campaignId;
+function attachExpandHandlers(rows) {
+  document.querySelectorAll(".expand-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      const detailRow = document.getElementById(`detail-${id}`);
 
-        portalState.selectedCampaignId = campaignId;
+      const isHidden = detailRow.style.display === "none";
 
-        const btn = document.querySelector(
-          '#ec-subtabs button[data-subtab="campaign-clicks"]'
-        );
-
-        if (btn) {
-          btn.disabled = false;
-          btn.classList.remove("disabled");
-          btn.style.display = "inline-block";
-          btn.click();
-        }
-      });
+      if (isHidden) {
+        detailRow.style.display = "table-row";
+        btn.textContent = "▲";
+      } else {
+        detailRow.style.display = "none";
+        btn.textContent = "▼";
+      }
     });
-  } catch (err) {
-    console.error("Error loading campaigns:", err);
-    container.innerHTML = `<section class="card"><p>Error loading campaigns.</p></section>`;
-  }
+  });
+}
+
+//
+// ⭐ STEP 1: CLICKED NUMBER HANDLER
+//
+function attachClickedHandlers(rows, portalState) {
+  document.querySelectorAll(".campaign-clicks-link").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const campaignId = btn.dataset.campaignId;
+      const campaignName = btn.dataset.campaignName;
+      const year = btn.dataset.year;
+
+      portalState.selectedCampaignId = campaignId;
+      portalState.selectedCampaignName = campaignName;
+      portalState.selectedCampaignYear = year;
+
+      const tabButton = document.querySelector('[data-subtab="campaign-clicks"]');
+      if (tabButton) tabButton.click();
+    });
+  });
 }
