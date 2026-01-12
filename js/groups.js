@@ -657,7 +657,7 @@ async function renderGroupFees(container, portalState, groupId) {
 
         return `
           <tr data-fee-id="${f.fee_id}">
-            <td>${formatDateTime(f.fee_date)}</td>
+            <td>${getEasternDateOnly(f.fee_date)}</td>
             <td class="amount">${formatCurrency(f.fee_amount)}</td>
             <td>${escapeHtml(f.description || "")}</td>
             <td>${escapeHtml(String(f.year || ""))}</td>
