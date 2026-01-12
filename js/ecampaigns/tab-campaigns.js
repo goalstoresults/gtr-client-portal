@@ -1,18 +1,12 @@
-// /ecampaigns/tab-campaigns.js
-// Renders the Campaigns subtab inside E‑Campaigns
+// tab-campaigns.js
 
 console.log("[tab-campaigns.js] loaded");
 
-
-
 // ------------------------------------------------------------
-// Fetch campaigns for the selected project
+// Fetch campaigns for a given project + optional year
 // ------------------------------------------------------------
-async function fetchCampaignsForProject(project, selectedYear, portalState) {
+async function fetchCampaignsForProject(project, selectedYear) {
   try {
-    // 🔥 Fallback: if project is missing, use portalState.project
-    project = project || portalState.project;
-
     const base = "https://ecampaigns-module.dennis-e64.workers.dev/analytics/campaigns";
 
     const url =
@@ -35,20 +29,29 @@ async function fetchCampaignsForProject(project, selectedYear, portalState) {
   }
 }
 
-
-
-
 // ------------------------------------------------------------
-// Render Campaigns table
+// Render Campaigns subtab
 // ------------------------------------------------------------
 export async function renderECCampaigns(container, portalState) {
   container.innerHTML = `<p>Loading campaigns...</p>`;
 
   try {
-    const campaigns = await fetchCampaignsForProject(portalState.project.id);
+    // USE ONLY WHAT EXISTS ON portalState – NO portalState INSIDE HELPER
+    const project = portalState.project;
+    const selectedYear = portalState.selectedCampaignYear || null;
+
+    if (!project) {
+      console.error("[tab-campaigns] No project found on portalState");
+      container.innerHTML = `<section class="card"><p>No project selected.</p></section>`;
+      return;
+    }
+
+    console.log("[tab-campaigns] renderECCampaigns project:", project, "year:", selectedYear);
+
+    const campaigns = await fetchCampaignsForProject(project, selectedYear);
 
     if (!campaigns || campaigns.length === 0) {
-      container.innerHTML = `<p>No campaigns found.</p>`;
+      container.innerHTML = `<section class="card"><p>No campaigns found.</p></section>`;
       return;
     }
 
@@ -67,19 +70,19 @@ export async function renderECCampaigns(container, portalState) {
           </thead>
           <tbody>
             ${campaigns
-              .map(c => {
-                const sent = c.sent_count ?? 0;
+              .map((c) => {
+                const sent = c.delivered_count ?? 0;      // adjust if you had a dedicated "sent" field
                 const delivered = c.delivered_count ?? 0;
                 const opened = c.opened_count ?? 0;
                 const clicked = c.clicked_count ?? 0;
 
                 return `
-                  <tr data-campaign-id="${c.id}">
-                    <td>${c.name}</td>
+                  <tr data-campaign-id="${c.campaign_id}">
+                    <td>${c.campaign_name}</td>
                     <td>${sent}</td>
                     <td>${delivered}</td>
                     <td>${opened}</td>
-                    <td class="clickable-clicks" data-campaign-id="${c.id}">
+                    <td class="clickable-clicks" data-campaign-id="${c.campaign_id}">
                       ${clicked}
                     </td>
                   </tr>
@@ -91,17 +94,14 @@ export async function renderECCampaigns(container, portalState) {
       </section>
     `;
 
-    // ------------------------------------------------------------
-    // Wire click handlers for "Clicked" column
-    // ------------------------------------------------------------
-    container.querySelectorAll(".clickable-clicks").forEach(cell => {
+    // Click handlers for "Clicked" column → go to Campaign Clicks subtab
+    container.querySelectorAll(".clickable-clicks").forEach((cell) => {
       cell.addEventListener("click", () => {
         const campaignId = cell.dataset.campaignId;
+        console.log("[tab-campaigns] clicked campaign:", campaignId);
 
-        // Store selected campaign in portalState
         portalState.selectedCampaignId = campaignId;
 
-        // Switch to the Campaign Clicks subtab
         const btn = document.querySelector(
           '#ec-subtabs button[data-subtab="campaign-clicks"]'
         );
@@ -116,6 +116,6 @@ export async function renderECCampaigns(container, portalState) {
     });
   } catch (err) {
     console.error("Error loading campaigns:", err);
-    container.innerHTML = `<p>Error loading campaigns.</p>`;
+    container.innerHTML = `<section class="card"><p>Error loading campaigns.</p></section>`;
   }
 }
