@@ -411,11 +411,26 @@ th.sortable:hover .sort-arrows {
   padding: 0 1px;
 }
 
-.raw-text-block {
-  white-space: normal;
+.html-note-block {
+  font-family: var(--font-sans, sans-serif);
+  line-height: 1.6;
   word-break: break-word;
-  font-family: var(--font-mono, monospace);
-  line-height: 1.45;
+  padding: 12px 0;
+}
+
+.html-note-block h2,
+.html-note-block h3 {
+  margin-top: 1em;
+  font-size: 1.2em;
+}
+
+.html-note-block ul {
+  padding-left: 1.2em;
+  margin-top: 0.5em;
+}
+
+.html-note-block li {
+  margin-bottom: 0.4em;
 }
 
 
