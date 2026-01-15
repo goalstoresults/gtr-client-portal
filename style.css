@@ -433,6 +433,12 @@ th.sortable:hover .sort-arrows {
   margin-bottom: 0.4em;
 }
 
+.html-note-block a {
+  pointer-events: none;   /* disables clicking */
+  cursor: default;        /* removes hand cursor */
+  text-decoration: none;  /* removes underline */
+  color: inherit;         /* matches surrounding text */
+}
 
 
 /* Right-align numeric/currency columns */
