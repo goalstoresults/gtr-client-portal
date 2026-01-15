@@ -134,7 +134,9 @@ export async function renderReview(container, portalState, noteId) {
             ? `
               <details style="margin-top:12px;">
                 <summary>Raw Text (click to expand)</summary>
-                <pre style="margin-top:8px;">${escapeHtml(note.raw_text)}</pre>
+                <div class="raw-text-block">
+                  ${escapeHtml(note.raw_text)}
+                </div>
               </details>
             `
             : ""
