@@ -60,7 +60,7 @@ export async function renderContactNotes(container, portalState, contactId) {
 
                       <div style="margin-top:8px;"><strong>Raw Text:</strong></div>
                       <div class="raw-text-block">
-                       ${escapeHtml(note.raw_text).replace(/\n/g, '<br>')}
+                       ${escapeHtml(n.raw_text).replace(/\n/g, '<br>')}
                      </div>
 
                       <button class="btn-danger btn-delete-note" data-id="${n.id}" style="margin-top:8px;">
