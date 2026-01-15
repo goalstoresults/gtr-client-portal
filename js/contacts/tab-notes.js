@@ -59,9 +59,9 @@ export async function renderContactNotes(container, portalState, contactId) {
                       <div><strong>Needs Review:</strong> ${n.needs_review ? "Yes" : "No"}</div>
 
                       <div style="margin-top:8px;"><strong>Raw Text:</strong></div>
-                      <pre style="white-space:pre-wrap; background:#fff; padding:8px; border:1px solid #ccc;">
-${escapeHtml(n.raw_text || "")}
-                      </pre>
+                      <div class="raw-text-block">
+                          ${escapeHtml(n.raw_text)}
+                     </div>
 
                       <button class="btn-danger btn-delete-note" data-id="${n.id}" style="margin-top:8px;">
                         Delete Note
