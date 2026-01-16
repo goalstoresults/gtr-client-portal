@@ -134,9 +134,19 @@ export async function renderReview(container, portalState, noteId) {
             ? `
               <details style="margin-top:12px;">
                 <summary>Raw Text (click to expand)</summary>
-                <div class="html-note-block">
-                  ${note.raw_text}
-                </div>
+                ${ /<\/?[a-z][\s\S]*>/i.test(note.raw_text)
+                  ? `
+                      <div class="html-note-block">
+                        ${note.raw_text}
+                      </div>
+                    `
+                  : `
+                      <div class="raw-text-block">
+                        ${note.raw_text}
+                      </div>
+                    `
+                  }
+
               </details>
             `
             : ""
