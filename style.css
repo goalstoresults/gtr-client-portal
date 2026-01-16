@@ -441,11 +441,13 @@ th.sortable:hover .sort-arrows {
 }
 
 .raw-text-block {
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: monospace;
-  line-height: 1.45;
+  white-space: pre-wrap;     /* preserves line breaks + spacing */
+  word-break: break-word;    /* prevents long lines from blowing out layout */
+  font-family: monospace;    /* gives structure + readability for plaintext */
+  line-height: 1.45;         /* adds breathing room */
+  padding: 12px 0;           /* matches your HTML block spacing */
 }
+
 
 
 /* Right-align numeric/currency columns */
