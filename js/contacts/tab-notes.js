@@ -59,9 +59,18 @@ export async function renderContactNotes(container, portalState, contactId) {
                       <div><strong>Needs Review:</strong> ${n.needs_review ? "Yes" : "No"}</div>
 
                       <div style="margin-top:8px;"><strong>Raw Text:</strong></div>
-                      <div class="html-note-block">
-                       ${n.raw_text}
-                     </div>
+${ /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(n.raw_text)
+    ? `
+        <div class="html-note-block">
+          ${n.raw_text}
+        </div>
+      `
+    : `
+        <div class="raw-text-block">
+          ${n.raw_text}
+        </div>
+      `
+}
 
                       <button class="btn-danger btn-delete-note" data-id="${n.id}" style="margin-top:8px;">
                         Delete Note
