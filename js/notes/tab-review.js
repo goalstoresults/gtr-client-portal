@@ -134,18 +134,18 @@ export async function renderReview(container, portalState, noteId) {
             ? `
               <details style="margin-top:12px;">
                 <summary>Raw Text (click to expand)</summary>
-                ${ note.raw_text.includes("<p") || note.raw_text.includes("<h")
-                    ? `
-                        <div class="html-note-block">
-                          ${note.raw_text}
-                        </div>
-                      `
-                    : `
-                        <div class="raw-text-block">
-                          ${note.raw_text}
-                        </div>
-                      `
-                }
+${ /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(note.raw_text)
+    ? `
+        <div class="html-note-block">
+          ${note.raw_text}
+        </div>
+      `
+    : `
+        <div class="raw-text-block">
+          ${note.raw_text}
+        </div>
+      `
+}
 
               </details>
             `
