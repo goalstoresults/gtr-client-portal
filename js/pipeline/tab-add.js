@@ -1,5 +1,5 @@
 // js/pipeline/tab-add.js
-// Add Lead Tab — lookup dropdowns + contact finder + auto-fill lead name
+// Add Lead Tab — lookup dropdowns + contact finder + auto-fill lead name + 2-column layout
 
 import { escapeHtml } from "../utilities.js";
 
@@ -53,55 +53,74 @@ export async function renderPipelineAdd(container, portalState) {
       Enter a first or last name and click Find.
     </div>
 
-    <!-- Lead Name (moved here + auto-filled) -->
+    <!-- Lead Name -->
     <label>Lead Name:</label>
-    <input id="lead_name" placeholder="Lead name" style="width:300px;margin-bottom:8px;" />
+    <input id="lead_name" placeholder="Lead name" style="width:300px;margin-bottom:12px;" />
 
-    <!-- Stage -->
-    <label>Stage:</label>
-    <select id="stage" style="width:200px;margin-bottom:8px;">
-      <option value="">-- select --</option>
-      ${renderOptions(stageOptions)}
-    </select>
+    <!-- Stage + Status -->
+    <div class="row" style="display:flex; gap:16px; margin-bottom:12px;">
+      <div style="flex:1;">
+        <label>Stage:</label>
+        <select id="stage" style="width:100%;">
+          <option value="">-- select --</option>
+          ${renderOptions(stageOptions)}
+        </select>
+      </div>
+      <div style="flex:1;">
+        <label>Status:</label>
+        <select id="status" style="width:100%;">
+          <option value="">-- select --</option>
+          ${renderOptions(statusOptions)}
+        </select>
+      </div>
+    </div>
 
-    <!-- Status -->
-    <label>Status:</label>
-    <select id="status" style="width:200px;margin-bottom:8px;">
-      <option value="">-- select --</option>
-      ${renderOptions(statusOptions)}
-    </select>
+    <!-- Amount + Lead Level -->
+    <div class="row" style="display:flex; gap:16px; margin-bottom:12px;">
+      <div style="flex:1;">
+        <label>Amount:</label>
+        <input type="number" id="amount" style="width:100%;" />
+      </div>
+      <div style="flex:1;">
+        <label>Lead Level:</label>
+        <select id="lead_level" style="width:100%;">
+          <option value="">-- select --</option>
+          ${renderOptions(levelOptions)}
+        </select>
+      </div>
+    </div>
 
-    <!-- Amount -->
-    <label>Amount:</label>
-    <input type="number" id="amount" style="width:200px;margin-bottom:8px;" />
-
-    <!-- Lead Level -->
-    <label>Lead Level:</label>
-    <select id="lead_level" style="width:200px;margin-bottom:8px;">
-      <option value="">-- select --</option>
-      ${renderOptions(levelOptions)}
-    </select>
-
-    <!-- Next Activity Date -->
-    <label>Next Activity Date:</label>
-    <input type="date" id="next_activity" style="width:200px;margin-bottom:8px;" />
-
-    <!-- Owner -->
-    <label>Owner:</label>
-    <input id="owner" placeholder="Owner" style="width:200px;margin-bottom:8px;" />
+    <!-- Next Activity + Owner -->
+    <div class="row" style="display:flex; gap:16px; margin-bottom:12px;">
+      <div style="flex:1;">
+        <label>Next Activity Date:</label>
+        <input type="date" id="next_activity" style="width:100%;" />
+      </div>
+      <div style="flex:1;">
+        <label>Owner:</label>
+        <input id="owner" placeholder="Owner" style="width:100%;" />
+      </div>
+    </div>
 
     ${isBroker ? `
-      <label>Initial Size:</label>
-      <input id="initial_size" placeholder="Initial size" style="width:200px;margin-bottom:8px;" />
+      <!-- Initial Size + Area -->
+      <div class="row" style="display:flex; gap:16px; margin-bottom:12px;">
+        <div style="flex:1;">
+          <label>Initial Size:</label>
+          <input id="initial_size" placeholder="Initial size" style="width:100%;" />
+        </div>
+        <div style="flex:1;">
+          <label>Initial Area:</label>
+          <input id="initial_area" placeholder="Initial area" style="width:100%;" />
+        </div>
+      </div>
 
-      <label>Initial Area:</label>
-      <input id="initial_area" placeholder="Initial area" style="width:200px;margin-bottom:8px;" />
-
+      <!-- No. Places Shown -->
       <label>No. Places Shown:</label>
-      <input type="number" id="no_places_shown" style="width:200px;margin-bottom:8px;" />
+      <input type="number" id="no_places_shown" style="width:200px;margin-bottom:12px;" />
     ` : ""}
 
-    <div style="margin-top:12px;">
+    <div style="margin-top:16px;">
       <button id="btnSaveLead" class="primary">Save Lead</button>
     </div>
 
@@ -109,7 +128,7 @@ export async function renderPipelineAdd(container, portalState) {
   `;
 
   // ------------------------------------------------------------
-  // CONTACT FINDER (same UX as Notes)
+  // CONTACT FINDER
   // ------------------------------------------------------------
   document.getElementById("btnAddFindContact").addEventListener("click", async () => {
     const first = document.getElementById("add-first").value.trim();
@@ -126,7 +145,6 @@ export async function renderPipelineAdd(container, portalState) {
     const filters = [`project.eq.${portalState.project}`];
     if (first) filters.push(`first_name.ilike.${first}*`);
     if (last) filters.push(`last_name.ilike.${last}*`);
-
     const query = filters.length > 1 ? `and=(${filters.join(",")})` : filters[0];
 
     const url = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${query}&select=contact_id,first_name,last_name,email,contact_type`;
@@ -140,22 +158,17 @@ export async function renderPipelineAdd(container, portalState) {
         return;
       }
 
-      resultsDiv.innerHTML = contacts
-        .map(
-          c => `
-            <div class="contact-result"
-                 data-id="${c.contact_id}"
-                 data-name="${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}"
-                 data-email="${escapeHtml(c.email || "")}">
-              <strong>${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}</strong>
-              (${escapeHtml(c.contact_type || "No type")})<br/>
-              <small>${escapeHtml(c.email || "No email")}</small>
-            </div>
-          `
-        )
-        .join("");
+      resultsDiv.innerHTML = contacts.map(c => `
+        <div class="contact-result"
+             data-id="${c.contact_id}"
+             data-name="${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}"
+             data-email="${escapeHtml(c.email || "")}">
+          <strong>${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}</strong>
+          (${escapeHtml(c.contact_type || "No type")})<br/>
+          <small>${escapeHtml(c.email || "No email")}</small>
+        </div>
+      `).join("");
 
-      // Wire click handlers
       resultsDiv.querySelectorAll(".contact-result").forEach(el => {
         el.addEventListener("click", () => {
           portalState.selectedLeadContactId = el.dataset.id;
