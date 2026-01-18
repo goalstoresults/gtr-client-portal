@@ -9,7 +9,7 @@ export async function renderPipelineCurrent(container, portalState) {
   `;
 
   const res = await fetch(
-    `https://pipeline-module.dennis-e64.workers.dev/list?project=${portalState.project}&status=active`,
+    `https://pipeline-module.dennis-e64.workers.dev/pipeline/list?project=${portalState.project}&status=active`,
     { cache: "no-cache" }
   );
 
