@@ -92,6 +92,9 @@
     /* ⭐ NEW IMPORT FOR ECampaigns (client-facing analytics) */
     import { loadECCampaignsTab } from "./js/ecampaigns.js";
 
+    /* ⭐ NEW IMPORT FOR PIPELINE TAB (#11) */
+    import { loadPipelineTab } from "./js/pipeline.js";
+
     const portalState = { project: "", contactId: "" };
     window.portalState = portalState;
 
@@ -115,11 +118,14 @@
       "7": { label: "Groups", loader: loadGroupsTab },
       "8": { label: "Setup", loader: loadSetupTab },
 
+      /* ⭐ Operations stays as 9 */
+      "9": { label: "Operations", loader: loadOperationsTab },
+
       /* ⭐ Staff-only Emails ingestion */
       "10": { label: "Emails", loader: loadEmailsTab },
 
-      /* ⭐ Operations stays as 9 */
-      "9": { label: "Operations", loader: loadOperationsTab }
+      /* ⭐ NEW PIPELINE TAB */
+      "11": { label: "Pipeline", loader: loadPipelineTab }
     };
 
     async function loadProjects() {
@@ -279,3 +285,4 @@
   </script>
 </body>
 </html>
+
