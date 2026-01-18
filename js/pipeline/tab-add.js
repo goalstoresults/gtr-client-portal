@@ -212,6 +212,9 @@ export async function renderPipelineAdd(container, portalState) {
       payload.no_places_shown = document.getElementById("no_places_shown").value || null;
     }
 
+    let data = {};
+    let success = false;
+
     try {
       const res = await fetch(
         `https://pipeline-module.dennis-e64.workers.dev/pipeline/add?project=${portalState.project}`,
@@ -222,13 +225,20 @@ export async function renderPipelineAdd(container, portalState) {
         }
       );
 
-      const data = await res.json();
+      try {
+        data = await res.json();
+      } catch (e) {
+        // Supabase returns empty body on 201 — this is normal
+      }
 
-      document.getElementById("leadAddResult").textContent =
-        res.ok ? "Lead saved!" : `Error: ${data.error || "Unknown error"}`;
+      success = res.status === 200 || res.status === 201;
     } catch (err) {
       document.getElementById("leadAddResult").textContent = `Error: ${err.message}`;
+      return;
     }
+
+    document.getElementById("leadAddResult").textContent =
+      success ? "Lead saved!" : `Error: ${data.error || "Unknown error"}`;
   });
 }
 
