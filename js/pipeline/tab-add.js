@@ -1,85 +1,191 @@
 // js/pipeline/tab-add.js
+// Add Lead Tab — matches Notes Add UI patterns
+
+import { escapeHtml } from "../utilities.js";
 
 export async function renderPipelineAdd(container, portalState) {
   const isBroker = portalState.projects_config?.is_broker === true;
 
+  // Reset selected contact state
+  portalState.selectedLeadContactId = null;
+  portalState.selectedLeadContactName = null;
+  portalState.selectedLeadContactEmail = null;
+
   container.innerHTML = `
-    <section class="card">
-      <h2>Add Lead</h2>
+    <h4>Add Lead</h4>
 
-      <form id="pipeline-add-form" class="form-grid">
+    <!-- Lead Name -->
+    <label>Lead Name:</label>
+    <input id="lead_name" placeholder="Lead name" style="width:300px;margin-bottom:8px;" />
 
-        <label>Lead Name</label>
-        <input type="text" id="lead_name" placeholder="Lead name" />
+    <!-- Contact Search -->
+    <div class="row" style="gap:8px; align-items:center; margin-bottom:8px;">
+      <label style="min-width:120px;">Contact Name:</label>
+      <input id="add-first" placeholder="First name" style="width:140px;" />
+      <input id="add-last" placeholder="Last name" style="width:140px;" />
+      <button id="btnAddFindContact" class="btn-primary">Find</button>
+    </div>
 
-        <label>Contact ID</label>
-        <input type="text" id="contact_id" placeholder="Contact ID" />
+    <div id="addContactSearchResults" class="muted" style="margin-bottom:12px;">
+      Enter a first or last name and click Find.
+    </div>
 
-        <label>Stage</label>
-        <input type="text" id="stage" placeholder="Stage (lookup)" />
+    <!-- Stage -->
+    <label>Stage:</label>
+    <input id="stage" placeholder="Stage (lookup)" style="width:200px;margin-bottom:8px;" />
 
-        <label>Status</label>
-        <input type="text" id="status" placeholder="active, closed_won, etc." />
+    <!-- Status -->
+    <label>Status:</label>
+    <input id="status" placeholder="active, closed_won, etc." style="width:200px;margin-bottom:8px;" />
 
-        <label>Amount</label>
-        <input type="number" id="amount" />
+    <!-- Amount -->
+    <label>Amount:</label>
+    <input type="number" id="amount" style="width:200px;margin-bottom:8px;" />
 
-        <label>Lead Level</label>
-        <input type="text" id="lead_level" />
+    <!-- Lead Level -->
+    <label>Lead Level:</label>
+    <input id="lead_level" placeholder="Lead level" style="width:200px;margin-bottom:8px;" />
 
-        <label>Start Date</label>
-        <input type="date" id="start_date" />
+    <!-- Start Date -->
+    <label>Start Date:</label>
+    <input type="date" id="start_date" style="width:200px;margin-bottom:8px;" />
 
-        <label>Owner</label>
-        <input type="text" id="owner" />
+    <!-- Owner -->
+    <label>Owner:</label>
+    <input id="owner" placeholder="Owner" style="width:200px;margin-bottom:8px;" />
 
-        ${isBroker ? `
-          <label>Initial Size</label>
-          <input type="text" id="initial_size" />
+    ${isBroker ? `
+      <label>Initial Size:</label>
+      <input id="initial_size" placeholder="Initial size" style="width:200px;margin-bottom:8px;" />
 
-          <label>Initial Area</label>
-          <input type="text" id="initial_area" />
+      <label>Initial Area:</label>
+      <input id="initial_area" placeholder="Initial area" style="width:200px;margin-bottom:8px;" />
 
-          <label>No. Places Shown</label>
-          <input type="number" id="no_places_shown" />
-        ` : ""}
+      <label>No. Places Shown:</label>
+      <input type="number" id="no_places_shown" style="width:200px;margin-bottom:8px;" />
+    ` : ""}
 
-        <button type="submit" class="primary">Save Lead</button>
-      </form>
-    </section>
+    <div style="margin-top:12px;">
+      <button id="btnSaveLead" class="primary">Save Lead</button>
+    </div>
+
+    <div id="leadAddResult" style="margin-top:8px;"></div>
   `;
 
-  document.getElementById("pipeline-add-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
+  // ------------------------------------------------------------
+  // FIND CONTACT (same UX as Notes Add)
+  // ------------------------------------------------------------
+  document.getElementById("btnAddFindContact").addEventListener("click", async () => {
+    const first = document.getElementById("add-first").value.trim();
+    const last = document.getElementById("add-last").value.trim();
+    const resultsDiv = document.getElementById("addContactSearchResults");
 
+    resultsDiv.innerHTML = "Searching...";
+
+    if (!first && !last) {
+      resultsDiv.textContent = "❌ Enter at least a first or last name.";
+      return;
+    }
+
+    const filters = [`project.eq.${portalState.project}`];
+    if (first) filters.push(`first_name.ilike.${first}*`);
+    if (last) filters.push(`last_name.ilike.${last}*`);
+
+    const query =
+      filters.length > 1
+        ? `and=(${filters.join(",")})`
+        : filters[0];
+
+    const url = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${query}&select=contact_id,first_name,last_name,email,contact_type`;
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        const msg = await res.text().catch(() => "");
+        resultsDiv.textContent = `❌ Search failed (${res.status}). ${msg}`;
+        return;
+      }
+
+      const contacts = await res.json();
+
+      if (!Array.isArray(contacts) || contacts.length === 0) {
+        resultsDiv.innerHTML = "<div class='muted'>No contacts found.</div>";
+        return;
+      }
+
+      // Render results
+      resultsDiv.innerHTML = contacts
+        .map(
+          c => `
+            <div class="contact-result"
+                 data-id="${c.contact_id}"
+                 data-name="${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}"
+                 data-email="${escapeHtml(c.email || "")}">
+              <strong>${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}</strong>
+              (${escapeHtml(c.contact_type || "No type")})<br/>
+              <small>${escapeHtml(c.email || "No email")}</small>
+            </div>
+          `
+        )
+        .join("");
+
+      // Wire click handlers
+      resultsDiv.querySelectorAll(".contact-result").forEach(el => {
+        el.addEventListener("click", () => {
+          portalState.selectedLeadContactId = el.dataset.id;
+          portalState.selectedLeadContactName = el.dataset.name;
+          portalState.selectedLeadContactEmail = el.dataset.email;
+
+          resultsDiv.innerHTML = `
+            <div class="success">
+              Selected: <strong>${escapeHtml(el.dataset.name)}</strong>
+            </div>
+          `;
+        });
+      });
+    } catch (err) {
+      resultsDiv.textContent = "❌ Network error searching contacts.";
+    }
+  });
+
+  // ------------------------------------------------------------
+  // SAVE LEAD
+  // ------------------------------------------------------------
+  document.getElementById("btnSaveLead").addEventListener("click", async () => {
     const payload = {
       project: portalState.project,
-      lead_name: document.getElementById("lead_name").value,
-      contact_id: document.getElementById("contact_id").value,
-      stage: document.getElementById("stage").value,
-      status: document.getElementById("status").value,
-      amount: document.getElementById("amount").value,
-      lead_level: document.getElementById("lead_level").value,
-      start_date: document.getElementById("start_date").value,
-      owner: document.getElementById("owner").value,
+      lead_name: document.getElementById("lead_name").value.trim(),
+      contact_id: portalState.selectedLeadContactId || null,
+      stage: document.getElementById("stage").value.trim(),
+      status: document.getElementById("status").value.trim(),
+      amount: document.getElementById("amount").value || null,
+      lead_level: document.getElementById("lead_level").value.trim(),
+      start_date: document.getElementById("start_date").value || null,
+      owner: document.getElementById("owner").value.trim()
     };
 
     if (isBroker) {
-      payload.initial_size = document.getElementById("initial_size").value;
-      payload.initial_area = document.getElementById("initial_area").value;
-      payload.no_places_shown = document.getElementById("no_places_shown").value;
+      payload.initial_size = document.getElementById("initial_size").value.trim();
+      payload.initial_area = document.getElementById("initial_area").value.trim();
+      payload.no_places_shown = document.getElementById("no_places_shown").value || null;
     }
 
-    const res = await fetch(
-      "https://pipeline-module.dennis-e64.workers.dev/add",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      }
-    );
+    try {
+      const res = await fetch(
+        `https://pipeline-module.dennis-e64.workers.dev/pipeline/add?project=${portalState.project}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }
+      );
 
-    const data = await res.json();
-    alert("Lead saved");
+      const data = await res.json();
+
+      document.getElementById("leadAddResult").textContent =
+        res.ok ? "Lead saved!" : `Error: ${data.error || "Unknown error"}`;
+    } catch (err) {
+      document.getElementById("leadAddResult").textContent = `Error: ${err.message}`;
+    }
   });
 }
