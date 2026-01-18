@@ -1,5 +1,5 @@
 // js/pipeline/tab-add.js
-// Add Lead Tab — matches Notes Add UI patterns
+// Add Lead Tab — with lookup dropdowns + contact finder
 
 import { escapeHtml } from "../utilities.js";
 
@@ -11,6 +11,33 @@ export async function renderPipelineAdd(container, portalState) {
   portalState.selectedLeadContactName = null;
   portalState.selectedLeadContactEmail = null;
 
+  // ------------------------------------------------------------
+  // FETCH LOOKUPS
+  // ------------------------------------------------------------
+  const lookupUrl = `https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${portalState.project}`;
+  const lookupRes = await fetch(lookupUrl, { cache: "no-cache" });
+  const lookupData = await lookupRes.json();
+
+  const lookups = Array.isArray(lookupData.lookups) ? lookupData.lookups : [];
+
+  const stageOptions = lookups
+    .filter(l => l.lookup_type === "lead_stage" && l.is_active)
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  const statusOptions = lookups
+    .filter(l => l.lookup_type === "lead_status" && l.is_active)
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  const levelOptions = lookups
+    .filter(l => l.lookup_type === "lead_level" && l.is_active)
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  const renderOptions = (rows) =>
+    rows.map(r => `<option value="${escapeHtml(r.value)}">${escapeHtml(r.value)}</option>`).join("");
+
+  // ------------------------------------------------------------
+  // RENDER UI
+  // ------------------------------------------------------------
   container.innerHTML = `
     <h4>Add Lead</h4>
 
@@ -32,11 +59,17 @@ export async function renderPipelineAdd(container, portalState) {
 
     <!-- Stage -->
     <label>Stage:</label>
-    <input id="stage" placeholder="Stage (lookup)" style="width:200px;margin-bottom:8px;" />
+    <select id="stage" style="width:200px;margin-bottom:8px;">
+      <option value="">-- select --</option>
+      ${renderOptions(stageOptions)}
+    </select>
 
     <!-- Status -->
     <label>Status:</label>
-    <input id="status" placeholder="active, closed_won, etc." style="width:200px;margin-bottom:8px;" />
+    <select id="status" style="width:200px;margin-bottom:8px;">
+      <option value="">-- select --</option>
+      ${renderOptions(statusOptions)}
+    </select>
 
     <!-- Amount -->
     <label>Amount:</label>
@@ -44,7 +77,10 @@ export async function renderPipelineAdd(container, portalState) {
 
     <!-- Lead Level -->
     <label>Lead Level:</label>
-    <input id="lead_level" placeholder="Lead level" style="width:200px;margin-bottom:8px;" />
+    <select id="lead_level" style="width:200px;margin-bottom:8px;">
+      <option value="">-- select --</option>
+      ${renderOptions(levelOptions)}
+    </select>
 
     <!-- Start Date -->
     <label>Start Date:</label>
@@ -73,7 +109,7 @@ export async function renderPipelineAdd(container, portalState) {
   `;
 
   // ------------------------------------------------------------
-  // FIND CONTACT (same UX as Notes Add)
+  // CONTACT FINDER (same UX as Notes)
   // ------------------------------------------------------------
   document.getElementById("btnAddFindContact").addEventListener("click", async () => {
     const first = document.getElementById("add-first").value.trim();
@@ -91,21 +127,12 @@ export async function renderPipelineAdd(container, portalState) {
     if (first) filters.push(`first_name.ilike.${first}*`);
     if (last) filters.push(`last_name.ilike.${last}*`);
 
-    const query =
-      filters.length > 1
-        ? `and=(${filters.join(",")})`
-        : filters[0];
+    const query = filters.length > 1 ? `and=(${filters.join(",")})` : filters[0];
 
     const url = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${query}&select=contact_id,first_name,last_name,email,contact_type`;
 
     try {
       const res = await fetch(url);
-      if (!res.ok) {
-        const msg = await res.text().catch(() => "");
-        resultsDiv.textContent = `❌ Search failed (${res.status}). ${msg}`;
-        return;
-      }
-
       const contacts = await res.json();
 
       if (!Array.isArray(contacts) || contacts.length === 0) {
@@ -113,7 +140,6 @@ export async function renderPipelineAdd(container, portalState) {
         return;
       }
 
-      // Render results
       resultsDiv.innerHTML = contacts
         .map(
           c => `
@@ -129,7 +155,6 @@ export async function renderPipelineAdd(container, portalState) {
         )
         .join("");
 
-      // Wire click handlers
       resultsDiv.querySelectorAll(".contact-result").forEach(el => {
         el.addEventListener("click", () => {
           portalState.selectedLeadContactId = el.dataset.id;
@@ -143,7 +168,7 @@ export async function renderPipelineAdd(container, portalState) {
           `;
         });
       });
-    } catch (err) {
+    } catch {
       resultsDiv.textContent = "❌ Network error searching contacts.";
     }
   });
