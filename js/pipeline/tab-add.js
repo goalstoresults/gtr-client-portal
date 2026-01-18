@@ -1,5 +1,5 @@
 // js/pipeline/tab-add.js
-// Add Lead Tab — with lookup dropdowns + contact finder
+// Add Lead Tab — lookup dropdowns + contact finder + auto-fill lead name
 
 import { escapeHtml } from "../utilities.js";
 
@@ -41,10 +41,6 @@ export async function renderPipelineAdd(container, portalState) {
   container.innerHTML = `
     <h4>Add Lead</h4>
 
-    <!-- Lead Name -->
-    <label>Lead Name:</label>
-    <input id="lead_name" placeholder="Lead name" style="width:300px;margin-bottom:8px;" />
-
     <!-- Contact Search -->
     <div class="row" style="gap:8px; align-items:center; margin-bottom:8px;">
       <label style="min-width:120px;">Contact Name:</label>
@@ -56,6 +52,10 @@ export async function renderPipelineAdd(container, portalState) {
     <div id="addContactSearchResults" class="muted" style="margin-bottom:12px;">
       Enter a first or last name and click Find.
     </div>
+
+    <!-- Lead Name (moved here + auto-filled) -->
+    <label>Lead Name:</label>
+    <input id="lead_name" placeholder="Lead name" style="width:300px;margin-bottom:8px;" />
 
     <!-- Stage -->
     <label>Stage:</label>
@@ -82,9 +82,9 @@ export async function renderPipelineAdd(container, portalState) {
       ${renderOptions(levelOptions)}
     </select>
 
-    <!-- Start Date -->
-    <label>Start Date:</label>
-    <input type="date" id="start_date" style="width:200px;margin-bottom:8px;" />
+    <!-- Next Activity Date -->
+    <label>Next Activity Date:</label>
+    <input type="date" id="next_activity" style="width:200px;margin-bottom:8px;" />
 
     <!-- Owner -->
     <label>Owner:</label>
@@ -155,11 +155,15 @@ export async function renderPipelineAdd(container, portalState) {
         )
         .join("");
 
+      // Wire click handlers
       resultsDiv.querySelectorAll(".contact-result").forEach(el => {
         el.addEventListener("click", () => {
           portalState.selectedLeadContactId = el.dataset.id;
           portalState.selectedLeadContactName = el.dataset.name;
           portalState.selectedLeadContactEmail = el.dataset.email;
+
+          // Auto-fill lead name
+          document.getElementById("lead_name").value = el.dataset.name;
 
           resultsDiv.innerHTML = `
             <div class="success">
@@ -185,7 +189,7 @@ export async function renderPipelineAdd(container, portalState) {
       status: document.getElementById("status").value.trim(),
       amount: document.getElementById("amount").value || null,
       lead_level: document.getElementById("lead_level").value.trim(),
-      start_date: document.getElementById("start_date").value || null,
+      next_activity: document.getElementById("next_activity").value || null,
       owner: document.getElementById("owner").value.trim()
     };
 
@@ -214,3 +218,4 @@ export async function renderPipelineAdd(container, portalState) {
     }
   });
 }
+
