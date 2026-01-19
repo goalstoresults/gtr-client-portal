@@ -1,6 +1,8 @@
 // js/groups/tab-add.js
 // GROUP ADD TAB — modular version
 
+import { renderGroupList } from "./tab-list.js";
+
 import { escapeHtml } from "../utilities.js";
 
 export async function renderGroupAdd(container, portalState) {
