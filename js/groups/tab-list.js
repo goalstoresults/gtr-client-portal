@@ -1,16 +1,28 @@
 // js/groups/tab-list.js
-// GROUP LIST TAB — modular version
+// GROUP LIST TAB — Year-aware, View-powered, Option A
 
 import { renderGroupDetails } from "./tab-details.js";
-
-import {
-  escapeHtml,
-  formatCurrency,
-  formatDateTime
-} from "../utilities.js";
+import { escapeHtml, formatCurrency, formatDateTime } from "../utilities.js";
 
 export async function renderGroupList(container, portalState) {
-  const prevName = document.getElementById("filter-group-name")?.value.trim() || "";
+  if (!portalState.project) {
+    container.innerHTML = `<section class="card"><p>No project selected.</p></section>`;
+    return;
+  }
+
+  // Load available years + default year
+  const yearRes = await fetch(
+    `https://groups-module.dennis-e64.workers.dev/groups/years?project=${portalState.project}`,
+    { cache: "no-cache" }
+  );
+  const { years = [], defaultYear = "all" } = await yearRes.json();
+
+  // Initialize selected year
+  if (!portalState.groupsListYear) {
+    portalState.groupsListYear = defaultYear;
+  }
+
+  const prevName = portalState.groupsListFilter || "";
 
   container.innerHTML = `
     <section class="card">
@@ -22,9 +34,25 @@ export async function renderGroupList(container, portalState) {
         )
       }</h2>
 
-      <div id="groupsFilters"
-           style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-        <label>Name: <input type="text" id="filter-group-name" value="${escapeHtml(prevName)}" /></label>
+      <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        
+        <label>Year:
+          <select id="groups-year-select">
+            <option value="all">All</option>
+            ${years
+              .map(
+                y => `<option value="${y}" ${
+                  y == portalState.groupsListYear ? "selected" : ""
+                }>${y}</option>`
+              )
+              .join("")}
+          </select>
+        </label>
+
+        <label>Name:
+          <input type="text" id="filter-group-name" value="${escapeHtml(prevName)}" />
+        </label>
+
         <button id="btnApplyGroupsFilter" class="btn-secondary">Apply Filter</button>
         <button id="btnClearGroupsFilter" class="btn-secondary">Clear Filter</button>
       </div>
@@ -35,9 +63,9 @@ export async function renderGroupList(container, portalState) {
 
   const tableDiv = container.querySelector("#groupTable");
 
-  // Fetch ROI summary view
-  const url = `https://groups-module.dennis-e64.workers.dev/groups/roi-list?project=${portalState.project}&limit=500`;
-  const res = await fetch(url, { cache: "no-cache" });
+  // Fetch year-aware ROI list
+  const listUrl = `https://groups-module.dennis-e64.workers.dev/groups/roi-list?project=${portalState.project}&year=${portalState.groupsListYear}`;
+  const res = await fetch(listUrl, { cache: "no-cache" });
 
   let groups = await res.json();
   if (!Array.isArray(groups)) groups = groups.rows || [];
@@ -55,8 +83,8 @@ export async function renderGroupList(container, portalState) {
 
   const columns = [
     { key: "group_name", label: "Name" },
-    { key: "fee_amount", label: "Total Amount", numeric: true },
-    { key: "referral_amount", label: "Total Referral Amount", numeric: true },
+    { key: "fee_amount", label: "Fees", numeric: true },
+    { key: "referral_amount", label: "Revenue", numeric: true },
     { key: "roi", label: "ROI (%)", numeric: true },
     { key: "created_at", label: "Created" }
   ];
@@ -87,40 +115,49 @@ export async function renderGroupList(container, portalState) {
   function renderTable() {
     sortGroups();
 
-    const headerHtml = columns.map(col => {
-      const isSorted = currentSortField === col.key;
-      const upArrow = isSorted && currentSortDirection === "asc" ? "▲" : "△";
-      const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+    const headerHtml = columns
+      .map(col => {
+        const isSorted = currentSortField === col.key;
+        const upArrow = isSorted && currentSortDirection === "asc" ? "▲" : "△";
+        const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
 
-      return `
-        <th class="sortable" data-field="${col.key}">
-          ${escapeHtml(col.label)}
-          <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-            <span class="sort-up">${upArrow}</span>
-            <span class="sort-down">${downArrow}</span>
-          </span>
-        </th>
-      `;
-    }).join("");
+        return `
+          <th class="sortable" data-field="${col.key}">
+            ${escapeHtml(col.label)}
+            <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+              <span class="sort-up">${upArrow}</span>
+              <span class="sort-down">${downArrow}</span>
+            </span>
+          </th>
+        `;
+      })
+      .join("");
 
-    const rowsHtml = groups.map(g => `
-      <tr>
-        <td>${escapeHtml(g.group_name || "")}</td>
-        <td class="amount">${formatCurrency(g.fee_amount)}</td>
-        <td class="amount">${formatCurrency(g.referral_amount)}</td>
-        <td class="amount">
-          ${(Number(g.roi || 0) * 100).toLocaleString("en-US", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-          })}%
-        </td>
-        <td>${formatDateTime(g.created_at)}</td>
-        <td><button class="btn-primary btn-select" data-id="${g.group_id}">Select</button></td>
-      </tr>
-    `).join("");
+    const rowsHtml = groups
+      .map(
+        g => `
+        <tr>
+          <td>${escapeHtml(g.group_name || "")}</td>
+          <td class="amount">${formatCurrency(g.fee_amount)}</td>
+          <td class="amount">${formatCurrency(g.referral_amount)}</td>
+          <td class="amount">
+            ${(Number(g.roi || 0) * 100).toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
+            })}%
+          </td>
+          <td>${formatDateTime(g.created_at)}</td>
+          <td><button class="btn-primary btn-select" data-id="${g.group_id}">Select</button></td>
+        </tr>
+      `
+      )
+      .join("");
 
     tableDiv.innerHTML = `
-      <h4>Showing ${groups.length} ${prevName ? "filtered" : "recent"} groups</h4>
+      <h4>Showing ${groups.length} ${
+      prevName ? "filtered" : portalState.groupsListYear === "all" ? "groups" : "active groups"
+    }</h4>
+
       <table class="notes-table">
         <thead>
           <tr>
@@ -129,7 +166,10 @@ export async function renderGroupList(container, portalState) {
           </tr>
         </thead>
         <tbody>
-          ${rowsHtml || `<tr><td colspan="6">(no groups found)</td></tr>`}
+          ${
+            rowsHtml ||
+            `<tr><td colspan="6">(no groups found for this year)</td></tr>`
+          }
         </tbody>
       </table>
     `;
@@ -139,7 +179,8 @@ export async function renderGroupList(container, portalState) {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
         if (currentSortField === field) {
-          currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+          currentSortDirection =
+            currentSortDirection === "asc" ? "desc" : "asc";
         } else {
           currentSortField = field;
           currentSortDirection = "asc";
@@ -154,11 +195,9 @@ export async function renderGroupList(container, portalState) {
         const groupId = btn.dataset.id;
         const group = groups.find(g => g.group_id === groupId);
 
-        // Save globally
         portalState.selectedGroupId = groupId;
         portalState.selectedGroupName = group?.group_name || "";
 
-        // Update blue context bar
         const contextBar = document.getElementById("groups-context-bar");
         if (contextBar) {
           contextBar.textContent = portalState.selectedGroupName
@@ -166,10 +205,11 @@ export async function renderGroupList(container, portalState) {
             : "No group selected";
         }
 
-        // Switch to Details tab
         const buttons = document.querySelectorAll("#groups-subtabs button");
         buttons.forEach(b => b.classList.remove("active"));
-        const detailsBtn = document.querySelector('#groups-subtabs button[data-subtab="details"]');
+        const detailsBtn = document.querySelector(
+          '#groups-subtabs button[data-subtab="details"]'
+        );
         if (detailsBtn) detailsBtn.classList.add("active");
 
         const content = document.querySelector("#groupsContent");
@@ -180,12 +220,28 @@ export async function renderGroupList(container, portalState) {
 
   renderTable();
 
-  document.getElementById("btnApplyGroupsFilter").addEventListener("click", () => {
-    renderGroupList(container, portalState);
-  });
+  // Filter events
+  document
+    .getElementById("btnApplyGroupsFilter")
+    .addEventListener("click", () => {
+      portalState.groupsListFilter =
+        document.getElementById("filter-group-name").value.trim();
+      renderGroupList(container, portalState);
+    });
 
-  document.getElementById("btnClearGroupsFilter").addEventListener("click", () => {
-    document.getElementById("filter-group-name").value = "";
-    renderGroupList(container, portalState);
-  });
+  document
+    .getElementById("btnClearGroupsFilter")
+    .addEventListener("click", () => {
+      portalState.groupsListFilter = "";
+      document.getElementById("filter-group-name").value = "";
+      renderGroupList(container, portalState);
+    });
+
+  // Year change
+  document
+    .getElementById("groups-year-select")
+    .addEventListener("change", e => {
+      portalState.groupsListYear = e.target.value;
+      renderGroupList(container, portalState);
+    });
 }
