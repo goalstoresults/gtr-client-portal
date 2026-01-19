@@ -1,6 +1,8 @@
 // js/groups/tab-details.js
 // GROUP DETAILS TAB — modular version
 
+import { renderGroupList } from "./tab-list.js";
+
 import {
   escapeHtml,
   formatDateTime
