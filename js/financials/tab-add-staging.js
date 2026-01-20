@@ -14,38 +14,68 @@ window.autoMatchContact = async function(id) {
     return;
   }
 
-  // 🔥 ALWAYS fetch the latest row from Supabase
-  const rowRes = await fetch(
-    `https://financials-module.dennis-e64.workers.dev/staging/list?project=${project}&id=eq.${id}`
-  );
+  const rowEl = document.querySelector(`#row-${id}`);
+  const actionCell = rowEl?.querySelector(".action-cell");
+  const statusCell = rowEl?.querySelector(".status-cell");
+  const errorCell = rowEl?.querySelector(".error-cell");
 
-  let rows = [];
-  try { rows = await rowRes.json(); } catch {}
-  const row = Array.isArray(rows) && rows.length === 1 ? rows[0] : null;
+  if (actionCell) {
+    actionCell.innerHTML = `<span style="color:#555;">Matching...</span>`;
+  }
 
-  if (!row) {
-    alert("Row not found.");
+  let res, data = {};
+  try {
+    res = await fetch(
+      `https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=${project}`,
+      { method: "POST" }
+    );
+    data = await res.json();
+  } catch (err) {
+    console.error("Auto-match failed", err);
+    if (errorCell) errorCell.textContent = "Auto-match error";
+    if (statusCell) {
+      statusCell.textContent = "error";
+      statusCell.style.color = "red";
+    }
+    if (actionCell) {
+      actionCell.innerHTML = `<button onclick="fixRow('${id}')">Fix Row</button>`;
+    }
     return;
   }
 
-  // Now use the FRESH customer_name
-  const customerName = row.customer_name;
-
-  console.log("AUTO-MATCH USING FRESH NAME:", customerName);
-
-  // Continue with your existing logic
-  const res = await fetch(
-    `https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=${project}`,
-    { method: "POST" }
-  );
-
-  const data = await res.json();
+  // 🔥 NEW LOGIC:
+  // Backend always sets needs_review = true in staging.
+  // So we should NOT treat needs_review as "no match found".
+  // Instead, we decide based on status.
 
   if (!res.ok) {
-    alert("Auto-match failed.");
+    if (errorCell) errorCell.textContent = data.error || "Auto-match error";
+    if (statusCell) {
+      statusCell.textContent = "error";
+      statusCell.style.color = "red";
+    }
+    if (actionCell) {
+      actionCell.innerHTML = `<button onclick="fixRow('${id}')">Fix Row</button>`;
+    }
     return;
   }
 
+  // If status is still "uploaded", we can show "no match found"
+  if (data.status === "uploaded") {
+    if (statusCell) {
+      statusCell.textContent = "uploaded";
+      statusCell.style.color = "orange";
+    }
+    if (errorCell) {
+      errorCell.textContent = "No contact match found";
+    }
+    if (actionCell) {
+      actionCell.innerHTML = `<button onclick="fixRow('${id}')">Fix Row</button>`;
+    }
+    return;
+  }
+
+  // Otherwise (matched / ready / etc.), reload the grid to reflect new state
   await loadStagingData();
 };
 
