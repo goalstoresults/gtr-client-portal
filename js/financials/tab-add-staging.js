@@ -187,33 +187,24 @@ window.fixRow = function (id) {
   window.toggleEdit(id);
 };
 
-window.saveEdit = async function (id) {
+window.saveEdit = async function(id) {
   const project = window.portalState?.project;
   if (!project) {
     alert("No project selected.");
     return;
   }
 
-  const customer_name = document
-    .getElementById(`edit_customer_${id}`)
-    .value.trim();
-  const invoice_number = document
-    .getElementById(`edit_invoice_${id}`)
-    .value.trim();
-  const transaction_date_raw = document
-    .getElementById(`edit_date_${id}`)
-    .value.trim();
-  const amount_raw = document
-    .getElementById(`edit_amount_${id}`)
-    .value.trim();
-  const contact_id_raw = document
-    .getElementById(`edit_contact_${id}`)
-    .value.trim();
+  // Extract values
+  const customer_name = document.getElementById(`edit_customer_${id}`).value.trim();
+  const invoice_number = document.getElementById(`edit_invoice_${id}`).value.trim();
 
-  const transaction_date =
-    transaction_date_raw === "" ? null : transaction_date_raw;
-  const amount =
-    amount_raw === "" ? null : Number(amount_raw);
+  const transaction_date_raw = document.getElementById(`edit_date_${id}`).value.trim();
+  const amount_raw = document.getElementById(`edit_amount_${id}`).value.trim();
+  const contact_id_raw = document.getElementById(`edit_contact_${id}`).value.trim();
+
+  // Sanitize
+  const transaction_date = transaction_date_raw === "" ? null : transaction_date_raw;
+  const amount = amount_raw === "" ? null : Number(amount_raw);
   const contact_id = contact_id_raw === "" ? null : contact_id_raw;
 
   const payload = {
@@ -228,6 +219,7 @@ window.saveEdit = async function (id) {
 
   console.log("INLINE UPDATE PAYLOAD:", payload);
 
+  // Send PATCH
   const res = await fetch(
     `https://financials-module.dennis-e64.workers.dev/staging/update-inline`,
     {
@@ -249,9 +241,15 @@ window.saveEdit = async function (id) {
     return;
   }
 
-  toggleEdit(id);
-  loadStagingData();
+  // 🔥 CRITICAL FIX:
+  // Wait for the grid to reload BEFORE allowing any further actions.
+  await loadStagingData();
+
+  // Close the editor AFTER the grid refreshes
+  const editRow = document.querySelector(`#edit-${id}`);
+  if (editRow) editRow.remove();
 };
+
 
 window.deleteStagingRow = async function (id) {
   const project = window.portalState?.project;
