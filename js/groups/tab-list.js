@@ -112,142 +112,148 @@ export async function renderGroupList(container, portalState) {
     });
   }
 
-  function renderTable() {
-    sortGroups();
+function renderTable() {
+  sortGroups();
 
-    const headerHtml = columns
-      .map(col => {
-        const isSorted = currentSortField === col.key;
-        const upArrow = isSorted && currentSortDirection === "asc" ? "▲" : "△";
-        const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+  // --- TOTALS CALCULATION ---
+  const totalFees = groups.reduce((sum, g) => sum + Number(g.fee_amount || 0), 0);
+  const totalRevenue = groups.reduce((sum, g) => sum + Number(g.referral_amount || 0), 0);
 
-        return `
-          <th class="sortable" data-field="${col.key}">
-            ${escapeHtml(col.label)}
-            <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-              <span class="sort-up">${upArrow}</span>
-              <span class="sort-down">${downArrow}</span>
-            </span>
-          </th>
-        `;
-      })
-      .join("");
-
-    const rowsHtml = groups
-      .map(g => {
-        // ROI DISPLAY LOGIC (NEW)
-        let roiDisplay;
-        if (g.roi === null) {
-          roiDisplay = "N/A";
-        } else {
-          roiDisplay = (Number(g.roi) * 100).toLocaleString("en-US", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-          }) + "%";
-        }
-
-        return `
-        <tr>
-          <td>${escapeHtml(g.group_name || "")}</td>
-          <td class="amount">${formatCurrency(g.fee_amount)}</td>
-          <td class="amount">${formatCurrency(g.referral_amount)}</td>
-          <td class="amount">${roiDisplay}</td>
-          <td>${formatDateTime(g.created_at)}</td>
-          <td><button class="btn-primary btn-select" data-id="${g.group_id}">Select</button></td>
-        </tr>
-      `;
-      })
-      .join("");
-
-    tableDiv.innerHTML = `
-      <h4>Showing ${groups.length} ${
-      prevName ? "filtered" : portalState.groupsListYear === "all" ? "groups" : "active groups"
-    }</h4>
-
-      <table class="notes-table">
-        <thead>
-          <tr>
-            ${headerHtml}
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${
-            rowsHtml ||
-            `<tr><td colspan="6">(no groups found for this year)</td></tr>`
-          }
-        </tbody>
-      </table>
-    `;
-
-    // Sorting
-    tableDiv.querySelectorAll("th.sortable").forEach(th => {
-      th.addEventListener("click", () => {
-        const field = th.dataset.field;
-        if (currentSortField === field) {
-          currentSortDirection =
-            currentSortDirection === "asc" ? "desc" : "asc";
-        } else {
-          currentSortField = field;
-          currentSortDirection = "asc";
-        }
-        renderTable();
-      });
-    });
-
-    // Select buttons
-    tableDiv.querySelectorAll(".btn-select").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const groupId = btn.dataset.id;
-        const group = groups.find(g => g.group_id === groupId);
-
-        portalState.selectedGroupId = groupId;
-        portalState.selectedGroupName = group?.group_name || "";
-
-        const contextBar = document.getElementById("groups-context-bar");
-        if (contextBar) {
-          contextBar.textContent = portalState.selectedGroupName
-            ? `Group: ${portalState.selectedGroupName}`
-            : "No group selected";
-        }
-
-        const buttons = document.querySelectorAll("#groups-subtabs button");
-        buttons.forEach(b => b.classList.remove("active"));
-        const detailsBtn = document.querySelector(
-          '#groups-subtabs button[data-subtab="details"]'
-        );
-        if (detailsBtn) detailsBtn.classList.add("active");
-
-        const content = document.querySelector("#groupsContent");
-        await renderGroupDetails(content, portalState, groupId);
-      });
-    });
+  let totalRoiDisplay;
+  if (totalFees === 0 && totalRevenue > 0) {
+    totalRoiDisplay = "N/A";
+  } else if (totalFees > 0) {
+    totalRoiDisplay = ((totalRevenue / totalFees) * 100).toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }) + "%";
+  } else {
+    totalRoiDisplay = "0.00%";
   }
 
-  renderTable();
+  // --- HEADER ---
+  const headerHtml = columns
+    .map(col => {
+      const isSorted = currentSortField === col.key;
+      const upArrow = isSorted && currentSortDirection === "asc" ? "▲" : "△";
+      const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
 
-  // Filter events
-  document
-    .getElementById("btnApplyGroupsFilter")
-    .addEventListener("click", () => {
-      portalState.groupsListFilter =
-        document.getElementById("filter-group-name").value.trim();
-      renderGroupList(container, portalState);
-    });
+      return `
+        <th class="sortable" data-field="${col.key}">
+          ${escapeHtml(col.label)}
+          <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+            <span class="sort-up">${upArrow}</span>
+            <span class="sort-down">${downArrow}</span>
+          </span>
+        </th>
+      `;
+    })
+    .join("");
 
-  document
-    .getElementById("btnClearGroupsFilter")
-    .addEventListener("click", () => {
-      portalState.groupsListFilter = "";
-      document.getElementById("filter-group-name").value = "";
-      renderGroupList(container, portalState);
-    });
+  // --- ROWS ---
+  const rowsHtml = groups
+    .map(g => {
+      let roiDisplay;
+      if (g.roi === null) {
+        roiDisplay = "N/A";
+      } else {
+        roiDisplay = (Number(g.roi) * 100).toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }) + "%";
+      }
 
-  // Year change
-  document
-    .getElementById("groups-year-select")
-    .addEventListener("change", e => {
-      portalState.groupsListYear = e.target.value;
-      renderGroupList(container, portalState);
+      return `
+      <tr>
+        <td>${escapeHtml(g.group_name || "")}</td>
+        <td class="amount">${formatCurrency(g.fee_amount)}</td>
+        <td class="amount">${formatCurrency(g.referral_amount)}</td>
+        <td class="amount">${roiDisplay}</td>
+        <td>${formatDateTime(g.created_at)}</td>
+        <td><button class="btn-primary btn-select" data-id="${g.group_id}">Select</button></td>
+      </tr>
+    `;
+    })
+    .join("");
+
+  // --- TOTALS FOOTER ---
+  const totalsFooter = `
+    <tfoot>
+      <tr style="font-weight:bold; background:#f7f7f7;">
+        <td>Total</td>
+        <td class="amount">${formatCurrency(totalFees)}</td>
+        <td class="amount">${formatCurrency(totalRevenue)}</td>
+        <td class="amount">${totalRoiDisplay}</td>
+        <td></td>
+        <td></td>
+      </tr>
+    </tfoot>
+  `;
+
+  // --- FINAL TABLE ---
+  tableDiv.innerHTML = `
+    <h4>Showing ${groups.length} ${
+    prevName ? "filtered" : portalState.groupsListYear === "all" ? "groups" : "active groups"
+  }</h4>
+
+    <table class="notes-table">
+      <thead>
+        <tr>
+          ${headerHtml}
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${
+          rowsHtml ||
+          `<tr><td colspan="6">(no groups found for this year)</td></tr>`
+        }
+      </tbody>
+      ${totalsFooter}
+    </table>
+  `;
+
+  // Sorting
+  tableDiv.querySelectorAll("th.sortable").forEach(th => {
+    th.addEventListener("click", () => {
+      const field = th.dataset.field;
+      if (currentSortField === field) {
+        currentSortDirection =
+          currentSortDirection === "asc" ? "desc" : "asc";
+      } else {
+        currentSortField = field;
+        currentSortDirection = "asc";
+      }
+      renderTable();
     });
+  });
+
+  // Select buttons
+  tableDiv.querySelectorAll(".btn-select").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const groupId = btn.dataset.id;
+      const group = groups.find(g => g.group_id === groupId);
+
+      portalState.selectedGroupId = groupId;
+      portalState.selectedGroupName = group?.group_name || "";
+
+      const contextBar = document.getElementById("groups-context-bar");
+      if (contextBar) {
+        contextBar.textContent = portalState.selectedGroupName
+          ? `Group: ${portalState.selectedGroupName}`
+          : "No group selected";
+      }
+
+      const buttons = document.querySelectorAll("#groups-subtabs button");
+      buttons.forEach(b => b.classList.remove("active"));
+      const detailsBtn = document.querySelector(
+        '#groups-subtabs button[data-subtab="details"]'
+      );
+      if (detailsBtn) detailsBtn.classList.add("active");
+
+      const content = document.querySelector("#groupsContent");
+      await renderGroupDetails(content, portalState, groupId);
+    });
+  });
 }
+
