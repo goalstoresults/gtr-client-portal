@@ -206,7 +206,7 @@ window.saveEdit = async function(id) {
   };
 
   await fetch(
-    `https://financials-module.dennis-e64.workers.dev/staging/update`,
+    `https://financials-module.dennis-e64.workers.dev/staging/update/inline`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -228,7 +228,7 @@ window.deleteStagingRow = async function(id) {
   if (!confirm("Delete this staging row?")) return;
 
   await fetch(
-    `https://financials-module.dennis-e64.workers.dev/staging/delete?id=${id}&project=${project}`,
+    `https://financials-module.dennis-e64.workers.dev/staging/delete-inline?id=${id}&project=${project}`,
     { method: "DELETE" }
   );
 
