@@ -1,4 +1,5 @@
 // financials/tab-add-staging.js
+
 // Staging subsystem for the Financials "Add" tab
 
 import { escapeHtml } from "../utilities.js";
@@ -61,8 +62,6 @@ window.autoMatchContact = async function(id) {
   }
 };
 
-
-
 window.insertStagingRow = async function(id) {
   const project = window.portalState?.project;
   if (!project) {
@@ -86,11 +85,10 @@ window.insertStagingRow = async function(id) {
     actionCell.innerHTML = `<span style="color:#555;">Inserting...</span>`;
   }
 
-const res = await fetch(
-  `https://financials-module.dennis-e64.workers.dev/payments/add-from-staging?id=${id}&project=${project}`,
-  { method: "POST" }
-);
-
+  const res = await fetch(
+    `https://financials-module.dennis-e64.workers.dev/payments/add-from-staging?id=${id}&project=${project}`,
+    { method: "POST" }
+  );
 
   let data = {};
   try {
@@ -115,74 +113,129 @@ const res = await fetch(
   }
 };
 
-window.fixRow = async function(id) {
-  const rowEl = document.querySelector(`#row-${id}`);
-  if (!rowEl) return;
+// NEW: inline editor toggle (replaces modal-style fix)
+window.toggleEdit = function(id) {
+  const existing = document.querySelector(`#edit-${id}`);
+  if (existing) {
+    existing.remove();
+    return;
+  }
 
-  // Extract values from the correct columns
-  const customer = rowEl.children[0].textContent.trim();
-  const invoice = rowEl.children[1].textContent.trim();
-  const date = rowEl.children[2].textContent.trim();     // transaction_date
-  const amount = rowEl.children[3].textContent.trim();   // amount
-  const contact = rowEl.querySelector(".contact-cell").textContent.trim();
+  const row = document.querySelector(`#row-${id}`);
+  if (!row) return;
 
-  const modal = document.createElement("div");
-  modal.style = `
-    position:fixed; top:0; left:0; width:100%; height:100%;
-    background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center;
-    z-index:9999;
-  `;
+  const customer = row.children[0].textContent.trim();
+  const invoice = row.children[1].textContent.trim();
+  const date = row.children[2].textContent.trim();
+  const amount = row.children[3].textContent.trim();
+  const contact = row.querySelector(".contact-cell")?.textContent.trim() || "";
 
-  modal.innerHTML = `
-    <div style="background:white; padding:20px; width:360px; border-radius:6px;">
-      <h3>Fix Row</h3>
+  const editRow = document.createElement("tr");
+  editRow.id = `edit-${id}`;
+  editRow.style.background = "#f7f7f7";
 
-      <label>Customer</label>
-      <input id="fix_customer" class="form-control" value="${customer}" />
+  editRow.innerHTML = `
+    <td colspan="9" style="padding:16px;">
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
 
-      <label style="margin-top:10px;">Invoice #</label>
-      <input id="fix_invoice" class="form-control" value="${invoice}" />
+        <div>
+          <label>Customer</label>
+          <input id="edit_customer_${id}" class="form-control" value="${escapeHtml(customer)}">
+        </div>
 
-      <label style="margin-top:10px;">Transaction Date</label>
-      <input id="fix_date" class="form-control" type="date" value="${date}" />
+        <div>
+          <label>Invoice #</label>
+          <input id="edit_invoice_${id}" class="form-control" value="${escapeHtml(invoice)}">
+        </div>
 
-      <label style="margin-top:10px;">Amount</label>
-      <input id="fix_amount" class="form-control" type="number" step="0.01" value="${amount}" />
+        <div>
+          <label>Date</label>
+          <input id="edit_date_${id}" type="date" class="form-control" value="${date}">
+        </div>
 
-      <label style="margin-top:10px;">Contact ID</label>
-      <input id="fix_contact" class="form-control" value="${contact === "(none)" ? "" : contact}" />
+        <div>
+          <label>Amount</label>
+          <input id="edit_amount_${id}" type="number" step="0.01" class="form-control" value="${amount}">
+        </div>
 
-      <div style="margin-top:16px; display:flex; justify-content:flex-end; gap:10px;">
-        <button id="fix_cancel">Cancel</button>
-        <button id="fix_save" class="btn-primary">Save</button>
+        <div>
+          <label>Contact ID</label>
+          <input id="edit_contact_${id}" class="form-control" value="${contact === "(none)" ? "" : contact}">
+        </div>
+
       </div>
-    </div>
+
+      <div style="margin-top:16px; display:flex; gap:10px;">
+        <button class="btn-primary" onclick="saveEdit('${id}')">Save</button>
+        <button class="btn-danger" onclick="deleteStagingRow('${id}')">Delete</button>
+        <button class="btn-secondary" onclick="toggleEdit('${id}')">Cancel</button>
+      </div>
+    </td>
   `;
 
-  document.body.appendChild(modal);
+  row.insertAdjacentElement("afterend", editRow);
+};
 
-  modal.querySelector("#fix_cancel").onclick = () => modal.remove();
+// fixRow now just opens the inline editor
+window.fixRow = function(id) {
+  window.toggleEdit(id);
+};
 
-  modal.querySelector("#fix_save").onclick = async () => {
-    const updatedContact = document.getElementById("fix_contact").value.trim() || null;
+window.saveEdit = async function(id) {
+  const project = window.portalState?.project;
+  if (!project) {
+    alert("No project selected.");
+    return;
+  }
 
-    await fetch(
-      `https://financials-module.dennis-e64.workers.dev/staging/update`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id,
-          contact_id: updatedContact,
-          needs_review: updatedContact ? false : true,
-          notes: ""
-        })
-      }
-    );
+  const customer_name = document.getElementById(`edit_customer_${id}`).value.trim();
+  const invoice_number = document.getElementById(`edit_invoice_${id}`).value.trim();
+  const transaction_date = document.getElementById(`edit_date_${id}`).value.trim();
+  const amount = Number(document.getElementById(`edit_amount_${id}`).value.trim() || 0);
+  const contact_id_raw = document.getElementById(`edit_contact_${id}`).value.trim();
+  const contact_id = contact_id_raw || null;
 
-    modal.remove();
-    loadStagingData();
+  const payload = {
+    id,
+    customer_name,
+    invoice_number,
+    transaction_date,
+    amount,
+    contact_id,
+    needs_review: !contact_id
   };
+
+  await fetch(
+    `https://financials-module.dennis-e64.workers.dev/staging/update`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }
+  );
+
+  toggleEdit(id);
+  loadStagingData();
+};
+
+window.deleteStagingRow = async function(id) {
+  const project = window.portalState?.project;
+  if (!project) {
+    alert("No project selected.");
+    return;
+  }
+
+  if (!confirm("Delete this staging row?")) return;
+
+  await fetch(
+    `https://financials-module.dennis-e64.workers.dev/staging/delete?id=${id}&project=${project}`,
+    { method: "DELETE" }
+  );
+
+  const editRow = document.querySelector(`#edit-${id}`);
+  if (editRow) editRow.remove();
+
+  loadStagingData();
 };
 
 window.refreshStagingGrid = function() {
@@ -196,7 +249,6 @@ window.reviewBulkData = function () {
   }
   loadStagingData();
 };
-
 
 /* =========================================================
    LOAD STAGING DATA
@@ -218,39 +270,30 @@ export async function loadStagingData() {
     case "":
       url += `&status=neq.imported`;
       break;
-
     case "uploaded":
       url += `&status=eq.uploaded`;
       break;
-
     case "ready":
       url += `&status=eq.ready`;
       break;
-
     case "error":
       url += `&status=eq.error`;
       break;
-
     case "imported":
       url += `&status=eq.imported`;
       break;
-
     case "missing_contact":
       url += `&contact_missing=true`;
       break;
-
     case "missing_referral":
       url += `&referral_missing=true`;
       break;
-
     case "missing_group":
       url += `&group_missing=true`;
       break;
-
     case "needs_review":
       url += `&needs_review=eq.true`;
       break;
-
     default:
       url += `&status=neq.imported`;
       break;
@@ -267,13 +310,14 @@ export async function loadStagingData() {
 
   renderStagingGrid(rows);
 }
-window.loadStagingData = loadStagingData;
 
+window.loadStagingData = loadStagingData;
 
 /* =========================================================
    STAGING GRID RENDERING
    Updated for referral_id + group_id + filters
 ========================================================= */
+
 function renderStagingGrid(rows) {
   const container = document.getElementById("stagingGrid");
 
@@ -329,14 +373,14 @@ function renderStagingGrid(rows) {
         const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
 
         return `
-          <th class="sortable" data-field="${col.key}">
-            ${escapeHtml(col.label)}
-            <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-              <span class="sort-up">${upArrow}</span>
-              <span class="sort-down">${downArrow}</span>
-            </span>
-          </th>
-        `;
+<th class="sortable" data-field="${col.key}">
+  ${escapeHtml(col.label)}
+  <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+    <span class="sort-up">${upArrow}</span>
+    <span class="sort-down">${downArrow}</span>
+  </span>
+</th>
+`;
       })
       .join("");
 
@@ -344,68 +388,65 @@ function renderStagingGrid(rows) {
     const rowsHtml = rows
       .map(
         (row, i) => `
-      <tr id="row-${row.id}" style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};">
-        <td>${escapeHtml(row.customer_name || "")}</td>
-        <td>${escapeHtml(row.invoice_number || "")}</td>
-        <td>${escapeHtml(row.transaction_date || "")}</td>
-        <td>${escapeHtml((Number(row.amount) || 0).toFixed(2))}</td>
-
-        <td class="contact-cell">${escapeHtml(row.contact_id || "(none)")}</td>
-
-        <td class="referral-cell" style="color:${row.referral_id ? "#000" : "red"};">
-          ${escapeHtml(row.referral_id || "(none)")}
-        </td>
-
-        <td class="status-cell">${escapeHtml(row.status || "")}</td>
-
-        <td class="error-cell" style="color:red;">
-          ${escapeHtml(row.error_message || "")}
-        </td>
-
-        <td class="action-cell">
-          ${renderStagingActionButton(row)}
-        </td>
-      </tr>
-    `
+<tr id="row-${row.id}" style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};">
+  <td class="expand-cell">
+    <a href="#" onclick="toggleEdit('${row.id}'); return false;">
+      ${escapeHtml(row.customer_name || "")}
+    </a>
+  </td>
+  <td>${escapeHtml(row.invoice_number || "")}</td>
+  <td>${escapeHtml(row.transaction_date || "")}</td>
+  <td>${escapeHtml((Number(row.amount) || 0).toFixed(2))}</td>
+  <td class="contact-cell">${escapeHtml(row.contact_id || "(none)")}</td>
+  <td class="referral-cell" style="color:${row.referral_id ? "#000" : "red"};">
+    ${escapeHtml(row.referral_id || "(none)")}
+  </td>
+  <td class="status-cell">${escapeHtml(row.status || "")}</td>
+  <td class="error-cell" style="color:red;">
+    ${escapeHtml(row.error_message || "")}
+  </td>
+  <td class="action-cell">
+    ${renderStagingActionButton(row)}
+  </td>
+</tr>
+`
       )
       .join("");
 
     container.innerHTML = `
-      <div style="margin-bottom:10px; display:flex; gap:12px; align-items:center;">
-        <button id="refreshStagingGrid" class="btn-primary">Refresh Grid</button>
-      
-        <select id="stagingFilter" style="padding:4px 6px;">
-          <option value="">All (except imported)</option>
-          <option value="uploaded">Uploaded</option>
-          <option value="ready">Ready</option>
-          <option value="error">Error</option>
-          <option value="imported">Imported</option>
-          <option value="missing_contact">Missing Contact</option>
-          <option value="missing_referral">Missing Referral</option>
-          <option value="needs_review">Needs Review</option>
-        </select>
-      </div>
+<div style="margin-bottom:10px; display:flex; gap:12px; align-items:center;">
+  <button id="refreshStagingGrid" class="btn-primary">Refresh Grid</button>
+  <select id="stagingFilter" style="padding:4px 6px;">
+    <option value="">All (except imported)</option>
+    <option value="uploaded">Uploaded</option>
+    <option value="ready">Ready</option>
+    <option value="error">Error</option>
+    <option value="imported">Imported</option>
+    <option value="missing_contact">Missing Contact</option>
+    <option value="missing_referral">Missing Referral</option>
+    <option value="needs_review">Needs Review</option>
+  </select>
+</div>
 
-      <table class="notes-table" style="width:100%; border-collapse:collapse; margin-top:12px;">
-        <thead>
-          <tr>${headerHtml}</tr>
-        </thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>
-    `;
+<table class="notes-table" style="width:100%; border-collapse:collapse; margin-top:12px;">
+  <thead>
+    <tr>${headerHtml}</tr>
+  </thead>
+  <tbody>${rowsHtml}</tbody>
+</table>
+`;
 
     // Sorting events
     container.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
-
         if (currentSortField === field) {
-          currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+          currentSortDirection =
+            currentSortDirection === "asc" ? "desc" : "asc";
         } else {
           currentSortField = field;
           currentSortDirection = "asc";
         }
-
         renderTable();
       });
     });
@@ -428,34 +469,29 @@ function renderStagingGrid(rows) {
   renderTable();
 }
 
-
-
-
 /* =========================================================
-   BUlk CSV File Upload
+   Bulk CSV File Upload
 ========================================================= */
 
 window.showBulkUploadModal = function () {
   const modal = document.createElement("div");
   modal.style = `
-    position:fixed; top:0; left:0; width:100%; height:100%;
-    background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center;
-    z-index:9999;
-  `;
+position:fixed; top:0; left:0; width:100%; height:100%;
+background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center;
+z-index:9999;
+`;
 
   modal.innerHTML = `
-    <div style="background:white; padding:20px; width:500px; border-radius:6px;">
-      <h3>Bulk Upload</h3>
-      <p>Select a CSV file to upload. First row must contain column names.</p>
-
-      <input type="file" id="bulkCsvFile" accept=".csv" style="margin-top:10px;" />
-
-      <div style="margin-top:16px; display:flex; justify-content:flex-end; gap:10px;">
-        <button id="bulkCancel">Cancel</button>
-        <button id="bulkUpload" class="btn-primary">Upload</button>
-      </div>
-    </div>
-  `;
+<div style="background:white; padding:20px; width:500px; border-radius:6px;">
+  <h3>Bulk Upload</h3>
+  <p>Select a CSV file to upload. First row must contain column names.</p>
+  <input type="file" id="bulkCsvFile" accept=".csv" style="margin-top:10px;" />
+  <div style="margin-top:16px; display:flex; justify-content:flex-end; gap:10px;">
+    <button id="bulkCancel">Cancel</button>
+    <button id="bulkUpload" class="btn-primary">Upload</button>
+  </div>
+</div>
+`;
 
   document.body.appendChild(modal);
 
@@ -498,7 +534,6 @@ window.showBulkUploadModal = function () {
       );
 
       const text = await res.text();
-
       if (!res.ok) {
         console.error("Bulk upload failed:", text);
         alert("Bulk upload failed. Check console for details.");
@@ -517,8 +552,6 @@ window.showBulkUploadModal = function () {
   };
 };
 
-
-
 /* =========================================================
    ACTION BUTTON LOGIC (Insert gating)
 ========================================================= */
@@ -535,24 +568,19 @@ function renderStagingActionButton(row) {
     case "uploaded":
       // No contact yet → Populate only
       return `<button onclick="autoMatchContact('${row.id}')">Populate</button>`;
-
     case "matched":
       // Contact found but referral missing → Populate + Insert
       return `
-        <button onclick="autoMatchContact('${row.id}')">Populate</button>
-        <button onclick="insertStagingRow('${row.id}')">Insert</button>
-      `;
-
+<button onclick="autoMatchContact('${row.id}')">Populate</button>
+<button onclick="insertStagingRow('${row.id}')">Insert</button>
+`;
     case "ready":
       // Contact + referral found → Insert only
       return `<button onclick="insertStagingRow('${row.id}')">Insert</button>`;
-
     case "error":
       return `<button onclick="fixRow('${row.id}')">Fix Row</button>`;
-
     case "imported":
       return `<span style="color:green;">Imported</span>`;
-
     default:
       return "";
   }
