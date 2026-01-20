@@ -206,7 +206,7 @@ window.saveEdit = async function(id) {
   };
 
   await fetch(
-    `https://financials-module.dennis-e64.workers.dev/staging/update/inline`,
+    `https://financials-module.dennis-e64.workers.dev/staging/update-inline`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
