@@ -134,23 +134,29 @@ export async function renderGroupList(container, portalState) {
       .join("");
 
     const rowsHtml = groups
-      .map(
-        g => `
+      .map(g => {
+        // ROI DISPLAY LOGIC (NEW)
+        let roiDisplay;
+        if (g.roi === null) {
+          roiDisplay = "N/A";
+        } else {
+          roiDisplay = (Number(g.roi) * 100).toLocaleString("en-US", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          }) + "%";
+        }
+
+        return `
         <tr>
           <td>${escapeHtml(g.group_name || "")}</td>
           <td class="amount">${formatCurrency(g.fee_amount)}</td>
           <td class="amount">${formatCurrency(g.referral_amount)}</td>
-          <td class="amount">
-            ${(Number(g.roi || 0) * 100).toLocaleString("en-US", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2
-            })}%
-          </td>
+          <td class="amount">${roiDisplay}</td>
           <td>${formatDateTime(g.created_at)}</td>
           <td><button class="btn-primary btn-select" data-id="${g.group_id}">Select</button></td>
         </tr>
-      `
-      )
+      `;
+      })
       .join("");
 
     tableDiv.innerHTML = `
