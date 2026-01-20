@@ -256,4 +256,4 @@ function renderTable() {
     });
   });
 }
-
+} // end renderGroupList
