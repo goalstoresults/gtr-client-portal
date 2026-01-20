@@ -7,59 +7,46 @@ import { escapeHtml } from "../utilities.js";
    STAGING ACTIONS (window.* so inline buttons still work)
 ========================================================= */
 
-window.autoMatchContact = async function (id) {
+window.autoMatchContact = async function(id) {
   const project = window.portalState?.project;
   if (!project) {
     alert("No project selected.");
     return;
   }
 
-  const rowEl = document.querySelector(`#row-${id}`);
-  const actionCell = rowEl?.querySelector(".action-cell");
-  const statusCell = rowEl?.querySelector(".status-cell");
-  const errorCell = rowEl?.querySelector(".error-cell");
+  // 🔥 ALWAYS fetch the latest row from Supabase
+  const rowRes = await fetch(
+    `https://financials-module.dennis-e64.workers.dev/staging/list?project=${project}&id=eq.${id}`
+  );
 
-  if (actionCell) {
-    actionCell.innerHTML = `<span style="color:#555;">Matching...</span>`;
-  }
+  let rows = [];
+  try { rows = await rowRes.json(); } catch {}
+  const row = Array.isArray(rows) && rows.length === 1 ? rows[0] : null;
 
-  let res,
-    data = {};
-  try {
-    res = await fetch(
-      `https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=${project}`,
-      { method: "POST" }
-    );
-    data = await res.json();
-  } catch (err) {
-    console.error("Auto-match failed", err);
-    if (errorCell) errorCell.textContent = "Auto-match error";
-    if (statusCell) {
-      statusCell.textContent = "error";
-      statusCell.style.color = "red";
-    }
-    if (actionCell) {
-      actionCell.innerHTML = `<button onclick="fixRow('${id}')">Fix Row</button>`;
-    }
+  if (!row) {
+    alert("Row not found.");
     return;
   }
 
-  // If backend marked it as needs_review
-  if (data?.needs_review) {
-    if (statusCell) {
-      statusCell.textContent = "uploaded";
-      statusCell.style.color = "orange";
-    }
-    if (errorCell) {
-      errorCell.textContent = "No contact match found";
-    }
-    if (actionCell) {
-      actionCell.innerHTML = `<button onclick="fixRow('${id}')">Fix Row</button>`;
-    }
-  } else {
-    // Success — reload grid
-    loadStagingData();
+  // Now use the FRESH customer_name
+  const customerName = row.customer_name;
+
+  console.log("AUTO-MATCH USING FRESH NAME:", customerName);
+
+  // Continue with your existing logic
+  const res = await fetch(
+    `https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=${project}`,
+    { method: "POST" }
+  );
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    alert("Auto-match failed.");
+    return;
   }
+
+  await loadStagingData();
 };
 
 window.insertStagingRow = async function (id) {
