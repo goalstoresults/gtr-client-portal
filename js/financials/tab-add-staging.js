@@ -14,13 +14,53 @@ window.autoMatchContact = async function(id) {
     return;
   }
 
-  await fetch(
-    `https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=${project}`,
-    { method: "POST" }
-  );
+  const rowEl = document.querySelector(`#row-${id}`);
+  const actionCell = rowEl?.querySelector(".action-cell");
+  const statusCell = rowEl?.querySelector(".status-cell");
+  const errorCell = rowEl?.querySelector(".error-cell");
 
-  loadStagingData();
+  if (actionCell) {
+    actionCell.innerHTML = `<span style="color:#555;">Matching...</span>`;
+  }
+
+  let res, data = {};
+  try {
+    res = await fetch(
+      `https://financials-module.dennis-e64.workers.dev/staging/auto-match?id=${id}&project=${project}`,
+      { method: "POST" }
+    );
+    data = await res.json();
+  } catch (err) {
+    console.error("Auto-match failed", err);
+    if (errorCell) errorCell.textContent = "Auto-match error";
+    if (statusCell) {
+      statusCell.textContent = "error";
+      statusCell.style.color = "red";
+    }
+    if (actionCell) {
+      actionCell.innerHTML = `<button onclick="fixRow('${id}')">Fix Row</button>`;
+    }
+    return;
+  }
+
+  // If backend marked it as needs_review
+  if (data?.needs_review) {
+    if (statusCell) {
+      statusCell.textContent = "uploaded";
+      statusCell.style.color = "orange";
+    }
+    if (errorCell) {
+      errorCell.textContent = "No contact match found";
+    }
+    if (actionCell) {
+      actionCell.innerHTML = `<button onclick="fixRow('${id}')">Fix Row</button>`;
+    }
+  } else {
+    // Success — reload grid
+    loadStagingData();
+  }
 };
+
 
 
 window.insertStagingRow = async function(id) {
