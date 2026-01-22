@@ -43,7 +43,7 @@ export async function renderContactList(container, portalState) {
           <button id="btnClearContactsFilter" class="secondary">Clear Filter</button>
         </div>
 
-        <div id="contactTable">(no contacts found)</div>
+        <div id="contactTable">(loading…)</div>
       </section>
     `;
 
@@ -106,6 +106,21 @@ export async function renderContactList(container, portalState) {
     }
 
     /* -------------------------------------------------------
+       DEFAULT: LOAD LAST 50 UPDATED CONTACTS
+    ------------------------------------------------------- */
+    async function loadDefaultRecentContacts() {
+      const params = new URLSearchParams({
+        project: portalState.project,
+        limit: "50",
+        sort: "updated_at.desc"
+      });
+
+      await fetchAll(params);
+      await loadFieldsIfNeeded();
+      renderSortedTable();
+    }
+
+    /* -------------------------------------------------------
        APPLY FILTER
     ------------------------------------------------------- */
     async function applyFilter() {
@@ -124,7 +139,8 @@ export async function renderContactList(container, portalState) {
         type.length >= 1;
 
       if (!hasMinimumInput) {
-        tableDiv.innerHTML = `<p>(no contacts found — enter a filter or use “ALL”)</p>`;
+        // Instead of showing nothing, load default recent list
+        await loadDefaultRecentContacts();
         return;
       }
 
@@ -278,13 +294,19 @@ export async function renderContactList(container, portalState) {
     ------------------------------------------------------- */
     document.getElementById("btnApplyContactsFilter").addEventListener("click", applyFilter);
 
-    document.getElementById("btnClearContactsFilter").addEventListener("click", () => {
+    document.getElementById("btnClearContactsFilter").addEventListener("click", async () => {
       document.getElementById("filter-first").value = "";
       document.getElementById("filter-last").value = "";
       document.getElementById("filter-business").value = "";
       document.getElementById("filter-contact-type").value = "";
-      tableDiv.innerHTML = `(no contacts found)`;
+
+      await loadDefaultRecentContacts();
     });
+
+    /* -------------------------------------------------------
+       INITIAL LOAD: LAST 50 UPDATED
+    ------------------------------------------------------- */
+    await loadDefaultRecentContacts();
 
   } catch (err) {
     container.innerHTML = `
