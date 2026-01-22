@@ -79,6 +79,23 @@ export async function renderContactList(container, portalState) {
     let listFields = [];
 
     /* -------------------------------------------------------
+       FILTER DETECTOR
+    ------------------------------------------------------- */
+    function filtersApplied() {
+      const first    = document.getElementById("filter-first").value.trim();
+      const last     = document.getElementById("filter-last").value.trim();
+      const business = document.getElementById("filter-business").value.trim();
+      const type     = document.getElementById("filter-contact-type").value;
+
+      return (
+        first.length > 0 ||
+        last.length > 0 ||
+        business.length > 0 ||
+        type.length > 0
+      );
+    }
+
+    /* -------------------------------------------------------
        LOAD LIST FIELDS (ONCE)
     ------------------------------------------------------- */
     async function loadFieldsIfNeeded() {
@@ -109,13 +126,23 @@ export async function renderContactList(container, portalState) {
        DEFAULT: LOAD LAST 50 UPDATED CONTACTS
     ------------------------------------------------------- */
     async function loadDefaultRecentContacts() {
-      const params = new URLSearchParams({
-        project: portalState.project,
-        limit: "50",
-        sort: "updated_at.desc"
-      });
+      const params = new URLSearchParams({ project: portalState.project });
 
       await fetchAll(params);
+
+      // Sort by updated_at DESC
+      contacts.sort((a, b) => {
+        const da = a.updated_at ? new Date(a.updated_at) : new Date(0);
+        const db = b.updated_at ? new Date(b.updated_at) : new Date(0);
+        return db - da;
+      });
+
+      // Keep only top 50
+      contacts = contacts.slice(0, 50);
+
+      currentSortField = "updated_at";
+      currentSortDirection = "desc";
+
       await loadFieldsIfNeeded();
       renderSortedTable();
     }
@@ -139,7 +166,6 @@ export async function renderContactList(container, portalState) {
         type.length >= 1;
 
       if (!hasMinimumInput) {
-        // Instead of showing nothing, load default recent list
         await loadDefaultRecentContacts();
         return;
       }
@@ -164,6 +190,16 @@ export async function renderContactList(container, portalState) {
         });
       }
 
+      // FILTERED MODE → alphabetical by search_name
+      contacts.sort((a, b) => {
+        const A = (a.search_name || "").toLowerCase();
+        const B = (b.search_name || "").toLowerCase();
+        return A.localeCompare(B);
+      });
+
+      currentSortField = "search_name";
+      currentSortDirection = "asc";
+
       await loadFieldsIfNeeded();
       renderSortedTable();
     }
@@ -176,6 +212,12 @@ export async function renderContactList(container, portalState) {
 
       if (currentSortField) {
         sorted.sort((a, b) => {
+          if (currentSortField === "updated_at") {
+            const da = a.updated_at ? new Date(a.updated_at) : new Date(0);
+            const db = b.updated_at ? new Date(b.updated_at) : new Date(0);
+            return currentSortDirection === "asc" ? da - db : db - da;
+          }
+
           const valA = (a[currentSortField] || "").toLowerCase();
           const valB = (b[currentSortField] || "").toLowerCase();
           return currentSortDirection === "asc"
@@ -316,3 +358,4 @@ export async function renderContactList(container, portalState) {
     console.error("[Contacts] Error in renderContactList:", err);
   }
 }
+
