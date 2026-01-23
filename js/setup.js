@@ -198,9 +198,7 @@ async function renderClientSetup(container, portalState) {
       { tab_id: "6", description: "E-Campaigns" },
       { tab_id: "7", description: "Groups" },
       { tab_id: "9", description: "Operations" }, 
-      { tab_id: "11", description: "Pipeline" }, 
-      { tab_id: "8", description: "Setup - GTR Project ONLY" },
-      { tab_id: "10", description: "Emails - GHL Project ONLY" }
+      { tab_id: "11", description: "Pipeline" }
     ];
 
     // ✅ Render client details + tab config
