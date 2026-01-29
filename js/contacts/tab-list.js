@@ -150,59 +150,48 @@ export async function renderContactList(container, portalState) {
     /* -------------------------------------------------------
        APPLY FILTER
     ------------------------------------------------------- */
-    async function applyFilter() {
-      const first    = document.getElementById("filter-first").value.trim();
-      const last     = document.getElementById("filter-last").value.trim();
-      const business = document.getElementById("filter-business").value.trim();
-      const type     = document.getElementById("filter-contact-type").value;
-
-      const isAll = first.toUpperCase() === "ALL";
-      const rangeMatch = first.match(/^([A-Za-z])-([A-Za-z])$/);
-
-      const hasMinimumInput =
-        first.length >= 1 ||
-        last.length >= 1 ||
-        business.length >= 1 ||
-        type.length >= 1;
-
-      if (!hasMinimumInput) {
-        await loadDefaultRecentContacts();
-        return;
+      async function applyFilter() {
+        const first = document.getElementById("filter-first").value.trim();
+        const last = document.getElementById("filter-last").value.trim();
+        const business = document.getElementById("filter-business").value.trim();
+        const type = document.getElementById("filter-type").value.trim();
+      
+        const isAll = first.toLowerCase() === "all";
+        const rangeMatch = first.match(/^([a-z])-([a-z])$/i);
+      
+        const hasMinimumInput =
+          isAll ||
+          rangeMatch ||
+          first.length >= 1 ||
+          last.length >= 1 ||
+          business.length >= 1 ||
+          type.length >= 1;
+      
+        if (!hasMinimumInput) {
+          alert("Please enter at least one filter value.");
+          return;
+        }
+      
+        const params = new URLSearchParams({ project: portalState.project });
+      
+        if (!isAll && !rangeMatch && first.length >= 1) params.set("first", first);
+        if (last.length >= 1) params.set("last", last);
+        if (business.length >= 1) params.set("business", business);
+      
+        // ⭐ NEW: SEND CONTACT TYPE TO BACKEND
+        if (type.length >= 1) params.set("contact_type", type);
+      
+        // Fetch from backend
+        await fetchAll(params);
+      
+        // ⭐ REMOVE LOCAL FILTERING — BACKEND NOW DOES IT
+        // if (type) contacts = contacts.filter(c => c.contact_type === type);
+      
+        // Sort alphabetically for filtered results
+        contacts.sort((a, b) => a.search_name.localeCompare(b.search_name));
+      
+        renderSortedTable();
       }
-
-      const params = new URLSearchParams({ project: portalState.project });
-
-      if (!isAll && !rangeMatch && first.length >= 1) params.set("first", first);
-      if (last.length >= 1) params.set("last", last);
-      if (business.length >= 1) params.set("business", business);
-
-      await fetchAll(params);
-
-      if (type) contacts = contacts.filter(c => c.contact_type === type);
-
-      if (rangeMatch) {
-        const start = rangeMatch[1].toUpperCase();
-        const end   = rangeMatch[2].toUpperCase();
-
-        contacts = contacts.filter(c => {
-          const letter = (c.first_name || "").charAt(0).toUpperCase();
-          return letter >= start && letter <= end;
-        });
-      }
-
-      // FILTERED MODE → alphabetical by search_name
-      contacts.sort((a, b) => {
-        const A = (a.search_name || "").toLowerCase();
-        const B = (b.search_name || "").toLowerCase();
-        return A.localeCompare(B);
-      });
-
-      currentSortField = "search_name";
-      currentSortDirection = "asc";
-
-      await loadFieldsIfNeeded();
-      renderSortedTable();
-    }
 
     /* -------------------------------------------------------
        RENDER SORTED TABLE
