@@ -154,7 +154,7 @@ export async function renderContactList(container, portalState) {
         const first = document.getElementById("filter-first").value.trim();
         const last = document.getElementById("filter-last").value.trim();
         const business = document.getElementById("filter-business").value.trim();
-        const type = document.getElementById("contact-type").value.trim();
+       const type     = document.getElementById("filter-contact-type")?.value || "";
       
         const isAll = first.toLowerCase() === "all";
         const rangeMatch = first.match(/^([a-z])-([a-z])$/i);
