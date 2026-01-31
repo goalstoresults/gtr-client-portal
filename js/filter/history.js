@@ -93,7 +93,7 @@ export async function renderFilterHistory(container, portalState) {
 
     try {
       const res = await fetch(
-        `https://jw-filter-contacts.dennis-e64.workers.dev/history?${qs.toString()}`,
+        `https://filter-module.dennis-e64.workers.dev/history?${qs.toString()}`,
         { headers: { accept: "application/json" } }
       );
 
