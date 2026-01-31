@@ -61,7 +61,7 @@ export async function renderFilterCoverage(container, portalState) {
 
     try {
       const res = await fetch(
-        `https://jw-filter-contacts.dennis-e64.workers.dev/unfiltered?days=${days}`,
+        `https://filter-module.dennis-e64.workers.dev/unfiltered?days=${days}`,
         { headers: { accept: "application/json" } }
       );
 
