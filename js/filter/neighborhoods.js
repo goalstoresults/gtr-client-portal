@@ -108,3 +108,33 @@ export async function renderFilterNeighborhoods(container, portalState) {
         { headers: { accept: "application/json" } }
       );
 
+      const data = await res.json();
+      if (!res.ok || !data?.success) throw new Error(data?.error || `HTTP ${res.status}`);
+
+      const items = Array.isArray(data.items) ? data.items : [];
+
+      if (!items.length) {
+        status.textContent = `No runs for "${neighborhood}" in last ${data.window_days ?? days} days.`;
+        return;
+      }
+
+      body.innerHTML = items
+        .map(item => {
+          return `
+            <tr>
+              <td>${escapeHtml(item.label)}</td>
+              <td>${item.runs}</td>
+              <td>${formatDateOnly(item.last_used)}</td>
+            </tr>
+          `;
+        })
+        .join("");
+
+      table.style.display = "";
+      status.textContent = `Showing ${items.length} range(s) for "${neighborhood}".`;
+
+    } catch (err) {
+      status.textContent = "Error: " + err.message;
+    }
+  };
+}
