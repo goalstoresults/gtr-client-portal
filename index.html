@@ -95,6 +95,9 @@
     /* ⭐ NEW IMPORT FOR PIPELINE TAB (#11) */
     import { loadPipelineTab } from "./js/pipeline.js";
 
+    /* ⭐ NEW IMPORT FOR FILTER MODULE */
+    import { loadFilterTab } from "./js/filter.js";
+
     const portalState = { project: "", contactId: "" };
     window.portalState = portalState;
 
@@ -125,7 +128,10 @@
       "10": { label: "Emails", loader: loadEmailsTab },
 
       /* ⭐ NEW PIPELINE TAB */
-      "11": { label: "Pipeline", loader: loadPipelineTab }
+      "11": { label: "Pipeline", loader: loadPipelineTab },
+
+      /* ⭐ NEW FILTER TAB */
+      "12": { label: "Filter", loader: loadFilterTab }
     };
 
     async function loadProjects() {
@@ -285,4 +291,3 @@
   </script>
 </body>
 </html>
-
