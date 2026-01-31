@@ -55,7 +55,7 @@ export async function renderFilterNeighborhoods(container, portalState) {
   // ------------------------------------------------------------
   // Load Lookups (Neighborhoods only)
   // ------------------------------------------------------------
-  const LOOKUP_URL = "https://jw-filter-contacts.dennis-e64.workers.dev/lookups";
+  const LOOKUP_URL = "https://filter-module.dennis-e64.workers.dev/lookups";
 
   let NEIGHBORHOODS = [];
 
@@ -104,7 +104,7 @@ export async function renderFilterNeighborhoods(container, portalState) {
 
     try {
       const res = await fetch(
-        `https://jw-filter-contacts.dennis-e64.workers.dev/used-sqft?${qs.toString()}`,
+        `https://filter-module.dennis-e64.workers.dev/used-sqft?${qs.toString()}`,
         { headers: { accept: "application/json" } }
       );
 
