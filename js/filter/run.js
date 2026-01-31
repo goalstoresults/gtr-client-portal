@@ -107,7 +107,7 @@ export async function renderRunFilter(container, portalState) {
   // ------------------------------------------------------------
   // Load Lookups
   // ------------------------------------------------------------
-  const LOOKUP_URL = "https://jw-filter-contacts.dennis-e64.workers.dev/lookups";
+  const LOOKUP_URL = "https://filter-module.dennis-e64.workers.dev/lookups";
 
   let NEIGHBORHOODS = [];
   let SQFT = [];
@@ -225,7 +225,7 @@ export async function renderRunFilter(container, portalState) {
     };
 
     try {
-      const res = await fetch("https://jw-filter-contacts.dennis-e64.workers.dev", {
+      const res = await fetch("https://filter-module.dennis-e64.workers.dev", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -289,7 +289,7 @@ export async function renderRunFilter(container, portalState) {
 
     // Log run
     try {
-      await fetch("https://jw-filter-contacts.dennis-e64.workers.dev/log-run", {
+      await fetch("https://filter-module.dennis-e64.workers.dev/log-run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -305,7 +305,7 @@ export async function renderRunFilter(container, portalState) {
     // Mark emailed
     try {
       if (window.currentContactIds?.length) {
-        await fetch("https://jw-filter-contacts.dennis-e64.workers.dev/mark-emailed", {
+        await fetch("https://filter-module.dennis-e64.workers.dev/mark-emailed", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ contact_ids: window.currentContactIds })
