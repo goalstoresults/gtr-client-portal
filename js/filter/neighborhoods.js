@@ -4,6 +4,17 @@
 import { escapeHtml, formatDateOnly } from "../utilities.js";
 
 export async function renderFilterNeighborhoods(container, portalState) {
+
+  // ------------------------------------------------------------
+  // Initialize sort state (NEW)
+  // ------------------------------------------------------------
+  if (!portalState.filterNeighborhoodSort) {
+    portalState.filterNeighborhoodSort = {
+      column: "label",
+      direction: "asc"
+    };
+  }
+
   container.innerHTML = `
     <section class="card">
 
@@ -30,7 +41,7 @@ export async function renderFilterNeighborhoods(container, portalState) {
 
       <table class="notes-table" id="drill-table" style="display:none;">
         <thead>
-          <tr>
+          <tr id="drill-header-row">
             <th>SqFt Range</th>
             <th>Runs</th>
             <th>Last Used</th>
@@ -111,24 +122,101 @@ export async function renderFilterNeighborhoods(container, portalState) {
       const data = await res.json();
       if (!res.ok || !data?.success) throw new Error(data?.error || `HTTP ${res.status}`);
 
-      const items = Array.isArray(data.items) ? data.items : [];
+      let items = Array.isArray(data.items) ? data.items : [];
 
       if (!items.length) {
         status.textContent = `No runs for "${neighborhood}" in last ${data.window_days ?? days} days.`;
         return;
       }
 
-      body.innerHTML = items
-        .map(item => {
-          return `
-            <tr>
-              <td>${escapeHtml(item.label)}</td>
-              <td>${item.runs}</td>
-              <td>${formatDateOnly(item.last_used)}</td>
-            </tr>
-          `;
-        })
-        .join("");
+      // ------------------------------------------------------------
+      // SORTING SYSTEM (NEW)
+      // ------------------------------------------------------------
+      function sortItems() {
+        const { column, direction } = portalState.filterNeighborhoodSort;
+
+        items.sort((a, b) => {
+          let A = a[column];
+          let B = b[column];
+
+          if (column === "last_used") {
+            A = A ? new Date(A) : 0;
+            B = B ? new Date(B) : 0;
+          } else if (column === "runs") {
+            A = Number(A) || 0;
+            B = Number(B) || 0;
+          } else {
+            A = (A || "").toString().toLowerCase();
+            B = (B || "").toString().toLowerCase();
+          }
+
+          if (A < B) return direction === "asc" ? -1 : 1;
+          if (A > B) return direction === "asc" ? 1 : -1;
+          return 0;
+        });
+      }
+
+      function renderDrillTable() {
+        sortItems();
+
+        const headerConfig = [
+          { key: "label", label: "SqFt Range" },
+          { key: "runs", label: "Runs" },
+          { key: "last_used", label: "Last Used" }
+        ];
+
+        const headerHtml = headerConfig
+          .map(col => {
+            const isSorted = portalState.filterNeighborhoodSort.column === col.key;
+            const up = isSorted && portalState.filterNeighborhoodSort.direction === "asc" ? "▲" : "△";
+            const down = isSorted && portalState.filterNeighborhoodSort.direction === "desc" ? "▼" : "▽";
+
+            return `
+              <th class="sortable" data-field="${col.key}">
+                ${col.label}
+                <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+                  <span>${up}</span>
+                  <span>${down}</span>
+                </span>
+              </th>
+            `;
+          })
+          .join("");
+
+        document.getElementById("drill-header-row").innerHTML = headerHtml;
+
+        body.innerHTML = items
+          .map(item => {
+            return `
+              <tr>
+                <td>${escapeHtml(item.label)}</td>
+                <td>${item.runs}</td>
+                <td>${formatDateOnly(item.last_used)}</td>
+              </tr>
+            `;
+          })
+          .join("");
+
+        // Sorting events
+        document.querySelectorAll("th.sortable").forEach(th => {
+          th.addEventListener("click", () => {
+            const field = th.dataset.field;
+
+            if (portalState.filterNeighborhoodSort.column === field) {
+              portalState.filterNeighborhoodSort.direction =
+                portalState.filterNeighborhoodSort.direction === "asc" ? "desc" : "asc";
+            } else {
+              portalState.filterNeighborhoodSort.column = field;
+              portalState.filterNeighborhoodSort.direction = "asc";
+            }
+
+            renderDrillTable();
+          });
+        });
+      }
+
+      // Initial render
+      renderDrillTable();
 
       table.style.display = "";
       status.textContent = `Showing ${items.length} range(s) for "${neighborhood}".`;
