@@ -21,18 +21,29 @@ export async function renderFilterCoverage(container, portalState) {
 
       <div id="cov-status" class="mini-label" style="margin-bottom:12px;"></div>
 
+      <!-- ⭐ NEW CLEANER TWO-COLUMN LAYOUT WITH BORDERS -->
       <div class="two-col" style="gap:24px;">
 
-        <div>
-          <h4>Neighborhoods Not Used</h4>
-          <ul id="cov-unused-nh" class="mini-list">
+        <div style="
+          border:1px solid #ddd;
+          border-radius:6px;
+          padding:16px;
+          background:#fafafa;
+        ">
+          <h4 style="margin-top:0;">Neighborhoods Not Used</h4>
+          <ul id="cov-unused-nh" class="mini-list" style="margin-top:8px;">
             <li class="mini-label">(ready)</li>
           </ul>
         </div>
 
-        <div>
-          <h4>SqFt Not Used</h4>
-          <ul id="cov-unused-sqft" class="mini-list">
+        <div style="
+          border:1px solid #ddd;
+          border-radius:6px;
+          padding:16px;
+          background:#fafafa;
+        ">
+          <h4 style="margin-top:0;">SqFt Not Used</h4>
+          <ul id="cov-unused-sqft" class="mini-list" style="margin-top:8px;">
             <li class="mini-label">(ready)</li>
           </ul>
         </div>
@@ -61,12 +72,12 @@ export async function renderFilterCoverage(container, portalState) {
 
     try {
       const res = await fetch(
-        `https://filter-module.dennis-e64.workers.dev/unfiltered?days=${days}`,
+        \`https://filter-module.dennis-e64.workers.dev/unfiltered?days=\${days}\`,
         { headers: { accept: "application/json" } }
       );
 
       const data = await res.json();
-      if (!res.ok || !data?.success) throw new Error(data?.error || `HTTP ${res.status}`);
+      if (!res.ok || !data?.success) throw new Error(data?.error || \`HTTP \${res.status}\`);
 
       const unusedNh = Array.isArray(data.unused_neighborhoods)
         ? data.unused_neighborhoods
@@ -78,22 +89,23 @@ export async function renderFilterCoverage(container, portalState) {
 
       // Neighborhoods
       ulNh.innerHTML = unusedNh.length
-        ? unusedNh.map(n => `<li>${escapeHtml(n)}</li>`).join("")
-        : `<li class="mini-label">None (all used)</li>`;
+        ? unusedNh.map(n => \`<li>\${escapeHtml(n)}</li>\`).join("")
+        : \`<li class="mini-label">None (all used)</li>\`;
 
       // SqFt
       ulSq.innerHTML = unusedSq.length
-        ? unusedSq.map(s => `<li>${escapeHtml(s)}</li>`).join("")
-        : `<li class="mini-label">None (all used)</li>`;
+        ? unusedSq.map(s => \`<li>\${escapeHtml(s)}</li>\`).join("")
+        : \`<li class="mini-label">None (all used)</li>\`;
 
       const totals = data.totals || {};
 
-      status.textContent = `Last ${data.window_days ?? days} days — Neighborhoods unused: ${unusedNh.length}/${totals.neighborhoods_all ?? "–"} • SqFt unused: ${unusedSq.length}/${totals.sqft_all ?? "–"}`;
+      status.textContent =
+        \`Last \${data.window_days ?? days} days — Neighborhoods unused: \${unusedNh.length}/\${totals.neighborhoods_all ?? "–"} • SqFt unused: \${unusedSq.length}/\${totals.sqft_all ?? "–"}\`;
 
     } catch (err) {
       status.textContent = "Error: " + err.message;
-      ulNh.innerHTML = `<li class="mini-label" style="color:#c00;">Failed.</li>`;
-      ulSq.innerHTML = `<li class="mini-label" style="color:#c00;">Failed.</li>`;
+      ulNh.innerHTML = \`<li class="mini-label" style="color:#c00;">Failed.</li>\`;
+      ulSq.innerHTML = \`<li class="mini-label" style="color:#c00;">Failed.</li>\`;
     }
   };
 }
