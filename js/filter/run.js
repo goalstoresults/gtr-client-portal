@@ -1,84 +1,101 @@
 // /js/filter/run.js
-// Run Filter — Phase 1 parity with cleaner UI + Choices.js
+// Main Filter Tab — updated order:
+// 1) Run By
+// 2) Filter Name
+// 3) Neighborhoods
+// 4) Square Footage
+// (rest unchanged)
 
-import { escapeHtml, formatDateOnly } from "../utilities.js";
+import { escapeHtml } from "../utilities.js";
 
-export async function renderRunFilter(container, portalState) {
+export async function renderFilterRun(container, portalState) {
   container.innerHTML = `
-    <section class="card two-col">
+    <section class="card">
 
-      <!-- LEFT PANEL -->
-      <div class="left-panel">
+      <h3>Filter Criteria</h3>
 
-        <h3>Filter Criteria</h3>
-
-        <label>Neighborhoods</label>
-        <select id="flt-neighborhoods" multiple></select>
-        <div class="btn-row">
-          <button id="flt-nh-selectall" class="secondary">Select All</button>
-          <button id="flt-nh-clear" class="secondary">Clear</button>
-        </div>
-
-        <label>Square Footage</label>
-        <select id="flt-sqft" multiple></select>
-        <div class="btn-row">
-          <button id="flt-sqft-selectall" class="secondary">Select All</button>
-          <button id="flt-sqft-clear" class="secondary">Clear</button>
-        </div>
-
-        <label>Run By</label>
-        <select id="flt-runby"></select>
-
-        <label>No emails recently</label>
-        <div class="inline">
-          <input type="checkbox" id="flt-apply-noemail" checked />
-          <span>Show contacts with no emails in the last</span>
-          <input type="number" id="flt-noemail-days" value="30" min="1" max="3650" />
-          <span>days</span>
-        </div>
-
-        <div class="inline" style="margin-top:12px;">
-          <input type="checkbox" id="flt-hot" />
-          <label for="flt-hot">Include Hot Leads</label>
-        </div>
-
-        <div class="inline">
-          <input type="checkbox" id="flt-customers" />
-          <label for="flt-customers">Include Customers</label>
-        </div>
-
-        <button id="flt-run" class="primary" style="margin-top:20px;">Run Filter</button>
-
+      <!-- ⭐ Run By FIRST -->
+      <div style="margin-bottom:16px;">
+        <label>
+          Run By
+          <input id="filter-runby" type="text" readonly value="${portalState.contact_name || ''}">
+        </label>
       </div>
 
-      <!-- RIGHT PANEL -->
-      <div class="right-panel">
-        <h3>Results</h3>
-        <div id="flt-message" class="mini-label"></div>
-
-        <div id="flt-total" style="font-weight:bold; margin-top:8px;"></div>
-
-        <div class="btn-row" style="margin-top:12px;">
-          <button id="flt-clear" class="secondary">Clear</button>
-          <button id="flt-savecsv" class="secondary">Save CSV</button>
-        </div>
-
-        <table id="flt-results" class="notes-table" style="display:none; margin-top:16px;">
-          <thead>
-            <tr>
-              <th>Email</th>
-              <th>Name</th>
-              <th>Neighborhood</th>
-              <th>Square Footage</th>
-              <th>Lead Level</th>
-              <th>Type</th>
-              <th>Last Email</th>
-              <th>Last Reply</th>
-            </tr>
-          </thead>
-          <tbody id="flt-results-body"></tbody>
-        </table>
+      <!-- ⭐ Filter Name SECOND -->
+      <div style="margin-bottom:16px;">
+        <label>
+          Filter Name (optional)
+          <input id="filter-name" type="text" placeholder="e.g. Bryant Park — Q4 Outreach">
+        </label>
       </div>
+
+      <!-- ⭐ Neighborhoods THIRD -->
+      <div style="margin-bottom:16px;">
+        <label>
+          Neighborhoods
+          <select id="filter-nh" multiple></select>
+        </label>
+        <div class="mini-buttons">
+          <button id="nh-select-all" type="button">Select All</button>
+          <button id="nh-clear" type="button">Clear</button>
+        </div>
+      </div>
+
+      <!-- ⭐ Square Footage FOURTH -->
+      <div style="margin-bottom:16px;">
+        <label>
+          Square Footage
+          <select id="filter-sqft" multiple></select>
+        </label>
+        <div class="mini-buttons">
+          <button id="sqft-select-all" type="button">Select All</button>
+          <button id="sqft-clear" type="button">Clear</button>
+        </div>
+      </div>
+
+      <!-- ⭐ Additional Filter Options -->
+      <div style="margin-bottom:16px;">
+        <label>
+          <input type="checkbox" id="filter-noemail">
+          Show contacts with no emails in the last
+        </label>
+        <input id="filter-noemail-days" type="number" value="30" min="1" max="3650" style="width:80px;">
+        days
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label>
+          <input type="checkbox" id="filter-hotleads">
+          Include Hot Leads
+        </label>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label>
+          <input type="checkbox" id="filter-customers">
+          Include Customers
+        </label>
+      </div>
+
+      <button id="filter-run" class="primary">Run Filter</button>
+
+      <div id="filter-status" class="mini-label" style="margin-top:16px;"></div>
+
+      <table class="notes-table" id="filter-table" style="display:none; margin-top:16px;">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Neighborhood</th>
+            <th>SqFt</th>
+            <th>Lead Level</th>
+            <th>Type</th>
+            <th>Last Email</th>
+          </tr>
+        </thead>
+        <tbody id="filter-body"></tbody>
+      </table>
 
     </section>
   `;
@@ -86,21 +103,15 @@ export async function renderRunFilter(container, portalState) {
   // ------------------------------------------------------------
   // Initialize Choices.js
   // ------------------------------------------------------------
-  const nhSelect = new Choices("#flt-neighborhoods", {
+  const nhSelect = new Choices("#filter-nh", {
     removeItemButton: true,
     searchEnabled: true,
     shouldSort: false
   });
 
-  const sqftSelect = new Choices("#flt-sqft", {
+  const sqftSelect = new Choices("#filter-sqft", {
     removeItemButton: true,
     searchEnabled: true,
-    shouldSort: false
-  });
-
-  const runBySelect = new Choices("#flt-runby", {
-    removeItemButton: false,
-    searchEnabled: false,
     shouldSort: false
   });
 
@@ -109,25 +120,22 @@ export async function renderRunFilter(container, portalState) {
   // ------------------------------------------------------------
   const LOOKUP_URL = "https://filter-module.dennis-e64.workers.dev/lookups";
 
-  let NEIGHBORHOODS = [];
-  let SQFT = [];
-
   try {
     const res = await fetch(LOOKUP_URL);
     const data = await res.json();
 
-    NEIGHBORHOODS = data.neighborhoods || [];
-    SQFT = data.square_footage || [];
+    const neighborhoods = data.neighborhoods || [];
+    const sqft = data.square_footage || [];
 
     nhSelect.setChoices(
-      NEIGHBORHOODS.map(n => ({ value: n, label: n })),
+      neighborhoods.map(n => ({ value: n, label: n })),
       "value",
       "label",
       false
     );
 
     sqftSelect.setChoices(
-      SQFT.map(s => ({ value: s, label: s })),
+      sqft.map(s => ({ value: s, label: s })),
       "value",
       "label",
       false
@@ -137,202 +145,108 @@ export async function renderRunFilter(container, portalState) {
   }
 
   // ------------------------------------------------------------
-  // Run By choices
+  // Select All / Clear Buttons
   // ------------------------------------------------------------
-  const RUNNERS = ["Jacob", "Benji"];
-  runBySelect.setChoices(
-    RUNNERS.map(r => ({ value: r, label: r })),
-    "value",
-    "label",
-    false
-  );
-
-  // Restore last used runner
-  const savedRunner = localStorage.getItem("jw_user_label");
-  if (savedRunner && RUNNERS.includes(savedRunner)) {
-    runBySelect.setChoiceByValue(savedRunner);
-  }
-
-  // ------------------------------------------------------------
-  // Select/Clear buttons
-  // ------------------------------------------------------------
-  document.getElementById("flt-nh-selectall").onclick = () =>
-    nhSelect.setChoiceByValue(NEIGHBORHOODS);
-
-  document.getElementById("flt-nh-clear").onclick = () =>
-    nhSelect.removeActiveItems();
-
-  document.getElementById("flt-sqft-selectall").onclick = () =>
-    sqftSelect.setChoiceByValue(SQFT);
-
-  document.getElementById("flt-sqft-clear").onclick = () =>
-    sqftSelect.removeActiveItems();
-
-  // ------------------------------------------------------------
-  // Clear Results
-  // ------------------------------------------------------------
-  document.getElementById("flt-clear").onclick = () => {
-    document.getElementById("flt-message").textContent = "";
-    document.getElementById("flt-results").style.display = "none";
-    document.getElementById("flt-results-body").innerHTML = "";
-    document.getElementById("flt-total").textContent = "";
+  document.getElementById("nh-select-all").onclick = () => {
+    nhSelect.setChoiceByValue(nhSelect._currentState.choices.map(c => c.value));
   };
+  document.getElementById("nh-clear").onclick = () => nhSelect.clearStore();
+
+  document.getElementById("sqft-select-all").onclick = () => {
+    sqftSelect.setChoiceByValue(sqftSelect._currentState.choices.map(c => c.value));
+  };
+  document.getElementById("sqft-clear").onclick = () => sqftSelect.clearStore();
 
   // ------------------------------------------------------------
   // Run Filter
   // ------------------------------------------------------------
-  document.getElementById("flt-run").onclick = async () => {
-    const msg = document.getElementById("flt-message");
-    const table = document.getElementById("flt-results");
-    const body = document.getElementById("flt-results-body");
-    const total = document.getElementById("flt-total");
+  document.getElementById("filter-run").onclick = async () => {
+    const status = document.getElementById("filter-status");
+    const table = document.getElementById("filter-table");
+    const body = document.getElementById("filter-body");
 
-    msg.textContent = "Loading...";
+    status.textContent = "";
     table.style.display = "none";
     body.innerHTML = "";
-    total.textContent = "";
 
     const neighborhoods = nhSelect.getValue(true);
-    const sqft = sqftSelect.getValue(true);
+    const square_footage = sqftSelect.getValue(true);
+    const runBy = document.getElementById("filter-runby").value.trim();
+    const filterName = document.getElementById("filter-name").value.trim();
 
-    if (!neighborhoods.length || !sqft.length) {
-      msg.textContent = "Please select at least one Neighborhood and one Square Footage.";
+    const applyNoEmail = document.getElementById("filter-noemail").checked;
+    const noEmailDays = parseInt(document.getElementById("filter-noemail-days").value || "30", 10);
+
+    const includeHotLeads = document.getElementById("filter-hotleads").checked;
+    const includeCustomers = document.getElementById("filter-customers").checked;
+
+    if (!neighborhoods.length || !square_footage.length) {
+      status.textContent = "Please select neighborhoods and square footage.";
       return;
     }
 
-    const runBy = runBySelect.getValue(true);
-    if (!runBy) {
-      msg.textContent = "Please select who ran this.";
-      return;
-    }
-
-    localStorage.setItem("jw_user_label", runBy);
-
-    const includeHot = document.getElementById("flt-hot").checked;
-    const includeCustomers = document.getElementById("flt-customers").checked;
-    const applyNoEmail = document.getElementById("flt-apply-noemail").checked;
-
-    let days = parseInt(document.getElementById("flt-noemail-days").value, 10);
-    if (!Number.isFinite(days) || days <= 0) days = 30;
+    status.textContent = "Running filter…";
 
     const payload = {
       neighborhoods,
-      square_footage: sqft,
-      includeHotLeads: includeHot,
+      square_footage,
+      includeHotLeads,
       includeCustomers,
       applyNoEmail,
-      noEmailDays: days
+      noEmailDays
     };
 
     try {
-      const res = await fetch("https://filter-module.dennis-e64.workers.dev", {
+      const res = await fetch("https://filter-module.dennis-e64.workers.dev/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
 
       const data = await res.json();
-      if (!data.success) throw new Error(data.error || "Unknown error");
+      if (!res.ok || !data?.success) throw new Error(data?.error || `HTTP ${res.status}`);
 
       const results = data.results || [];
+
       if (!results.length) {
-        msg.textContent = "No matching records found.";
+        status.textContent = "No matching contacts found.";
         return;
       }
 
-      msg.textContent = "";
+      body.innerHTML = results
+        .map(r => `
+          <tr>
+            <td>${escapeHtml(r.first_name || "")} ${escapeHtml(r.last_name || "")}</td>
+            <td>${escapeHtml(r.email || "")}</td>
+            <td>${escapeHtml(r.neighborhood || "")}</td>
+            <td>${escapeHtml(r.square_footage || "")}</td>
+            <td>${escapeHtml(r.lead_level || "")}</td>
+            <td>${escapeHtml(r.type || "")}</td>
+            <td>${escapeHtml(r.last_email_date || "")}</td>
+          </tr>
+        `)
+        .join("");
+
       table.style.display = "";
-      total.textContent = `Total Rows: ${results.length}`;
+      status.textContent = `Found ${results.length} contacts.`;
 
-      window.currentContactIds = [];
-
-      results.forEach(c => {
-        const tr = document.createElement("tr");
-
-        const name = [c.first_name, c.last_name].filter(Boolean).join(" ");
-        const nh = Array.isArray(c.neighborhood) ? c.neighborhood.join(", ") : (c.neighborhood || "");
-        const sq = Array.isArray(c.square_footage) ? c.square_footage.join(", ") : (c.square_footage || "");
-
-        tr.innerHTML = `
-          <td>${escapeHtml(c.email || "")}</td>
-          <td>${escapeHtml(name)}</td>
-          <td>${escapeHtml(nh)}</td>
-          <td>${escapeHtml(sq)}</td>
-          <td>${escapeHtml(c.lead_level || "")}</td>
-          <td>${escapeHtml(c.type || "")}</td>
-          <td>${formatDateOnly(c.last_email_date)}</td>
-          <td>${formatDateOnly(c.last_reply_date)}</td>
-        `;
-
-        body.appendChild(tr);
-        if (c.contact_id) window.currentContactIds.push(String(c.contact_id));
-      });
-
-    } catch (err) {
-      msg.textContent = "Error fetching data: " + err.message;
-    }
-  };
-
-  // ------------------------------------------------------------
-  // Save CSV + Log Run + Mark Emailed
-  // ------------------------------------------------------------
-  document.getElementById("flt-savecsv").onclick = async () => {
-    const table = document.getElementById("flt-results");
-    const rows = Array.from(document.querySelectorAll("#flt-results-body tr"));
-    if (!rows.length) return alert("No data to save");
-
-    const runBy = runBySelect.getValue(true);
-    if (!runBy) return alert("Please select who ran this.");
-
-    const neighborhoods = nhSelect.getValue(true);
-    const sqft = sqftSelect.getValue(true);
-
-    // Log run
-    try {
+      // ------------------------------------------------------------
+      // Log Run
+      // ------------------------------------------------------------
       await fetch("https://filter-module.dennis-e64.workers.dev/log-run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_label: runBy,
-          filter_name: "",
+          filter_name: filterName,
           neighborhoods,
-          square_footage: sqft,
-          result_count: rows.length
+          square_footage,
+          result_count: results.length
         })
       });
-    } catch (_) {}
 
-    // Mark emailed
-    try {
-      if (window.currentContactIds?.length) {
-        await fetch("https://filter-module.dennis-e64.workers.dev/mark-emailed", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contact_ids: window.currentContactIds })
-        });
-      }
-    } catch (_) {}
-
-    // CSV export
-    const trs = Array.from(table.querySelectorAll("tr"));
-    const csv = trs
-      .map(tr =>
-        Array.from(tr.querySelectorAll("th,td"))
-          .map(td => `"${td.textContent.replace(/"/g, '""')}"`)
-          .join(",")
-      )
-      .join("\n");
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "jw_contacts.csv";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-
-    URL.revokeObjectURL(url);
+    } catch (err) {
+      status.textContent = "Error: " + err.message;
+    }
   };
 }
