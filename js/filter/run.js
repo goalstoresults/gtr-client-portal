@@ -4,87 +4,98 @@
 import { escapeHtml, formatDateOnly } from "../utilities.js";
 
 export async function renderRunFilter(container, portalState) {
+
+  // ------------------------------------------------------------
+  // Initialize sort state (NEW)
+  // ------------------------------------------------------------
+  if (!portalState.filterSort) {
+    portalState.filterSort = {
+      column: "email",
+      direction: "asc"
+    };
+  }
+
   container.innerHTML = `
-    <section class="card two-col">
+<section class="card two-col">
 
-      <!-- LEFT PANEL -->
-      <div class="left-panel">
+  <!-- LEFT PANEL -->
+  <div class="left-panel">
+    <h3>Filter Criteria</h3>
 
-        <h3>Filter Criteria</h3>
+    <label>Neighborhoods</label>
+    <select id="flt-neighborhoods" multiple></select>
 
-        <label>Neighborhoods</label>
-        <select id="flt-neighborhoods" multiple></select>
-        <div class="btn-row">
-          <button id="flt-nh-selectall" class="secondary">Select All</button>
-          <button id="flt-nh-clear" class="secondary">Clear</button>
-        </div>
+    <div class="btn-row">
+      <button id="flt-nh-selectall" class="secondary">Select All</button>
+      <button id="flt-nh-clear" class="secondary">Clear</button>
+    </div>
 
-        <label>Square Footage</label>
-        <select id="flt-sqft" multiple></select>
-        <div class="btn-row">
-          <button id="flt-sqft-selectall" class="secondary">Select All</button>
-          <button id="flt-sqft-clear" class="secondary">Clear</button>
-        </div>
+    <label>Square Footage</label>
+    <select id="flt-sqft" multiple></select>
 
-        <label>Run By</label>
-        <select id="flt-runby"></select>
+    <div class="btn-row">
+      <button id="flt-sqft-selectall" class="secondary">Select All</button>
+      <button id="flt-sqft-clear" class="secondary">Clear</button>
+    </div>
 
-        <label>Filename</label>
-        <input id="flt-filename" type="text" placeholder="e.g. Bryant Park — Q4 Outreach" style="width:100%;" />
+    <label>Run By</label>
+    <select id="flt-runby"></select>
 
-        <label>No emails recently</label>
-        <div class="inline">
-          <input type="checkbox" id="flt-apply-noemail" checked />
-          <span>Show contacts with no emails in the last</span>
-          <input type="number" id="flt-noemail-days" value="30" min="1" max="3650" />
-          <span>days</span>
-        </div>
+    <label>Filename</label>
+    <input id="flt-filename" type="text" placeholder="e.g. Bryant Park — Q4 Outreach" style="width:100%;" />
 
-        <div class="inline" style="margin-top:12px;">
-          <input type="checkbox" id="flt-hot" />
-          <label for="flt-hot">Include Hot Leads</label>
-        </div>
+    <label>No emails recently</label>
+    <div class="inline">
+      <input type="checkbox" id="flt-apply-noemail" checked />
+      <span>Show contacts with no emails in the last</span>
+      <input type="number" id="flt-noemail-days" value="30" min="1" max="3650" />
+      <span>days</span>
+    </div>
 
-        <div class="inline">
-          <input type="checkbox" id="flt-customers" />
-          <label for="flt-customers">Include Customers</label>
-        </div>
+    <div class="inline" style="margin-top:12px;">
+      <input type="checkbox" id="flt-hot" />
+      <label for="flt-hot">Include Hot Leads</label>
+    </div>
 
-        <button id="flt-run" class="primary" style="margin-top:20px;">Run Filter</button>
+    <div class="inline">
+      <input type="checkbox" id="flt-customers" />
+      <label for="flt-customers">Include Customers</label>
+    </div>
 
-      </div>
+    <button id="flt-run" class="primary" style="margin-top:20px;">Run Filter</button>
+  </div>
 
-      <!-- RIGHT PANEL -->
-      <div class="right-panel">
-        <h3>Results</h3>
-        <div id="flt-message" class="mini-label"></div>
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <h3>Results</h3>
 
-        <div id="flt-total" style="font-weight:bold; margin-top:8px;"></div>
+    <div id="flt-message" class="mini-label"></div>
+    <div id="flt-total" style="font-weight:bold; margin-top:8px;"></div>
 
-        <div class="btn-row" style="margin-top:12px;">
-          <button id="flt-clear" class="secondary">Clear</button>
-          <button id="flt-savecsv" class="secondary">Save CSV</button>
-        </div>
+    <div class="btn-row" style="margin-top:12px;">
+      <button id="flt-clear" class="secondary">Clear</button>
+      <button id="flt-savecsv" class="secondary">Save CSV</button>
+    </div>
 
-        <table id="flt-results" class="notes-table" style="display:none; margin-top:16px;">
-          <thead>
-            <tr>
-              <th>Email</th>
-              <th>Name</th>
-              <th>Neighborhood</th>
-              <th>Square Footage</th>
-              <th>Lead Level</th>
-              <th>Type</th>
-              <th>Last Email</th>
-              <th>Last Reply</th>
-            </tr>
-          </thead>
-          <tbody id="flt-results-body"></tbody>
-        </table>
-      </div>
+    <table id="flt-results" class="notes-table" style="display:none; margin-top:16px;">
+      <thead>
+        <tr id="flt-header-row">
+          <th>Email</th>
+          <th>Name</th>
+          <th>Neighborhood</th>
+          <th>Square Footage</th>
+          <th>Lead Level</th>
+          <th>Type</th>
+          <th>Last Email</th>
+          <th>Last Reply</th>
+        </tr>
+      </thead>
+      <tbody id="flt-results-body"></tbody>
+    </table>
+  </div>
 
-    </section>
-  `;
+</section>
+`;
 
   // ------------------------------------------------------------
   // Initialize Choices.js
@@ -143,6 +154,7 @@ export async function renderRunFilter(container, portalState) {
   // Run By choices
   // ------------------------------------------------------------
   const RUNNERS = ["Jacob", "Benji"];
+
   runBySelect.setChoices(
     RUNNERS.map(r => ({ value: r, label: r })),
     "value",
@@ -150,7 +162,6 @@ export async function renderRunFilter(container, portalState) {
     false
   );
 
-  // Restore last used runner
   const savedRunner = localStorage.getItem("jw_user_label");
   if (savedRunner && RUNNERS.includes(savedRunner)) {
     runBySelect.setChoiceByValue(savedRunner);
@@ -238,6 +249,7 @@ export async function renderRunFilter(container, portalState) {
       if (!data.success) throw new Error(data.error || "Unknown error");
 
       const results = data.results || [];
+
       if (!results.length) {
         msg.textContent = "No matching records found.";
         return;
@@ -249,25 +261,109 @@ export async function renderRunFilter(container, portalState) {
 
       window.currentContactIds = [];
 
+      // ------------------------------------------------------------
+      // SORTING SYSTEM (NEW)
+      // ------------------------------------------------------------
+
+      function sortResults() {
+        const { column, direction } = portalState.filterSort;
+
+        results.sort((a, b) => {
+          let A = a[column];
+          let B = b[column];
+
+          if (column === "last_email_date" || column === "last_reply_date") {
+            A = A ? new Date(A) : 0;
+            B = B ? new Date(B) : 0;
+          } else {
+            A = (A || "").toString().toLowerCase();
+            B = (B || "").toString().toLowerCase();
+          }
+
+          if (A < B) return direction === "asc" ? -1 : 1;
+          if (A > B) return direction === "asc" ? 1 : -1;
+          return 0;
+        });
+      }
+
+      function renderResultsTable() {
+        sortResults();
+
+        const headerConfig = [
+          { key: "email", label: "Email" },
+          { key: "name", label: "Name" },
+          { key: "neighborhood", label: "Neighborhood" },
+          { key: "square_footage", label: "Square Footage" },
+          { key: "lead_level", label: "Lead Level" },
+          { key: "type", label: "Type" },
+          { key: "last_email_date", label: "Last Email" },
+          { key: "last_reply_date", label: "Last Reply" }
+        ];
+
+        const headerHtml = headerConfig
+          .map(col => {
+            const isSorted = portalState.filterSort.column === col.key;
+            const up = isSorted && portalState.filterSort.direction === "asc" ? "▲" : "△";
+            const down = isSorted && portalState.filterSort.direction === "desc" ? "▼" : "▽";
+
+            return `
+              <th class="sortable" data-field="${col.key}">
+                ${col.label}
+                <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+                  <span>${up}</span>
+                  <span>${down}</span>
+                </span>
+              </th>
+            `;
+          })
+          .join("");
+
+        document.getElementById("flt-header-row").innerHTML = headerHtml;
+
+        body.innerHTML = results
+          .map(c => {
+            const name = [c.first_name, c.last_name].filter(Boolean).join(" ");
+            const nh = Array.isArray(c.neighborhood) ? c.neighborhood.join(", ") : (c.neighborhood || "");
+            const sq = Array.isArray(c.square_footage) ? c.square_footage.join(", ") : (c.square_footage || "");
+
+            return `
+              <tr>
+                <td>${escapeHtml(c.email || "")}</td>
+                <td>${escapeHtml(name)}</td>
+                <td>${escapeHtml(nh)}</td>
+                <td>${escapeHtml(sq)}</td>
+                <td>${escapeHtml(c.lead_level || "")}</td>
+                <td>${escapeHtml(c.type || "")}</td>
+                <td>${formatDateOnly(c.last_email_date)}</td>
+                <td>${formatDateOnly(c.last_reply_date)}</td>
+              </tr>
+            `;
+          })
+          .join("");
+
+        // Sorting events
+        document.querySelectorAll("th.sortable").forEach(th => {
+          th.addEventListener("click", () => {
+            const field = th.dataset.field;
+
+            if (portalState.filterSort.column === field) {
+              portalState.filterSort.direction =
+                portalState.filterSort.direction === "asc" ? "desc" : "asc";
+            } else {
+              portalState.filterSort.column = field;
+              portalState.filterSort.direction = "asc";
+            }
+
+            renderResultsTable();
+          });
+        });
+      }
+
+      // Initial render
+      renderResultsTable();
+
+      // Track contact IDs for CSV + mark emailed
       results.forEach(c => {
-        const tr = document.createElement("tr");
-
-        const name = [c.first_name, c.last_name].filter(Boolean).join(" ");
-        const nh = Array.isArray(c.neighborhood) ? c.neighborhood.join(", ") : (c.neighborhood || "");
-        const sq = Array.isArray(c.square_footage) ? c.square_footage.join(", ") : (c.square_footage || "");
-
-        tr.innerHTML = `
-          <td>${escapeHtml(c.email || "")}</td>
-          <td>${escapeHtml(name)}</td>
-          <td>${escapeHtml(nh)}</td>
-          <td>${escapeHtml(sq)}</td>
-          <td>${escapeHtml(c.lead_level || "")}</td>
-          <td>${escapeHtml(c.type || "")}</td>
-          <td>${formatDateOnly(c.last_email_date)}</td>
-          <td>${formatDateOnly(c.last_reply_date)}</td>
-        `;
-
-        body.appendChild(tr);
         if (c.contact_id) window.currentContactIds.push(String(c.contact_id));
       });
 
@@ -282,6 +378,7 @@ export async function renderRunFilter(container, portalState) {
   document.getElementById("flt-savecsv").onclick = async () => {
     const table = document.getElementById("flt-results");
     const rows = Array.from(document.querySelectorAll("#flt-results-body tr"));
+
     if (!rows.length) return alert("No data to save");
 
     const runBy = runBySelect.getValue(true);
@@ -318,6 +415,7 @@ export async function renderRunFilter(container, portalState) {
 
     // CSV export
     const trs = Array.from(table.querySelectorAll("tr"));
+
     const csv = trs
       .map(tr =>
         Array.from(tr.querySelectorAll("th,td"))
