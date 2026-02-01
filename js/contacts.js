@@ -1,4 +1,4 @@
-// js/contacts.js v2.0
+// js/contacts.js v2.1
 
 import { renderAddContactForm } from "./contacts/tab-add.js";
 import { renderContactList } from "./contacts/tab-list.js";
@@ -8,14 +8,12 @@ import { renderContactNotes } from "./contacts/tab-notes.js";
 import { renderContactServicesTab } from "./contacts/tab-services.js";   // ⭐ NEW IMPORT
 
 
-// 🔧 Load Contacts Tab with subtab switching
-
 export async function loadContactsTab({ portalState, tabContent }) {
   // Load base HTML template
   const res = await fetch("./components/contacts.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
 
-  // 🔧 Inject contact context bar (above subtabs)
+  // 🔧 Inject contact context bar
   let contextBar = document.getElementById("contact-context-bar");
   if (!contextBar) {
     contextBar = document.createElement("div");
@@ -31,23 +29,28 @@ export async function loadContactsTab({ portalState, tabContent }) {
   const buttons = tabContent.querySelectorAll("#contacts-subtabs button");
 
   // ⭐ DETERMINE IF OPERATIONS (TAB 9) IS ENABLED
-  const operationsEnabled =
-    Array.isArray(portalState.enabled_tabs) &&
-    portalState.enabled_tabs.includes("9");
+  const enabledTabs = portalState.enabled_tabs || [];
+  const operationsEnabled = enabledTabs.includes("9");
 
-  // ⭐ REMOVE SERVICES TAB IF OPERATIONS IS NOT ENABLED
+  console.log("CONTACTS: enabled_tabs =", enabledTabs);
+  console.log("CONTACTS: operationsEnabled =", operationsEnabled);
+
+  // ⭐ FIND SERVICES BUTTON SAFELY
   const servicesBtn = tabContent.querySelector(
     '#contacts-subtabs button[data-subtab="services"]'
   );
 
+  console.log("CONTACTS: servicesBtn found =", !!servicesBtn);
+
+  // ⭐ REMOVE SERVICES TAB IF OPERATIONS IS NOT ENABLED
   if (!operationsEnabled && servicesBtn) {
-    servicesBtn.remove(); // physically remove it so it never appears
+    console.log("CONTACTS: Removing Services tab (Operations disabled)");
+    servicesBtn.remove();
   }
 
   // ⭐ SUBTAB ROUTER
   buttons.forEach(btn => {
     btn.addEventListener("click", async () => {
-      // Reset active state
       buttons.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
@@ -75,11 +78,7 @@ export async function loadContactsTab({ portalState, tabContent }) {
 
         case "details":
           if (portalState.selectedContactId) {
-            await renderContactDetails(
-              content,
-              portalState,
-              portalState.selectedContactId
-            );
+            await renderContactDetails(content, portalState, portalState.selectedContactId);
           } else {
             content.innerHTML = `
               <section class="card">
@@ -92,11 +91,7 @@ export async function loadContactsTab({ portalState, tabContent }) {
 
         case "relationships":
           if (portalState.selectedContactId) {
-            await renderContactRelationships(
-              content,
-              portalState,
-              portalState.selectedContactId
-            );
+            await renderContactRelationships(content, portalState, portalState.selectedContactId);
           } else {
             content.innerHTML = `
               <section class="card">
@@ -109,11 +104,7 @@ export async function loadContactsTab({ portalState, tabContent }) {
 
         case "notes":
           if (portalState.selectedContactId) {
-            await renderContactNotes(
-              content,
-              portalState,
-              portalState.selectedContactId
-            );
+            await renderContactNotes(content, portalState, portalState.selectedContactId);
           } else {
             content.innerHTML = `
               <section class="card">
@@ -140,9 +131,7 @@ export async function loadContactsTab({ portalState, tabContent }) {
   });
 
   // ⭐ DEFAULT TO LIST VIEW
-  const defaultBtn = tabContent.querySelector(
-    '#contacts-subtabs button[data-subtab="list"]'
-  );
+  const defaultBtn = tabContent.querySelector('#contacts-subtabs button[data-subtab="list"]');
   if (defaultBtn) {
     defaultBtn.classList.add("active");
     await renderContactList(content, portalState);
