@@ -29,6 +29,9 @@ export async function renderRunFilter(container, portalState) {
         <label>Run By</label>
         <select id="flt-runby"></select>
 
+        <label>Filename</label>
+        <input id="flt-filename" type="text" placeholder="e.g. Bryant Park — Q4 Outreach" />
+
         <label>No emails recently</label>
         <div class="inline">
           <input type="checkbox" id="flt-apply-noemail" checked />
