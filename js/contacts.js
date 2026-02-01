@@ -5,6 +5,7 @@ import { renderContactList } from "./contacts/tab-list.js";
 import { renderContactDetails } from "./contacts/tab-details.js";
 import { renderContactRelationships } from "./contacts/tab-relationships.js";
 import { renderContactNotes } from "./contacts/tab-notes.js";
+import { renderContactServicesTab } from "./contacts/tab-services.js";   // ⭐ NEW IMPORT
 
 
 // 🔧 Load Contacts Tab with subtab switching
@@ -36,6 +37,7 @@ export async function loadContactsTab({ portalState, tabContent }) {
       btn.classList.add("active");
 
       const subtab = btn.dataset.subtab;
+
       switch (subtab) {
         case "add":
           await renderAddContactForm(content, portalState);
@@ -82,6 +84,11 @@ export async function loadContactsTab({ portalState, tabContent }) {
               </section>
             `;
           }
+          break;
+
+        // ⭐ NEW SERVICES SUBTAB
+        case "services":
+          await renderContactServicesTab(content, portalState);
           break;
 
         default:
