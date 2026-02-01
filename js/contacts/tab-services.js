@@ -34,8 +34,6 @@ export async function renderContactServicesTab(container, portalState) {
 
   addBtn.addEventListener("click", async () => {
     let catalog = await fetchProjectServices(portalState.project);
-
-    // Sort by sort_order ASC
     catalog.sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
 
     openClientServiceModal({
@@ -55,19 +53,68 @@ export async function renderContactServicesTab(container, portalState) {
   }
 
   function renderGrid(rows) {
-    if (!rows.length) {
-      grid.innerHTML = `
-        <p>This client has no services assigned yet.</p>
-      `;
-      return;
+    if (!portalState.servicesSort) {
+      portalState.servicesSort = {
+        column: "start_date",
+        direction: "asc"
+      };
     }
+
+    const columns = [
+      { key: "service_name", label: "Service" },
+      { key: "start_date", label: "Start" },
+      { key: "end_date", label: "End" },
+      { key: "price", label: "Price" }
+    ];
+
+    function sortRows() {
+      const { column, direction } = portalState.servicesSort;
+
+      rows.sort((a, b) => {
+        let A = a[column];
+        let B = b[column];
+
+        if (column === "price") {
+          A = Number(A ?? 0);
+          B = Number(B ?? 0);
+        } else {
+          A = (A || "").toString().toLowerCase();
+          B = (B || "").toString().toLowerCase();
+        }
+
+        if (A < B) return direction === "asc" ? -1 : 1;
+        if (A > B) return direction === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+
+    sortRows();
 
     const header = `
       <tr>
-        <th>Service</th>
-        <th>Start</th>
-        <th>End</th>
-        <th>Price</th>
+        ${columns
+          .map(col => {
+            const isSorted = portalState.servicesSort.column === col.key;
+            const upArrow =
+              isSorted && portalState.servicesSort.direction === "asc"
+                ? "▲"
+                : "△";
+            const downArrow =
+              isSorted && portalState.servicesSort.direction === "desc"
+                ? "▼"
+                : "▽";
+
+            return `
+              <th class="sortable" data-field="${col.key}">
+                ${col.label}
+                <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+                  <span class="sort-up">${upArrow}</span>
+                  <span class="sort-down">${downArrow}</span>
+                </span>
+              </th>
+            `;
+          })
+          .join("")}
         <th>Source</th>
         <th>Notes</th>
         <th>Actions</th>
@@ -80,10 +127,7 @@ export async function renderContactServicesTab(container, portalState) {
           <td>${escapeHtml(s.service_name)}</td>
           <td>${escapeHtml(s.start_date)}</td>
           <td>${escapeHtml(s.end_date || "")}</td>
-
-          <!-- ⭐ PRICE FORMATTED HERE -->
           <td>${formatCurrency(s.price)}</td>
-
           <td>${escapeHtml(s.price_source || "")}</td>
           <td>${escapeHtml(s.notes || "")}</td>
           <td>
@@ -101,6 +145,24 @@ export async function renderContactServicesTab(container, portalState) {
       </table>
     `;
 
+    // Sorting events
+    grid.querySelectorAll("th.sortable").forEach(th => {
+      th.addEventListener("click", () => {
+        const field = th.dataset.field;
+
+        if (portalState.servicesSort.column === field) {
+          portalState.servicesSort.direction =
+            portalState.servicesSort.direction === "asc" ? "desc" : "asc";
+        } else {
+          portalState.servicesSort.column = field;
+          portalState.servicesSort.direction = "asc";
+        }
+
+        renderGrid(rows);
+      });
+    });
+
+    // Edit/Delete
     grid.querySelectorAll("[data-edit]").forEach(btn => {
       btn.addEventListener("click", async () => {
         const id = btn.getAttribute("data-edit");
@@ -228,7 +290,6 @@ function openClientServiceModal({ project, client_id, catalog, service = null, o
   const serviceSelect = modal.querySelector("#svc-service");
   const priceInput = modal.querySelector("#svc-price");
 
-  // Auto-populate price when selecting a service
   serviceSelect.addEventListener("change", () => {
     const selected = catalog.find(s => s.id === serviceSelect.value);
     if (selected) {
