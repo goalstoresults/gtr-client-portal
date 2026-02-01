@@ -47,13 +47,34 @@ async function renderGoalsTab(container, portalState) {
     const goals = await fetchMonthlyGoals(portalState.project, year);
     const actuals = await fetchActuals(portalState.project, year);
 
-    renderClientsGrid(services, goals, actuals, year);
-    renderRevenueGrid(services, goals, actuals, year);
-    renderLeadIndicatorsGrid(goals, year);
+    console.log("SERVICES RAW:", services);
+    console.log("GOALS RAW:", goals);
+    console.log("ACTUALS RAW:", actuals);
+
+    const safeServices = Array.isArray(services) ? services : [];
+    const safeGoals = Array.isArray(goals) ? goals : [];
+    const safeActuals = Array.isArray(actuals) ? actuals : [];
+
+    if (!Array.isArray(services)) {
+      clientsGrid.innerHTML = "<p>Error loading services.</p>";
+      revenueGrid.innerHTML = "<p>Error loading services.</p>";
+      leadsGrid.innerHTML = "<p>Error loading services.</p>";
+      return;
+    }
+
+    if (!Array.isArray(goals)) {
+      leadsGrid.innerHTML = "<p>Error loading goals.</p>";
+      return;
+    }
+
+    renderClientsGrid(safeServices, safeGoals, safeActuals, year);
+    renderRevenueGrid(safeServices, safeGoals, safeActuals, year);
+    renderLeadIndicatorsGrid(safeGoals, year);
   }
 
   function renderClientsGrid(services, goals, actuals, year) {
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const safeActuals = Array.isArray(actuals) ? actuals : [];
 
     const header = `
       <tr>
@@ -65,7 +86,7 @@ async function renderGoalsTab(container, portalState) {
 
     const body = services.map(s => {
       const rowActuals = months.map((_, idx) => {
-        const a = actuals.find(a => a.service_id === s.id && a.month === idx + 1);
+        const a = safeActuals.find(a => a.service_id === s.id && a.month === idx + 1);
         return a?.actual_clients || 0;
       });
 
@@ -95,13 +116,21 @@ async function renderGoalsTab(container, portalState) {
     clientsGrid.querySelectorAll("td.clickable").forEach(td => {
       td.addEventListener("click", () => {
         const month = Number(td.dataset.month);
-        openGoalsModal(services, goals, month, Number(yearSelect.value), portalState.project, () => loadYear());
+        openGoalsModal(
+          services,
+          goals,
+          month,
+          Number(yearSelect.value),
+          portalState.project,
+          () => loadYear()
+        );
       });
     });
   }
 
   function renderRevenueGrid(services, goals, actuals, year) {
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const safeActuals = Array.isArray(actuals) ? actuals : [];
 
     const header = `
       <tr>
@@ -113,7 +142,7 @@ async function renderGoalsTab(container, portalState) {
 
     const body = services.map(s => {
       const rowActuals = months.map((_, idx) => {
-        const a = actuals.find(a => a.service_id === s.id && a.month === idx + 1);
+        const a = safeActuals.find(a => a.service_id === s.id && a.month === idx + 1);
         return a?.actual_revenue || 0;
       });
 
@@ -138,6 +167,7 @@ async function renderGoalsTab(container, portalState) {
   }
 
   function renderLeadIndicatorsGrid(goals, year) {
+    const safeGoals = Array.isArray(goals) ? goals : [];
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
     const indicators = [
@@ -159,7 +189,7 @@ async function renderGoalsTab(container, portalState) {
 
     const body = indicators.map(ind => {
       const row = months.map((_, idx) => {
-        const g = goals.find(g => g.month === idx + 1);
+        const g = safeGoals.find(g => g.month === idx + 1);
         return g?.[ind.key] || 0;
       });
 
@@ -189,13 +219,15 @@ async function renderGoalsTab(container, portalState) {
 ------------------------------------------------------------ */
 
 function openGoalsModal(services, goals, month, year, project, onSave) {
+  const safeGoals = Array.isArray(goals) ? goals : [];
+
   const modal = document.createElement("div");
   modal.className = "modal-overlay";
 
-  const goalsForMonth = goals.find(g => g.month === month);
+  const goalsForMonth = safeGoals.find(g => g.month === month);
 
   const serviceRows = services.map(s => {
-    const g = goals.find(g => g.service_id === s.id && g.month === month);
+    const g = safeGoals.find(g => g.service_id === s.id && g.month === month);
     return `
       <label>${escapeHtml(s.service_name)}</label>
       <input type="number" class="goal-input" data-service="${s.id}" value="${g?.goal_clients || 0}">
@@ -259,7 +291,19 @@ function openGoalsModal(services, goals, month, year, project, onSave) {
       sales_calls: Number(modal.querySelector("#li-sales").value)
     };
 
-    await updateMonthlyGoals(project, year, month, payload, leadIndicators);
+    const res = await fetch(
+      "https://operations-module.dennis-e64.workers.dev/goals/monthly/update",
+      {
+        method: "POST",
+        body: JSON.stringify({ project, year, month, goals: payload, lead_indicators: leadIndicators }),
+        headers: { "Content-Type": "application/json" }
+      }
+    );
+
+    if (!res.ok) {
+      console.error("UPDATE GOALS ERROR:", await res.text());
+    }
+
     modal.remove();
     onSave();
   });
@@ -295,3 +339,4 @@ async function updateMonthlyGoals(project, year, month, goals, lead_indicators) 
     headers: { "Content-Type": "application/json" }
   });
 }
+
