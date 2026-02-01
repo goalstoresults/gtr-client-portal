@@ -7,25 +7,45 @@ export async function loadGoalsTab({ portalState, content }) {
 }
 
 async function renderGoalsTab(container, portalState) {
-container.innerHTML = `
-  <section class="card">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <h2>Goals</h2>
-      <button id="goals-save-all" class="btn">Save Goals</button>
+  container.innerHTML = `
+    <section class="card">
+
+      <!-- Header with Save Button -->
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2>Goals</h2>
+        <button id="goals-save-all" class="btn">Save Goals</button>
+      </div>
+
+      <label style="display:block; margin-bottom:12px; margin-top:12px;">
+        Year:
+        <select id="goals-year"></select>
+      </label>
+
+      <div id="goals-leads-grid">(loading…)</div>
+      <div style="height:32px;"></div>
+      <div id="goals-clients-grid">(loading…)</div>
+      <div style="height:32px;"></div>
+      <div id="goals-revenue-grid">(loading…)</div>
+
+    </section>
+
+    <!-- Toast -->
+    <div id="toast" style="
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #4caf50;
+      color: white;
+      padding: 12px 18px;
+      border-radius: 6px;
+      font-size: 14px;
+      display: none;
+      z-index: 9999;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    ">
+      Saved!
     </div>
-
-    <label style="display:block; margin-bottom:12px; margin-top:12px;">
-      Year:
-      <select id="goals-year"></select>
-    </label>
-
-    <div id="goals-leads-grid">(loading…)</div>
-    <div style="height:32px;"></div>
-    <div id="goals-clients-grid">(loading…)</div>
-    <div style="height:32px;"></div>
-    <div id="goals-revenue-grid">(loading…)</div>
-  </section>
-`;
+  `;
 
   const yearSelect = container.querySelector("#goals-year");
   const leadsGrid = container.querySelector("#goals-leads-grid");
@@ -61,23 +81,13 @@ container.innerHTML = `
     const services = await fetchServices(portalState.project);
     const goals = await fetchMonthlyGoals(portalState.project, year);
 
-    console.log("SERVICES RAW:", services);
-    console.log("GOALS RAW:", goals);
-
     const safeServices = Array.isArray(services) ? services : [];
     const safeGoals = Array.isArray(goals) ? goals : [];
 
-    if (!Array.isArray(services)) {
-      leadsGrid.innerHTML = "<p>Error loading services.</p>";
-      clientsGrid.innerHTML = "<p>Error loading services.</p>";
-      revenueGrid.innerHTML = "<p>Error loading services.</p>";
-      return;
-    }
-
-    if (!Array.isArray(goals)) {
-      leadsGrid.innerHTML = "<p>Error loading goals.</p>";
-      clientsGrid.innerHTML = "<p>Error loading goals.</p>";
-      revenueGrid.innerHTML = "<p>Error loading goals.</p>";
+    if (!Array.isArray(services) || !Array.isArray(goals)) {
+      leadsGrid.innerHTML = "<p>Error loading data.</p>";
+      clientsGrid.innerHTML = "<p>Error loading data.</p>";
+      revenueGrid.innerHTML = "<p>Error loading data.</p>";
       return;
     }
 
@@ -92,7 +102,16 @@ container.innerHTML = `
     });
 
     saveButton.onclick = async () => {
+      saveButton.disabled = true;
+      saveButton.textContent = "Saving…";
+
       await saveAllGoals(portalState.project, year, indicators);
+
+      saveButton.disabled = false;
+      saveButton.textContent = "Save Goals";
+
+      showToast("Goals saved!");
+
       const refreshedGoals = await fetchMonthlyGoals(portalState.project, year);
       renderLeadIndicatorsGrid(Array.isArray(refreshedGoals) ? refreshedGoals : []);
       renderClientsGrid(safeServices, Array.isArray(refreshedGoals) ? refreshedGoals : []);
@@ -267,6 +286,24 @@ container.innerHTML = `
         console.error(`UPDATE GOALS ERROR (month ${month}):`, await res.text());
       }
     }
+  }
+
+  function showToast(message = "Saved!") {
+    const toast = document.getElementById("toast");
+    if (!toast) return;
+
+    toast.textContent = message;
+    toast.style.display = "block";
+    toast.style.opacity = "1";
+
+    setTimeout(() => {
+      toast.style.transition = "opacity 0.6s";
+      toast.style.opacity = "0";
+      setTimeout(() => {
+        toast.style.display = "none";
+        toast.style.transition = "";
+      }, 600);
+    }, 1500);
   }
 }
 
