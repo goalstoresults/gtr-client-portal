@@ -4,6 +4,17 @@
 import { escapeHtml, formatDateTime } from "../utilities.js";
 
 export async function renderFilterHistory(container, portalState) {
+
+  // ------------------------------------------------------------
+  // Initialize sort state (NEW)
+  // ------------------------------------------------------------
+  if (!portalState.filterHistorySort) {
+    portalState.filterHistorySort = {
+      column: "run_at",
+      direction: "desc"
+    };
+  }
+
   container.innerHTML = `
     <section class="card">
 
@@ -36,7 +47,7 @@ export async function renderFilterHistory(container, portalState) {
 
       <table class="notes-table" id="hist-table" style="display:none;">
         <thead>
-          <tr>
+          <tr id="hist-header-row">
             <th>Run At</th>
             <th>User</th>
             <th>Filter Name</th>
@@ -100,37 +111,115 @@ export async function renderFilterHistory(container, portalState) {
       const data = await res.json();
       if (!res.ok || !data?.success) throw new Error(data?.error || `HTTP ${res.status}`);
 
-      const runs = Array.isArray(data.runs) ? data.runs : [];
+      let runs = Array.isArray(data.runs) ? data.runs : [];
 
       if (!runs.length) {
         status.textContent = `No runs in the last ${data.window_days ?? days} days.`;
         return;
       }
 
-      body.innerHTML = runs
-        .map(run => {
-          const nh = Array.isArray(run.neighborhoods)
-            ? run.neighborhoods.join(", ")
-            : (run.neighborhoods || "");
+      // ------------------------------------------------------------
+      // SORTING SYSTEM (NEW)
+      // ------------------------------------------------------------
 
-          const sq = Array.isArray(run.square_footage)
-            ? run.square_footage.join(", ")
-            : (run.square_footage || "");
+      function sortRuns() {
+        const { column, direction } = portalState.filterHistorySort;
 
-          const fname = run.filter_name || "";
+        runs.sort((a, b) => {
+          let A = a[column];
+          let B = b[column];
 
-          return `
-            <tr>
-              <td>${formatDateTime(run.run_at)}</td>
-              <td>${escapeHtml(run.user_label || "")}</td>
-              <td title="${escapeHtml(fname)}">${escapeHtml(fname)}</td>
-              <td>${escapeHtml(nh)}</td>
-              <td>${escapeHtml(sq)}</td>
-              <td>${run.result_count ?? ""}</td>
-            </tr>
-          `;
-        })
-        .join("");
+          if (column === "run_at") {
+            A = A ? new Date(A) : 0;
+            B = B ? new Date(B) : 0;
+          } else {
+            A = (A || "").toString().toLowerCase();
+            B = (B || "").toString().toLowerCase();
+          }
+
+          if (A < B) return direction === "asc" ? -1 : 1;
+          if (A > B) return direction === "asc" ? 1 : -1;
+          return 0;
+        });
+      }
+
+      function renderHistoryTable() {
+        sortRuns();
+
+        const headerConfig = [
+          { key: "run_at", label: "Run At" },
+          { key: "user_label", label: "User" },
+          { key: "filter_name", label: "Filter Name" },
+          { key: "neighborhoods", label: "Neighborhoods" },
+          { key: "square_footage", label: "Square Footage" },
+          { key: "result_count", label: "Result Count" }
+        ];
+
+        const headerHtml = headerConfig
+          .map(col => {
+            const isSorted = portalState.filterHistorySort.column === col.key;
+            const up = isSorted && portalState.filterHistorySort.direction === "asc" ? "▲" : "△";
+            const down = isSorted && portalState.filterHistorySort.direction === "desc" ? "▼" : "▽";
+
+            return `
+              <th class="sortable" data-field="${col.key}">
+                ${col.label}
+                <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+                  <span>${up}</span>
+                  <span>${down}</span>
+                </span>
+              </th>
+            `;
+          })
+          .join("");
+
+        document.getElementById("hist-header-row").innerHTML = headerHtml;
+
+        body.innerHTML = runs
+          .map(run => {
+            const nh = Array.isArray(run.neighborhoods)
+              ? run.neighborhoods.join(", ")
+              : (run.neighborhoods || "");
+
+            const sq = Array.isArray(run.square_footage)
+              ? run.square_footage.join(", ")
+              : (run.square_footage || "");
+
+            const fname = run.filter_name || "";
+
+            return `
+              <tr>
+                <td>${formatDateTime(run.run_at)}</td>
+                <td>${escapeHtml(run.user_label || "")}</td>
+                <td title="${escapeHtml(fname)}">${escapeHtml(fname)}</td>
+                <td>${escapeHtml(nh)}</td>
+                <td>${escapeHtml(sq)}</td>
+                <td>${run.result_count ?? ""}</td>
+              </tr>
+            `;
+          })
+          .join("");
+
+        // Sorting events
+        document.querySelectorAll("th.sortable").forEach(th => {
+          th.addEventListener("click", () => {
+            const field = th.dataset.field;
+
+            if (portalState.filterHistorySort.column === field) {
+              portalState.filterHistorySort.direction =
+                portalState.filterHistorySort.direction === "asc" ? "desc" : "asc";
+            } else {
+              portalState.filterHistorySort.column = field;
+              portalState.filterHistorySort.direction = "asc";
+            }
+
+            renderHistoryTable();
+          });
+        });
+      }
+
+      // Initial render
+      renderHistoryTable();
 
       table.style.display = "";
       status.textContent = `Showing ${runs.length} run(s) from last ${data.window_days ?? days} days${user ? ` for ${user}` : ""}${limit > 0 ? ` (limit ${limit})` : ""}.`;
