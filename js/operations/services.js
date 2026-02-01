@@ -142,7 +142,9 @@ function openServiceModal({ project, service = null, onSave }) {
     </div>
   `;
 
-  document.body.appendChild(modal);
+  const container = document.querySelector("#services-grid").parentElement;
+container.prepend(modal);
+
 
   modal.querySelector("#svc-cancel").addEventListener("click", () => {
     modal.remove();
