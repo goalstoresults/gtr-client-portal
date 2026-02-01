@@ -243,6 +243,9 @@
       portalState.contact_first_name = config.contact_first_name;
       portalState.contact_last_name = config.contact_last_name;
 
+      /* ⭐ CRITICAL FIX — now Contacts sees enabled_tabs */
+      portalState.enabled_tabs = config.enabled_tabs || [];
+
       portalTitleText.textContent = config.display_name || "";
       pageTitle.textContent = config.display_name || "";
     }
@@ -295,3 +298,4 @@
   </script>
 </body>
 </html>
+
