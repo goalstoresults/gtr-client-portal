@@ -1,82 +1,76 @@
-// js/contacts/tab-services.js
+// /notes/tab-history.js
+// Handles: Notes list, sorting, filtering, navigation to Review tab
 
-import { escapeHtml, formatCurrency } from "../utilities.js";
+import { escapeHtml, formatDateTime } from "../utilities.js";
+import { renderReview } from "./tab-review.js";
 
-export async function renderContactServicesTab(container, portalState) {
-  const contactId = portalState.selectedContactId;
+// ------------------------------------------------------------
+// Main Renderer
+// ------------------------------------------------------------
+export async function renderHistory(container, portalState) {
+  try {
+    const reviewOnly =
+      document.getElementById("filter-review-only")?.checked ?? true;
+    const name =
+      document.getElementById("filter-name")?.value.trim() || "";
 
-  if (!contactId) {
-    container.innerHTML = `
-      <section class="card">
-        <h2>Services</h2>
-        <p>Select a contact from the list to view their services.</p>
-      </section>
-    `;
-    return;
-  }
-
-  container.innerHTML = `
-    <section class="card">
-      <h2>Services</h2>
-
-      <div style="margin-bottom: 16px;">
-        <button id="add-client-service-btn" class="btn">Add Service</button>
-      </div>
-
-      <div id="client-services-grid">(loading…)</div>
-    </section>
-  `;
-
-  const grid = container.querySelector("#client-services-grid");
-  const addBtn = container.querySelector("#add-client-service-btn");
-
-  loadGrid();
-
-  addBtn.addEventListener("click", async () => {
-    let catalog = await fetchProjectServices(portalState.project);
-    catalog.sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
-
-    openClientServiceModal({
+    // ------------------------------------------------------------
+    // Fetch notes
+    // ------------------------------------------------------------
+    const params = new URLSearchParams({
       project: portalState.project,
-      client_id: contactId,
-      catalog,
-      onSave: async (payload) => {
-        await createClientService(payload);
-        loadGrid();
-      }
+      limit: "500"
     });
-  });
 
-  async function loadGrid() {
-    const rows = await fetchClientServices(portalState.project, contactId);
-    renderGrid(rows);
-  }
+    if (reviewOnly) params.set("needs_review", "true");
 
-  function renderGrid(rows) {
-    if (!portalState.servicesSort) {
-      portalState.servicesSort = {
-        column: "start_date",
-        direction: "asc"
+    const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${params}`;
+    const res = await fetch(url, { cache: "no-cache" });
+    const data = await res.json();
+
+    let notes = Array.isArray(data?.notes) ? data.notes : [];
+
+    // ------------------------------------------------------------
+    // Client-side name filter
+    // ------------------------------------------------------------
+    if (name) {
+      const term = name.toLowerCase();
+      notes = notes.filter(n =>
+        (n.from_name || "").toLowerCase().includes(term)
+      );
+    }
+
+    // ------------------------------------------------------------
+    // Initialize sort state
+    // ------------------------------------------------------------
+    if (!portalState.notesSort) {
+      portalState.notesSort = {
+        column: "created_at",
+        direction: "desc"
       };
     }
 
     const columns = [
-      { key: "service_name", label: "Service" },
-      { key: "start_date", label: "Start" },
-      { key: "end_date", label: "End" },
-      { key: "price", label: "Price" }
+      { key: "created_at", label: "Created", isDate: true },
+      { key: "subject", label: "Subject" },
+      { key: "from_name", label: "From" },
+      { key: "contact_name", label: "Contact" },
+      { key: "needs_review", label: "Needs Review" }
     ];
 
-    function sortRows() {
-      const { column, direction } = portalState.servicesSort;
+    // ------------------------------------------------------------
+    // Sorting helper
+    // ------------------------------------------------------------
+    function sortNotes() {
+      const { column, direction } = portalState.notesSort;
 
-      rows.sort((a, b) => {
+      notes.sort((a, b) => {
         let A = a[column];
         let B = b[column];
 
-        if (column === "price") {
-          A = Number(A ?? 0);
-          B = Number(B ?? 0);
+        if (column === "created_at") {
+          A = new Date(A);
+          B = new Date(B);
         } else {
           A = (A || "").toString().toLowerCase();
           B = (B || "").toString().toLowerCase();
@@ -88,230 +82,178 @@ export async function renderContactServicesTab(container, portalState) {
       });
     }
 
-    sortRows();
+    // ------------------------------------------------------------
+    // Table Renderer
+    // ------------------------------------------------------------
+    function renderTable() {
+      sortNotes();
 
-    const header = `
-      <tr>
-        ${columns
-          .map(col => {
-            const isSorted = portalState.servicesSort.column === col.key;
-            const upArrow =
-              isSorted && portalState.servicesSort.direction === "asc"
-                ? "▲"
-                : "△";
-            const downArrow =
-              isSorted && portalState.servicesSort.direction === "desc"
-                ? "▼"
-                : "▽";
+      const headerHtml = columns
+        .map(col => {
+          const isSorted = portalState.notesSort.column === col.key;
+          const upArrow =
+            isSorted && portalState.notesSort.direction === "asc"
+              ? "▲"
+              : "△";
+          const downArrow =
+            isSorted && portalState.notesSort.direction === "desc"
+              ? "▼"
+              : "▽";
 
-            return `
-              <th class="sortable" data-field="${col.key}">
-                ${col.label}
-                <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-                  <span class="sort-up">${upArrow}</span>
-                  <span class="sort-down">${downArrow}</span>
-                </span>
-              </th>
-            `;
-          })
-          .join("")}
-        <th>Source</th>
-        <th>Notes</th>
-        <th>Actions</th>
-      </tr>
-    `;
+          return `
+            <th class="sortable" data-field="${col.key}">
+              ${col.label}
+              <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+                <span class="sort-up">${upArrow}</span>
+                <span class="sort-down">${downArrow}</span>
+              </span>
+            </th>
+          `;
+        })
+        .join("");
 
-    const body = rows
-      .map(s => `
-        <tr>
-          <td>${escapeHtml(s.service_name)}</td>
-          <td>${escapeHtml(s.start_date)}</td>
-          <td>${escapeHtml(s.end_date || "")}</td>
-          <td>${formatCurrency(s.price)}</td>
-          <td>${escapeHtml(s.price_source || "")}</td>
-          <td>${escapeHtml(s.notes || "")}</td>
-          <td>
-            <button class="btn-small" data-edit="${s.id}">Edit</button>
-            <button class="btn-small btn-danger" data-delete="${s.id}">Delete</button>
-          </td>
-        </tr>
-      `)
-      .join("");
+      const rowsHtml = notes
+        .map(
+          n => `
+          <tr>
+            <td>${formatDateTime(n.created_at)}</td>
+            <td>${escapeHtml(n.subject || "")}</td>
+            <td>${escapeHtml(n.from_name || "")}</td>
+            <td>${escapeHtml(n.contact_name || "")}</td>
+            <td>${n.needs_review ? "Yes" : "No"}</td>
+            <td><button class="btn-primary btn-review" data-id="${n.id}">Review</button></td>
+          </tr>
+        `
+        )
+        .join("");
 
-    grid.innerHTML = `
-      <table class="notes-table">
-        <thead>${header}</thead>
-        <tbody>${body}</tbody>
-      </table>
-    `;
+      container.innerHTML = `
+        <h4>Notes History (Total: ${notes.length})</h4>
 
-    // Sorting events
-    grid.querySelectorAll("th.sortable").forEach(th => {
-      th.addEventListener("click", () => {
-        const field = th.dataset.field;
+        <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+          <label>
+            <input type="checkbox" id="filter-review-only" ${reviewOnly ? "checked" : ""}>
+            Needs Review Only
+          </label>
 
-        if (portalState.servicesSort.column === field) {
-          portalState.servicesSort.direction =
-            portalState.servicesSort.direction === "asc" ? "desc" : "asc";
-        } else {
-          portalState.servicesSort.column = field;
-          portalState.servicesSort.direction = "asc";
-        }
+          <label>Name:
+            <input type="text" id="filter-name" value="${escapeHtml(name)}">
+          </label>
 
-        renderGrid(rows);
-      });
-    });
+          <button id="btnApplyFilter" class="secondary">Apply Filter</button>
+          <button id="btnClearFilter" class="secondary">Clear Filter</button>
+        </div>
 
-    // Edit/Delete
-    grid.querySelectorAll("[data-edit]").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const id = btn.getAttribute("data-edit");
-        const svc = rows.find(r => r.id === id);
-        let catalog = await fetchProjectServices(portalState.project);
+        <table class="notes-table">
+          <thead>
+            <tr>
+              ${headerHtml}
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${
+              rowsHtml ||
+              `<tr><td colspan="6" class="muted">(no notes found)</td></tr>`
+            }
+          </tbody>
+        </table>
+      `;
 
-        catalog.sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
+      // ------------------------------------------------------------
+      // Sorting events
+      // ------------------------------------------------------------
+      container.querySelectorAll("th.sortable").forEach(th => {
+        th.addEventListener("click", () => {
+          const field = th.dataset.field;
 
-        openClientServiceModal({
-          project: portalState.project,
-          client_id: contactId,
-          catalog,
-          service: svc,
-          onSave: async (payload) => {
-            await updateClientService(id, payload);
-            loadGrid();
+          if (portalState.notesSort.column === field) {
+            portalState.notesSort.direction =
+              portalState.notesSort.direction === "asc"
+                ? "desc"
+                : "asc";
+          } else {
+            portalState.notesSort.column = field;
+            portalState.notesSort.direction = "asc";
           }
+
+          renderTable();
         });
       });
-    });
 
-    grid.querySelectorAll("[data-delete]").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const id = btn.getAttribute("data-delete");
-        if (!confirm("Remove this service from the client?")) return;
-        await deleteClientService(id);
-        loadGrid();
+      // ------------------------------------------------------------
+      // Review button events
+      // ------------------------------------------------------------
+      container.querySelectorAll(".btn-review").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const noteId = btn.dataset.id;
+          portalState.selectedNoteId = noteId;
+
+          const clientName =
+            btn.closest("tr").querySelector("td:nth-child(4)")
+              ?.textContent || "";
+
+          const contextBar = document.getElementById(
+            "contact-context-bar"
+          );
+          if (contextBar) {
+            contextBar.textContent = clientName
+              ? `Contact: ${clientName}`
+              : "Contact not linked yet";
+          }
+
+          // ✅ Enable Review and Relationships subtabs locally
+          ["review", "relationships"].forEach(subtab => {
+            const btn = document.querySelector(
+              `#notes-subtabs button[data-subtab="${subtab}"]`
+            );
+            if (btn) {
+              btn.disabled = false;
+              btn.classList.remove("disabled");
+            }
+          });
+
+          // Switch tab
+          document
+            .querySelectorAll("#notes-subtabs button")
+            .forEach(b => b.classList.remove("active"));
+
+          document
+            .querySelector(
+              '#notes-subtabs button[data-subtab="review"]'
+            )
+            ?.classList.add("active");
+
+          renderReview(container, portalState, noteId);
+        });
       });
-    });
-  }
-}
 
-/* ------------------------------------------------------------
-   API HELPERS
------------------------------------------------------------- */
+      // ------------------------------------------------------------
+      // Filter buttons
+      // ------------------------------------------------------------
+      document
+        .getElementById("btnApplyFilter")
+        .addEventListener("click", () => {
+          renderHistory(container, portalState);
+        });
 
-async function fetchClientServices(project, client_id) {
-  const url = `https://operations-module.dennis-e64.workers.dev/client_services/list?project=${project}&client_id=${client_id}`;
-  const res = await fetch(url, { cache: "no-cache" });
-  return await res.json();
-}
-
-async function fetchProjectServices(project) {
-  const url = `https://operations-module.dennis-e64.workers.dev/services/list?project=${project}`;
-  const res = await fetch(url, { cache: "no-cache" });
-  return await res.json();
-}
-
-async function createClientService(payload) {
-  const url = `https://operations-module.dennis-e64.workers.dev/client_services/create`;
-  const res = await fetch(url, {
-    method: "POST",
-    body: JSON.stringify(payload),
-    headers: { "Content-Type": "application/json" }
-  });
-  return await res.json();
-}
-
-async function updateClientService(id, payload) {
-  const url = `https://operations-module.dennis-e64.workers.dev/client_services/update?id=${id}`;
-  const res = await fetch(url, {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-    headers: { "Content-Type": "application/json" }
-  });
-  return await res.json();
-}
-
-async function deleteClientService(id) {
-  const url = `https://operations-module.dennis-e64.workers.dev/client_services/delete?id=${id}`;
-  await fetch(url, { method: "DELETE" });
-}
-
-/* ------------------------------------------------------------
-   MODAL
------------------------------------------------------------- */
-
-function openClientServiceModal({ project, client_id, catalog, service = null, onSave }) {
-  const isEdit = !!service;
-
-  const options = `
-    <option value="">-- Select a Service --</option>
-  ` + catalog
-    .map(s => `
-      <option value="${s.id}" ${service?.service_id === s.id ? "selected" : ""}>
-        ${escapeHtml(s.service_name)}
-      </option>
-    `)
-    .join("");
-
-  const modal = document.createElement("div");
-  modal.className = "modal-overlay";
-
-  modal.innerHTML = `
-    <div class="modal">
-      <h3>${isEdit ? "Edit Service" : "Add Service"}</h3>
-
-      <label>Service</label>
-      <select id="svc-service">${options}</select>
-
-      <label>Start Date</label>
-      <input id="svc-start" type="date" value="${service?.start_date || ""}">
-
-      <label>End Date</label>
-      <input id="svc-end" type="date" value="${service?.end_date || ""}">
-
-      <label>Price</label>
-      <input id="svc-price" type="number" step="0.01" value="${service?.price || ""}">
-
-      <label>Price Source</label>
-      <input id="svc-source" type="text" value="${service?.price_source || ""}">
-
-      <label>Notes</label>
-      <textarea id="svc-notes">${service?.notes || ""}</textarea>
-
-      <div class="modal-actions">
-        <button id="svc-save" class="btn">${isEdit ? "Save" : "Create"}</button>
-        <button id="svc-cancel" class="btn-secondary">Cancel</button>
-      </div>
-    </div>
-  `;
-
-  document.querySelector("#contactsContent").prepend(modal);
-
-  const serviceSelect = modal.querySelector("#svc-service");
-  const priceInput = modal.querySelector("#svc-price");
-
-  serviceSelect.addEventListener("change", () => {
-    const selected = catalog.find(s => s.id === serviceSelect.value);
-    if (selected) {
-      priceInput.value = selected.default_price ?? "";
+      document
+        .getElementById("btnClearFilter")
+        .addEventListener("click", () => {
+          document.getElementById("filter-review-only").checked = true;
+          document.getElementById("filter-name").value = "";
+          renderHistory(container, portalState);
+        });
     }
-  });
 
-  modal.querySelector("#svc-cancel").addEventListener("click", () => modal.remove());
-
-  modal.querySelector("#svc-save").addEventListener("click", async () => {
-    const payload = {
-      project,
-      client_id,
-      service_id: modal.querySelector("#svc-service").value,
-      start_date: modal.querySelector("#svc-start").value,
-      end_date: modal.querySelector("#svc-end").value || null,
-      price: modal.querySelector("#svc-price").value || null,
-      price_source: modal.querySelector("#svc-source").value.trim() || null,
-      notes: modal.querySelector("#svc-notes").value.trim() || null
-    };
-
-    await onSave(payload);
-    modal.remove();
-  });
+    // ------------------------------------------------------------
+    // Initial render
+    // ------------------------------------------------------------
+    renderTable();
+  } catch (err) {
+    container.innerHTML = `
+      <h4>Notes History</h4>
+      <p>Error loading history: ${escapeHtml(err.message)}</p>
+    `;
+  }
 }
