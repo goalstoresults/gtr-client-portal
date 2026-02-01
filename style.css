@@ -448,6 +448,29 @@ th.sortable:hover .sort-arrows {
   padding: 12px 0;           /* matches your HTML block spacing */
 }
 
+/* Wrap each grid in a scroll container */
+.goals-scroll-container {
+  overflow-x: auto;
+  position: relative;
+}
+
+/* Freeze the first column */
+.goals-table th:first-child,
+.goals-table td:first-child {
+  position: sticky;
+  left: 0;
+  background: #fff; /* or your card background */
+  z-index: 2;
+  border-right: 1px solid #ddd;
+}
+
+/* Freeze the header row */
+.goals-table thead th {
+  position: sticky;
+  top: 0;
+  background: #f7f7f7;
+  z-index: 3;
+}
 
 
 /* Right-align numeric/currency columns */
