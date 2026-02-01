@@ -8,7 +8,7 @@
 
 import { escapeHtml } from "../utilities.js";
 
-export async function renderFilterRun(container, portalState) {
+export async function renderRunFilter(container, portalState) {
   container.innerHTML = `
     <section class="card">
 
