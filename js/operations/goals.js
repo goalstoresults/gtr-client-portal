@@ -7,26 +7,25 @@ export async function loadGoalsTab({ portalState, content }) {
 }
 
 async function renderGoalsTab(container, portalState) {
-  container.innerHTML = `
-    <section class="card">
+container.innerHTML = `
+  <section class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
       <h2>Goals</h2>
+      <button id="goals-save-all" class="btn">Save Goals</button>
+    </div>
 
-      <label style="display:block; margin-bottom:12px;">
-        Year:
-        <select id="goals-year"></select>
-      </label>
+    <label style="display:block; margin-bottom:12px; margin-top:12px;">
+      Year:
+      <select id="goals-year"></select>
+    </label>
 
-      <div id="goals-leads-grid">(loading…)</div>
-      <div style="height:32px;"></div>
-      <div id="goals-clients-grid">(loading…)</div>
-      <div style="height:32px;"></div>
-      <div id="goals-revenue-grid">(loading…)</div>
-
-      <div style="margin-top:24px; text-align:right;">
-        <button id="goals-save-all" class="btn">Save Goals</button>
-      </div>
-    </section>
-  `;
+    <div id="goals-leads-grid">(loading…)</div>
+    <div style="height:32px;"></div>
+    <div id="goals-clients-grid">(loading…)</div>
+    <div style="height:32px;"></div>
+    <div id="goals-revenue-grid">(loading…)</div>
+  </section>
+`;
 
   const yearSelect = container.querySelector("#goals-year");
   const leadsGrid = container.querySelector("#goals-leads-grid");
