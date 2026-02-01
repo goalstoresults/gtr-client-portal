@@ -142,8 +142,9 @@ function openServiceModal({ project, service = null, onSave }) {
     </div>
   `;
 
-  const container = document.querySelector("#services-grid").parentElement;
-container.prepend(modal);
+  // Insert modal at the top of the Services card
+    const container = document.querySelector("#operations-content section.card");
+    container.prepend(modal);
 
 
   modal.querySelector("#svc-cancel").addEventListener("click", () => {
