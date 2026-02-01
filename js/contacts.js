@@ -30,14 +30,21 @@ export async function loadContactsTab({ portalState, tabContent }) {
   const content = tabContent.querySelector("#contactsContent");
   const buttons = tabContent.querySelectorAll("#contacts-subtabs button");
 
-  // ⭐ HIDE SERVICES TAB IF OPERATIONS (9) IS NOT ENABLED
-  const servicesBtn = tabContent.querySelector('#contacts-subtabs button[data-subtab="services"]');
-  const operationsEnabled = portalState.enabled_tabs?.includes("9");
+  // ⭐ DETERMINE IF OPERATIONS (TAB 9) IS ENABLED
+  const operationsEnabled =
+    Array.isArray(portalState.enabled_tabs) &&
+    portalState.enabled_tabs.includes("9");
+
+  // ⭐ REMOVE SERVICES TAB IF OPERATIONS IS NOT ENABLED
+  const servicesBtn = tabContent.querySelector(
+    '#contacts-subtabs button[data-subtab="services"]'
+  );
 
   if (!operationsEnabled && servicesBtn) {
-    servicesBtn.style.display = "none";
+    servicesBtn.remove(); // physically remove it so it never appears
   }
 
+  // ⭐ SUBTAB ROUTER
   buttons.forEach(btn => {
     btn.addEventListener("click", async () => {
       // Reset active state
@@ -68,7 +75,11 @@ export async function loadContactsTab({ portalState, tabContent }) {
 
         case "details":
           if (portalState.selectedContactId) {
-            await renderContactDetails(content, portalState, portalState.selectedContactId);
+            await renderContactDetails(
+              content,
+              portalState,
+              portalState.selectedContactId
+            );
           } else {
             content.innerHTML = `
               <section class="card">
@@ -81,7 +92,11 @@ export async function loadContactsTab({ portalState, tabContent }) {
 
         case "relationships":
           if (portalState.selectedContactId) {
-            await renderContactRelationships(content, portalState, portalState.selectedContactId);
+            await renderContactRelationships(
+              content,
+              portalState,
+              portalState.selectedContactId
+            );
           } else {
             content.innerHTML = `
               <section class="card">
@@ -94,7 +109,11 @@ export async function loadContactsTab({ portalState, tabContent }) {
 
         case "notes":
           if (portalState.selectedContactId) {
-            await renderContactNotes(content, portalState, portalState.selectedContactId);
+            await renderContactNotes(
+              content,
+              portalState,
+              portalState.selectedContactId
+            );
           } else {
             content.innerHTML = `
               <section class="card">
@@ -120,8 +139,10 @@ export async function loadContactsTab({ portalState, tabContent }) {
     });
   });
 
-  // ✅ Default to List view when tab first loads
-  const defaultBtn = tabContent.querySelector('#contacts-subtabs button[data-subtab="list"]');
+  // ⭐ DEFAULT TO LIST VIEW
+  const defaultBtn = tabContent.querySelector(
+    '#contacts-subtabs button[data-subtab="list"]'
+  );
   if (defaultBtn) {
     defaultBtn.classList.add("active");
     await renderContactList(content, portalState);
