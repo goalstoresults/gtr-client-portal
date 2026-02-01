@@ -33,7 +33,11 @@ export async function loadServicesTab({ portalState, content }) {
   // LOAD SERVICES
   // ------------------------------------------------------------
   async function loadServices() {
-    const rows = await fetchServices(portalState.project);
+    let rows = await fetchServices(portalState.project);
+
+    // ⭐ Sort by sort_order ASC (nulls last)
+    rows.sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
+
     renderGrid(rows);
   }
 
@@ -48,6 +52,7 @@ export async function loadServicesTab({ portalState, content }) {
 
     const header = `
       <tr>
+        <th>Sort</th>
         <th>Name</th>
         <th>Category</th>
         <th>Default Price</th>
@@ -60,6 +65,15 @@ export async function loadServicesTab({ portalState, content }) {
       .map(s => {
         return `
           <tr>
+            <td>
+              <input 
+                type="number" 
+                class="sort-input" 
+                data-id="${s.id}" 
+                value="${s.sort_order ?? ''}" 
+                style="width:60px;"
+              >
+            </td>
             <td>${s.service_name}</td>
             <td>${s.category || ""}</td>
             <td>${s.default_price != null ? "$" + Number(s.default_price).toFixed(2) : ""}</td>
@@ -79,6 +93,17 @@ export async function loadServicesTab({ portalState, content }) {
         <tbody>${body}</tbody>
       </table>
     `;
+
+    // ⭐ SORT ORDER CHANGE HANDLERS
+    grid.querySelectorAll(".sort-input").forEach(input => {
+      input.addEventListener("change", async () => {
+        const id = input.dataset.id;
+        const newValue = Number(input.value);
+
+        await updateSortOrder(id, newValue);
+        loadServices(); // reload sorted
+      });
+    });
 
     // Attach action listeners
     grid.querySelectorAll("[data-edit]").forEach(btn => {
@@ -143,9 +168,8 @@ function openServiceModal({ project, service = null, onSave }) {
   `;
 
   // Insert modal at the top of the Services card
-    const container = document.querySelector("#operations-content section.card");
-    container.prepend(modal);
-
+  const container = document.querySelector("#operations-content section.card");
+  container.prepend(modal);
 
   modal.querySelector("#svc-cancel").addEventListener("click", () => {
     modal.remove();
@@ -216,3 +240,18 @@ async function deleteService(id) {
     console.error("Failed to delete service:", err);
   }
 }
+
+// ⭐ NEW: UPDATE SORT ORDER
+async function updateSortOrder(id, sort_order) {
+  try {
+    const url = `https://operations-module.dennis-e64.workers.dev/services/update_sort_order?id=${id}`;
+    await fetch(url, {
+      method: "PATCH",
+      body: JSON.stringify({ sort_order }),
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (err) {
+    console.error("Failed to update sort order:", err);
+  }
+}
+
