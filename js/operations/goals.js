@@ -86,17 +86,14 @@ async function renderGoalsTab(container, portalState) {
     renderClientsGrid(safeServices, safeGoals);
     renderRevenueGrid(safeServices);
 
-    // Recalculate revenue whenever client goals change
     clientsGrid.addEventListener("input", (e) => {
       if (e.target.classList.contains("client-goal-input")) {
         renderRevenueGrid(safeServices);
       }
     });
 
-    // Wire up Save button (idempotent)
     saveButton.onclick = async () => {
-      await saveAllGoals(portalState.project, year, indicators, months);
-      // Reload to reflect any backend normalization
+      await saveAllGoals(portalState.project, year, indicators);
       const refreshedGoals = await fetchMonthlyGoals(portalState.project, year);
       renderLeadIndicatorsGrid(Array.isArray(refreshedGoals) ? refreshedGoals : []);
       renderClientsGrid(safeServices, Array.isArray(refreshedGoals) ? refreshedGoals : []);
@@ -144,10 +141,12 @@ async function renderGoalsTab(container, portalState) {
 
     leadsGrid.innerHTML = `
       <h3>Lead Indicators (Goals)</h3>
-      <table class="notes-table">
-        <thead>${header}</thead>
-        <tbody>${body}</tbody>
-      </table>
+      <div class="goals-scroll-container">
+        <table class="notes-table goals-table">
+          <thead>${header}</thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
     `;
   }
 
@@ -191,15 +190,16 @@ async function renderGoalsTab(container, portalState) {
 
     clientsGrid.innerHTML = `
       <h3>Client Count Goals</h3>
-      <table class="notes-table">
-        <thead>${header}</thead>
-        <tbody>${body}</tbody>
-      </table>
+      <div class="goals-scroll-container">
+        <table class="notes-table goals-table">
+          <thead>${header}</thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
     `;
   }
 
   function renderRevenueGrid(services) {
-    // Read current client goals from the DOM and compute revenue
     const header = `
       <tr>
         <th>Service</th>
@@ -232,20 +232,17 @@ async function renderGoalsTab(container, portalState) {
 
     revenueGrid.innerHTML = `
       <h3>Revenue Goals (Calculated)</h3>
-      <table class="notes-table">
-        <thead>${header}</thead>
-        <tbody>${body}</tbody>
-      </table>
+      <div class="goals-scroll-container">
+        <table class="notes-table goals-table">
+          <thead>${header}</thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
     `;
   }
 
-  async function saveAllGoals(project, year, indicators, months) {
-    // For each month, collect:
-    // - lead indicators
-    // - client goals per service
-    // and send to /goals/monthly/update
+  async function saveAllGoals(project, year, indicators) {
     for (let month = 1; month <= 12; month++) {
-      // Lead indicators
       const leadIndicators = {};
       for (const ind of indicators) {
         const input = document.querySelector(
@@ -254,7 +251,6 @@ async function renderGoalsTab(container, portalState) {
         leadIndicators[ind.key] = input ? Number(input.value) || 0 : 0;
       }
 
-      // Client goals
       const clientInputs = document.querySelectorAll(
         `.client-goal-input[data-month="${month}"]`
       );
@@ -266,11 +262,6 @@ async function renderGoalsTab(container, portalState) {
           goal_clients: Number(input.value) || 0
         });
       });
-
-      if (goalsPayload.length === 0 && Object.values(leadIndicators).every(v => v === 0)) {
-        // Nothing to save for this month
-        continue;
-      }
 
       const res = await updateMonthlyGoals(project, year, month, goalsPayload, leadIndicators);
       if (!res.ok) {
@@ -305,4 +296,3 @@ async function updateMonthlyGoals(project, year, month, goals, lead_indicators) 
   });
   return res;
 }
-
