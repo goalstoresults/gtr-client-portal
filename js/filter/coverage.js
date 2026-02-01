@@ -1,5 +1,5 @@
 // /js/filter/coverage.js
-// Coverage Gaps — Phase 1 parity with cleaner UI
+// Coverage Gaps — Neighborhood-first expandable UI (strict pairing)
 
 import { escapeHtml } from "../utilities.js";
 
@@ -21,23 +21,9 @@ export async function renderFilterCoverage(container, portalState) {
 
       <div id="cov-status" class="mini-label" style="margin-bottom:12px;"></div>
 
-      <!-- Clean two-column layout with borders -->
-      <div class="two-col" style="gap:24px;">
-
-        <div style="border:1px solid #ddd; border-radius:6px; padding:16px; background:#fafafa;">
-          <h4 style="margin-top:0;">Neighborhoods Not Used</h4>
-          <ul id="cov-unused-nh" class="mini-list" style="margin-top:8px;">
-            <li class="mini-label">(ready)</li>
-          </ul>
-        </div>
-
-        <div style="border:1px solid #ddd; border-radius:6px; padding:16px; background:#fafafa;">
-          <h4 style="margin-top:0;">SqFt Not Used</h4>
-          <ul id="cov-unused-sqft" class="mini-list" style="margin-top:8px;">
-            <li class="mini-label">(ready)</li>
-          </ul>
-        </div>
-
+      <!-- NEW: Neighborhood-first expandable list -->
+      <div id="cov-grid" style="margin-top:16px;">
+        <div class="mini-label">(ready)</div>
       </div>
 
     </section>
@@ -53,12 +39,10 @@ export async function renderFilterCoverage(container, portalState) {
     );
 
     const status = document.getElementById("cov-status");
-    const ulNh = document.getElementById("cov-unused-nh");
-    const ulSq = document.getElementById("cov-unused-sqft");
+    const grid = document.getElementById("cov-grid");
 
     status.textContent = "Loading…";
-    ulNh.innerHTML = `<li class="mini-label">Loading…</li>`;
-    ulSq.innerHTML = `<li class="mini-label">Loading…</li>`;
+    grid.innerHTML = `<div class="mini-label">Loading…</div>`;
 
     try {
       const res = await fetch(
@@ -69,33 +53,66 @@ export async function renderFilterCoverage(container, portalState) {
       const data = await res.json();
       if (!res.ok || !data?.success) throw new Error(data?.error || `HTTP ${res.status}`);
 
-      const unusedNh = Array.isArray(data.unused_neighborhoods)
-        ? data.unused_neighborhoods
-        : [];
+      const unusedByNeighborhood = data.unused_by_neighborhood || {};
 
-      const unusedSq = Array.isArray(data.unused_sqft)
-        ? data.unused_sqft
-        : [];
+      // Build UI
+      const neighborhoods = Object.keys(unusedByNeighborhood);
 
-      // Neighborhoods
-      ulNh.innerHTML = unusedNh.length
-        ? unusedNh.map(n => `<li>${escapeHtml(n)}</li>`).join("")
-        : `<li class="mini-label">None (all used)</li>`;
+      if (!neighborhoods.length) {
+        grid.innerHTML = `<div class="mini-label">No neighborhoods found.</div>`;
+        return;
+      }
 
-      // SqFt
-      ulSq.innerHTML = unusedSq.length
-        ? unusedSq.map(s => `<li>${escapeHtml(s)}</li>`).join("")
-        : `<li class="mini-label">None (all used)</li>`;
+      // Build the expandable grid
+      grid.innerHTML = neighborhoods
+        .map(n => {
+          const gaps = unusedByNeighborhood[n] || [];
+          const count = gaps.length;
 
-      const totals = data.totals || {};
+          return `
+            <div class="cov-row" style="border:1px solid #ddd; border-radius:6px; margin-bottom:8px; background:#fafafa;">
+              <div class="cov-header" data-nh="${escapeHtml(n)}"
+                   style="padding:12px 16px; cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <strong>${escapeHtml(n)}</strong>
+                  <span class="mini-label" style="margin-left:8px;">${count} missing</span>
+                </div>
+                <span class="cov-arrow" style="font-size:18px;">▸</span>
+              </div>
 
-      status.textContent =
-        `Last ${data.window_days ?? days} days — Neighborhoods unused: ${unusedNh.length}/${totals.neighborhoods_all ?? "–"} • SqFt unused: ${unusedSq.length}/${totals.sqft_all ?? "–"}`;
+              <div class="cov-body" style="display:none; padding:12px 16px; border-top:1px solid #ddd;">
+                ${
+                  count === 0
+                    ? `<div class="mini-label">No gaps (all SqFt ranges used)</div>`
+                    : `
+                      <ul class="mini-list">
+                        ${gaps.map(s => `<li>${escapeHtml(s)}</li>`).join("")}
+                      </ul>
+                    `
+                }
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+
+      // Add expand/collapse behavior
+      grid.querySelectorAll(".cov-header").forEach(header => {
+        header.onclick = () => {
+          const body = header.parentElement.querySelector(".cov-body");
+          const arrow = header.querySelector(".cov-arrow");
+
+          const isOpen = body.style.display === "block";
+          body.style.display = isOpen ? "none" : "block";
+          arrow.textContent = isOpen ? "▸" : "▾";
+        };
+      });
+
+      status.textContent = `Last ${data.window_days ?? days} days — Coverage gaps by neighborhood`;
 
     } catch (err) {
       status.textContent = "Error: " + err.message;
-      ulNh.innerHTML = `<li class="mini-label" style="color:#c00;">Failed.</li>`;
-      ulSq.innerHTML = `<li class="mini-label" style="color:#c00;">Failed.</li>`;
+      grid.innerHTML = `<div class="mini-label" style="color:#c00;">Failed.</div>`;
     }
   };
 }
