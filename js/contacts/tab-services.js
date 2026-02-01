@@ -33,7 +33,10 @@ export async function renderContactServicesTab(container, portalState) {
   loadGrid();
 
   addBtn.addEventListener("click", async () => {
-    const catalog = await fetchProjectServices(portalState.project);
+    let catalog = await fetchProjectServices(portalState.project);
+
+    // Sort by sort_order ASC
+    catalog.sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
 
     openClientServiceModal({
       project: portalState.project,
@@ -99,7 +102,9 @@ export async function renderContactServicesTab(container, portalState) {
       btn.addEventListener("click", async () => {
         const id = btn.getAttribute("data-edit");
         const svc = rows.find(r => r.id === id);
-        const catalog = await fetchProjectServices(portalState.project);
+        let catalog = await fetchProjectServices(portalState.project);
+
+        catalog.sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
 
         openClientServiceModal({
           project: portalState.project,
@@ -173,12 +178,19 @@ async function deleteClientService(id) {
 function openClientServiceModal({ project, client_id, catalog, service = null, onSave }) {
   const isEdit = !!service;
 
+  // Build dropdown with blank first option
+  const options = `
+    <option value="">-- Select a Service --</option>
+  ` + catalog
+    .map(s => `
+      <option value="${s.id}" ${service?.service_id === s.id ? "selected" : ""}>
+        ${escapeHtml(s.service_name)}
+      </option>
+    `)
+    .join("");
+
   const modal = document.createElement("div");
   modal.className = "modal-overlay";
-
-  const options = catalog
-    .map(s => `<option value="${s.id}" ${service?.service_id === s.id ? "selected" : ""}>${escapeHtml(s.service_name)}</option>`)
-    .join("");
 
   modal.innerHTML = `
     <div class="modal">
@@ -211,6 +223,17 @@ function openClientServiceModal({ project, client_id, catalog, service = null, o
 
   document.querySelector("#contactsContent").prepend(modal);
 
+  const serviceSelect = modal.querySelector("#svc-service");
+  const priceInput = modal.querySelector("#svc-price");
+
+  // Auto-populate price when selecting a service
+  serviceSelect.addEventListener("change", () => {
+    const selected = catalog.find(s => s.id === serviceSelect.value);
+    if (selected) {
+      priceInput.value = selected.default_price ?? "";
+    }
+  });
+
   modal.querySelector("#svc-cancel").addEventListener("click", () => modal.remove());
 
   modal.querySelector("#svc-save").addEventListener("click", async () => {
@@ -229,4 +252,3 @@ function openClientServiceModal({ project, client_id, catalog, service = null, o
     modal.remove();
   });
 }
-
