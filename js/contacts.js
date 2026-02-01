@@ -30,6 +30,14 @@ export async function loadContactsTab({ portalState, tabContent }) {
   const content = tabContent.querySelector("#contactsContent");
   const buttons = tabContent.querySelectorAll("#contacts-subtabs button");
 
+  // ⭐ HIDE SERVICES TAB IF OPERATIONS (9) IS NOT ENABLED
+  const servicesBtn = tabContent.querySelector('#contacts-subtabs button[data-subtab="services"]');
+  const operationsEnabled = portalState.enabled_tabs?.includes("9");
+
+  if (!operationsEnabled && servicesBtn) {
+    servicesBtn.style.display = "none";
+  }
+
   buttons.forEach(btn => {
     btn.addEventListener("click", async () => {
       // Reset active state
@@ -37,6 +45,17 @@ export async function loadContactsTab({ portalState, tabContent }) {
       btn.classList.add("active");
 
       const subtab = btn.dataset.subtab;
+
+      // ⭐ BLOCK ROUTING TO SERVICES IF OPERATIONS IS DISABLED
+      if (subtab === "services" && !operationsEnabled) {
+        content.innerHTML = `
+          <section class="card">
+            <h2>Services</h2>
+            <p>This project does not have Operations enabled.</p>
+          </section>
+        `;
+        return;
+      }
 
       switch (subtab) {
         case "add":
