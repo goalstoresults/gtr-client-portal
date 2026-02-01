@@ -1,6 +1,6 @@
 // js/contacts/tab-services.js
 
-import { escapeHtml } from "../utilities.js";
+import { escapeHtml, formatCurrency } from "../utilities.js";
 
 export async function renderContactServicesTab(container, portalState) {
   const contactId = portalState.selectedContactId;
@@ -80,7 +80,10 @@ export async function renderContactServicesTab(container, portalState) {
           <td>${escapeHtml(s.service_name)}</td>
           <td>${escapeHtml(s.start_date)}</td>
           <td>${escapeHtml(s.end_date || "")}</td>
-          <td>${s.price != null ? "$" + Number(s.price).toFixed(2) : ""}</td>
+
+          <!-- ⭐ PRICE FORMATTED HERE -->
+          <td>${formatCurrency(s.price)}</td>
+
           <td>${escapeHtml(s.price_source || "")}</td>
           <td>${escapeHtml(s.notes || "")}</td>
           <td>
@@ -178,7 +181,6 @@ async function deleteClientService(id) {
 function openClientServiceModal({ project, client_id, catalog, service = null, onSave }) {
   const isEdit = !!service;
 
-  // Build dropdown with blank first option
   const options = `
     <option value="">-- Select a Service --</option>
   ` + catalog
