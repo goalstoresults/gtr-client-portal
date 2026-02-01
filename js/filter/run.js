@@ -30,7 +30,7 @@ export async function renderRunFilter(container, portalState) {
         <select id="flt-runby"></select>
 
         <label>Filename</label>
-        <input id="flt-filename" type="text" placeholder="e.g. Bryant Park — Q4 Outreach" />
+        <input id="flt-filename" type="text" placeholder="e.g. Bryant Park — Q4 Outreach" style="width:100%;" />
 
         <label>No emails recently</label>
         <div class="inline">
