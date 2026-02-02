@@ -119,13 +119,16 @@ async function renderGoalsTab(container, portalState) {
     };
   }
 
+  /* ------------------------------------------------------------
+     GRID 1 — LEAD INDICATORS (with TOTAL row)
+  ------------------------------------------------------------ */
   function renderLeadIndicatorsGrid(goals) {
     const safeGoals = Array.isArray(goals) ? goals : [];
 
     const header = `
       <tr>
         <th>Indicator</th>
-        ${months.map(m => `<th>${m}</th>`).join("")}
+        ${months.map(m => `<th class="amount">${m}</th>`).join("")}
       </tr>
     `;
 
@@ -136,7 +139,7 @@ async function renderGoalsTab(container, portalState) {
         const value = gForMonth?.[ind.key] || 0;
 
         return `
-          <td>
+          <td class="amount">
             <input
               type="number"
               class="li-input"
@@ -157,24 +160,50 @@ async function renderGoalsTab(container, portalState) {
       `;
     }).join("");
 
+    // TOTAL ROW
+    const totals = months.map((_, idx) => {
+      const month = idx + 1;
+      let sum = 0;
+
+      indicators.forEach(ind => {
+        const input = document.querySelector(
+          `.li-input[data-li-key="${ind.key}"][data-month="${month}"]`
+        );
+        sum += input ? Number(input.value) || 0 : 0;
+      });
+
+      return `<td class="amount"><strong>${sum}</strong></td>`;
+    }).join("");
+
+    const totalRow = `
+      <tr>
+        <td><strong>TOTAL</strong></td>
+        ${totals}
+      </tr>
+    `;
+
     leadsGrid.innerHTML = `
       <h3>Lead Indicators (Goals)</h3>
       <div class="goals-scroll-container">
         <table class="notes-table goals-table">
           <thead>${header}</thead>
           <tbody>${body}</tbody>
+          <tfoot>${totalRow}</tfoot>
         </table>
       </div>
     `;
   }
 
+  /* ------------------------------------------------------------
+     GRID 2 — CLIENT COUNT GOALS (with TOTAL row)
+  ------------------------------------------------------------ */
   function renderClientsGrid(services, goals) {
     const safeGoals = Array.isArray(goals) ? goals : [];
 
     const header = `
       <tr>
         <th>Service</th>
-        ${months.map(m => `<th>${m}</th>`).join("")}
+        ${months.map(m => `<th class="amount">${m}</th>`).join("")}
       </tr>
     `;
 
@@ -185,7 +214,7 @@ async function renderGoalsTab(container, portalState) {
         const value = g?.goal_clients || 0;
 
         return `
-          <td>
+          <td class="amount">
             <input
               type="number"
               class="client-goal-input"
@@ -206,23 +235,49 @@ async function renderGoalsTab(container, portalState) {
       `;
     }).join("");
 
+    // TOTAL ROW
+    const totals = months.map((_, idx) => {
+      const month = idx + 1;
+      let sum = 0;
+
+      services.forEach(s => {
+        const input = document.querySelector(
+          `.client-goal-input[data-service="${s.id}"][data-month="${month}"]`
+        );
+        sum += input ? Number(input.value) || 0 : 0;
+      });
+
+      return `<td class="amount"><strong>${sum}</strong></td>`;
+    }).join("");
+
+    const totalRow = `
+      <tr>
+        <td><strong>TOTAL</strong></td>
+        ${totals}
+      </tr>
+    `;
+
     clientsGrid.innerHTML = `
       <h3>Client Count Goals</h3>
       <div class="goals-scroll-container">
         <table class="notes-table goals-table">
           <thead>${header}</thead>
           <tbody>${body}</tbody>
+          <tfoot>${totalRow}</tfoot>
         </table>
       </div>
     `;
   }
 
+  /* ------------------------------------------------------------
+     GRID 3 — REVENUE GOALS (with TOTAL row + TOTAL column)
+  ------------------------------------------------------------ */
   function renderRevenueGrid(services) {
     const header = `
       <tr>
         <th>Service</th>
-        ${months.map(m => `<th>${m}</th>`).join("")}
-        <th>Total</th>
+        ${months.map(m => `<th class="amount">${m}</th>`).join("")}
+        <th class="amount">Total</th>
       </tr>
     `;
 
@@ -242,11 +297,50 @@ async function renderGoalsTab(container, portalState) {
       return `
         <tr>
           <td>${escapeHtml(s.service_name)}</td>
-          ${monthlyValues.map(v => `<td>${formatCurrency(v)}</td>`).join("")}
-          <td>${formatCurrency(total)}</td>
+          ${monthlyValues.map(v => `<td class="amount">${formatCurrency(v)}</td>`).join("")}
+          <td class="amount"><strong>${formatCurrency(total)}</strong></td>
         </tr>
       `;
     }).join("");
+
+    // TOTAL ROW (sum of each month across all services)
+    const totals = months.map((_, idx) => {
+      const month = idx + 1;
+      let sum = 0;
+
+      services.forEach(s => {
+        const input = document.querySelector(
+          `.client-goal-input[data-service="${s.id}"][data-month="${month}"]`
+        );
+        const clients = input ? Number(input.value) || 0 : 0;
+        const price = s.default_price || 0;
+        sum += clients * price;
+      });
+
+      return `<td class="amount"><strong>${formatCurrency(sum)}</strong></td>`;
+    }).join("");
+
+    // TOTAL of TOTAL column
+    let grandTotal = 0;
+    services.forEach(s => {
+      months.forEach((_, idx) => {
+        const month = idx + 1;
+        const input = document.querySelector(
+          `.client-goal-input[data-service="${s.id}"][data-month="${month}"]`
+        );
+        const clients = input ? Number(input.value) || 0 : 0;
+        const price = s.default_price || 0;
+        grandTotal += clients * price;
+      });
+    });
+
+    const totalRow = `
+      <tr>
+        <td><strong>TOTAL</strong></td>
+        ${totals}
+        <td class="amount"><strong>${formatCurrency(grandTotal)}</strong></td>
+      </tr>
+    `;
 
     revenueGrid.innerHTML = `
       <h3>Revenue Goals (Calculated)</h3>
@@ -254,11 +348,15 @@ async function renderGoalsTab(container, portalState) {
         <table class="notes-table goals-table">
           <thead>${header}</thead>
           <tbody>${body}</tbody>
+          <tfoot>${totalRow}</tfoot>
         </table>
       </div>
     `;
   }
 
+  /* ------------------------------------------------------------
+     SAVE ALL GOALS
+  ------------------------------------------------------------ */
   async function saveAllGoals(project, year, indicators) {
     for (let month = 1; month <= 12; month++) {
       const leadIndicators = {};
@@ -288,6 +386,9 @@ async function renderGoalsTab(container, portalState) {
     }
   }
 
+  /* ------------------------------------------------------------
+     TOAST
+  ------------------------------------------------------------ */
   function showToast(message = "Saved!") {
     const toast = document.getElementById("toast");
     if (!toast) return;
