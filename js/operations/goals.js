@@ -21,11 +21,15 @@ async function renderGoalsTab(container, portalState) {
         <select id="goals-year"></select>
       </label>
 
-      <div id="goals-leads-grid">(loading…)</div>
+      <div id="goals-empty-message" style="margin:20px 0; display:none;">
+        <em>No goals exist for this year. Click "Create Year" to begin.</em>
+      </div>
+
+      <div id="goals-leads-grid"></div>
       <div style="height:32px;"></div>
-      <div id="goals-clients-grid">(loading…)</div>
+      <div id="goals-clients-grid"></div>
       <div style="height:32px;"></div>
-      <div id="goals-revenue-grid">(loading…)</div>
+      <div id="goals-revenue-grid"></div>
     </section>
 
     <div id="toast" style="
@@ -47,16 +51,13 @@ async function renderGoalsTab(container, portalState) {
   const leadsGrid = container.querySelector("#goals-leads-grid");
   const clientsGrid = container.querySelector("#goals-clients-grid");
   const revenueGrid = container.querySelector("#goals-revenue-grid");
+  const emptyMessage = container.querySelector("#goals-empty-message");
 
   const btnCreate = container.querySelector("#goals-create-year");
   const btnRefresh = container.querySelector("#goals-refresh-year");
 
-  const currentYear = new Date().getFullYear();
-  const years = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
-
-  yearSelect.innerHTML = years
-    .map(y => `<option value="${y}" ${y === currentYear ? "selected" : ""}>${y}</option>`)
-    .join("");
+  // Load years from backend
+  await loadYearDropdown();
 
   yearSelect.addEventListener("change", loadYear);
   btnCreate.addEventListener("click", () => createYear(portalState));
@@ -64,8 +65,31 @@ async function renderGoalsTab(container, portalState) {
 
   loadYear();
 
+  /* ------------------------------------------------------------
+     LOAD YEAR DROPDOWN
+  ------------------------------------------------------------ */
+  async function loadYearDropdown() {
+    const years = await fetchYears(portalState.project);
+
+    yearSelect.innerHTML = years
+      .map(y => `<option value="${y}">${y}</option>`)
+      .join("");
+
+    if (years.length === 0) {
+      yearSelect.innerHTML = "";
+    }
+  }
+
+  /* ------------------------------------------------------------
+     LOAD YEAR DATA
+  ------------------------------------------------------------ */
   async function loadYear() {
     const year = Number(yearSelect.value);
+    if (!year) {
+      clearGrids();
+      emptyMessage.style.display = "block";
+      return;
+    }
 
     const [services, goals] = await Promise.all([
       fetchServices(portalState.project),
@@ -74,6 +98,14 @@ async function renderGoalsTab(container, portalState) {
 
     window._servicesCache = services;
 
+    if (!goals || goals.length === 0) {
+      clearGrids();
+      emptyMessage.style.display = "block";
+      return;
+    }
+
+    emptyMessage.style.display = "none";
+
     renderLeadIndicatorsGrid(goals);
     renderClientsGrid(services, goals);
     renderRevenueGrid(services);
@@ -81,8 +113,18 @@ async function renderGoalsTab(container, portalState) {
     attachAutosaveHandlers(portalState, year);
   }
 
+  function clearGrids() {
+    leadsGrid.innerHTML = "";
+    clientsGrid.innerHTML = "";
+    revenueGrid.innerHTML = "";
+  }
+
+  /* ------------------------------------------------------------
+     CREATE YEAR
+  ------------------------------------------------------------ */
   async function createYear(portalState) {
-    const year = Number(yearSelect.value);
+    const year = prompt("Enter year to create:");
+    if (!year) return;
 
     await fetch(`https://goals-module.dennis-e64.workers.dev/create-year`, {
       method: "POST",
@@ -90,12 +132,19 @@ async function renderGoalsTab(container, portalState) {
       headers: { "Content-Type": "application/json" }
     });
 
+    await loadYearDropdown();
+    yearSelect.value = year;
+
     showToast("Year created");
     loadYear();
   }
 
+  /* ------------------------------------------------------------
+     REFRESH YEAR
+  ------------------------------------------------------------ */
   async function refreshYear(portalState) {
     const year = Number(yearSelect.value);
+    if (!year) return;
 
     await fetch(`https://goals-module.dennis-e64.workers.dev/refresh-year`, {
       method: "POST",
@@ -161,7 +210,7 @@ async function renderGoalsTab(container, portalState) {
       const cells = months.map((_, idx) => {
         const month = idx + 1;
         const row = goals.find(g => g.month === month && g.service_id === null);
-        const value = row?.[ind.key] || 0;
+        const value = row?.[ind.key] ?? "";
 
         return `
           <td class="amount">
@@ -176,23 +225,12 @@ async function renderGoalsTab(container, portalState) {
       return `<tr><td>${escapeHtml(ind.label)}</td>${cells}</tr>`;
     }).join("");
 
-    const totals = months.map((_, idx) => {
-      const month = idx + 1;
-      let sum = 0;
-      indicators.forEach(ind => {
-        const row = goals.find(g => g.month === month && g.service_id === null);
-        sum += Number(row?.[ind.key] || 0);
-      });
-      return `<td class="amount"><strong>${sum}</strong></td>`;
-    }).join("");
-
     leadsGrid.innerHTML = `
       <h3>Lead Indicators (Goals)</h3>
       <div class="goals-scroll-container">
         <table class="notes-table goals-table">
           <thead>${header}</thead>
           <tbody>${body}</tbody>
-          <tfoot><tr><td><strong>TOTAL</strong></td>${totals}</tr></tfoot>
         </table>
       </div>
     `;
@@ -210,7 +248,7 @@ async function renderGoalsTab(container, portalState) {
       const row = months.map((_, idx) => {
         const month = idx + 1;
         const g = goals.find(g => g.service_id === s.id && g.month === month);
-        const value = g?.goal_clients || 0;
+        const value = g?.goal_clients ?? "";
 
         return `
           <td class="amount">
@@ -225,23 +263,12 @@ async function renderGoalsTab(container, portalState) {
       return `<tr><td>${escapeHtml(s.service_name)}</td>${row}</tr>`;
     }).join("");
 
-    const totals = months.map((_, idx) => {
-      const month = idx + 1;
-      let sum = 0;
-      services.forEach(s => {
-        const g = goals.find(g => g.service_id === s.id && g.month === month);
-        sum += Number(g?.goal_clients || 0);
-      });
-      return `<td class="amount"><strong>${sum}</strong></td>`;
-    }).join("");
-
     clientsGrid.innerHTML = `
       <h3>Client Count Goals</h3>
       <div class="goals-scroll-container">
         <table class="notes-table goals-table">
           <thead>${header}</thead>
           <tbody>${body}</tbody>
-          <tfoot><tr><td><strong>TOTAL</strong></td>${totals}</tr></tfoot>
         </table>
       </div>
     `;
@@ -277,44 +304,12 @@ async function renderGoalsTab(container, portalState) {
       `;
     }).join("");
 
-    const totals = months.map((_, idx) => {
-      const month = idx + 1;
-      let sum = 0;
-      services.forEach(s => {
-        const input = document.querySelector(
-          `.client-goal-input[data-service="${s.id}"][data-month="${month}"]`
-        );
-        const clients = Number(input?.value || 0);
-        sum += clients * (s.default_price || 0);
-      });
-      return `<td class="amount"><strong>${formatCurrency(sum)}</strong></td>`;
-    }).join("");
-
-    let grandTotal = 0;
-    services.forEach(s => {
-      months.forEach((_, idx) => {
-        const month = idx + 1;
-        const input = document.querySelector(
-          `.client-goal-input[data-service="${s.id}"][data-month="${month}"]`
-        );
-        const clients = Number(input?.value || 0);
-        grandTotal += clients * (s.default_price || 0);
-      });
-    });
-
     revenueGrid.innerHTML = `
       <h3>Revenue Goals (Calculated)</h3>
       <div class="goals-scroll-container">
         <table class="notes-table goals-table">
           <thead>${header}</thead>
           <tbody>${body}</tbody>
-          <tfoot>
-            <tr>
-              <td><strong>TOTAL</strong></td>
-              ${totals}
-              <td class="amount"><strong>${formatCurrency(grandTotal)}</strong></td>
-            </tr>
-          </tfoot>
         </table>
       </div>
     `;
@@ -323,6 +318,13 @@ async function renderGoalsTab(container, portalState) {
   /* ------------------------------------------------------------
      API HELPERS
   ------------------------------------------------------------ */
+
+  async function fetchYears(project) {
+    const res = await fetch(
+      `https://goals-module.dennis-e64.workers.dev/years?project=${project}`
+    );
+    return await res.json();
+  }
 
   async function fetchServices(project) {
     const res = await fetch(
@@ -373,4 +375,3 @@ async function renderGoalsTab(container, portalState) {
     }, 1500);
   }
 }
-
