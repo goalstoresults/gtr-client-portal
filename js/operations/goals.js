@@ -56,7 +56,6 @@ async function renderGoalsTab(container, portalState) {
   const btnCreate = container.querySelector("#goals-create-year");
   const btnRefresh = container.querySelector("#goals-refresh-year");
 
-  // Load years from backend
   await loadYearDropdown();
 
   yearSelect.addEventListener("change", loadYear);
@@ -96,7 +95,9 @@ async function renderGoalsTab(container, portalState) {
       fetchGoals(portalState.project, year)
     ]);
 
-    window._servicesCache = services;
+    // Only active services should appear in Goals UI
+    const activeServices = services.filter(s => s.is_active !== false);
+    window._servicesCache = activeServices;
 
     if (!goals || goals.length === 0) {
       clearGrids();
@@ -106,9 +107,9 @@ async function renderGoalsTab(container, portalState) {
 
     emptyMessage.style.display = "none";
 
-    renderLeadIndicatorsGrid(goals);
-    renderClientsGrid(services, goals);
-    renderRevenueGrid(services);
+    renderLeadIndicatorsGrid(goals, year);
+    renderClientsGrid(activeServices, goals);
+    renderRevenueGrid(activeServices);
 
     attachAutosaveHandlers(portalState, year);
   }
@@ -198,50 +199,47 @@ async function renderGoalsTab(container, portalState) {
     { key: "sales_calls", label: "Sales Calls" }
   ];
 
-function renderLeadIndicatorsGrid(goals) {
-  const year = Number(yearSelect.value);
+  function renderLeadIndicatorsGrid(goals, year) {
+    const header = `
+      <tr>
+        <th>Indicator</th>
+        ${months.map(m => `<th class="amount">${m}</th>`).join("")}
+      </tr>
+    `;
 
-  const header = `
-    <tr>
-      <th>Indicator</th>
-      ${months.map(m => `<th class="amount">${m}</th>`).join("")}
-    </tr>
-  `;
+    const body = indicators.map(ind => {
+      const cells = months.map((_, idx) => {
+        const month = idx + 1;
 
-  const body = indicators.map(ind => {
-    const cells = months.map((_, idx) => {
-      const month = idx + 1;
+        // System ID for indicator rows
+        const sid = `${portalState.project}-${year}-${month}-indicators`;
+        const row = goals.find(g => g.month === month && g.service_id === sid);
 
-      // FIX: use system ID instead of null
-      const sid = `${portalState.project}-${year}-${month}-indicators`;
-      const row = goals.find(g => g.month === month && g.service_id === sid);
+        const value = Number(row?.[ind.key] ?? 0);
 
-      const value = Number(row?.[ind.key] ?? 0);
+        return `
+          <td class="amount">
+            <input type="number" class="li-input"
+              data-li-key="${ind.key}"
+              data-month="${month}"
+              value="${value}" min="0">
+          </td>
+        `;
+      }).join("");
 
-      return `
-        <td class="amount">
-          <input type="number" class="li-input"
-            data-li-key="${ind.key}"
-            data-month="${month}"
-            value="${value}" min="0">
-        </td>
-      `;
+      return `<tr><td>${escapeHtml(ind.label)}</td>${cells}</tr>`;
     }).join("");
 
-    return `<tr><td>${escapeHtml(ind.label)}</td>${cells}</tr>`;
-  }).join("");
-
-  leadsGrid.innerHTML = `
-    <h3>Lead Indicators (Goals)</h3>
-    <div class="goals-scroll-container">
-      <table class="notes-table goals-table">
-        <thead>${header}</thead>
-        <tbody>${body}</tbody>
-      </table>
-    </div>
-  `;
-}
-
+    leadsGrid.innerHTML = `
+      <h3>Lead Indicators (Goals)</h3>
+      <div class="goals-scroll-container">
+        <table class="notes-table goals-table">
+          <thead>${header}</thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    `;
+  }
 
   function renderClientsGrid(services, goals) {
     const header = `
@@ -255,7 +253,7 @@ function renderLeadIndicatorsGrid(goals) {
       const row = months.map((_, idx) => {
         const month = idx + 1;
         const g = goals.find(g => g.service_id === s.id && g.month === month);
-        const value = g?.goal_clients ?? "";
+        const value = Number(g?.goal_clients ?? 0);
 
         return `
           <td class="amount">
