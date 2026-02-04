@@ -160,30 +160,43 @@ async function renderGoalsTab(container, portalState) {
   /* ------------------------------------------------------------
      AUTOSAVE
   ------------------------------------------------------------ */
-  function attachAutosaveHandlers(portalState, year) {
-    document.querySelectorAll(".li-input").forEach(input => {
-      input.addEventListener("blur", async e => {
-        const key = e.target.dataset.liKey;
-        const month = Number(e.target.dataset.month);
-        const value = Number(e.target.value) || 0;
+function attachAutosaveHandlers(portalState, year) {
 
-        await updateIndicatorCell(portalState.project, year, month, key, value);
-        showToast();
-      });
+  // LEAD INDICATORS
+  document.querySelectorAll(".li-input").forEach(input => {
+    input.addEventListener("blur", async e => {
+      const key = e.target.dataset.liKey;
+      const month = Number(e.target.dataset.month);
+      const value = Number(e.target.value) || 0;
+
+      await updateIndicatorCell(portalState.project, year, month, key, value);
+
+      // Re-fetch goals + re-render leads grid
+      const goals = await fetchGoals(portalState.project, year);
+      renderLeadIndicatorsGrid(goals, year);
+
+      showToast();
     });
+  });
 
-    document.querySelectorAll(".client-goal-input").forEach(input => {
-      input.addEventListener("blur", async e => {
-        const service_id = e.target.dataset.service;
-        const month = Number(e.target.dataset.month);
-        const value = Number(e.target.value) || 0;
+  // CLIENT GOALS
+  document.querySelectorAll(".client-goal-input").forEach(input => {
+    input.addEventListener("blur", async e => {
+      const service_id = e.target.dataset.service;
+      const month = Number(e.target.dataset.month);
+      const value = Number(e.target.value) || 0;
 
-        await updateClientCell(portalState.project, year, month, service_id, value);
-        showToast();
-        renderRevenueGrid(window._servicesCache);
-      });
+      await updateClientCell(portalState.project, year, month, service_id, value);
+
+      // Re-fetch goals + re-render clients + revenue
+      const goals = await fetchGoals(portalState.project, year);
+      renderClientsGrid(window._servicesCache, goals);
+      renderRevenueGrid(window._servicesCache);
+
+      showToast();
     });
-  }
+  });
+}
 
   /* ------------------------------------------------------------
      API HELPERS
