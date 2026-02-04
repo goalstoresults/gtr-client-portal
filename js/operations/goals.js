@@ -244,7 +244,7 @@ async function renderGoalsTab(container, portalState) {
       }, 600);
     }, 1500);
   }
-}
+
   /* ------------------------------------------------------------
      GRID RENDERING — LEAD INDICATORS (WITH TOTALS AT TOP)
   ------------------------------------------------------------ */
