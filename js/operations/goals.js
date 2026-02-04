@@ -16,9 +16,10 @@ async function renderGoalsTab(container, portalState) {
         </div>
       </div>
 
-      <label style="display:block; margin-bottom:12px; margin-top:12px;">
-        Year:
+      <label style="display:flex; align-items:center; gap:12px; margin-bottom:12px; margin-top:12px;">
+        <span>Year:</span>
         <select id="goals-year"></select>
+        <button id="goals-update-totals" class="btn">Update Totals</button>
       </label>
 
       <div id="goals-empty-message" style="margin:20px 0; display:none;">
@@ -61,6 +62,10 @@ async function renderGoalsTab(container, portalState) {
   yearSelect.addEventListener("change", loadYear);
   btnCreate.addEventListener("click", () => createYear(portalState));
   btnRefresh.addEventListener("click", () => refreshYear(portalState));
+  
+  const btnUpdateTotals = container.querySelector("#goals-update-totals");
+  btnUpdateTotals.addEventListener("click", () => updateTotals(portalState));
+
 
   loadYear();
 
@@ -140,6 +145,28 @@ async function renderGoalsTab(container, portalState) {
     loadYear();
   }
 
+    /* ------------------------------------------------------------
+       UPDATE TOTALS (manual refresh)
+    ------------------------------------------------------------ */
+    async function updateTotals(portalState) {
+      const year = Number(yearSelect.value);
+      if (!year) return;
+    
+      // Re-fetch goals fresh from backend
+      const goals = await fetchGoals(portalState.project, year);
+    
+      // Re-render all three grids
+      renderLeadIndicatorsGrid(goals, year);
+      renderClientsGrid(window._servicesCache, goals);
+      renderRevenueGrid(window._servicesCache);
+    
+      // Re-attach autosave handlers
+      attachAutosaveHandlers(portalState, year);
+    
+      showToast("Totals updated");
+    }
+
+  
   /* ------------------------------------------------------------
      REFRESH YEAR
   ------------------------------------------------------------ */
@@ -174,13 +201,13 @@ function attachAutosaveHandlers(portalState, year) {
       // Re-fetch goals + re-render leads grid
       const goals = await fetchGoals(portalState.project, year);
       renderLeadIndicatorsGrid(goals, year);
-      attachAutosaveHandlers(portalState, year);
 
 
       showToast();
     });
   });
 
+  
   // CLIENT GOALS
   document.querySelectorAll(".client-goal-input").forEach(input => {
     input.addEventListener("blur", async e => {
@@ -194,7 +221,6 @@ function attachAutosaveHandlers(portalState, year) {
       const goals = await fetchGoals(portalState.project, year);
       renderClientsGrid(window._servicesCache, goals);
       renderRevenueGrid(window._servicesCache);
-      attachAutosaveHandlers(portalState, year);
 
       showToast();
     });
