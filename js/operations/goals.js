@@ -186,141 +186,6 @@ async function renderGoalsTab(container, portalState) {
   }
 
   /* ------------------------------------------------------------
-     GRID RENDERING
-  ------------------------------------------------------------ */
-
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const indicators = [
-    { key: "outreach_past_clients", label: "Outreach to Clients (Current/Past)" },
-    { key: "outreach_networks", label: "Outreach to Networks" },
-    { key: "outreach_referrals", label: "Outreach to Referral Partners" },
-    { key: "new_leads", label: "New Leads" },
-    { key: "discovery_calls", label: "Discovery Calls" },
-    { key: "sales_calls", label: "Sales Calls" }
-  ];
-
-  function renderLeadIndicatorsGrid(goals, year) {
-    const header = `
-      <tr>
-        <th>Indicator</th>
-        ${months.map(m => `<th class="amount">${m}</th>`).join("")}
-      </tr>
-    `;
-
-    const body = indicators.map(ind => {
-      const cells = months.map((_, idx) => {
-        const month = idx + 1;
-
-        // System ID for indicator rows
-        const sid = `${portalState.project}-${year}-${month}-indicators`;
-        const row = goals.find(g => g.month === month && g.service_id === sid);
-
-        const value = Number(row?.[ind.key] ?? 0);
-
-        return `
-          <td class="amount">
-            <input type="number" class="li-input"
-              data-li-key="${ind.key}"
-              data-month="${month}"
-              value="${value}" min="0">
-          </td>
-        `;
-      }).join("");
-
-      return `<tr><td>${escapeHtml(ind.label)}</td>${cells}</tr>`;
-    }).join("");
-
-    leadsGrid.innerHTML = `
-      <h3>Lead Indicators (Goals)</h3>
-      <div class="goals-scroll-container">
-        <table class="notes-table goals-table">
-          <thead>${header}</thead>
-          <tbody>${body}</tbody>
-        </table>
-      </div>
-    `;
-  }
-
-  function renderClientsGrid(services, goals) {
-    const header = `
-      <tr>
-        <th>Service</th>
-        ${months.map(m => `<th class="amount">${m}</th>`).join("")}
-      </tr>
-    `;
-
-    const body = services.map(s => {
-      const row = months.map((_, idx) => {
-        const month = idx + 1;
-        const g = goals.find(g => g.service_id === s.id && g.month === month);
-        const value = Number(g?.goal_clients ?? 0);
-
-        return `
-          <td class="amount">
-            <input type="number" class="client-goal-input"
-              data-service="${s.id}"
-              data-month="${month}"
-              value="${value}" min="0">
-          </td>
-        `;
-      }).join("");
-
-      return `<tr><td>${escapeHtml(s.service_name)}</td>${row}</tr>`;
-    }).join("");
-
-    clientsGrid.innerHTML = `
-      <h3>Client Count Goals</h3>
-      <div class="goals-scroll-container">
-        <table class="notes-table goals-table">
-          <thead>${header}</thead>
-          <tbody>${body}</tbody>
-        </table>
-      </div>
-    `;
-  }
-
-  function renderRevenueGrid(services) {
-    const header = `
-      <tr>
-        <th>Service</th>
-        ${months.map(m => `<th class="amount">${m}</th>`).join("")}
-        <th class="amount">Total</th>
-      </tr>
-    `;
-
-    const body = services.map(s => {
-      const monthly = months.map((_, idx) => {
-        const month = idx + 1;
-        const input = document.querySelector(
-          `.client-goal-input[data-service="${s.id}"][data-month="${month}"]`
-        );
-        const clients = Number(input?.value || 0);
-        return clients * (s.default_price || 0);
-      });
-
-      const total = monthly.reduce((a, b) => a + b, 0);
-
-      return `
-        <tr>
-          <td>${escapeHtml(s.service_name)}</td>
-          ${monthly.map(v => `<td class="amount">${formatCurrency(v)}</td>`).join("")}
-          <td class="amount"><strong>${formatCurrency(total)}</strong></td>
-        </tr>
-      `;
-    }).join("");
-
-    revenueGrid.innerHTML = `
-      <h3>Revenue Goals (Calculated)</h3>
-      <div class="goals-scroll-container">
-        <table class="notes-table goals-table">
-          <thead>${header}</thead>
-          <tbody>${body}</tbody>
-        </table>
-      </div>
-    `;
-  }
-
-  /* ------------------------------------------------------------
      API HELPERS
   ------------------------------------------------------------ */
 
@@ -378,5 +243,264 @@ async function renderGoalsTab(container, portalState) {
         toast.style.transition = "";
       }, 600);
     }, 1500);
+  }
+}
+  /* ------------------------------------------------------------
+     GRID RENDERING — LEAD INDICATORS (WITH TOTALS AT TOP)
+  ------------------------------------------------------------ */
+
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const indicators = [
+    { key: "outreach_past_clients", label: "Outreach to Clients (Current/Past)" },
+    { key: "outreach_networks", label: "Outreach to Networks" },
+    { key: "outreach_referrals", label: "Outreach to Referral Partners" },
+    { key: "new_leads", label: "New Leads" },
+    { key: "discovery_calls", label: "Discovery Calls" },
+    { key: "sales_calls", label: "Sales Calls" }
+  ];
+
+  function renderLeadIndicatorsGrid(goals, year) {
+
+    /* ------------------------------------------------------------
+       1. Compute monthly totals for each indicator
+    ------------------------------------------------------------ */
+    const monthlyTotals = months.map((_, idx) => {
+      const month = idx + 1;
+
+      return indicators.reduce((sum, ind) => {
+        const sid = `${portalState.project}-${year}-${month}-indicators`;
+        const row = goals.find(g => g.month === month && g.service_id === sid);
+        const value = Number(row?.[ind.key] ?? 0);
+        return sum + value;
+      }, 0);
+    });
+
+    /* ------------------------------------------------------------
+       2. Build totals row (highlighted)
+    ------------------------------------------------------------ */
+    const totalsRow = `
+      <tr style="background:#f0f0f0; font-weight:bold;">
+        <td style="text-align:left;">TOTAL</td>
+        ${monthlyTotals.map(t => `<td class="amount">${t}</td>`).join("")}
+      </tr>
+    `;
+
+    /* ------------------------------------------------------------
+       3. Build header row
+    ------------------------------------------------------------ */
+    const header = `
+      <tr>
+        <th>Indicator</th>
+        ${months.map(m => `<th class="amount">${m}</th>`).join("")}
+      </tr>
+    `;
+
+    /* ------------------------------------------------------------
+       4. Build indicator rows
+    ------------------------------------------------------------ */
+    const body = indicators.map(ind => {
+      const cells = months.map((_, idx) => {
+        const month = idx + 1;
+
+        const sid = `${portalState.project}-${year}-${month}-indicators`;
+        const row = goals.find(g => g.month === month && g.service_id === sid);
+
+        const value = Number(row?.[ind.key] ?? 0);
+
+        return `
+          <td class="amount">
+            <input type="number" class="li-input"
+              data-li-key="${ind.key}"
+              data-month="${month}"
+              value="${value}" min="0">
+          </td>
+        `;
+      }).join("");
+
+      return `<tr><td>${escapeHtml(ind.label)}</td>${cells}</tr>`;
+    }).join("");
+
+    /* ------------------------------------------------------------
+       5. Render final grid (totals at top)
+    ------------------------------------------------------------ */
+    leadsGrid.innerHTML = `
+      <h3>Lead Indicators (Goals)</h3>
+      <div class="goals-scroll-container">
+        <table class="notes-table goals-table">
+          <thead>
+            ${totalsRow}
+            ${header}
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    `;
+  }
+  /* ------------------------------------------------------------
+     GRID RENDERING — CLIENT GOALS (WITH TOTALS AT TOP)
+  ------------------------------------------------------------ */
+
+  function renderClientsGrid(services, goals) {
+
+    /* ------------------------------------------------------------
+       1. Compute monthly totals across all services
+    ------------------------------------------------------------ */
+    const monthlyTotals = months.map((_, idx) => {
+      const month = idx + 1;
+
+      return services.reduce((sum, s) => {
+        const g = goals.find(g => g.service_id === s.id && g.month === month);
+        const value = Number(g?.goal_clients ?? 0);
+        return sum + value;
+      }, 0);
+    });
+
+    /* ------------------------------------------------------------
+       2. Build totals row (highlighted)
+    ------------------------------------------------------------ */
+    const totalsRow = `
+      <tr style="background:#f0f0f0; font-weight:bold;">
+        <td style="text-align:left;">TOTAL</td>
+        ${monthlyTotals.map(t => `<td class="amount">${t}</td>`).join("")}
+      </tr>
+    `;
+
+    /* ------------------------------------------------------------
+       3. Build header row
+    ------------------------------------------------------------ */
+    const header = `
+      <tr>
+        <th>Service</th>
+        ${months.map(m => `<th class="amount">${m}</th>`).join("")}
+      </tr>
+    `;
+
+    /* ------------------------------------------------------------
+       4. Build service rows
+    ------------------------------------------------------------ */
+    const body = services.map(s => {
+      const row = months.map((_, idx) => {
+        const month = idx + 1;
+        const g = goals.find(g => g.service_id === s.id && g.month === month);
+        const value = Number(g?.goal_clients ?? 0);
+
+        return `
+          <td class="amount">
+            <input type="number" class="client-goal-input"
+              data-service="${s.id}"
+              data-month="${month}"
+              value="${value}" min="0">
+          </td>
+        `;
+      }).join("");
+
+      return `<tr><td>${escapeHtml(s.service_name)}</td>${row}</tr>`;
+    }).join("");
+
+    /* ------------------------------------------------------------
+       5. Render final grid (totals at top)
+    ------------------------------------------------------------ */
+    clientsGrid.innerHTML = `
+      <h3>Client Count Goals</h3>
+      <div class="goals-scroll-container">
+        <table class="notes-table goals-table">
+          <thead>
+            ${totalsRow}
+            ${header}
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  /* ------------------------------------------------------------
+     GRID RENDERING — REVENUE (WITH TOTALS AT TOP)
+  ------------------------------------------------------------ */
+
+  function renderRevenueGrid(services) {
+
+    /* ------------------------------------------------------------
+       1. Compute monthly revenue totals
+    ------------------------------------------------------------ */
+    const monthlyTotals = months.map((_, idx) => {
+      const month = idx + 1;
+
+      return services.reduce((sum, s) => {
+        const input = document.querySelector(
+          `.client-goal-input[data-service="${s.id}"][data-month="${month}"]`
+        );
+        const clients = Number(input?.value || 0);
+        const revenue = clients * (s.default_price || 0);
+        return sum + revenue;
+      }, 0);
+    });
+
+    /* ------------------------------------------------------------
+       2. Compute grand total
+    ------------------------------------------------------------ */
+    const grandTotal = monthlyTotals.reduce((a, b) => a + b, 0);
+
+    /* ------------------------------------------------------------
+       3. Build totals row (highlighted)
+    ------------------------------------------------------------ */
+    const totalsRow = `
+      <tr style="background:#f0f0f0; font-weight:bold;">
+        <td style="text-align:left;">TOTAL</td>
+        ${monthlyTotals.map(t => `<td class="amount">${formatCurrency(t)}</td>`).join("")}
+        <td class="amount"><strong>${formatCurrency(grandTotal)}</strong></td>
+      </tr>
+    `;
+
+    /* ------------------------------------------------------------
+       4. Build header row
+    ------------------------------------------------------------ */
+    const header = `
+      <tr>
+        <th>Service</th>
+        ${months.map(m => `<th class="amount">${m}</th>`).join("")}
+        <th class="amount">Total</th>
+      </tr>
+    `;
+
+    /* ------------------------------------------------------------
+       5. Build service rows
+    ------------------------------------------------------------ */
+    const body = services.map(s => {
+      const monthly = months.map((_, idx) => {
+        const month = idx + 1;
+        const input = document.querySelector(
+          `.client-goal-input[data-service="${s.id}"][data-month="${month}"]`
+        );
+        const clients = Number(input?.value || 0);
+        return clients * (s.default_price || 0);
+      });
+
+      const total = monthly.reduce((a, b) => a + b, 0);
+
+      return `
+        <tr>
+          <td>${escapeHtml(s.service_name)}</td>
+          ${monthly.map(v => `<td class="amount">${formatCurrency(v)}</td>`).join("")}
+          <td class="amount"><strong>${formatCurrency(total)}</strong></td>
+        </tr>
+      `;
+    }).join("");
+
+    /* ------------------------------------------------------------
+       6. Render final grid (totals at top)
+    ------------------------------------------------------------ */
+    revenueGrid.innerHTML = `
+      <h3>Revenue Goals (Calculated)</h3>
+      <div class="goals-scroll-container">
+        <table class="notes-table goals-table">
+          <thead>
+            ${totalsRow}
+            ${header}
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    `;
   }
 }
