@@ -198,43 +198,50 @@ async function renderGoalsTab(container, portalState) {
     { key: "sales_calls", label: "Sales Calls" }
   ];
 
-  function renderLeadIndicatorsGrid(goals) {
-    const header = `
-      <tr>
-        <th>Indicator</th>
-        ${months.map(m => `<th class="amount">${m}</th>`).join("")}
-      </tr>
-    `;
+function renderLeadIndicatorsGrid(goals) {
+  const year = Number(yearSelect.value);
 
-    const body = indicators.map(ind => {
-      const cells = months.map((_, idx) => {
-        const month = idx + 1;
-        const row = goals.find(g => g.month === month && g.service_id === null);
-        const value = row?.[ind.key] ?? "";
+  const header = `
+    <tr>
+      <th>Indicator</th>
+      ${months.map(m => `<th class="amount">${m}</th>`).join("")}
+    </tr>
+  `;
 
-        return `
-          <td class="amount">
-            <input type="number" class="li-input"
-              data-li-key="${ind.key}"
-              data-month="${month}"
-              value="${value}" min="0">
-          </td>
-        `;
-      }).join("");
+  const body = indicators.map(ind => {
+    const cells = months.map((_, idx) => {
+      const month = idx + 1;
 
-      return `<tr><td>${escapeHtml(ind.label)}</td>${cells}</tr>`;
+      // FIX: use system ID instead of null
+      const sid = `${portalState.project}-${year}-${month}-indicators`;
+      const row = goals.find(g => g.month === month && g.service_id === sid);
+
+      const value = Number(row?.[ind.key] ?? 0);
+
+      return `
+        <td class="amount">
+          <input type="number" class="li-input"
+            data-li-key="${ind.key}"
+            data-month="${month}"
+            value="${value}" min="0">
+        </td>
+      `;
     }).join("");
 
-    leadsGrid.innerHTML = `
-      <h3>Lead Indicators (Goals)</h3>
-      <div class="goals-scroll-container">
-        <table class="notes-table goals-table">
-          <thead>${header}</thead>
-          <tbody>${body}</tbody>
-        </table>
-      </div>
-    `;
-  }
+    return `<tr><td>${escapeHtml(ind.label)}</td>${cells}</tr>`;
+  }).join("");
+
+  leadsGrid.innerHTML = `
+    <h3>Lead Indicators (Goals)</h3>
+    <div class="goals-scroll-container">
+      <table class="notes-table goals-table">
+        <thead>${header}</thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>
+  `;
+}
+
 
   function renderClientsGrid(services, goals) {
     const header = `
