@@ -174,6 +174,8 @@ function attachAutosaveHandlers(portalState, year) {
       // Re-fetch goals + re-render leads grid
       const goals = await fetchGoals(portalState.project, year);
       renderLeadIndicatorsGrid(goals, year);
+      attachAutosaveHandlers(portalState, year);
+
 
       showToast();
     });
@@ -192,6 +194,7 @@ function attachAutosaveHandlers(portalState, year) {
       const goals = await fetchGoals(portalState.project, year);
       renderClientsGrid(window._servicesCache, goals);
       renderRevenueGrid(window._servicesCache);
+      attachAutosaveHandlers(portalState, year);
 
       showToast();
     });
