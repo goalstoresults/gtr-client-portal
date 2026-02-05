@@ -205,17 +205,10 @@ function attachAutosaveHandlers(portalState, year) {
       const value = Number(e.target.value) || 0;
 
       await updateIndicatorCell(portalState.project, year, month, key, value);
-
-      // Re-fetch goals + re-render leads grid
-      const goals = await fetchGoals(portalState.project, year);
-      renderLeadIndicatorsGrid(goals, year);
-
-
       showToast();
     });
   });
 
-  
   // CLIENT GOALS
   document.querySelectorAll(".client-goal-input").forEach(input => {
     input.addEventListener("blur", async e => {
@@ -224,12 +217,6 @@ function attachAutosaveHandlers(portalState, year) {
       const value = Number(e.target.value) || 0;
 
       await updateClientCell(portalState.project, year, month, service_id, value);
-
-      // Re-fetch goals + re-render clients + revenue
-      const goals = await fetchGoals(portalState.project, year);
-      renderClientsGrid(window._servicesCache, goals);
-      renderRevenueGrid(window._servicesCache);
-
       showToast();
     });
   });
