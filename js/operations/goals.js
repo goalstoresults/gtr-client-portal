@@ -152,10 +152,18 @@ async function renderGoalsTab(container, portalState) {
       const year = Number(yearSelect.value);
       if (!year) return;
     
-      // Re-fetch goals fresh from backend
+      // Force blur to trigger autosave if a cell is active
+      if (document.activeElement) {
+        document.activeElement.blur();
+      }
+    
+      // Wait a moment for autosave to complete
+      await new Promise(r => setTimeout(r, 150));
+    
+      // Fetch fresh goals
       const goals = await fetchGoals(portalState.project, year);
     
-      // Re-render all three grids
+      // Re-render all grids
       renderLeadIndicatorsGrid(goals, year);
       renderClientsGrid(window._servicesCache, goals);
       renderRevenueGrid(window._servicesCache);
