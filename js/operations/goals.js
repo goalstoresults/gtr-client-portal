@@ -100,9 +100,13 @@ async function renderGoalsTab(container, portalState) {
       fetchGoals(portalState.project, year)
     ]);
 
-    // Only active services should appear in Goals UI
-    const activeServices = services.filter(s => s.is_active !== false);
+    // Only active services should appear in Goals UI, sorted by sort_order
+    const activeServices = services
+      .filter(s => s.is_active !== false)
+      .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
+    
     window._servicesCache = activeServices;
+
 
     if (!goals || goals.length === 0) {
       clearGrids();
