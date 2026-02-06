@@ -232,8 +232,14 @@ function attachClickedHandlers(rows, portalState) {
       portalState.selectedCampaignName = campaignName;
       portalState.selectedCampaignYear = year;
 
+      // ⭐ NEW: enable the subtab before clicking it
       const tabButton = document.querySelector('[data-subtab="campaign-clicks"]');
-      if (tabButton) tabButton.click();
+      if (tabButton) {
+        tabButton.disabled = false;
+        tabButton.classList.remove("disabled");
+        tabButton.click();
+      }
     });
   });
 }
+
