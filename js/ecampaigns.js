@@ -113,7 +113,7 @@ async function loadECSubtab(subtab, portalState) {
   if (subtab === "timeline") return renderECTimeline(container, portalState);
   if (subtab === "contact-activity") return renderECContactActivity(container, portalState);
 
-  // ⭐ NEW SUBTAB
+  // ⭐ NEW SUBTAB — Campaign Clicks
   if (subtab === "campaign-clicks") {
     enableSubtab("campaign-clicks", true);
     return renderECCampaignClicks(container, portalState);
@@ -121,3 +121,4 @@ async function loadECSubtab(subtab, portalState) {
 
   container.innerHTML = `<p>Unknown subtab</p>`;
 }
+
