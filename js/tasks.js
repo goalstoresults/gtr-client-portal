@@ -1,4 +1,5 @@
-// js/tasks.js
+// js/tasks.js — Phase 1: iframe version (identical UI + behavior)
+
 export async function loadTasksTab({ portalState, tabContent }) {
   tabContent.innerHTML = `
     <section class="card">
