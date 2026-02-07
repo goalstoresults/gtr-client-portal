@@ -29,7 +29,7 @@ export async function renderECOverview(container, portalState) {
     container.innerHTML = `
       <section class="card">
         <h3>E‑Campaigns Overview</h3>
-        <p>High‑level engagement metrics across all campaigns.</p>
+        <p>Engagement of your current contacts for all campaigns</p>
 
         <table class="notes-table">
           <thead>
