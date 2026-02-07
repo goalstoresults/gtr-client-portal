@@ -1,5 +1,5 @@
 // js/tasks.js
-// Phase 1: full iframe of legacy Task Manager (safe, minimal, working)
+// Phase 1: Load the FULL legacy Task Manager exactly as-is
 
 export async function loadTasksTab({ portalState, tabContent }) {
   tabContent.innerHTML = `
@@ -8,34 +8,10 @@ export async function loadTasksTab({ portalState, tabContent }) {
 
       <iframe
         id="tasksFrame"
-        src="about:blank"
+        src="https://gtr-task-add.dennis-e64.workers.dev/"
         style="width:100%; height:80vh; border:1px solid #e5e7eb; border-radius:12px; background:#fff;">
       </iframe>
     </section>
   `;
-
-  const frame = document.getElementById("tasksFrame");
-
-  const LEGACY_URL = "https://gtr-task-add.dennis-e64.workers.dev";
-
-  // 1) Try Portal project id
-  let cid = portalState?.selectedProjectId;
-
-  // 2) Fallback to URL ?cid= like the old app
-  if (!cid) {
-    try {
-      const url = new URL(window.location.href);
-      cid = (url.searchParams.get("cid") || "").trim();
-    } catch (e) {
-      // if URL constructor fails for any reason, just leave cid as-is
-    }
-  }
-
-  if (!cid) {
-    frame.srcdoc = `<p style="padding:20px;">No project selected (cid missing).</p>`;
-    return;
-  }
-
-  const fullUrl = `${LEGACY_URL}/?cid=${encodeURIComponent(cid)}&admin=1`;
-  frame.src = fullUrl;
 }
+
