@@ -120,7 +120,7 @@ function renderClickTables(container, matched, unmatched) {
             <tr>
               <td>${escapeHtml(m.contact_name)}</td>
               <td>${escapeHtml(m.contact_type || "")}</td>
-              <td>${formatDateTime(m.action_date)}</td>
+              <td>${formatDateTimeStored(m.action_date)}</td>
             </tr>
           `
                   )
@@ -147,7 +147,7 @@ function renderClickTables(container, matched, unmatched) {
                     u => `
             <tr>
               <td>${escapeHtml(u.email)}</td>
-              <td>${formatDateTime(u.action_date)}</td>
+              <td>${formatDateTimeStored(u.action_date)}</td>
               <td><pre style="white-space:pre-wrap;margin:0;">${escapeHtml(
                 u.raw_text || ""
               )}</pre></td>
