@@ -1,207 +1,256 @@
 // ------------------------------------------------------------
 // RENDER E‑CAMPAIGNS → TOP CONTACTS (FULL GRID + SORTING)
 // ------------------------------------------------------------
-export async function renderECTopContacts(container, portalState) {
+import { escapeHtml, formatDateTime } from "../utilities.js";
+
+let currentSortField = "total_clicks";
+let currentSortDirection = "desc";
+
+const columns = [
+  { key: "contact_name", label: "Contact" },
+  { key: "email", label: "Email" },
+  { key: "total_opens", label: "Opens" },
+  { key: "total_clicks", label: "Clicks" },
+  { key: "total_unsubscribes", label: "Unsubs" },
+  { key: "last_activity_at", label: "Last Activity" },
+  { key: "actions", label: "" }
+];
+
+export async function renderECTopContacts(container, portalState, selectedYear = null) {
   container.innerHTML = `
     <section class="card">
       <h3>Top Contacts</h3>
-      <p>Loading top contacts...</p>
+      <p>Loading contacts...</p>
     </section>
   `;
 
-  const project = portalState.project;
-
-  // IMPORTANT: match the Campaigns tab base URL
-  const base = "https://ecampaigns-module.dennis-e64.workers.dev";
-
-  // Fetch aggregated data
-  let rows = [];
   try {
-    const url = new URL(`${base}/analytics/top-contacts`);
-    url.searchParams.set("project", project);
+    const res = await fetch(
+      `https://ecampaigns-module.dennis-e64.workers.dev/analytics/top-contacts?project=${portalState.project}${selectedYear ? `&year=${selectedYear}` : ""}`,
+      { cache: "no-cache" }
+    );
 
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Server error: ${res.status}`);
-
-    rows = await res.json();
+    let rows = await res.json();
     if (!Array.isArray(rows)) rows = [];
+
+    // Normalize fields
+    rows.forEach(r => {
+      r.contact_id = r.contact_id;
+      r.contact_name = r.contact_name || "(No name)";
+      r.email = r.email || "";
+      r.total_opens = r.total_opens ?? 0;
+      r.total_clicks = r.total_clicks ?? 0;
+      r.total_unsubscribes = r.total_unsubscribes ?? 0;
+      r.last_activity_at = r.last_activity_at || null;
+    });
+
+    renderTable(rows, container, portalState, selectedYear);
   } catch (err) {
+    console.error(err);
     container.innerHTML = `
       <section class="card">
         <h3>Top Contacts</h3>
-        <p class="error">Error loading top contacts: ${err.message}</p>
+        <p class="error">Unable to load contacts.</p>
       </section>
     `;
-    return;
   }
+}
 
-  // -----------------------------
-  // SORTING STATE
-  // -----------------------------
-  let currentSortField = "total_clicks";   // default sort
-  let currentSortDirection = "desc";
+function renderTable(rows, container, portalState, selectedYear) {
+  sortContacts(rows);
 
-  const columns = [
-    { key: "contact_name", label: "Contact Name" },
-    { key: "contact_type", label: "Type" },
-    { key: "total_opens", label: "Opens (All)", numeric: true },
-    { key: "total_clicks", label: "Clicks (All)", numeric: true },
-    { key: "last_activity", label: "Last Activity", date: true }
-  ];
+  container.innerHTML = `
+    <section class="card">
+      <h3>Top Contacts</h3>
+      <p>Contacts with engagement from your current contacts.</p>
+      <table class="notes-table">
+        <thead>
+          <tr>${renderHeader()}</tr>
+        </thead>
+        <tbody>
+          ${renderRows(rows)}
+        </tbody>
+      </table>
+    </section>
+  `;
 
-  // -----------------------------
-  // SORT FUNCTION
-  // -----------------------------
-  function sortRows() {
-    rows.sort((a, b) => {
-      let A = a[currentSortField];
-      let B = b[currentSortField];
+  attachSortHandlers(rows, container, portalState, selectedYear);
+  attachExpandHandlers(rows, portalState);
+}
 
-      if (A == null) A = "";
-      if (B == null) B = "";
+function sortContacts(rows) {
+  rows.sort((a, b) => {
+    const x = a[currentSortField];
+    const y = b[currentSortField];
 
-      // Numeric sort
-      if (columns.find(c => c.key === currentSortField)?.numeric) {
-        const numA = Number(A) || 0;
-        const numB = Number(B) || 0;
-        return currentSortDirection === "asc" ? numA - numB : numB - numA;
-      }
+    if (typeof x === "number" && typeof y === "number") {
+      return currentSortDirection === "asc" ? x - y : y - x;
+    }
 
-      // Date sort
-      if (columns.find(c => c.key === currentSortField)?.date) {
-        const dateA = A ? new Date(A).getTime() : 0;
-        const dateB = B ? new Date(B).getTime() : 0;
-        return currentSortDirection === "asc" ? dateA - dateB : dateB - dateA;
-      }
+    if (currentSortField === "last_activity_at") {
+      const dx = x ? new Date(x) : new Date(0);
+      const dy = y ? new Date(y) : new Date(0);
+      return currentSortDirection === "asc" ? dx - dy : dy - dx;
+    }
 
-      // String sort
-      const strA = String(A).toLowerCase();
-      const strB = String(B).toLowerCase();
-      return currentSortDirection === "asc"
-        ? strA.localeCompare(strB)
-        : strB.localeCompare(strA);
-    });
-  }
+    return currentSortDirection === "asc"
+      ? String(x || "").localeCompare(String(y || ""))
+      : String(y || "").localeCompare(String(x || ""));
+  });
+}
 
-  // -----------------------------
-  // RENDER TABLE
-  // -----------------------------
-  function renderTable() {
-    sortRows();
+function renderHeader() {
+  return columns
+    .map(col => {
+      const isSorted = currentSortField === col.key;
+      const upArrow = isSorted && currentSortDirection === "asc" ? "▲" : "△";
+      const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
 
-    const headerHtml = columns
-      .map(col => {
-        const isSorted = currentSortField === col.key;
-        const upArrow = isSorted && currentSortDirection === "asc" ? "▲" : "△";
-        const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
-
-        return `
-          <th class="sortable" data-field="${col.key}">
-            ${col.label}
+      return `
+        <th class="${col.key !== 'actions' ? 'sortable' : ''}" data-field="${col.key}">
+          ${escapeHtml(col.label)}
+          ${col.key !== "actions" ? `
             <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
               <span class="sort-up">${upArrow}</span>
               <span class="sort-down">${downArrow}</span>
             </span>
-          </th>
-        `;
-      })
-      .join("");
-
-    const rowsHtml = rows
-      .map(r => {
-        const last = r.last_activity
-          ? new Date(r.last_activity).toLocaleString()
-          : "-";
-
-        return `
-          <tr>
-            <td>${escapeHtml(r.contact_name || "")}</td>
-            <td>${escapeHtml(r.contact_type || "")}</td>
-            <td>${r.total_opens || 0}</td>
-            <td>${r.total_clicks || 0}</td>
-            <td>${last}</td>
-            <td><button class="btn-primary btn-view" data-id="${r.contact_id}">View</button></td>
-          </tr>
-        `;
-      })
-      .join("");
-
-    container.innerHTML = `
-      <section class="card">
-        <h3>Top Contacts</h3>
-        <p>Contacts with the highest engagement across all campaigns.</p>
-
-        <table class="notes-table">
-          <thead>
-            <tr>
-              ${headerHtml}
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${
-              rowsHtml ||
-              `<tr><td colspan="6" style="text-align:center; padding:20px;">No engagement found.</td></tr>`
-            }
-          </tbody>
-        </table>
-      </section>
-    `;
-
-    // Sorting events
-    container.querySelectorAll("th.sortable").forEach(th => {
-      th.addEventListener("click", () => {
-        const field = th.dataset.field;
-        if (currentSortField === field) {
-          currentSortDirection =
-            currentSortDirection === "asc" ? "desc" : "asc";
-        } else {
-          currentSortField = field;
-          currentSortDirection = "asc";
-        }
-        renderTable();
-      });
-    });
-
-    // View Contact buttons
-    container.querySelectorAll(".btn-view").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const contactId = btn.dataset.id;
-
-        const buttons = document.querySelectorAll("#ecampaigns-subtabs button");
-        buttons.forEach(b => b.classList.remove("active"));
-
-        const activityBtn = document.querySelector(
-          '#ecampaigns-subtabs button[data-subtab="contact-activity"]'
-        );
-        if (activityBtn) activityBtn.classList.add("active");
-
-        portalState.selectedContactId = contactId;
-
-        const content = document.querySelector("#ecampaignsContent");
-        renderECContactActivity(content, portalState);
-      });
-    });
-  }
-
-  // Initial render
-  renderTable();
+          ` : ""}
+        </th>
+      `;
+    })
+    .join("");
 }
 
-// ------------------------------------------------------------
-// HELPER: escapeHtml
-// ------------------------------------------------------------
-function escapeHtml(str) {
-  if (!str) return "";
-  return str.replace(/[&<>"']/g, m => {
-    return (
-      {
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;"
-      }[m] || m
-    );
+function renderRows(rows) {
+  return rows
+    .map(row => {
+      const lastActivity = row.last_activity_at
+        ? formatDateTime(row.last_activity_at)
+        : "—";
+
+      return `
+        <tr>
+          <td>${escapeHtml(row.contact_name)}</td>
+          <td>${escapeHtml(row.email)}</td>
+          <td>${row.total_opens}</td>
+          <td>${row.total_clicks}</td>
+          <td>${row.total_unsubscribes}</td>
+          <td>${lastActivity}</td>
+          <td>
+            <button 
+              class="expand-contact-btn"
+              data-contact-id="${row.contact_id}"
+              style="background:none;border:none;color:#0077cc;text-decoration:underline;cursor:pointer;padding:0;"
+            >
+              View Activity
+            </button>
+          </td>
+        </tr>
+
+        <tr class="contact-detail-row" id="contact-detail-${row.contact_id}" style="display:none;">
+          <td colspan="7">
+            <div class="detail-box" style="padding: 12px;">
+              <div class="detail-field">
+                <strong>Activity for ${escapeHtml(row.contact_name)} (${escapeHtml(row.email)})</strong>
+              </div>
+              <div class="contact-activity-container" data-contact-id="${row.contact_id}">
+                <p>Loading activity...</p>
+              </div>
+            </div>
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+function attachSortHandlers(rows, container, portalState, selectedYear) {
+  container.querySelectorAll("th.sortable").forEach(th => {
+    th.addEventListener("click", () => {
+      const field = th.dataset.field;
+
+      if (currentSortField === field) {
+        currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+      } else {
+        currentSortField = field;
+        currentSortDirection = "asc";
+      }
+
+      renderTable(rows, container, portalState, selectedYear);
+    });
   });
+}
+
+function attachExpandHandlers(rows, portalState) {
+  document.querySelectorAll(".expand-contact-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const contactId = btn.dataset.contactId;
+      const detailRow = document.getElementById(`contact-detail-${contactId}`);
+      const container = detailRow.querySelector(".contact-activity-container");
+
+      const isHidden = detailRow.style.display === "none";
+
+      if (isHidden) {
+        detailRow.style.display = "table-row";
+        btn.textContent = "Hide Activity";
+
+        // Only load once per contact
+        if (!container.dataset.loaded) {
+          await loadContactActivity(contactId, container, portalState);
+          container.dataset.loaded = "true";
+        }
+      } else {
+        detailRow.style.display = "none";
+        btn.textContent = "View Activity";
+      }
+    });
+  });
+}
+
+async function loadContactActivity(contactId, container, portalState) {
+  try {
+    const res = await fetch(
+      `https://ecampaigns-module.dennis-e64.workers.dev/analytics/contact-activity?project=${portalState.project}&contact_id=${encodeURIComponent(contactId)}`,
+      { cache: "no-cache" }
+    );
+
+    let events = await res.json();
+    if (!Array.isArray(events)) events = [];
+
+    // Sort newest → oldest
+    events.sort((a, b) => new Date(b.event_at) - new Date(a.event_at));
+
+    if (events.length === 0) {
+      container.innerHTML = `<p>No activity found for this contact.</p>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <table class="notes-table" style="margin-top:8px;">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Type</th>
+            <th>Campaign</th>
+            <th>Subject</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${events
+            .map(ev => `
+              <tr>
+                <td>${formatDateTime(ev.event_at)}</td>
+                <td>${escapeHtml(ev.event_type || "")}</td>
+                <td>${escapeHtml(ev.campaign_name || "")}</td>
+                <td>${escapeHtml(ev.subject_line || "")}</td>
+              </tr>
+            `)
+            .join("")}
+        </tbody>
+      </table>
+    `;
+  } catch (err) {
+    console.error(err);
+    container.innerHTML = `<p class="error">Unable to load activity.</p>`;
+  }
 }
