@@ -5,7 +5,6 @@ import { renderECOverview } from "./ecampaigns/tab-overview.js";
 import { renderECCampaigns } from "./ecampaigns/tab-campaigns.js";
 import { renderECTopContacts } from "./ecampaigns/tab-top-contacts.js";
 import { renderECSegmentation } from "./ecampaigns/tab-segmentation.js";
-import { renderECTimeline } from "./ecampaigns/tab-timeline.js";
 import { renderECContactActivity } from "./ecampaigns/tab-contact-activity.js";
 import { renderECCampaignClicks } from "./ecampaigns/tab-campaign-clicks.js";
 
@@ -110,7 +109,6 @@ async function loadECSubtab(subtab, portalState) {
   if (subtab === "campaigns") return renderECCampaigns(container, portalState);
   if (subtab === "top-contacts") return renderECTopContacts(container, portalState);
   if (subtab === "segmentation") return renderECSegmentation(container, portalState);
-  if (subtab === "timeline") return renderECTimeline(container, portalState);
   if (subtab === "contact-activity") return renderECContactActivity(container, portalState);
 
   // ⭐ NEW SUBTAB — Campaign Clicks
