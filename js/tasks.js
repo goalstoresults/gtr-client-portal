@@ -1,53 +1,41 @@
-// /tasks/tasks.js
-// Phase 1: Wrap the legacy Task Manager inside the Portal
+// js/tasks.js
+// Phase 1: full iframe of legacy Task Manager (safe, minimal, working)
 
-export async function renderTasksTab(container, portalState) {
-  container.innerHTML = `
+export async function loadTasksTab({ portalState, tabContent }) {
+  tabContent.innerHTML = `
     <section class="card">
-      <h3>Tasks</h3>
-      <div id="tasksFrameWrap" style="margin-top:16px;">
-        <iframe id="tasksFrame"
-          src="about:blank"
-          style="width:100%; height:72vh; border:1px solid #e5e7eb; border-radius:12px; background:#fff;">
-        </iframe>
-      </div>
+      <h2>Tasks</h2>
+
+      <iframe
+        id="tasksFrame"
+        src="about:blank"
+        style="width:100%; height:80vh; border:1px solid #e5e7eb; border-radius:12px; background:#fff;">
+      </iframe>
     </section>
   `;
 
   const frame = document.getElementById("tasksFrame");
 
-  // === CONFIG (copied from legacy index.html) ===
-  const GTR_ID = "hezFHREjxhfwcOdxYOcc";
-  const WORKER_BASE = "https://gtr-task-add.dennis-e64.workers.dev";
+  const LEGACY_URL = "https://gtr-task-add.dennis-e64.workers.dev";
 
-  // === Determine cid ===
-  // Option A: Use the Portal project ID
-  let cid = portalState.selectedProjectId;
+  // 1) Try Portal project id
+  let cid = portalState?.selectedProjectId;
 
-  // ⭐ Option B: Fallback to URL ?cid= (this fixes your issue)
+  // 2) Fallback to URL ?cid= like the old app
   if (!cid) {
-    const url = new URL(window.location.href);
-    cid = (url.searchParams.get("cid") || "").trim();
+    try {
+      const url = new URL(window.location.href);
+      cid = (url.searchParams.get("cid") || "").trim();
+    } catch (e) {
+      // if URL constructor fails for any reason, just leave cid as-is
+    }
   }
 
   if (!cid) {
-    frame.srcdoc = `<p style="padding:20px;">No project selected.</p>`;
+    frame.srcdoc = `<p style="padding:20px;">No project selected (cid missing).</p>`;
     return;
   }
 
-  // === Determine admin mode ===
-  const isAdmin = true; // You can refine this later
-
-  // === Build the legacy URL ===
-  function buildTasksUrl(view, cid, keepAdmin, embed = false) {
-    const a = keepAdmin ? "&admin=1" : "";
-    const e = embed ? "&embed=1" : "";
-    return `${WORKER_BASE}/tasks?view=${encodeURIComponent(view)}&cid=${encodeURIComponent(cid)}${a}${e}`;
-  }
-
-  // Default view = active
-  const src = buildTasksUrl("active", cid, isAdmin, true);
-
-  // Load the legacy Task Manager
-  frame.src = src;
+  const fullUrl = `${LEGACY_URL}/?cid=${encodeURIComponent(cid)}&admin=1`;
+  frame.src = fullUrl;
 }
