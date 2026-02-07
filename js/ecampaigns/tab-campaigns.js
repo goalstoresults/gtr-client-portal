@@ -45,7 +45,27 @@ export async function renderECCampaigns(container, portalState, selectedYear = n
       r.raw_text = r.raw_text ?? "";
     });
 
-    renderTable(rows, container, portalState, selectedYear);
+    // ⭐ Compute totals row
+    const totals = rows.reduce(
+      (acc, r) => {
+        acc.delivered += r.delivered;
+        acc.opened += r.opened;
+        acc.clicked += r.clicked;
+        acc.unsubscribed += r.unsubscribed;
+        return acc;
+      },
+      { delivered: 0, opened: 0, clicked: 0, unsubscribed: 0 }
+    );
+
+    totals.open_rate = totals.delivered ? ((totals.opened / totals.delivered) * 100).toFixed(1) : "0.0";
+    totals.click_rate = totals.delivered ? ((totals.clicked / totals.delivered) * 100).toFixed(1) : "0.0";
+
+    totals.isTotalsRow = true;
+
+    // ⭐ Insert totals row at the top (under headers)
+    const rowsWithTotals = [totals, ...rows];
+
+    renderTable(rowsWithTotals, container, portalState, selectedYear);
   } catch (err) {
     console.error(err);
     container.innerHTML = `
@@ -81,6 +101,10 @@ function renderTable(rows, container, portalState, selectedYear) {
 
 function sortCampaigns(rows) {
   rows.sort((a, b) => {
+    // Keep totals row at the top
+    if (a.isTotalsRow) return -1;
+    if (b.isTotalsRow) return 1;
+
     const x = a[currentSortField];
     const y = b[currentSortField];
 
@@ -124,61 +148,79 @@ function renderHeader() {
 
 function renderRows(rows) {
   return rows
-    .map(row => `
-      <tr>
-        <td>${escapeHtml(row.campaign_name)}</td>
-        <td>${escapeHtml(row.subject_line)}</td>
-        <td>${formatDateTime(row.send_date)}</td>
-        <td>${row.delivered}</td>
-        <td>${row.opened}</td>
+    .map(row => {
+      if (row.isTotalsRow) {
+        return `
+          <tr style="background:#f7f7f7; font-weight:bold;">
+            <td>Totals</td>
+            <td></td>
+            <td></td>
+            <td>${row.delivered}</td>
+            <td>${row.opened}</td>
+            <td>${row.clicked}</td>
+            <td>${row.unsubscribed}</td>
+            <td>${row.open_rate}%</td>
+            <td>${row.click_rate}%</td>
+            <td></td>
+          </tr>
+        `;
+      }
 
-        <!-- ⭐ CLICKED NUMBER IS NOW CLICKABLE -->
-        <td>
-          <button 
-            class="campaign-clicks-link"
-            data-campaign-id="${row.campaign_id}"
-            data-campaign-name="${escapeHtml(row.campaign_name)}"
-            data-year="${row.year}"
-            style="background:none;border:none;color:#0077cc;text-decoration:underline;cursor:pointer;padding:0;"
-          >
-            ${row.clicked}
-          </button>
-        </td>
+      return `
+        <tr>
+          <td>${escapeHtml(row.campaign_name)}</td>
+          <td>${escapeHtml(row.subject_line)}</td>
+          <td>${formatDateTime(row.send_date)}</td>
+          <td>${row.delivered}</td>
+          <td>${row.opened}</td>
 
-        <td>${row.unsubscribed}</td>
-        <td>${row.open_rate}%</td>
-        <td>${row.click_rate}%</td>
-        <td><button class="expand-btn" data-id="${row.campaign_id}">▼</button></td>
-      </tr>
+          <td>
+            <button 
+              class="campaign-clicks-link"
+              data-campaign-id="${row.campaign_id}"
+              data-campaign-name="${escapeHtml(row.campaign_name)}"
+              data-year="${row.year}"
+              style="background:none;border:none;color:#0077cc;text-decoration:underline;cursor:pointer;padding:0;"
+            >
+              ${row.clicked}
+            </button>
+          </td>
 
-      <tr class="detail-row" id="detail-${row.campaign_id}" style="display:none;">
-        <td colspan="10">
-          <div class="detail-box" style="padding: 12px;">
-            <div class="detail-field">
-              <strong>Campaign Name</strong><br>
-              <span class="detail-value">${escapeHtml(row.campaign_name)}</span>
-            </div>
+          <td>${row.unsubscribed}</td>
+          <td>${row.open_rate}%</td>
+          <td>${row.click_rate}%</td>
+          <td><button class="expand-btn" data-id="${row.campaign_id}">▼</button></td>
+        </tr>
 
-            <div class="detail-field" style="margin-top: 12px;">
-              <strong>Subject Line</strong><br>
-              <span class="detail-value">${escapeHtml(row.subject_line)}</span>
-            </div>
+        <tr class="detail-row" id="detail-${row.campaign_id}" style="display:none;">
+          <td colspan="10">
+            <div class="detail-box" style="padding: 12px;">
+              <div class="detail-field">
+                <strong>Campaign Name</strong><br>
+                <span class="detail-value">${escapeHtml(row.campaign_name)}</span>
+              </div>
 
-            <div class="detail-field" style="margin-top: 12px;">
-              <strong>Send Date (Eastern Time)</strong><br>
-              <span class="detail-value">${formatDateTime(row.send_date)}</span>
-            </div>
+              <div class="detail-field" style="margin-top: 12px;">
+                <strong>Subject Line</strong><br>
+                <span class="detail-value">${escapeHtml(row.subject_line)}</span>
+              </div>
 
-            <div class="detail-field" style="margin-top: 12px;">
-              <strong>Raw Email Content</strong><br>
-              <pre class="detail-value" style="white-space: pre-wrap; margin: 0;">
+              <div class="detail-field" style="margin-top: 12px;">
+                <strong>Send Date (Eastern Time)</strong><br>
+                <span class="detail-value">${formatDateTime(row.send_date)}</span>
+              </div>
+
+              <div class="detail-field" style="margin-top: 12px;">
+                <strong>Raw Email Content</strong><br>
+                <pre class="detail-value" style="white-space: pre-wrap; margin: 0;">
 ${escapeHtml(row.raw_text)}
-              </pre>
+                </pre>
+              </div>
             </div>
-          </div>
-        </td>
-      </tr>
-    `)
+          </td>
+        </tr>
+      `;
+    })
     .join("");
 }
 
@@ -218,9 +260,6 @@ function attachExpandHandlers(rows) {
   });
 }
 
-//
-// ⭐ STEP 1: CLICKED NUMBER HANDLER
-//
 function attachClickedHandlers(rows, portalState) {
   document.querySelectorAll(".campaign-clicks-link").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -232,7 +271,6 @@ function attachClickedHandlers(rows, portalState) {
       portalState.selectedCampaignName = campaignName;
       portalState.selectedCampaignYear = year;
 
-      // ⭐ NEW: enable the subtab before clicking it
       const tabButton = document.querySelector('[data-subtab="campaign-clicks"]');
       if (tabButton) {
         tabButton.disabled = false;
@@ -242,4 +280,3 @@ function attachClickedHandlers(rows, portalState) {
     });
   });
 }
-
