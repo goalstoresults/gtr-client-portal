@@ -1,5 +1,4 @@
-// js/tasks.js
-// Phase 1: Load the FULL legacy Task Manager exactly as-is
+// js/tasks.js — Phase 1: full iframe, hard-coded cid
 
 export async function loadTasksTab({ portalState, tabContent }) {
   tabContent.innerHTML = `
@@ -8,10 +7,9 @@ export async function loadTasksTab({ portalState, tabContent }) {
 
       <iframe
         id="tasksFrame"
-        src="https://gtr-task-add.dennis-e64.workers.dev/"
+        src="https://gtr-task-manager.pages.dev/?cid=hezFHREjxhfwcOdxYOcc"
         style="width:100%; height:80vh; border:1px solid #e5e7eb; border-radius:12px; background:#fff;">
       </iframe>
     </section>
   `;
 }
-
