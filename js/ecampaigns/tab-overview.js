@@ -12,8 +12,11 @@ export async function renderECOverview(container, portalState) {
   const project = portalState.project;
   const year = portalState.selectedYear || "";
 
+  // IMPORTANT: match the Campaigns tab base URL
+  const base = "https://ecampaigns-module.dennis-e64.workers.dev";
+
   try {
-    const url = new URL(`${portalState.apiBase}/analytics/overview`);
+    const url = new URL(`${base}/analytics/overview`);
     url.searchParams.set("project", project);
     if (year) url.searchParams.set("year", year);
 
