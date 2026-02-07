@@ -11,10 +11,13 @@ export async function renderECTopContacts(container, portalState) {
 
   const project = portalState.project;
 
+  // IMPORTANT: match the Campaigns tab base URL
+  const base = "https://ecampaigns-module.dennis-e64.workers.dev";
+
   // Fetch aggregated data
   let rows = [];
   try {
-    const url = new URL(`${portalState.apiBase}/analytics/top-contacts`);
+    const url = new URL(`${base}/analytics/top-contacts`);
     url.searchParams.set("project", project);
 
     const res = await fetch(url);
@@ -165,7 +168,6 @@ export async function renderECTopContacts(container, portalState) {
       btn.addEventListener("click", () => {
         const contactId = btn.dataset.id;
 
-        // Switch to Contact Activity tab
         const buttons = document.querySelectorAll("#ecampaigns-subtabs button");
         buttons.forEach(b => b.classList.remove("active"));
 
@@ -187,7 +189,7 @@ export async function renderECTopContacts(container, portalState) {
 }
 
 // ------------------------------------------------------------
-// HELPER: escapeHtml (same as Groups module)
+// HELPER: escapeHtml
 // ------------------------------------------------------------
 function escapeHtml(str) {
   if (!str) return "";
