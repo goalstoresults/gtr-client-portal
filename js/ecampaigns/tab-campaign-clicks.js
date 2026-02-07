@@ -107,23 +107,19 @@ function renderClickTables(container, matched, unmatched) {
           <tr>
             <th>Contact Name</th>
             <th>Contact Type</th>
-            <th>Clicks (All)</th>
-            <th>Opens (All)</th>
             <th>Clicked This Campaign</th>
           </tr>
         </thead>
         <tbody>
           ${
             matched.length === 0
-              ? `<tr><td colspan="5" style="text-align:center;">No matched clickers.</td></tr>`
+              ? `<tr><td colspan="3" style="text-align:center;">No matched clickers.</td></tr>`
               : matched
                   .map(
                     m => `
             <tr>
               <td>${escapeHtml(m.contact_name)}</td>
               <td>${escapeHtml(m.contact_type || "")}</td>
-              <td>${m.total_clicks ?? 0}</td>
-              <td>${m.total_opens ?? 0}</td>
               <td>${formatDateTime(m.action_date)}</td>
             </tr>
           `
@@ -165,3 +161,4 @@ function renderClickTables(container, matched, unmatched) {
     </section>
   `;
 }
+
