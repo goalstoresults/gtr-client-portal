@@ -1,5 +1,5 @@
 // ------------------------------------------------------------
-// RENDER E‑CAMPAIGNS OVERVIEW
+// RENDER E‑CAMPAIGNS OVERVIEW (DEFAULT GRID STYLE)
 // ------------------------------------------------------------
 export async function renderECOverview(container, portalState) {
   container.innerHTML = `
@@ -12,7 +12,7 @@ export async function renderECOverview(container, portalState) {
   const project = portalState.project;
   const year = portalState.selectedYear || "";
 
-  // IMPORTANT: match the Campaigns tab base URL
+  // Match Campaigns tab base URL
   const base = "https://ecampaigns-module.dennis-e64.workers.dev";
 
   try {
@@ -31,7 +31,7 @@ export async function renderECOverview(container, portalState) {
         <h3>E‑Campaigns Overview</h3>
         <p>High‑level engagement metrics across all campaigns.</p>
 
-        <table class="table">
+        <table class="notes-table">
           <thead>
             <tr>
               <th>Metric</th>
