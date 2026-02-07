@@ -72,6 +72,24 @@ export function formatDateTime(value) {
   });
 }
 
+export function formatDateTimeStored(value) {
+  if (!value) return "";
+
+  // Remove timezone suffixes like Z or +00
+  const clean = value.replace("Z", "").replace("+00", "");
+
+  const parts = clean.split(/[-T: ]/);
+  if (parts.length < 5) return clean;
+
+  const [year, month, day, hour, minute] = parts;
+
+  let h = parseInt(hour, 10);
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+
+  return `${month}/${day}/${year}, ${h}:${minute.padStart(2, "0")} ${ampm}`;
+}
+
 
 // Shared Contact Picker
 export async function renderContactPicker(container, portalState, onContactSelected) {
