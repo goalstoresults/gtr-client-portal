@@ -101,7 +101,7 @@ function sortClickRows(rows) {
     const x = a[ccSortField] ?? "";
     const y = b[ccSortField] ?? "";
 
-    if (ccSortField === "action_date") {
+    if (ccSortField === "event_timestamp_eastern") {
       return ccSortDirection === "asc"
         ? new Date(x) - new Date(y)
         : new Date(y) - new Date(x);
@@ -133,7 +133,7 @@ function renderClickTables(container, matched, unmatched) {
           <tr>
             ${renderSortableHeader("contact_name", "Contact Name")}
             ${renderSortableHeader("contact_type", "Contact Type")}
-            ${renderSortableHeader("action_date", "Clicked This Campaign")}
+            ${renderSortableHeader("event_timestamp_eastern", "Clicked This Campaign")}
           </tr>
         </thead>
         <tbody>
@@ -146,7 +146,7 @@ function renderClickTables(container, matched, unmatched) {
             <tr>
               <td>${escapeHtml(m.contact_name)}</td>
               <td>${escapeHtml(m.contact_type || "")}</td>
-              <td>${formatDateTimeStored(m.action_date)}</td>
+              <td>${formatDateTimeStored(m.event_timestamp_eastern)}</td>
             </tr>
           `
                   )
@@ -160,7 +160,7 @@ function renderClickTables(container, matched, unmatched) {
         <thead>
           <tr>
             ${renderSortableHeader("email", "Email")}
-            ${renderSortableHeader("action_date", "Action Date")}
+            ${renderSortableHeader("event_timestamp_eastern", "Action Date")}
           </tr>
         </thead>
         <tbody>
@@ -172,7 +172,7 @@ function renderClickTables(container, matched, unmatched) {
                     u => `
             <tr>
               <td>${escapeHtml(u.email)}</td>
-              <td>${formatDateTimeStored(u.action_date)}</td>
+              <td>${formatDateTimeStored(u.event_timestamp_eastern)}</td>
             </tr>
           `
                   )
