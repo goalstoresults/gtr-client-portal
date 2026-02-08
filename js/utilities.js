@@ -75,10 +75,20 @@ export function formatDateTime(value) {
 export function formatDateTimeStored(value) {
   if (!value) return "";
 
-  // Remove timezone suffixes like Z or +00
-  const clean = value.replace("Z", "").replace("+00", "");
+  // Normalize timezone suffixes
+  let clean = value
+    .replace("Z", "")
+    .replace("+00:00", "")
+    .replace("+00", "")
+    .trim();
 
-  const parts = clean.split(/[-T: ]/);
+  // Replace "T" with space so all formats normalize
+  clean = clean.replace("T", " ");
+
+  // Split on ANY combination of separators
+  const parts = clean.split(/[- :]+/);
+
+  // Expect at least: YYYY MM DD HH mm
   if (parts.length < 5) return clean;
 
   const [year, month, day, hour, minute] = parts;
@@ -89,6 +99,7 @@ export function formatDateTimeStored(value) {
 
   return `${month}/${day}/${year}, ${h}:${minute.padStart(2, "0")} ${ampm}`;
 }
+
 
 
 // Shared Contact Picker
