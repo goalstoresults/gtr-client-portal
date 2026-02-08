@@ -1,4 +1,4 @@
-import { escapeHtml, formatDateTime, formatDateTimeStored } from "../utilities.js";
+import { escapeHtml, formatDateTimeStored } from "../utilities.js";
 
 //
 // Campaign Clicks Tab
@@ -29,7 +29,7 @@ export async function renderECCampaignClicks(container, portalState) {
   `;
 
   //
-  // 1. Load all campaigns for the selected year (for dropdown)
+  // Load campaigns for dropdown
   //
   const campaignsRes = await fetch(
     `https://ecampaigns-module.dennis-e64.workers.dev/analytics/campaigns?project=${portalState.project}&year=${selectedYear}`,
@@ -60,12 +60,12 @@ export async function renderECCampaignClicks(container, portalState) {
   const campaignSelect = container.querySelector("#cc-campaign-select");
 
   //
-  // 2. Load click data for the selected campaign
+  // Load click data for selected campaign
   //
   await loadClickData(container, portalState, campaignSelect.value);
 
   //
-  // 3. Wire dropdown change
+  // Dropdown change handler
   //
   campaignSelect.addEventListener("change", async () => {
     portalState.selectedCampaignId = campaignSelect.value;
@@ -91,9 +91,35 @@ async function loadClickData(container, portalState, campaignId) {
 }
 
 //
+// Sorting state
+//
+let ccSortField = "contact_name";
+let ccSortDirection = "asc";
+
+function sortClickRows(rows) {
+  rows.sort((a, b) => {
+    const x = a[ccSortField] ?? "";
+    const y = b[ccSortField] ?? "";
+
+    if (ccSortField === "action_date") {
+      return ccSortDirection === "asc"
+        ? new Date(x) - new Date(y)
+        : new Date(y) - new Date(x);
+    }
+
+    return ccSortDirection === "asc"
+      ? String(x).localeCompare(String(y))
+      : String(y).localeCompare(String(x));
+  });
+}
+
+//
 // Render the two tables
 //
 function renderClickTables(container, matched, unmatched) {
+  sortClickRows(matched);
+  sortClickRows(unmatched);
+
   container.innerHTML = `
     <section class="card">
       <h3 style="display:flex; align-items:center; gap:12px;">
@@ -101,13 +127,13 @@ function renderClickTables(container, matched, unmatched) {
         <span id="cc-campaign-dropdown"></span>
       </h3>
 
-      <h4>Matched Clickers</h4>
+      <h4>Portal Contacts Clicked</h4>
       <table class="notes-table">
         <thead>
           <tr>
-            <th>Contact Name</th>
-            <th>Contact Type</th>
-            <th>Clicked This Campaign</th>
+            ${renderSortableHeader("contact_name", "Contact Name")}
+            ${renderSortableHeader("contact_type", "Contact Type")}
+            ${renderSortableHeader("action_date", "Clicked This Campaign")}
           </tr>
         </thead>
         <tbody>
@@ -129,28 +155,24 @@ function renderClickTables(container, matched, unmatched) {
         </tbody>
       </table>
 
-      <h4 style="margin-top:24px;">Unmatched Clicks (Staging)</h4>
+      <h4 style="margin-top:24px;">Non‑Portal Contacts Clicked</h4>
       <table class="notes-table">
         <thead>
           <tr>
-            <th>Email</th>
-            <th>Action Date</th>
-            <th>Raw Text</th>
+            ${renderSortableHeader("email", "Email")}
+            ${renderSortableHeader("action_date", "Action Date")}
           </tr>
         </thead>
         <tbody>
           ${
             unmatched.length === 0
-              ? `<tr><td colspan="3" style="text-align:center;">No unmatched clicks.</td></tr>`
+              ? `<tr><td colspan="2" style="text-align:center;">No unmatched clicks.</td></tr>`
               : unmatched
                   .map(
                     u => `
             <tr>
               <td>${escapeHtml(u.email)}</td>
               <td>${formatDateTimeStored(u.action_date)}</td>
-              <td><pre style="white-space:pre-wrap;margin:0;">${escapeHtml(
-                u.raw_text || ""
-              )}</pre></td>
             </tr>
           `
                   )
@@ -160,5 +182,45 @@ function renderClickTables(container, matched, unmatched) {
       </table>
     </section>
   `;
+
+  attachClickSortHandlers(container, matched, unmatched);
 }
 
+//
+// Sorting header renderer
+//
+function renderSortableHeader(field, label) {
+  const isSorted = ccSortField === field;
+  const arrow = isSorted
+    ? ccSortDirection === "asc"
+      ? "▲"
+      : "▼"
+    : "▽";
+
+  return `
+    <th class="sortable" data-field="${field}">
+      ${escapeHtml(label)}
+      <span style="margin-left:4px; font-size:0.8em;">${arrow}</span>
+    </th>
+  `;
+}
+
+//
+// Sorting click handlers
+//
+function attachClickSortHandlers(container, matched, unmatched) {
+  container.querySelectorAll("th.sortable").forEach(th => {
+    th.addEventListener("click", () => {
+      const field = th.dataset.field;
+
+      if (ccSortField === field) {
+        ccSortDirection = ccSortDirection === "asc" ? "desc" : "asc";
+      } else {
+        ccSortField = field;
+        ccSortDirection = "asc";
+      }
+
+      renderClickTables(container, matched, unmatched);
+    });
+  });
+}
