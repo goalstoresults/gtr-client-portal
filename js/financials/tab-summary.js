@@ -47,7 +47,7 @@ export async function renderFinancialSummary(container, portalState) {
 }
 
 /* =========================================================
-   LOAD YEARS (using transaction_date)
+   LOAD YEARS (using transaction_year)
 ========================================================= */
 
 async function loadSummaryYears(portalState) {
@@ -67,8 +67,8 @@ async function loadSummaryYears(portalState) {
 
   const years = new Set();
   for (const p of payments) {
-    if (p.transaction_date) {
-      years.add(new Date(p.transaction_date).getFullYear());
+    if (p.transaction_year) {
+      years.add(Number(p.transaction_year));
     }
   }
 
@@ -88,7 +88,7 @@ async function loadSummaryData(portalState) {
   const type = document.getElementById("summaryType").value;
   const year = document.getElementById("summaryYear").value;
 
-  // Fetch revenue rows
+  // Fetch revenue rows (now guaranteed to include transaction_year)
   const payRes = await fetch(
     `https://financials-module.dennis-e64.workers.dev/payments/list?project=${portalState.project}&limit=2000`,
     { cache: "no-cache" }
@@ -138,11 +138,10 @@ async function loadSummaryData(portalState) {
     });
   }
 
-  // Filter by year (using transaction_date)
+  // Filter by year (using transaction_year)
   if (year !== "all") {
     payments = payments.filter(p => {
-      if (!p.transaction_date) return false;
-      return new Date(p.transaction_date).getFullYear().toString() === year;
+      return String(p.transaction_year) === String(year);
     });
   }
 
@@ -171,11 +170,11 @@ async function loadSummaryData(portalState) {
       break;
 
     case "group":
-      summaryRows = summarizeByGroup(payments, groupByContactId, nameById);
+      summaryRows = summarizeByGroup(payments, groupByContactId);
       break;
 
     case "group_year":
-      summaryRows = summarizeByGroupYear(payments, groupByContactId, nameById);
+      summaryRows = summarizeByGroupYear(payments, groupByContactId);
       break;
   }
 
@@ -183,7 +182,7 @@ async function loadSummaryData(portalState) {
 }
 
 /* =========================================================
-   SUMMARY LOGIC (revenue-native)
+   SUMMARY LOGIC (transaction_year-native)
 ========================================================= */
 
 function summarizeByClient(payments, nameById) {
@@ -236,8 +235,8 @@ function summarizeByYear(payments) {
   const map = new Map();
 
   for (const p of payments) {
-    if (!p.transaction_date) continue;
-    const year = new Date(p.transaction_date).getFullYear();
+    const year = p.transaction_year;
+    if (!year) continue;
 
     if (!map.has(year)) {
       map.set(year, {
@@ -267,8 +266,9 @@ function summarizeByYearClient(payments, nameById) {
   const map = new Map();
 
   for (const p of payments) {
-    if (!p.transaction_date) continue;
-    const year = new Date(p.transaction_date).getFullYear();
+    const year = p.transaction_year;
+    if (!year) continue;
+
     const key = `${year}-${p.contact_id}`;
 
     if (!map.has(key)) {
@@ -293,8 +293,9 @@ function summarizeByYearReferral(payments, nameById) {
   const map = new Map();
 
   for (const p of payments) {
-    if (!p.transaction_date) continue;
-    const year = new Date(p.transaction_date).getFullYear();
+    const year = p.transaction_year;
+    if (!year) continue;
+
     const key = `${year}-${p.referral_id}`;
 
     if (!map.has(key)) {
@@ -352,9 +353,9 @@ function summarizeByGroupYear(payments, groupByContactId) {
   const map = new Map();
 
   for (const p of payments) {
-    if (!p.transaction_date) continue;
+    const year = p.transaction_year;
+    if (!year) continue;
 
-    const year = new Date(p.transaction_date).getFullYear();
     const groupInfo =
       groupByContactId.get(p.referral_id) || { group_id: null, group_name: "(none)" };
 
@@ -569,7 +570,7 @@ function renderSummaryGrid(rows, type) {
       </table>
     `;
 
-      container.querySelectorAll("th.sortable").forEach(th => {
+    container.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
 
@@ -588,3 +589,4 @@ function renderSummaryGrid(rows, type) {
 
   render();
 }
+
