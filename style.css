@@ -478,3 +478,80 @@ th.sortable:hover .sort-arrows {
 .notes-table th.amount {
   text-align: right;
 }
+
+/* ============================================================
+   LOGIN MODAL (GLOBAL)
+   ============================================================ */
+
+.login-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: none; /* stays hidden until triggered */
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  backdrop-filter: blur(2px);
+}
+
+.login-modal-content {
+  background: #ffffff;
+  padding: 28px 24px;
+  border-radius: 10px;
+  width: 320px;
+  max-width: 90%;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  text-align: center;
+  animation: loginFadeIn 0.25s ease-out;
+}
+
+.login-modal-content h2 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #222;
+}
+
+.login-modal-content input {
+  width: 100%;
+  padding: 10px 12px;
+  margin: 12px 0 16px 0;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 15px;
+}
+
+.login-modal-content button {
+  width: 100%;
+  padding: 10px;
+  background: #111;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.15s ease-in-out;
+}
+
+.login-modal-content button:hover {
+  background: #000;
+}
+
+.login-error {
+  color: #d00;
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+/* Subtle fade-in animation */
+@keyframes loginFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
