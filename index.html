@@ -4,9 +4,7 @@
 <head>
 <meta charset="UTF-8" />
 <title id="page-title"></title>
-<link rel="stylesheet" href="style.css" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-
 <link rel="icon" type="image/png" href="./redumbrella_black.png" />
 
 <style>
@@ -67,8 +65,10 @@ footer {
 <div id="loginForm" class="login-wrapper">
   <img src="./RedUmbrellaPro Header2.png" alt="Red Umbrella Pro" class="logo-waiting" />
 
-  <label for="projectInput">Project:</label>
-  <input id="projectInput" type="text" placeholder="Project name" />
+  <div id="projectFieldBlock">
+    <label for="projectInput">Project:</label>
+    <input id="projectInput" type="text" placeholder="Project name" />
+  </div>
 
   <label for="emailInput">Email:</label>
   <input id="emailInput" type="email" placeholder="Email address" />
@@ -138,6 +138,7 @@ const portalState = {
 window.portalState = portalState;
 
 const loginForm = document.getElementById("loginForm");
+const projectFieldBlock = document.getElementById("projectFieldBlock");
 const projectInput = document.getElementById("projectInput");
 const emailInput = document.getElementById("emailInput");
 const loginBtn = document.getElementById("loginBtn");
@@ -328,6 +329,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   if (projectParam) {
     projectInput.value = projectParam;
+    projectFieldBlock.style.display = "none"; // HIDE PROJECT FIELD COMPLETELY
   }
 });
 
@@ -335,4 +337,3 @@ window.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
-
