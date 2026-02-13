@@ -9,9 +9,6 @@
 
 <link rel="icon" type="image/png" href="./redumbrella_black.png" />
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
-<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
-
 <style>
 .logo-waiting {
   display: block;
@@ -33,7 +30,7 @@
 .login-wrapper input {
   padding: 6px;
   margin-bottom: 10px;
-  width: 260px; /* wider */
+  width: 260px;
 }
 
 .login-wrapper button {
@@ -45,6 +42,10 @@
   color: red;
   margin-top: 10px;
   height: 18px;
+}
+
+header {
+  margin-top: 20px;
 }
 
 footer {
@@ -62,14 +63,12 @@ footer {
 
 <body>
 
-<!-- ⭐ ONE SCREEN LOGIN FORM (PROJECT + EMAIL) -->
+<!-- ⭐ ONE SCREEN LOGIN FORM -->
 <div id="loginForm" class="login-wrapper">
   <img src="./RedUmbrellaPro Header2.png" alt="Red Umbrella Pro" class="logo-waiting" />
 
-  <div id="projectFieldBlock">
-    <label for="projectInput">Project:</label>
-    <input id="projectInput" type="text" placeholder="Project name" />
-  </div>
+  <label for="projectInput">Project:</label>
+  <input id="projectInput" type="text" placeholder="Project name" />
 
   <label for="emailInput">Email:</label>
   <input id="emailInput" type="email" placeholder="Email address" />
@@ -81,15 +80,26 @@ footer {
 
 <!-- ⭐ PORTAL UI (HIDDEN UNTIL LOGIN SUCCESS) -->
 <header id="portalHeader" style="display:none;">
-  <div id="logo-container" style="text-align:center; margin:20px 0;"></div>
 
-  <h1 id="portal-title"
-      style="display:flex; align-items:center; gap:8px; margin-left:20px;">
-    <img src="./RedUmbrellaPro_black.png"
-         alt="Portal Logo"
-         style="height:26px; width:auto;" />
-    <span id="portal-title-text"></span>
-  </h1>
+  <!-- TABLE‑BASED HEADER FOR PERFECT ALIGNMENT -->
+  <table style="border-collapse: collapse; margin-left: 20px;">
+    <tr>
+      <td rowspan="2" style="vertical-align: top; padding-right: 10px;">
+        <img src="./RedUmbrellaPro_black.png"
+             alt="Portal Logo"
+             style="height:32px; width:auto;" />
+      </td>
+      <td style="font-size: 26px; font-weight: 600;" id="welcomeHeader">
+        Welcome
+      </td>
+    </tr>
+    <tr>
+      <td style="font-size: 16px; opacity: 0.8;" id="subHeader">
+        Portal
+      </td>
+    </tr>
+  </table>
+
 </header>
 
 <nav id="tabs" style="display:none;"></nav>
@@ -122,12 +132,12 @@ import { loadFilterTab } from "./js/filter.js";
 ============================================================ */
 const portalState = {
   project: "",
-  userEmail: ""
+  userEmail: "",
+  staffName: ""
 };
 window.portalState = portalState;
 
 const loginForm = document.getElementById("loginForm");
-const projectFieldBlock = document.getElementById("projectFieldBlock");
 const projectInput = document.getElementById("projectInput");
 const emailInput = document.getElementById("emailInput");
 const loginBtn = document.getElementById("loginBtn");
@@ -135,7 +145,8 @@ const errorBox = document.getElementById("errorBox");
 
 const portalHeader = document.getElementById("portalHeader");
 const portalFooter = document.getElementById("portalFooter");
-const portalTitleText = document.getElementById("portal-title-text");
+const welcomeHeader = document.getElementById("welcomeHeader");
+const subHeader = document.getElementById("subHeader");
 const pageTitle = document.getElementById("page-title");
 const tabs = document.getElementById("tabs");
 const tabContent = document.getElementById("tab-content");
@@ -154,6 +165,20 @@ const tabMap = {
   "11": { label: "Pipeline", loader: loadPipelineTab },
   "12": { label: "Filter", loader: loadFilterTab }
 };
+
+/* ============================================================
+   SMART NAME LOGIC
+============================================================ */
+function getFriendlyName(fullName) {
+  if (!fullName) return "";
+  const parts = fullName.trim().split(/\s+/);
+
+  if (parts.length <= 2) {
+    return fullName;
+  }
+
+  return parts[0];
+}
 
 /* ============================================================
    LOGIN HANDLER
@@ -194,6 +219,10 @@ async function attemptLogin() {
     // SUCCESS
     portalState.project = project;
     portalState.userEmail = email;
+    portalState.staffName = result.staff_name || "";
+
+    const friendly = getFriendlyName(portalState.staffName);
+    welcomeHeader.textContent = `Welcome ${friendly}`;
 
     loginForm.style.display = "none";
     portalHeader.style.display = "block";
@@ -208,6 +237,14 @@ async function attemptLogin() {
 }
 
 loginBtn.addEventListener("click", attemptLogin);
+
+/* ⭐ ENTER KEY TRIGGERS LOGIN */
+loginForm.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    loginBtn.click();
+  }
+});
 
 /* ============================================================
    LOAD PROJECT CONFIG
@@ -230,7 +267,9 @@ async function loadPortalConfig(projectName) {
       return;
     }
 
-    injectConfig(match);
+    subHeader.textContent = match.display_name || "";
+    pageTitle.textContent = match.display_name || "";
+
     const enabledTabs = normalizeTabs(match.enabled_tabs);
     renderTabs(enabledTabs);
 
@@ -243,11 +282,6 @@ async function loadPortalConfig(projectName) {
 /* ============================================================
    SUPPORT FUNCTIONS
 ============================================================ */
-function injectConfig(config) {
-  portalTitleText.textContent = config.display_name || "";
-  pageTitle.textContent = config.display_name || "";
-}
-
 function normalizeTabs(raw) {
   if (Array.isArray(raw)) return raw;
   if (typeof raw === "string") {
@@ -288,13 +322,12 @@ async function loadTab(tabId) {
 /* ============================================================
    INITIALIZE — HANDLE ?project PARAM
 ============================================================ */
-window.addEventListener("DOMContentLoaded", async () => {
+window.addEventListener("DOMContentLoaded", () => {
   const urlParams = new URLSearchParams(window.location.search);
   const projectParam = urlParams.get("project");
 
   if (projectParam) {
     projectInput.value = projectParam;
-    projectFieldBlock.style.display = "none";
   }
 });
 
@@ -302,3 +335,4 @@ window.addEventListener("DOMContentLoaded", async () => {
 
 </body>
 </html>
+
