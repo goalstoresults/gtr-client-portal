@@ -136,11 +136,12 @@ document.getElementById("testLoginBtn").addEventListener("click", async () => {
 });
 
 /* ============================================================
-⭐ REAL LOGIN LOGIC (COMMENTED OUT — WILL ACTIVATE LATER)
+⭐ REAL LOGIN LOGIC (ACTIVE)
 ============================================================ */
 
 async function handlePortalLogin(enteredEmail) {
   try {
+    // 1. Validate staff email for this project
     const res = await fetch(
       "https://client-portal-api.dennis-e64.workers.dev/api/check_staff",
       {
@@ -159,8 +160,10 @@ async function handlePortalLogin(enteredEmail) {
       return;
     }
 
+    // 2. Set authenticated user
     portalState.userEmail = enteredEmail;
 
+    // 3. Log login event
     await fetch(
       "https://client-portal-api.dennis-e64.workers.dev/api/log_portal_login",
       {
@@ -180,6 +183,7 @@ async function handlePortalLogin(enteredEmail) {
     alert("Unable to log in. Please try again.");
   }
 }
+
 window.handlePortalLogin = handlePortalLogin;
 
   
