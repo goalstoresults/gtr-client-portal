@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
 <meta charset="UTF-8" />
 <title id="page-title"></title>
@@ -45,29 +46,30 @@ footer {
   padding: 8px;
 }
 </style>
+
 </head>
 
 <body>
 
 <header>
-  <div id="logo-container" style="text-align:center; margin:20px 0;"></div>
+<div id="logo-container" style="text-align:center; margin:20px 0;"></div>
 
-  <h1 id="portal-title"
-      style="display:flex; align-items:center; gap:8px; margin-left:20px;">
-      <img src="./RedUmbrellaPro_black.png"
-           alt="Portal Logo"
-           style="height:26px; width:auto;" />
-      <span id="portal-title-text"></span>
-  </h1>
+<h1 id="portal-title"
+style="display:flex; align-items:center; gap:8px; margin-left:20px;">
+<img src="./RedUmbrellaPro_black.png"
+alt="Portal Logo"
+style="height:26px; width:auto;" />
+<span id="portal-title-text"></span>
+</h1>
 
-  <div id="project-selector-row" style="display:none;"></div>
+<div id="project-selector-row" style="display:none;"></div>
 </header>
 
 <nav id="tabs" style="display:none;"></nav>
 <div id="tab-content"></div>
 
 <footer>
-  <small style="display:block; opacity:0.7;">Portal Version: 2.0.0</small>
+<small style="display:block; opacity:0.7;">Portal Version: 2.0.0</small>
 </footer>
 
 <script type="module">
@@ -118,20 +120,25 @@ const tabMap = {
 🔐 PORTAL LOGIN HANDLER
 ============================================================ */
 
-/* ⭐ ACTIVE PLACEHOLDER — does nothing except set the email */
+// ⭐ ACTIVE PLACEHOLDER — does nothing except set the email
 async function handlePortalLogin(enteredEmail) {
   portalState.userEmail = enteredEmail;
   console.log("Logged in as:", portalState.userEmail);
 }
 window.handlePortalLogin = handlePortalLogin;
 
-/* ⭐ TEST LOGIN BUTTON — NOW OPENS POPUP */
-document.getElementById("testLoginBtn").addEventListener("click", () => {
-  const loginModal = document.getElementById("loginModal");
-  loginModal.style.display = "flex";
+document.getElementById("testLoginBtn").addEventListener("click", async () => {
+  const email = prompt("Enter test email:");
+  if (!email) return;
+  console.log("Testing login with:", email);
+  await handlePortalLogin(email);
+  console.log("portalState.userEmail =", portalState.userEmail);
 });
 
-/* ⭐ REAL LOGIN LOGIC (COMMENTED OUT — WILL ACTIVATE LATER)
+/* ============================================================
+⭐ REAL LOGIN LOGIC (COMMENTED OUT — WILL ACTIVATE LATER)
+============================================================
+
 async function handlePortalLogin(enteredEmail) {
   try {
     const res = await fetch(
@@ -174,10 +181,7 @@ async function handlePortalLogin(enteredEmail) {
   }
 }
 window.handlePortalLogin = handlePortalLogin;
-*/
 
-/* ============================================================
-PROJECT LOADING
 ============================================================ */
 
 async function loadProjects() {
@@ -340,26 +344,26 @@ window.addEventListener("DOMContentLoaded", async () => {
 });
 </script>
 
-<!-- ⭐ TEMPORARY TEST LOGIN BUTTON -->
+<!-- ⭐ TEMPORARY TEST LOGIN BUTTON (SAFE) -->
 <button id="testLoginBtn"
-  style="
-    position:fixed;
-    bottom:60px;
-    right:20px;
-    z-index:9999;
-    padding:8px 14px;
-    background:#333;
-    color:white;
-    border:none;
-    border-radius:4px;
-    cursor:pointer;
-    opacity:0.7;
-  ">
-  Test Login
+style="
+position:fixed;
+bottom:60px;
+right:20px;
+z-index:9999;
+padding:8px 14px;
+background:#333;
+color:white;
+border:none;
+border-radius:4px;
+cursor:pointer;
+opacity:0.7;
+">
+Test Login
 </button>
 
-<!-- ⭐ LOGIN POPUP (ACTIVE FOR TESTING ONLY) -->
-<div id="loginModal" class="login-modal" style="display:none;">
+<!-- ⭐ LOGIN POPUP (NOW UNCOMMENTED) -->
+<div id="loginModal" class="login-modal">
   <div class="login-modal-content">
     <h2>Log In</h2>
     <input id="loginEmailInput"
@@ -442,7 +446,7 @@ LOGIN MODAL (GLOBAL)
 </style>
 
 <script>
-/* ⭐ POPUP JS — ACTIVE FOR TESTING */
+/* ⭐ POPUP JS — NOW UNCOMMENTED */
 const loginModal = document.getElementById("loginModal");
 const loginEmailInput = document.getElementById("loginEmailInput");
 const loginSubmitBtn = document.getElementById("loginSubmitBtn");
@@ -472,4 +476,3 @@ loginSubmitBtn.addEventListener("click", async () => {
 
 </body>
 </html>
-
