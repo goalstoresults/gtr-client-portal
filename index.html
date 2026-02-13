@@ -171,13 +171,6 @@ const tabMap = {
 };
 
 /* ============================================================
-   FRIENDLY NAME LOGIC — USE FIRST NAME DIRECTLY
-============================================================ */
-function getFriendlyName(result) {
-  return result.first_name || "!";
-}
-
-/* ============================================================
    LOGIN HANDLER
 ============================================================ */
 async function attemptLogin() {
@@ -216,9 +209,10 @@ async function attemptLogin() {
     // SUCCESS
     portalState.project = project;
     portalState.userEmail = email;
-    portalState.staffName = result.staff_name || "";
 
-    const friendly = getFriendlyName(portalState.staffName);
+    // ⭐ USE FIRST NAME DIRECTLY
+    const friendly = result.first_name || "";
+
     welcomeHeader.textContent = `Welcome ${friendly}`;
 
     loginForm.style.display = "none";
@@ -325,7 +319,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   if (projectParam) {
     projectInput.value = projectParam;
-    projectFieldBlock.style.display = "none";   // ⭐ HIDE PROJECT FIELD COMPLETELY
+    projectFieldBlock.style.display = "none";   // ⭐ HIDE PROJECT FIELD
   }
 });
 
