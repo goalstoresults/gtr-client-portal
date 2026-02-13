@@ -19,25 +19,32 @@
   height: 80px;
 }
 
-.project-entry {
+.login-wrapper {
   text-align: center;
   margin-top: 20px;
 }
 
-.project-entry label {
+.login-wrapper label {
   display: block;
   margin-bottom: 8px;
   font-weight: bold;
 }
 
-.project-entry input {
+.login-wrapper input {
   padding: 6px;
-  margin-right: 8px;
-  width: 260px; /* ⭐ wider input */
+  margin-bottom: 10px;
+  width: 260px; /* wider */
 }
 
-.project-entry button {
+.login-wrapper button {
   padding: 6px 12px;
+  margin-top: 10px;
+}
+
+#errorBox {
+  color: red;
+  margin-top: 10px;
+  height: 18px;
 }
 
 footer {
@@ -55,18 +62,25 @@ footer {
 
 <body>
 
-<!-- ⭐ LOGIN SCREEN (SAME LAYOUT, ALWAYS UNDER PROJECT SELECTOR) -->
-<div id="login-screen" class="project-entry" style="display:none;">
+<!-- ⭐ ONE SCREEN LOGIN FORM (PROJECT + EMAIL) -->
+<div id="loginForm" class="login-wrapper">
   <img src="./RedUmbrellaPro Header2.png" alt="Red Umbrella Pro" class="logo-waiting" />
 
-  <label for="loginEmailInput">Enter your email to continue:</label>
-  <input id="loginEmailInput" type="email" placeholder="Email address" />
-  <button id="loginSubmitBtn">Login</button>
+  <div id="projectFieldBlock">
+    <label for="projectInput">Project:</label>
+    <input id="projectInput" type="text" placeholder="Project name" />
+  </div>
 
-  <div id="loginError" style="color:red; margin-top:10px; height:18px;"></div>
+  <label for="emailInput">Email:</label>
+  <input id="emailInput" type="email" placeholder="Email address" />
+
+  <button id="loginBtn">Login</button>
+
+  <div id="errorBox"></div>
 </div>
 
-<header>
+<!-- ⭐ PORTAL UI (HIDDEN UNTIL LOGIN SUCCESS) -->
+<header id="portalHeader" style="display:none;">
   <div id="logo-container" style="text-align:center; margin:20px 0;"></div>
 
   <h1 id="portal-title"
@@ -76,14 +90,12 @@ footer {
          style="height:26px; width:auto;" />
     <span id="portal-title-text"></span>
   </h1>
-
-  <div id="project-selector-row" style="display:none;"></div>
 </header>
 
 <nav id="tabs" style="display:none;"></nav>
 <div id="tab-content"></div>
 
-<footer>
+<footer id="portalFooter" style="display:none;">
   <small style="display:block; opacity:0.7;">Portal Version: 2.0.0</small>
 </footer>
 
@@ -110,22 +122,23 @@ import { loadFilterTab } from "./js/filter.js";
 ============================================================ */
 const portalState = {
   project: "",
-  contactId: "",
   userEmail: ""
 };
 window.portalState = portalState;
 
+const loginForm = document.getElementById("loginForm");
+const projectFieldBlock = document.getElementById("projectFieldBlock");
+const projectInput = document.getElementById("projectInput");
+const emailInput = document.getElementById("emailInput");
+const loginBtn = document.getElementById("loginBtn");
+const errorBox = document.getElementById("errorBox");
+
+const portalHeader = document.getElementById("portalHeader");
+const portalFooter = document.getElementById("portalFooter");
 const portalTitleText = document.getElementById("portal-title-text");
 const pageTitle = document.getElementById("page-title");
-const selectorRow = document.getElementById("project-selector-row");
 const tabs = document.getElementById("tabs");
 const tabContent = document.getElementById("tab-content");
-const logoContainer = document.getElementById("logo-container");
-
-const loginScreen = document.getElementById("login-screen");
-const loginEmailInput = document.getElementById("loginEmailInput");
-const loginSubmitBtn = document.getElementById("loginSubmitBtn");
-const loginError = document.getElementById("loginError");
 
 const tabMap = {
   "1": { label: "Contacts", loader: loadContactsTab },
@@ -143,18 +156,21 @@ const tabMap = {
 };
 
 /* ============================================================
-   LOGIN — NO POPUPS, NO PHISHING
+   LOGIN HANDLER
 ============================================================ */
-function showLoginScreen() {
-  loginScreen.style.display = "block";
-}
-
 async function attemptLogin() {
-  const email = loginEmailInput.value.trim();
-  loginError.textContent = "";
+  errorBox.textContent = "";
+
+  const project = projectInput.value.trim();
+  const email = emailInput.value.trim();
+
+  if (!project) {
+    errorBox.textContent = "Please enter a project.";
+    return;
+  }
 
   if (!email) {
-    loginError.textContent = "Please enter an email.";
+    errorBox.textContent = "Please enter an email.";
     return;
   }
 
@@ -164,39 +180,39 @@ async function attemptLogin() {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          project: portalState.project,
-          email
-        })
+        body: JSON.stringify({ project, email })
       }
     );
 
     const result = await res.json();
 
     if (!result.valid) {
-      loginEmailInput.value = "";
-      loginError.textContent = "Invalid email. Please try again.";
+      errorBox.textContent = "Invalid email for this project.";
       return;
     }
 
     // SUCCESS
+    portalState.project = project;
     portalState.userEmail = email;
 
-    loginScreen.style.display = "none";
-    selectorRow.style.display = "none";
+    loginForm.style.display = "none";
+    portalHeader.style.display = "block";
+    portalFooter.style.display = "block";
     tabs.style.display = "block";
 
+    loadPortalConfig(project);
+
   } catch (err) {
-    loginError.textContent = "Server error. Please try again.";
+    errorBox.textContent = "Server error. Try again.";
   }
 }
 
-loginSubmitBtn.addEventListener("click", attemptLogin);
+loginBtn.addEventListener("click", attemptLogin);
 
 /* ============================================================
-   LOAD PROJECTS — SHOW LOGIN UNDER SELECTOR
+   LOAD PROJECT CONFIG
 ============================================================ */
-async function loadProjects() {
+async function loadPortalConfig(projectName) {
   try {
     const res = await fetch(
       "https://client-portal-api.dennis-e64.workers.dev/api/projects_config",
@@ -204,73 +220,13 @@ async function loadProjects() {
     );
 
     const projects = await res.json();
-    if (!Array.isArray(projects) || projects.length === 0)
-      throw new Error("No projects returned");
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const projectParamRaw = urlParams.get("project");
-    let projectParam = projectParamRaw ? projectParamRaw.trim() : "";
-
-    /* CASE 1 — No ?project param */
-    if (!projectParam) {
-      logoContainer.innerHTML =
-        `<img src="./RedUmbrellaPro Header2.png"
-              alt="Red Umbrella Pro"
-              class="logo-waiting" />`;
-
-      selectorRow.style.display = "block";
-      selectorRow.className = "project-entry";
-
-      selectorRow.innerHTML = `
-        <label for="projectInput">Enter Project Name:</label>
-        <input id="projectInput" type="text" placeholder="Project name" />
-        <button id="btnSetProject" class="primary">Enter</button>
-      `;
-
-      portalState.project = "";
-      portalTitleText.textContent = "";
-      pageTitle.textContent = "";
-      tabs.style.display = "none";
-
-      document.getElementById("btnSetProject").addEventListener("click", async () => {
-        const projectName =
-          document.getElementById("projectInput").value.trim();
-
-        if (!projectName) {
-          alert("Please enter a project name.");
-          return;
-        }
-
-        const match = projects.find(
-          p => String(p.project).toLowerCase() === projectName.toLowerCase()
-        );
-
-        if (!match) {
-          tabContent.innerHTML =
-            `<section class="card"><p>Invalid project specified. No UI available.</p></section>`;
-          return;
-        }
-
-        injectConfig(match);
-        const enabledTabs = normalizeTabs(match.enabled_tabs);
-        renderTabs(enabledTabs);
-
-        /* ⭐ SHOW LOGIN UNDER SELECTOR */
-        showLoginScreen();
-      });
-
-      return;
-    }
-
-    /* CASE 2 — ?project param exists */
     const match = projects.find(
-      p => String(p.project).toLowerCase() === projectParam.toLowerCase()
+      p => String(p.project).toLowerCase() === projectName.toLowerCase()
     );
 
     if (!match) {
-      tabs.style.display = "none";
       tabContent.innerHTML =
-        `<section class="card"><p>Invalid project specified. No UI available.</p></section>`;
+        `<section class="card"><p>Invalid project specified.</p></section>`;
       return;
     }
 
@@ -278,14 +234,9 @@ async function loadProjects() {
     const enabledTabs = normalizeTabs(match.enabled_tabs);
     renderTabs(enabledTabs);
 
-    /* ⭐ SHOW LOGIN UNDER SELECTOR */
-    showLoginScreen();
-
   } catch (err) {
-    selectorRow.style.display = "none";
-    tabs.style.display = "none";
     tabContent.innerHTML =
-      `<section class="card"><p>Unable to load projects. Please try again later.</p></section>`;
+      `<section class="card"><p>Error loading project config.</p></section>`;
   }
 }
 
@@ -293,16 +244,6 @@ async function loadProjects() {
    SUPPORT FUNCTIONS
 ============================================================ */
 function injectConfig(config) {
-  portalState.project = config.project;
-  portalState.projects_config = config;
-  portalState.display_name = config.display_name;
-  portalState.business_name = config.business_name;
-  portalState.contact_name = config.contact_name;
-  portalState.contact_email = config.contact_email;
-  portalState.contact_first_name = config.contact_first_name;
-  portalState.contact_last_name = config.contact_last_name;
-  portalState.enabled_tabs = config.enabled_tabs || [];
-
   portalTitleText.textContent = config.display_name || "";
   pageTitle.textContent = config.display_name || "";
 }
@@ -345,31 +286,19 @@ async function loadTab(tabId) {
 }
 
 /* ============================================================
-   INITIALIZE
+   INITIALIZE — HANDLE ?project PARAM
 ============================================================ */
 window.addEventListener("DOMContentLoaded", async () => {
-  await loadProjects();
+  const urlParams = new URLSearchParams(window.location.search);
+  const projectParam = urlParams.get("project");
+
+  if (projectParam) {
+    projectInput.value = projectParam;
+    projectFieldBlock.style.display = "none";
+  }
 });
 
 </script>
-
-<!-- ⭐ TEST LOGIN BUTTON (UNCHANGED) -->
-<button id="testLoginBtn"
-style="
-position:fixed;
-bottom:60px;
-right:20px;
-z-index:9999;
-padding:8px 14px;
-background:#333;
-color:white;
-border:none;
-border-radius:4px;
-cursor:pointer;
-opacity:0.7;
-">
-Test Login
-</button>
 
 </body>
 </html>
