@@ -1,58 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8" />
-  <title id="page-title"></title>
-  <link rel="stylesheet" href="style.css" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8" />
+<title id="page-title"></title>
+<link rel="stylesheet" href="style.css" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="./redumbrella_black.png" />
+<link rel="icon" type="image/png" href="./redumbrella_black.png" />
 
-  <!-- Choices.js -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
-  <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 
-  <style>
-    .logo-waiting {
-      display: block;
-      margin: 20px auto;
-      height: 80px;
-    }
-    .project-entry {
-      text-align: center;
-      margin-top: 20px;
-    }
-    .project-entry label {
-      display: block;
-      margin-bottom: 8px;
-      font-weight: bold;
-    }
-    .project-entry input {
-      padding: 6px;
-      margin-right: 8px;
-    }
-    .project-entry button {
-      padding: 6px 12px;
-    }
-    footer {
-      margin-top: 20px;
-      text-align: left;
-      color: #666;
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      padding: 8px;
-    }
-  </style>
+<style>
+.logo-waiting {
+  display: block;
+  margin: 20px auto;
+  height: 80px;
+}
+.project-entry {
+  text-align: center;
+  margin-top: 20px;
+}
+.project-entry label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+.project-entry input {
+  padding: 6px;
+  margin-right: 8px;
+}
+.project-entry button {
+  padding: 6px 12px;
+}
+footer {
+  margin-top: 20px;
+  text-align: left;
+  color: #666;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  padding: 8px;
+}
+</style>
+
 </head>
 
 <body>
+
 <header>
   <div id="logo-container" style="text-align:center; margin:20px 0;"></div>
 
-  <h1 id="portal-title" style="display:flex; align-items:center; gap:8px; margin-left:20px;">
-    <img src="./RedUmbrellaPro_black.png" alt="Portal Logo" style="height:26px; width:auto;" />
+  <h1 id="portal-title"
+      style="display:flex; align-items:center; gap:8px; margin-left:20px;">
+    <img src="./RedUmbrellaPro_black.png"
+         alt="Portal Logo"
+         style="height:26px; width:auto;" />
     <span id="portal-title-text"></span>
   </h1>
 
@@ -67,6 +71,7 @@
 </footer>
 
 <script type="module">
+
 /* ============================================================
    IMPORT TAB MODULES
 ============================================================ */
@@ -116,11 +121,10 @@ const tabMap = {
 };
 
 /* ============================================================
-   REAL LOGIN LOGIC — NO MODAL, ONLY PROMPT()
+   REAL LOGIN LOGIC — PROMPT-BASED
 ============================================================ */
 async function handlePortalLogin(enteredEmail) {
   try {
-    // Validate staff email
     const res = await fetch(
       "https://client-portal-api.dennis-e64.workers.dev/api/check_staff",
       {
@@ -136,7 +140,6 @@ async function handlePortalLogin(enteredEmail) {
     const result = await res.json();
 
     if (!result.valid) {
-      // Log failure
       await fetch(
         "https://client-portal-api.dennis-e64.workers.dev/api/log_portal_login",
         {
@@ -156,10 +159,8 @@ async function handlePortalLogin(enteredEmail) {
       return;
     }
 
-    // Authorized
     portalState.userEmail = enteredEmail;
 
-    // Log success
     await fetch(
       "https://client-portal-api.dennis-e64.workers.dev/api/log_portal_login",
       {
@@ -177,13 +178,11 @@ async function handlePortalLogin(enteredEmail) {
 
     console.log("Logged in as:", portalState.userEmail);
 
-    // Show tabs now that user is logged in
     tabs.style.display = "block";
 
   } catch (err) {
     console.error("Login error:", err);
 
-    // Log server error
     await fetch(
       "https://client-portal-api.dennis-e64.workers.dev/api/log_portal_login",
       {
@@ -206,18 +205,27 @@ async function handlePortalLogin(enteredEmail) {
 window.handlePortalLogin = handlePortalLogin;
 
 /* ============================================================
-   TEST LOGIN BUTTON — PROMPT() ONLY
+   TEST LOGIN BUTTON — STILL WORKS
 ============================================================ */
 document.getElementById("testLoginBtn").addEventListener("click", async () => {
   const email = prompt("Enter test email:");
   if (!email) return;
 
-  console.log("Testing login with:", email);
   await handlePortalLogin(email);
 });
 
 /* ============================================================
-   LOAD PROJECTS — CLEANED, NO MODAL ANYWHERE
+   AUTO-PROMPT ON PAGE LOAD
+============================================================ */
+async function autoPromptLogin() {
+  const email = prompt("Enter your email to access the portal:");
+  if (!email) return;
+
+  await handlePortalLogin(email);
+}
+
+/* ============================================================
+   LOAD PROJECTS — NO MODAL ANYWHERE
 ============================================================ */
 async function loadProjects() {
   try {
@@ -281,7 +289,6 @@ async function loadProjects() {
         const enabledTabs = normalizeTabs(match.enabled_tabs);
         renderTabs(enabledTabs);
 
-        // LOGIN GATE — NO MODAL
         if (portalState.userEmail) {
           tabs.style.display = "block";
           tabContent.innerHTML = "";
@@ -312,7 +319,6 @@ async function loadProjects() {
     const enabledTabs = normalizeTabs(match.enabled_tabs);
     renderTabs(enabledTabs);
 
-    // LOGIN GATE — NO MODAL
     if (portalState.userEmail) {
       tabs.style.display = "block";
     } else {
@@ -388,7 +394,9 @@ async function loadTab(tabId) {
 ============================================================ */
 window.addEventListener("DOMContentLoaded", async () => {
   await loadProjects();
+  await autoPromptLogin();
 });
+
 </script>
 
 <!-- ⭐ TEST LOGIN BUTTON (UNCHANGED) -->
