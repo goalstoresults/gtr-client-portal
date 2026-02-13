@@ -1,78 +1,75 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-<meta charset="UTF-8" />
-<title id="page-title"></title>
-<link rel="stylesheet" href="style.css" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8" />
+  <title id="page-title"></title>
+  <link rel="stylesheet" href="style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-<!-- ⭐ New Portal Favicon -->
-<link rel="icon" type="image/png" href="./redumbrella_black.png" />
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="./redumbrella_black.png" />
 
-<!-- ⭐ Choices.js (needed for Filter module dropdowns) -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
-<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+  <!-- Choices.js -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 
-<style>
-.logo-waiting {
-  display: block;
-  margin: 20px auto;
-  height: 80px;
-}
-.project-entry {
-  text-align: center;
-  margin-top: 20px;
-}
-.project-entry label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: bold;
-}
-.project-entry input {
-  padding: 6px;
-  margin-right: 8px;
-}
-.project-entry button {
-  padding: 6px 12px;
-}
-footer {
-  margin-top: 20px;
-  text-align: left;
-  color: #666;
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  padding: 8px;
-}
-</style>
-
+  <style>
+    .logo-waiting {
+      display: block;
+      margin: 20px auto;
+      height: 80px;
+    }
+    .project-entry {
+      text-align: center;
+      margin-top: 20px;
+    }
+    .project-entry label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+    .project-entry input {
+      padding: 6px;
+      margin-right: 8px;
+    }
+    .project-entry button {
+      padding: 6px 12px;
+    }
+    footer {
+      margin-top: 20px;
+      text-align: left;
+      color: #666;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      padding: 8px;
+    }
+  </style>
 </head>
 
 <body>
-
 <header>
-<div id="logo-container" style="text-align:center; margin:20px 0;"></div>
+  <div id="logo-container" style="text-align:center; margin:20px 0;"></div>
 
-<h1 id="portal-title"
-style="display:flex; align-items:center; gap:8px; margin-left:20px;">
-<img src="./RedUmbrellaPro_black.png"
-alt="Portal Logo"
-style="height:26px; width:auto;" />
-<span id="portal-title-text"></span>
-</h1>
+  <h1 id="portal-title" style="display:flex; align-items:center; gap:8px; margin-left:20px;">
+    <img src="./RedUmbrellaPro_black.png" alt="Portal Logo" style="height:26px; width:auto;" />
+    <span id="portal-title-text"></span>
+  </h1>
 
-<div id="project-selector-row" style="display:none;"></div>
+  <div id="project-selector-row" style="display:none;"></div>
 </header>
 
 <nav id="tabs" style="display:none;"></nav>
 <div id="tab-content"></div>
 
 <footer>
-<small style="display:block; opacity:0.7;">Portal Version: 2.0.0</small>
+  <small style="display:block; opacity:0.7;">Portal Version: 2.0.0</small>
 </footer>
 
 <script type="module">
+/* ============================================================
+   IMPORT TAB MODULES
+============================================================ */
 import { loadContactsTab } from "./js/contacts.js";
 import { loadFinancialsTab } from "./js/financials.js";
 import { loadNotesTab } from "./js/notes.js";
@@ -86,7 +83,9 @@ import { loadECCampaignsTab } from "./js/ecampaigns.js";
 import { loadPipelineTab } from "./js/pipeline.js";
 import { loadFilterTab } from "./js/filter.js";
 
-/* ⭐ UPDATED PORTAL STATE WITH LOGIN FIELD */
+/* ============================================================
+   PORTAL STATE
+============================================================ */
 const portalState = {
   project: "",
   contactId: "",
@@ -117,32 +116,11 @@ const tabMap = {
 };
 
 /* ============================================================
-🔐 PORTAL LOGIN HANDLER — PLACEHOLDER DISABLED
+   REAL LOGIN LOGIC — NO MODAL, ONLY PROMPT()
 ============================================================ */
-/*
-async function handlePortalLogin(enteredEmail) {
-  portalState.userEmail = enteredEmail;
-  console.log("Logged in as:", portalState.userEmail);
-}
-window.handlePortalLogin = handlePortalLogin;
-*/
-
-
-document.getElementById("testLoginBtn").addEventListener("click", async () => {
-  const email = prompt("Enter test email:");
-  if (!email) return;
-  console.log("Testing login with:", email);
-  await handlePortalLogin(email);
-  console.log("portalState.userEmail =", portalState.userEmail);
-});
-
-/* ============================================================
-⭐ REAL LOGIN LOGIC (ACTIVE)
-============================================================ */
-
 async function handlePortalLogin(enteredEmail) {
   try {
-    // 1. Validate staff email for this project
+    // Validate staff email
     const res = await fetch(
       "https://client-portal-api.dennis-e64.workers.dev/api/check_staff",
       {
@@ -157,8 +135,8 @@ async function handlePortalLogin(enteredEmail) {
 
     const result = await res.json();
 
-    // 2. If not authorized → log failure + show alert
     if (!result.valid) {
+      // Log failure
       await fetch(
         "https://client-portal-api.dennis-e64.workers.dev/api/log_portal_login",
         {
@@ -178,10 +156,10 @@ async function handlePortalLogin(enteredEmail) {
       return;
     }
 
-    // 3. Authorized → set user
+    // Authorized
     portalState.userEmail = enteredEmail;
 
-    // 4. Log success
+    // Log success
     await fetch(
       "https://client-portal-api.dennis-e64.workers.dev/api/log_portal_login",
       {
@@ -199,10 +177,13 @@ async function handlePortalLogin(enteredEmail) {
 
     console.log("Logged in as:", portalState.userEmail);
 
+    // Show tabs now that user is logged in
+    tabs.style.display = "block";
+
   } catch (err) {
     console.error("Login error:", err);
 
-    // 5. Log server error
+    // Log server error
     await fetch(
       "https://client-portal-api.dennis-e64.workers.dev/api/log_portal_login",
       {
@@ -224,8 +205,20 @@ async function handlePortalLogin(enteredEmail) {
 
 window.handlePortalLogin = handlePortalLogin;
 
-  
+/* ============================================================
+   TEST LOGIN BUTTON — PROMPT() ONLY
+============================================================ */
+document.getElementById("testLoginBtn").addEventListener("click", async () => {
+  const email = prompt("Enter test email:");
+  if (!email) return;
 
+  console.log("Testing login with:", email);
+  await handlePortalLogin(email);
+});
+
+/* ============================================================
+   LOAD PROJECTS — CLEANED, NO MODAL ANYWHERE
+============================================================ */
 async function loadProjects() {
   try {
     const res = await fetch(
@@ -241,9 +234,7 @@ async function loadProjects() {
     const projectParamRaw = urlParams.get("project");
     let projectParam = projectParamRaw ? projectParamRaw.trim() : "";
 
-    // ============================================================
-    // CASE 1 — No ?project param → show project selector
-    // ============================================================
+    /* CASE 1 — No ?project param */
     if (!projectParam) {
       logoContainer.innerHTML =
         `<img src="./RedUmbrellaPro Header2.png"
@@ -264,52 +255,45 @@ async function loadProjects() {
       pageTitle.textContent = "";
       tabs.style.display = "none";
 
-      document
-        .getElementById("btnSetProject")
-        .addEventListener("click", () => {
-          const projectName =
-            document.getElementById("projectInput").value.trim();
+      document.getElementById("btnSetProject").addEventListener("click", () => {
+        const projectName =
+          document.getElementById("projectInput").value.trim();
 
-          if (!projectName) {
-            alert("Please enter a project name.");
-            return;
-          }
+        if (!projectName) {
+          alert("Please enter a project name.");
+          return;
+        }
 
-          const match = projects.find(
-            p =>
-              String(p.project).toLowerCase() ===
-              projectName.toLowerCase()
-          );
+        const match = projects.find(
+          p => String(p.project).toLowerCase() === projectName.toLowerCase()
+        );
 
-          if (!match) {
-            tabContent.innerHTML =
-              `<section class="card"><p>Invalid project specified. No UI available.</p></section>`;
-            return;
-          }
+        if (!match) {
+          tabContent.innerHTML =
+            `<section class="card"><p>Invalid project specified. No UI available.</p></section>`;
+          return;
+        }
 
-          logoContainer.innerHTML = "";
-          selectorRow.style.display = "none";
+        logoContainer.innerHTML = "";
+        selectorRow.style.display = "none";
 
-          injectConfig(match);
-          const enabledTabs = normalizeTabs(match.enabled_tabs);
-          renderTabs(enabledTabs);
+        injectConfig(match);
+        const enabledTabs = normalizeTabs(match.enabled_tabs);
+        renderTabs(enabledTabs);
 
-          // ⭐ LOGIN GATE
-          if (portalState.userEmail) {
-            tabs.style.display = "block";
-            tabContent.innerHTML = "";
-          } else {
-            tabs.style.display = "none";
-            loginModal.style.display = "flex";
-          }
-        });
+        // LOGIN GATE — NO MODAL
+        if (portalState.userEmail) {
+          tabs.style.display = "block";
+          tabContent.innerHTML = "";
+        } else {
+          tabs.style.display = "none";
+        }
+      });
 
-      return; // END CASE 1
+      return;
     }
 
-    // ============================================================
-    // CASE 2 — ?project param exists
-    // ============================================================
+    /* CASE 2 — ?project param exists */
     const match = projects.find(
       p => String(p.project).toLowerCase() === projectParam.toLowerCase()
     );
@@ -328,12 +312,11 @@ async function loadProjects() {
     const enabledTabs = normalizeTabs(match.enabled_tabs);
     renderTabs(enabledTabs);
 
-    // ⭐ LOGIN GATE
+    // LOGIN GATE — NO MODAL
     if (portalState.userEmail) {
       tabs.style.display = "block";
     } else {
       tabs.style.display = "none";
-      loginModal.style.display = "flex";
     }
 
   } catch (err) {
@@ -345,7 +328,9 @@ async function loadProjects() {
   }
 }
 
-
+/* ============================================================
+   SUPPORT FUNCTIONS
+============================================================ */
 function injectConfig(config) {
   portalState.project = config.project;
   portalState.projects_config = config;
@@ -364,11 +349,8 @@ function injectConfig(config) {
 function normalizeTabs(raw) {
   if (Array.isArray(raw)) return raw;
   if (typeof raw === "string") {
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return [];
-    }
+    try { return JSON.parse(raw); }
+    catch { return []; }
   }
   return [];
 }
@@ -388,12 +370,10 @@ function renderTabs(enabledTabs) {
 }
 
 async function loadTab(tabId) {
-  document
-    .querySelectorAll("#tabs button")
+  document.querySelectorAll("#tabs button")
     .forEach(btn => btn.classList.remove("active"));
 
-  document
-    .querySelector(`#tabs button[data-tab="${tabId}"]`)
+  document.querySelector(`#tabs button[data-tab="${tabId}"]`)
     ?.classList.add("active");
 
   const tab = tabMap[tabId];
@@ -403,15 +383,15 @@ async function loadTab(tabId) {
   }
 }
 
+/* ============================================================
+   INITIALIZE
+============================================================ */
 window.addEventListener("DOMContentLoaded", async () => {
   await loadProjects();
 });
-
-
-
 </script>
 
-<!-- ⭐ TEMPORARY TEST LOGIN BUTTON (SAFE) -->
+<!-- ⭐ TEST LOGIN BUTTON (UNCHANGED) -->
 <button id="testLoginBtn"
 style="
 position:fixed;
@@ -426,121 +406,8 @@ border-radius:4px;
 cursor:pointer;
 opacity:0.7;
 ">
-Test Login
+  Test Login
 </button>
-
-<!-- ⭐ LOGIN POPUP (NOW UNCOMMENTED) -->
-<div id="loginModal" class="login-modal">
-  <div class="login-modal-content">
-    <h2>Log In</h2>
-    <input id="loginEmailInput"
-           type="email"
-           placeholder="Enter your email"
-           autocomplete="email" />
-    <button id="loginSubmitBtn">Continue</button>
-    <p id="loginErrorMsg" class="login-error" style="display:none;"></p>
-  </div>
-</div>
-
-<style>
-/* ============================================================
-LOGIN MODAL (GLOBAL)
-============================================================ */
-.login-modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  z-index: 99999;
-  backdrop-filter: blur(2px);
-}
-.login-modal-content {
-  background: #ffffff;
-  padding: 28px 24px;
-  border-radius: 10px;
-  width: 320px;
-  max-width: 90%;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
-  text-align: center;
-  animation: loginFadeIn 0.25s ease-out;
-}
-.login-modal-content h2 {
-  margin-top: 0;
-  margin-bottom: 16px;
-  font-size: 20px;
-  font-weight: 600;
-  color: #222;
-}
-.login-modal-content input {
-  width: 100%;
-  padding: 10px 12px;
-  margin: 12px 0 16px 0;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  font-size: 15px;
-}
-.login-modal-content button {
-  width: 100%;
-  padding: 10px;
-  background: #111;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 15px;
-  cursor: pointer;
-  transition: background 0.15s ease-in-out;
-}
-.login-modal-content button:hover {
-  background: #000;
-}
-.login-error {
-  color: #d00;
-  margin-top: 10px;
-  font-size: 14px;
-}
-@keyframes loginFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-</style>
-  
-
-<script>
-/* ⭐ POPUP JS — NOW UNCOMMENTED */
-const loginModal = document.getElementById("loginModal");
-const loginEmailInput = document.getElementById("loginEmailInput");
-const loginSubmitBtn = document.getElementById("loginSubmitBtn");
-const loginErrorMsg = document.getElementById("loginErrorMsg");
-
-loginSubmitBtn.addEventListener("click", async () => {
-  const email = loginEmailInput.value.trim();
-  if (!email) {
-    loginErrorMsg.textContent = "Please enter an email.";
-    loginErrorMsg.style.display = "block";
-    return;
-  }
-
-  loginErrorMsg.style.display = "none";
-
-  await handlePortalLogin(email);
-
-  if (!portalState.userEmail) {
-    loginErrorMsg.textContent = "Invalid email.";
-    loginErrorMsg.style.display = "block";
-    return;
-  }
-
-  loginModal.style.display = "none";
-});
-</script>
 
 </body>
 </html>
