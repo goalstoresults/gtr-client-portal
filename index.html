@@ -121,7 +121,16 @@ const tabMap = {
 };
 
 /* ============================================================
-   REAL LOGIN LOGIC — PROMPT-BASED
+   AUTO-PROMPT LOGIN
+============================================================ */
+async function autoPromptLogin() {
+  const email = prompt("Enter your email to access the portal:");
+  if (!email) return;
+  await handlePortalLogin(email);
+}
+
+/* ============================================================
+   REAL LOGIN LOGIC — WITH RETRY ON INVALID
 ============================================================ */
 async function handlePortalLogin(enteredEmail) {
   try {
@@ -156,6 +165,9 @@ async function handlePortalLogin(enteredEmail) {
       );
 
       alert("This email is not authorized for this project.");
+
+      /* ⭐ RETRY LOGIN IMMEDIATELY */
+      await autoPromptLogin();
       return;
     }
 
@@ -199,6 +211,9 @@ async function handlePortalLogin(enteredEmail) {
     );
 
     alert("Unable to log in. Please try again.");
+
+    /* ⭐ RETRY ON SERVER ERROR TOO */
+    await autoPromptLogin();
   }
 }
 
@@ -215,17 +230,7 @@ document.getElementById("testLoginBtn").addEventListener("click", async () => {
 });
 
 /* ============================================================
-   AUTO-PROMPT LOGIN (BUT ONLY AFTER PROJECT IS LOADED)
-============================================================ */
-async function autoPromptLogin() {
-  const email = prompt("Enter your email to access the portal:");
-  if (!email) return;
-
-  await handlePortalLogin(email);
-}
-
-/* ============================================================
-   LOAD PROJECTS — NO MODAL ANYWHERE
+   LOAD PROJECTS — AUTO-PROMPT ONLY AFTER PROJECT IS KNOWN
 ============================================================ */
 async function loadProjects() {
   try {
