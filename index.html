@@ -241,6 +241,9 @@ async function loadProjects() {
     const projectParamRaw = urlParams.get("project");
     let projectParam = projectParamRaw ? projectParamRaw.trim() : "";
 
+    // ============================================================
+    // CASE 1 — No ?project param → show project selector
+    // ============================================================
     if (!projectParam) {
       logoContainer.innerHTML =
         `<img src="./RedUmbrellaPro Header2.png"
@@ -291,30 +294,48 @@ async function loadProjects() {
           const enabledTabs = normalizeTabs(match.enabled_tabs);
           renderTabs(enabledTabs);
 
-          tabs.style.display = "block";
-          tabContent.innerHTML = "";
+          // ⭐ LOGIN GATE
+          if (portalState.userEmail) {
+            tabs.style.display = "block";
+            tabContent.innerHTML = "";
+          } else {
+            tabs.style.display = "none";
+            loginModal.style.display = "flex";
+          }
         });
-    } else {
-      const match = projects.find(
-        p => String(p.project).toLowerCase() === projectParam.toLowerCase()
-      );
 
-      if (!match) {
-        tabs.style.display = "none";
-        tabContent.innerHTML =
-          `<section class="card"><p>Invalid project specified. No UI available.</p></section>`;
-        return;
-      }
-
-      logoContainer.innerHTML = "";
-      selectorRow.style.display = "none";
-
-      injectConfig(match);
-      const enabledTabs = normalizeTabs(match.enabled_tabs);
-      renderTabs(enabledTabs);
-
-      tabs.style.display = "block";
+      return; // END CASE 1
     }
+
+    // ============================================================
+    // CASE 2 — ?project param exists
+    // ============================================================
+    const match = projects.find(
+      p => String(p.project).toLowerCase() === projectParam.toLowerCase()
+    );
+
+    if (!match) {
+      tabs.style.display = "none";
+      tabContent.innerHTML =
+        `<section class="card"><p>Invalid project specified. No UI available.</p></section>`;
+      return;
+    }
+
+    logoContainer.innerHTML = "";
+    selectorRow.style.display = "none";
+
+    injectConfig(match);
+    const enabledTabs = normalizeTabs(match.enabled_tabs);
+    renderTabs(enabledTabs);
+
+    // ⭐ LOGIN GATE
+    if (portalState.userEmail) {
+      tabs.style.display = "block";
+    } else {
+      tabs.style.display = "none";
+      loginModal.style.display = "flex";
+    }
+
   } catch (err) {
     console.error("Failed to load projects:", err);
     selectorRow.style.display = "none";
@@ -323,6 +344,7 @@ async function loadProjects() {
       `<section class="card"><p>Unable to load projects. Please try again later.</p></section>`;
   }
 }
+
 
 function injectConfig(config) {
   portalState.project = config.project;
