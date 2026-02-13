@@ -171,13 +171,10 @@ const tabMap = {
 };
 
 /* ============================================================
-   SMART NAME LOGIC
+   FRIENDLY NAME LOGIC — USE FIRST NAME DIRECTLY
 ============================================================ */
-function getFriendlyName(fullName) {
-  if (!fullName) return "";
-  const parts = fullName.trim().split(/\s+/);
-  if (parts.length <= 2) return fullName;
-  return parts[0];
+function getFriendlyName(result) {
+  return result.first_name || "!";
 }
 
 /* ============================================================
