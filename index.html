@@ -1,179 +1,139 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title id="page-title"></title>
-  <link rel="stylesheet" href="style.css" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8" />
+<title id="page-title"></title>
+<link rel="stylesheet" href="style.css" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- ⭐ New Portal Favicon -->
-  <link rel="icon" type="image/png" href="./redumbrella_black.png" />
+<!-- ⭐ New Portal Favicon -->
+<link rel="icon" type="image/png" href="./redumbrella_black.png" />
 
-  <!-- ⭐ Choices.js (needed for Filter module dropdowns) -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
-  <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+<!-- ⭐ Choices.js (needed for Filter module dropdowns) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 
-  <style>
-    .logo-waiting {
-      display: block;
-      margin: 20px auto;
-      height: 80px;
-    }
-
-    .project-entry {
-      text-align: center;
-      margin-top: 20px;
-    }
-
-    .project-entry label {
-      display: block;
-      margin-bottom: 8px;
-      font-weight: bold;
-    }
-
-    .project-entry input {
-      padding: 6px;
-      margin-right: 8px;
-    }
-
-    .project-entry button {
-      padding: 6px 12px;
-    }
-
-    footer {
-      margin-top: 20px;
-      text-align: left;
-      color: #666;
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      padding: 8px;
-    }
-  </style>
+<style>
+.logo-waiting {
+  display: block;
+  margin: 20px auto;
+  height: 80px;
+}
+.project-entry {
+  text-align: center;
+  margin-top: 20px;
+}
+.project-entry label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+.project-entry input {
+  padding: 6px;
+  margin-right: 8px;
+}
+.project-entry button {
+  padding: 6px 12px;
+}
+footer {
+  margin-top: 20px;
+  text-align: left;
+  color: #666;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  padding: 8px;
+}
+</style>
 </head>
 
 <body>
-  <header>
-    <!-- Logo container only used when no project -->
-    <div id="logo-container" style="text-align:center; margin:20px 0;"></div>
 
-    <!-- ⭐ Updated header with perfectly proportioned inline umbrella logo -->
-    <h1 id="portal-title"
-        style="display:flex; align-items:center; gap:8px; margin-left:20px;">
+<header>
+  <div id="logo-container" style="text-align:center; margin:20px 0;"></div>
+
+  <h1 id="portal-title"
+      style="display:flex; align-items:center; gap:8px; margin-left:20px;">
       <img src="./RedUmbrellaPro_black.png"
            alt="Portal Logo"
            style="height:26px; width:auto;" />
       <span id="portal-title-text"></span>
-    </h1>
+  </h1>
 
-    <div id="project-selector-row" style="display:none;"></div>
-  </header>
+  <div id="project-selector-row" style="display:none;"></div>
+</header>
 
-  <!-- Top-level tabs -->
-  <nav id="tabs" style="display:none;"></nav>
+<nav id="tabs" style="display:none;"></nav>
+<div id="tab-content"></div>
 
-  <div id="tab-content"></div>
+<footer>
+  <small style="display:block; opacity:0.7;">Portal Version: 2.0.0</small>
+</footer>
 
-  <footer>
-    <small style="display:block; opacity:0.7;">Portal Version: 2.0.0</small>
-  </footer>
+<script type="module">
+import { loadContactsTab } from "./js/contacts.js";
+import { loadFinancialsTab } from "./js/financials.js";
+import { loadNotesTab } from "./js/notes.js";
+import { loadTasksTab } from "./js/tasks.js";
+import { loadLookupsTab } from "./js/lookups.js";
+import { loadGroupsTab } from "./js/groups.js";
+import { loadSetupTab } from "./js/setup.js";
+import { loadOperationsTab } from "./js/operations.js";
+import { loadEmailsTab } from "./js/emails.js";
+import { loadECCampaignsTab } from "./js/ecampaigns.js";
+import { loadPipelineTab } from "./js/pipeline.js";
+import { loadFilterTab } from "./js/filter.js";
 
-  <script type="module">
-    import { loadContactsTab } from "./js/contacts.js";
-    import { loadFinancialsTab } from "./js/financials.js";
-    import { loadNotesTab } from "./js/notes.js";
-    import { loadTasksTab } from "./js/tasks.js";
-    import { loadLookupsTab } from "./js/lookups.js";
-    import { loadGroupsTab } from "./js/groups.js";
-    import { loadSetupTab } from "./js/setup.js";
+/* ⭐ UPDATED PORTAL STATE WITH LOGIN FIELD */
+const portalState = {
+  project: "",
+  contactId: "",
+  userEmail: "" // blank = not logged in
+};
+window.portalState = portalState;
 
-    /* ⭐ NEW IMPORT */
-    import { loadOperationsTab } from "./js/operations.js";
+const portalTitleText = document.getElementById("portal-title-text");
+const pageTitle = document.getElementById("page-title");
+const selectorRow = document.getElementById("project-selector-row");
+const tabs = document.getElementById("tabs");
+const tabContent = document.getElementById("tab-content");
+const logoContainer = document.getElementById("logo-container");
 
-    /* ⭐ NEW IMPORT FOR EMAILS (staff ingestion) */
-    import { loadEmailsTab } from "./js/emails.js";
-
-    /* ⭐ NEW IMPORT FOR ECampaigns (client-facing analytics) */
-    import { loadECCampaignsTab } from "./js/ecampaigns.js";
-
-    /* ⭐ NEW IMPORT FOR PIPELINE TAB (#11) */
-    import { loadPipelineTab } from "./js/pipeline.js";
-
-    /* ⭐ NEW IMPORT FOR FILTER MODULE */
-    import { loadFilterTab } from "./js/filter.js";
-
-    /* ⭐ UPDATED PORTAL STATE WITH LOGIN FIELD */
-    const portalState = {
-      project: "",
-      contactId: "",
-      userEmail: ""   // blank = not logged in
-    };
-    window.portalState = portalState;
-
-    const portalTitleText = document.getElementById("portal-title-text");
-    const pageTitle = document.getElementById("page-title");
-    const selectorRow = document.getElementById("project-selector-row");
-    const tabs = document.getElementById("tabs");
-    const tabContent = document.getElementById("tab-content");
-    const logoContainer = document.getElementById("logo-container");
-
-    const tabMap = {
-      "1": { label: "Contacts", loader: loadContactsTab },
-      "2": { label: "Financials", loader: loadFinancialsTab },
-      "3": { label: "Notes", loader: loadNotesTab },
-      "4": { label: "Tasks", loader: loadTasksTab },
-      "5": { label: "Lookups", loader: loadLookupsTab },
-
-      /* ⭐ REPLACED DASHBOARD WITH ECampaigns */
-      "6": { label: "E-Campaigns", loader: loadECCampaignsTab },
-
-      "7": { label: "Groups", loader: loadGroupsTab },
-      "8": { label: "Setup", loader: loadSetupTab },
-
-      /* ⭐ Operations stays as 9 */
-      "9": { label: "Operations", loader: loadOperationsTab },
-
-      /* ⭐ Staff-only Emails ingestion */
-      "10": { label: "Emails", loader: loadEmailsTab },
-
-      /* ⭐ NEW PIPELINE TAB */
-      "11": { label: "Pipeline", loader: loadPipelineTab },
-
-      /* ⭐ NEW FILTER TAB */
-      "12": { label: "Filter", loader: loadFilterTab }
-    };
+const tabMap = {
+  "1": { label: "Contacts", loader: loadContactsTab },
+  "2": { label: "Financials", loader: loadFinancialsTab },
+  "3": { label: "Notes", loader: loadNotesTab },
+  "4": { label: "Tasks", loader: loadTasksTab },
+  "5": { label: "Lookups", loader: loadLookupsTab },
+  "6": { label: "E-Campaigns", loader: loadECCampaignsTab },
+  "7": { label: "Groups", loader: loadGroupsTab },
+  "8": { label: "Setup", loader: loadSetupTab },
+  "9": { label: "Operations", loader: loadOperationsTab },
+  "10": { label: "Emails", loader: loadEmailsTab },
+  "11": { label: "Pipeline", loader: loadPipelineTab },
+  "12": { label: "Filter", loader: loadFilterTab }
+};
 
 /* ============================================================
-   🔐 PORTAL LOGIN HANDLER
-   Step 1: Placeholder (active)
-   Step 2: Real logic (commented out for now)
-   ============================================================ */
+🔐 PORTAL LOGIN HANDLER
+============================================================ */
 
-// ⭐ ACTIVE PLACEHOLDER — does nothing except set the email
+/* ⭐ ACTIVE PLACEHOLDER — does nothing except set the email */
 async function handlePortalLogin(enteredEmail) {
   portalState.userEmail = enteredEmail;
   console.log("Logged in as:", portalState.userEmail);
 }
 window.handlePortalLogin = handlePortalLogin;
 
-    document.getElementById("testLoginBtn").addEventListener("click", async () => {
-  const email = prompt("Enter test email:");
-  if (!email) return;
-
-  console.log("Testing login with:", email);
-  await handlePortalLogin(email);
-
-  console.log("portalState.userEmail =", portalState.userEmail);
+/* ⭐ TEST LOGIN BUTTON — NOW OPENS POPUP */
+document.getElementById("testLoginBtn").addEventListener("click", () => {
+  const loginModal = document.getElementById("loginModal");
+  loginModal.style.display = "flex";
 });
 
-
-/* ============================================================
-   ⭐ REAL LOGIN LOGIC (COMMENTED OUT — WILL ACTIVATE LATER)
-   ============================================================
-
+/* ⭐ REAL LOGIN LOGIC (COMMENTED OUT — WILL ACTIVATE LATER)
 async function handlePortalLogin(enteredEmail) {
   try {
-    // 1. Validate staff email for this project
     const res = await fetch(
       "https://client-portal-api.dennis-e64.workers.dev/api/check_staff",
       {
@@ -187,16 +147,13 @@ async function handlePortalLogin(enteredEmail) {
     );
 
     const result = await res.json();
-
     if (!result.valid) {
       alert("This email is not authorized for this project.");
       return;
     }
 
-    // 2. Set authenticated user
     portalState.userEmail = enteredEmail;
 
-    // 3. Log login event
     await fetch(
       "https://client-portal-api.dennis-e64.workers.dev/api/log_portal_login",
       {
@@ -211,91 +168,71 @@ async function handlePortalLogin(enteredEmail) {
     );
 
     console.log("Logged in as:", portalState.userEmail);
-
   } catch (err) {
     console.error("Login error:", err);
     alert("Unable to log in. Please try again.");
   }
 }
-
 window.handlePortalLogin = handlePortalLogin;
+*/
 
+/* ============================================================
+PROJECT LOADING
 ============================================================ */
 
+async function loadProjects() {
+  try {
+    const res = await fetch(
+      "https://client-portal-api.dennis-e64.workers.dev/api/projects_config",
+      { cache: "no-cache" }
+    );
 
-    async function loadProjects() {
-      try {
-        const res = await fetch(
-          "https://client-portal-api.dennis-e64.workers.dev/api/projects_config",
-          { cache: "no-cache" }
-        );
-        const projects = await res.json();
+    const projects = await res.json();
+    if (!Array.isArray(projects) || projects.length === 0)
+      throw new Error("No projects returned");
 
-        if (!Array.isArray(projects) || projects.length === 0)
-          throw new Error("No projects returned");
+    const urlParams = new URLSearchParams(window.location.search);
+    const projectParamRaw = urlParams.get("project");
+    let projectParam = projectParamRaw ? projectParamRaw.trim() : "";
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const projectParamRaw = urlParams.get("project");
-        let projectParam = projectParamRaw ? projectParamRaw.trim() : "";
+    if (!projectParam) {
+      logoContainer.innerHTML =
+        `<img src="./RedUmbrellaPro Header2.png"
+              alt="Red Umbrella Pro"
+              class="logo-waiting" />`;
 
-        if (!projectParam) {
-          /* ⭐ Show new Red Umbrella waiting logo */
-          logoContainer.innerHTML =
-            `<img src="./RedUmbrellaPro Header2.png"
-                  alt="Red Umbrella Pro"
-                  class="logo-waiting" />`;
+      selectorRow.style.display = "block";
+      selectorRow.className = "project-entry";
 
-          selectorRow.style.display = "block";
-          selectorRow.className = "project-entry";
-          selectorRow.innerHTML = `
-            <label for="projectInput">Enter Project Name:</label>
-            <input id="projectInput" type="text" placeholder="Project name" />
-            <button id="btnSetProject" class="primary">Enter</button>
-          `;
+      selectorRow.innerHTML = `
+        <label for="projectInput">Enter Project Name:</label>
+        <input id="projectInput" type="text" placeholder="Project name" />
+        <button id="btnSetProject" class="primary">Enter</button>
+      `;
 
-          portalState.project = "";
-          portalTitleText.textContent = "";
-          pageTitle.textContent = "";
-          tabs.style.display = "none";
+      portalState.project = "";
+      portalTitleText.textContent = "";
+      pageTitle.textContent = "";
+      tabs.style.display = "none";
 
-          document
-            .getElementById("btnSetProject")
-            .addEventListener("click", () => {
-              const projectName =
-                document.getElementById("projectInput").value.trim();
-              if (!projectName) {
-                alert("Please enter a project name.");
-                return;
-              }
+      document
+        .getElementById("btnSetProject")
+        .addEventListener("click", () => {
+          const projectName =
+            document.getElementById("projectInput").value.trim();
 
-              const match = projects.find(
-                p =>
-                  String(p.project).toLowerCase() ===
-                  projectName.toLowerCase()
-              );
+          if (!projectName) {
+            alert("Please enter a project name.");
+            return;
+          }
 
-              if (!match) {
-                tabContent.innerHTML =
-                  `<section class="card"><p>Invalid project specified. No UI available.</p></section>`;
-                return;
-              }
-
-              logoContainer.innerHTML = "";
-              selectorRow.style.display = "none";
-
-              injectConfig(match);
-              const enabledTabs = normalizeTabs(match.enabled_tabs);
-              renderTabs(enabledTabs);
-              tabs.style.display = "block";
-              tabContent.innerHTML = "";
-            });
-        } else {
           const match = projects.find(
-            p => String(p.project).toLowerCase() === projectParam.toLowerCase()
+            p =>
+              String(p.project).toLowerCase() ===
+              projectName.toLowerCase()
           );
 
           if (!match) {
-            tabs.style.display = "none";
             tabContent.innerHTML =
               `<section class="card"><p>Invalid project specified. No UI available.</p></section>`;
             return;
@@ -307,82 +244,103 @@ window.handlePortalLogin = handlePortalLogin;
           injectConfig(match);
           const enabledTabs = normalizeTabs(match.enabled_tabs);
           renderTabs(enabledTabs);
+
           tabs.style.display = "block";
-        }
-      } catch (err) {
-        console.error("Failed to load projects:", err);
-        selectorRow.style.display = "none";
+          tabContent.innerHTML = "";
+        });
+    } else {
+      const match = projects.find(
+        p => String(p.project).toLowerCase() === projectParam.toLowerCase()
+      );
+
+      if (!match) {
         tabs.style.display = "none";
         tabContent.innerHTML =
-          `<section class="card"><p>Unable to load projects. Please try again later.</p></section>`;
+          `<section class="card"><p>Invalid project specified. No UI available.</p></section>`;
+        return;
       }
+
+      logoContainer.innerHTML = "";
+      selectorRow.style.display = "none";
+
+      injectConfig(match);
+      const enabledTabs = normalizeTabs(match.enabled_tabs);
+      renderTabs(enabledTabs);
+
+      tabs.style.display = "block";
     }
+  } catch (err) {
+    console.error("Failed to load projects:", err);
+    selectorRow.style.display = "none";
+    tabs.style.display = "none";
+    tabContent.innerHTML =
+      `<section class="card"><p>Unable to load projects. Please try again later.</p></section>`;
+  }
+}
 
-    function injectConfig(config) {
-      portalState.project = config.project;
-      portalState.projects_config = config;
-      portalState.display_name = config.display_name;
-      portalState.business_name = config.business_name;
-      portalState.contact_name = config.contact_name;
-      portalState.contact_email = config.contact_email;
-      portalState.contact_first_name = config.contact_first_name;
-      portalState.contact_last_name = config.contact_last_name;
+function injectConfig(config) {
+  portalState.project = config.project;
+  portalState.projects_config = config;
+  portalState.display_name = config.display_name;
+  portalState.business_name = config.business_name;
+  portalState.contact_name = config.contact_name;
+  portalState.contact_email = config.contact_email;
+  portalState.contact_first_name = config.contact_first_name;
+  portalState.contact_last_name = config.contact_last_name;
+  portalState.enabled_tabs = config.enabled_tabs || [];
 
-      /* ⭐ CRITICAL FIX — now Contacts sees enabled_tabs */
-      portalState.enabled_tabs = config.enabled_tabs || [];
+  portalTitleText.textContent = config.display_name || "";
+  pageTitle.textContent = config.display_name || "";
+}
 
-      portalTitleText.textContent = config.display_name || "";
-      pageTitle.textContent = config.display_name || "";
-    }
-
-    function normalizeTabs(raw) {
-      if (Array.isArray(raw)) return raw;
-      if (typeof raw === "string") {
-        try {
-          return JSON.parse(raw);
-        } catch {
-          return [];
-        }
-      }
+function normalizeTabs(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw);
+    } catch {
       return [];
     }
+  }
+  return [];
+}
 
-    function renderTabs(enabledTabs) {
-      tabs.innerHTML = enabledTabs
-        .map(tabId =>
-          tabMap[tabId]
-            ? `<button data-tab="${tabId}">${tabMap[tabId].label}</button>`
-            : ""
-        )
-        .join("");
+function renderTabs(enabledTabs) {
+  tabs.innerHTML = enabledTabs
+    .map(tabId =>
+      tabMap[tabId]
+        ? `<button data-tab="${tabId}">${tabMap[tabId].label}</button>`
+        : ""
+    )
+    .join("");
 
-      tabs.querySelectorAll("button[data-tab]").forEach(btn => {
-        btn.addEventListener("click", () => loadTab(btn.dataset.tab));
-      });
-    }
+  tabs.querySelectorAll("button[data-tab]").forEach(btn => {
+    btn.addEventListener("click", () => loadTab(btn.dataset.tab));
+  });
+}
 
-    async function loadTab(tabId) {
-      document
-        .querySelectorAll("#tabs button")
-        .forEach(btn => btn.classList.remove("active"));
+async function loadTab(tabId) {
+  document
+    .querySelectorAll("#tabs button")
+    .forEach(btn => btn.classList.remove("active"));
 
-      document
-        .querySelector(`#tabs button[data-tab="${tabId}"]`)
-        ?.classList.add("active");
+  document
+    .querySelector(`#tabs button[data-tab="${tabId}"]`)
+    ?.classList.add("active");
 
-      const tab = tabMap[tabId];
-      if (tab && typeof tab.loader === "function") {
-        tabContent.innerHTML = "";
-        await tab.loader({ portalState, tabContent });
-      }
-    }
+  const tab = tabMap[tabId];
+  if (tab && typeof tab.loader === "function") {
+    tabContent.innerHTML = "";
+    await tab.loader({ portalState, tabContent });
+  }
+}
 
-    window.addEventListener("DOMContentLoaded", async () => {
-      await loadProjects();
-    });
-  </script>
+window.addEventListener("DOMContentLoaded", async () => {
+  await loadProjects();
+});
+</script>
 
-<!-- ⭐ TEMPORARY TEST LOGIN BUTTON (SAFE) -->
+<!-- ⭐ TEMPORARY TEST LOGIN BUTTON -->
 <button id="testLoginBtn"
   style="
     position:fixed;
@@ -400,138 +358,118 @@ window.handlePortalLogin = handlePortalLogin;
   Test Login
 </button>
 
-<!-- ============================================================
-     ⭐ LOGIN POPUP (COMMENTED OUT — WILL ACTIVATE LATER)
-     ============================================================
-
-<div id="loginModal" class="login-modal">
+<!-- ⭐ LOGIN POPUP (ACTIVE FOR TESTING ONLY) -->
+<div id="loginModal" class="login-modal" style="display:none;">
   <div class="login-modal-content">
     <h2>Log In</h2>
-
     <input id="loginEmailInput"
            type="email"
            placeholder="Enter your email"
            autocomplete="email" />
-
     <button id="loginSubmitBtn">Continue</button>
-
     <p id="loginErrorMsg" class="login-error" style="display:none;"></p>
   </div>
 </div>
 
 <style>
-  /* ============================================================
-     LOGIN MODAL (GLOBAL)
-     ============================================================ */
-
-  .login-modal {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.45);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 99999;
-    backdrop-filter: blur(2px);
+/* ============================================================
+LOGIN MODAL (GLOBAL)
+============================================================ */
+.login-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  backdrop-filter: blur(2px);
+}
+.login-modal-content {
+  background: #ffffff;
+  padding: 28px 24px;
+  border-radius: 10px;
+  width: 320px;
+  max-width: 90%;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  text-align: center;
+  animation: loginFadeIn 0.25s ease-out;
+}
+.login-modal-content h2 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #222;
+}
+.login-modal-content input {
+  width: 100%;
+  padding: 10px 12px;
+  margin: 12px 0 16px 0;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 15px;
+}
+.login-modal-content button {
+  width: 100%;
+  padding: 10px;
+  background: #111;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.15s ease-in-out;
+}
+.login-modal-content button:hover {
+  background: #000;
+}
+.login-error {
+  color: #d00;
+  margin-top: 10px;
+  font-size: 14px;
+}
+@keyframes loginFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
   }
-
-  .login-modal-content {
-    background: #ffffff;
-    padding: 28px 24px;
-    border-radius: 10px;
-    width: 320px;
-    max-width: 90%;
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
-    text-align: center;
-    animation: loginFadeIn 0.25s ease-out;
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
-
-  .login-modal-content h2 {
-    margin-top: 0;
-    margin-bottom: 16px;
-    font-size: 20px;
-    font-weight: 600;
-    color: #222;
-  }
-
-  .login-modal-content input {
-    width: 100%;
-    padding: 10px 12px;
-    margin: 12px 0 16px 0;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    font-size: 15px;
-  }
-
-  .login-modal-content button {
-    width: 100%;
-    padding: 10px;
-    background: #111;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-size: 15px;
-    cursor: pointer;
-    transition: background 0.15s ease-in-out;
-  }
-
-  .login-modal-content button:hover {
-    background: #000;
-  }
-
-  .login-error {
-    color: #d00;
-    margin-top: 10px;
-    font-size: 14px;
-  }
-
-  @keyframes loginFadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(6px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
+}
 </style>
 
 <script>
-  // ⭐ COMMENTED OUT — WILL ACTIVATE LATER
-  /*
-  const loginModal = document.getElementById("loginModal");
-  const loginEmailInput = document.getElementById("loginEmailInput");
-  const loginSubmitBtn = document.getElementById("loginSubmitBtn");
-  const loginErrorMsg = document.getElementById("loginErrorMsg");
+/* ⭐ POPUP JS — ACTIVE FOR TESTING */
+const loginModal = document.getElementById("loginModal");
+const loginEmailInput = document.getElementById("loginEmailInput");
+const loginSubmitBtn = document.getElementById("loginSubmitBtn");
+const loginErrorMsg = document.getElementById("loginErrorMsg");
 
-  loginSubmitBtn.addEventListener("click", async () => {
-    const email = loginEmailInput.value.trim();
-    if (!email) {
-      loginErrorMsg.textContent = "Please enter an email.";
-      loginErrorMsg.style.display = "block";
-      return;
-    }
+loginSubmitBtn.addEventListener("click", async () => {
+  const email = loginEmailInput.value.trim();
+  if (!email) {
+    loginErrorMsg.textContent = "Please enter an email.";
+    loginErrorMsg.style.display = "block";
+    return;
+  }
 
-    loginErrorMsg.style.display = "none";
+  loginErrorMsg.style.display = "none";
 
-    await handlePortalLogin(email);
+  await handlePortalLogin(email);
 
-    if (!portalState.userEmail) {
-      loginErrorMsg.textContent = "Invalid email.";
-      loginErrorMsg.style.display = "block";
-      return;
-    }
+  if (!portalState.userEmail) {
+    loginErrorMsg.textContent = "Invalid email.";
+    loginErrorMsg.style.display = "block";
+    return;
+  }
 
-    loginModal.style.display = "none";
-  });
-  */
+  loginModal.style.display = "none";
+});
 </script>
 
-============================================================ -->
-
-  
 </body>
 </html>
-
 
