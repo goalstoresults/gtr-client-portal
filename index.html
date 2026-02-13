@@ -211,7 +211,7 @@ async function attemptLogin() {
     portalState.userEmail = email;
 
     // ⭐ USE FIRST NAME DIRECTLY
-    const friendly = result.first_name || "";
+    const friendly = result.first_name || "!";
 
     welcomeHeader.textContent = `Welcome ${friendly}`;
 
