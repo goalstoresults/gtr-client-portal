@@ -224,9 +224,10 @@ async function attemptLogin() {
       return;
     }
 
-    // 4️⃣ SUCCESS — SHOW PORTAL
+    // 4️⃣ SUCCESS — STORE STATE
     portalState.project = project;
     portalState.userEmail = email;
+    portalState.allowedTabs = result.allowed_tabs || [];   // ⭐ NEW
 
     const friendly = result.first_name || "";
     welcomeHeader.textContent = `Welcome ${friendly}!`;
@@ -242,6 +243,7 @@ async function attemptLogin() {
     errorBox.textContent = "Server error. Try again.";
   }
 }
+
 
 
 loginBtn.addEventListener("click", attemptLogin);
@@ -278,8 +280,16 @@ async function loadPortalConfig(projectName) {
     subHeader.textContent = match.display_name || "";
     pageTitle.textContent = match.display_name || "";
 
-    const enabledTabs = normalizeTabs(match.enabled_tabs);
-    renderTabs(enabledTabs);
+    // ⭐ PROJECT-LEVEL TABS
+    const projectTabs = normalizeTabs(match.enabled_tabs);
+
+    // ⭐ STAFF-LEVEL TABS
+    const staffTabs = portalState.allowedTabs || [];
+
+    // ⭐ INTERSECTION: Only tabs allowed by BOTH
+    const finalTabs = projectTabs.filter(t => staffTabs.includes(t));
+
+    renderTabs(finalTabs);
 
   } catch (err) {
     tabContent.innerHTML =
@@ -287,6 +297,7 @@ async function loadPortalConfig(projectName) {
   }
 }
 
+  
 /* ============================================================
    SUPPORT FUNCTIONS
 ============================================================ */
