@@ -190,6 +190,7 @@ async function attemptLogin() {
   }
 
   try {
+    // 1️⃣ CHECK STAFF
     const res = await fetch(
       "https://client-portal-api.dennis-e64.workers.dev/api/check_staff",
       {
@@ -201,20 +202,34 @@ async function attemptLogin() {
 
     const result = await res.json();
 
+    // 2️⃣ ALWAYS LOG THE ATTEMPT (success or invalid)
+    await fetch(
+      "https://client-portal-api.dennis-e64.workers.dev/api/log_portal_login",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project,
+          email,
+          status: result.valid ? "success" : "invalid",
+          reason: result.valid ? null : "Email not found for project",
+          userAgent: navigator.userAgent
+        })
+      }
+    );
+
+    // 3️⃣ INVALID LOGIN — STOP HERE
     if (!result.valid) {
       errorBox.textContent = "Invalid email for this project.";
       return;
     }
 
-    // SUCCESS
+    // 4️⃣ SUCCESS — SHOW PORTAL
     portalState.project = project;
     portalState.userEmail = email;
 
-    // ⭐ USE FIRST NAME DIRECTLY
     const friendly = result.first_name || "";
-
     welcomeHeader.textContent = `Welcome ${friendly}!`;
-
 
     loginForm.style.display = "none";
     portalHeader.style.display = "block";
@@ -227,6 +242,7 @@ async function attemptLogin() {
     errorBox.textContent = "Server error. Try again.";
   }
 }
+
 
 loginBtn.addEventListener("click", attemptLogin);
 
