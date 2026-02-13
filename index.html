@@ -406,6 +406,14 @@ async function loadTab(tabId) {
 window.addEventListener("DOMContentLoaded", async () => {
   await loadProjects();
 });
+
+// ⭐ Auto-open login modal if not logged in
+window.addEventListener("DOMContentLoaded", () => {
+  if (!portalState.userEmail) {
+    loginModal.style.display = "flex";
+  }
+});
+
 </script>
 
 <!-- ⭐ TEMPORARY TEST LOGIN BUTTON (SAFE) -->
