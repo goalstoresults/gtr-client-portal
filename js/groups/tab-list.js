@@ -1,10 +1,11 @@
 // js/groups/tab-list.js
-// GROUP LIST TAB — Year-aware, View-powered, Option A
+// GROUP LIST TAB — Year-aware, View-powered, Cleaned Version
 
 import { renderGroupDetails } from "./tab-details.js";
-import { escapeHtml, formatCurrency, formatDateTime } from "../utilities.js";
+import { escapeHtml, formatCurrency } from "../utilities.js";
 
 export async function renderGroupList(container, portalState) {
+
   if (!portalState.project) {
     container.innerHTML = `<section class="card"><p>No project selected.</p></section>`;
     return;
@@ -15,6 +16,7 @@ export async function renderGroupList(container, portalState) {
     `https://groups-module.dennis-e64.workers.dev/groups/years?project=${portalState.project}`,
     { cache: "no-cache" }
   );
+
   const { years = [], defaultYear = "all" } = await yearRes.json();
 
   // Initialize selected year
@@ -35,7 +37,6 @@ export async function renderGroupList(container, portalState) {
       }</h2>
 
       <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-        
         <label>Year:
           <select id="groups-year-select">
             <option value="all">All</option>
@@ -85,8 +86,7 @@ export async function renderGroupList(container, portalState) {
     { key: "group_name", label: "Name" },
     { key: "fee_amount", label: "Fees", numeric: true },
     { key: "referral_amount", label: "Revenue", numeric: true },
-    { key: "roi", label: "ROI (%)", numeric: true },
-    { key: "created_at", label: "Created" }
+    { key: "roi", label: "ROI (%)", numeric: true }
   ];
 
   function sortGroups() {
@@ -123,10 +123,11 @@ export async function renderGroupList(container, portalState) {
     if (totalFees === 0 && totalRevenue > 0) {
       totalRoiDisplay = "N/A";
     } else if (totalFees > 0) {
-      totalRoiDisplay = ((totalRevenue / totalFees) * 100).toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      }) + "%";
+      totalRoiDisplay =
+        ((totalRevenue / totalFees) * 100).toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }) + "%";
     } else {
       totalRoiDisplay = "0.00%";
     }
@@ -154,25 +155,26 @@ export async function renderGroupList(container, portalState) {
     const rowsHtml = groups
       .map(g => {
         let roiDisplay;
+
         if (g.roi === null) {
           roiDisplay = "N/A";
         } else {
-          roiDisplay = (Number(g.roi) * 100).toLocaleString("en-US", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-          }) + "%";
+          roiDisplay =
+            (Number(g.roi) * 100).toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
+            }) + "%";
         }
 
         return `
-        <tr>
-          <td>${escapeHtml(g.group_name || "")}</td>
-          <td class="amount">${formatCurrency(g.fee_amount)}</td>
-          <td class="amount">${formatCurrency(g.referral_amount)}</td>
-          <td class="amount">${roiDisplay}</td>
-          <td>${formatDateTime(g.created_at)}</td>
-          <td><button class="btn-primary btn-select" data-id="${g.group_id}">Select</button></td>
-        </tr>
-      `;
+          <tr>
+            <td>${escapeHtml(g.group_name || "")}</td>
+            <td class="amount">${formatCurrency(g.fee_amount)}</td>
+            <td class="amount">${formatCurrency(g.referral_amount)}</td>
+            <td class="amount">${roiDisplay}</td>
+            <td><button class="btn-primary btn-select" data-id="${g.group_id}">Select</button></td>
+          </tr>
+        `;
       })
       .join("");
 
@@ -185,7 +187,6 @@ export async function renderGroupList(container, portalState) {
           <td class="amount">${formatCurrency(totalRevenue)}</td>
           <td class="amount">${totalRoiDisplay}</td>
           <td></td>
-          <td></td>
         </tr>
       </tfoot>
     `;
@@ -193,8 +194,12 @@ export async function renderGroupList(container, portalState) {
     // --- FINAL TABLE ---
     tableDiv.innerHTML = `
       <h4>Showing ${groups.length} ${
-      prevName ? "filtered" : portalState.groupsListYear === "all" ? "groups" : "active groups"
-    }</h4>
+        prevName
+          ? "filtered"
+          : portalState.groupsListYear === "all"
+          ? "groups"
+          : "active groups"
+      }</h4>
 
       <table class="notes-table">
         <thead>
@@ -203,12 +208,14 @@ export async function renderGroupList(container, portalState) {
             <th>Actions</th>
           </tr>
         </thead>
+
         <tbody>
           ${
             rowsHtml ||
-            `<tr><td colspan="6">(no groups found for this year)</td></tr>`
+            `<tr><td colspan="5">(no groups found for this year)</td></tr>`
           }
         </tbody>
+
         ${totalsFooter}
       </table>
     `;
@@ -217,6 +224,7 @@ export async function renderGroupList(container, portalState) {
     tableDiv.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
+
         if (currentSortField === field) {
           currentSortDirection =
             currentSortDirection === "asc" ? "desc" : "asc";
@@ -224,6 +232,7 @@ export async function renderGroupList(container, portalState) {
           currentSortField = field;
           currentSortDirection = "asc";
         }
+
         renderTable();
       });
     });
@@ -246,6 +255,7 @@ export async function renderGroupList(container, portalState) {
 
         const buttons = document.querySelectorAll("#groups-subtabs button");
         buttons.forEach(b => b.classList.remove("active"));
+
         const detailsBtn = document.querySelector(
           '#groups-subtabs button[data-subtab="details"]'
         );
@@ -257,7 +267,7 @@ export async function renderGroupList(container, portalState) {
     });
   } // end renderTable
 
-  // CALL IT — this was missing before
+  // CALL IT
   renderTable();
 
   // Filter events
@@ -284,5 +294,4 @@ export async function renderGroupList(container, portalState) {
       portalState.groupsListYear = e.target.value;
       renderGroupList(container, portalState);
     });
-
 } // end renderGroupList
