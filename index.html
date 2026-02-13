@@ -215,7 +215,7 @@ document.getElementById("testLoginBtn").addEventListener("click", async () => {
 });
 
 /* ============================================================
-   AUTO-PROMPT ON PAGE LOAD
+   AUTO-PROMPT LOGIN (BUT ONLY AFTER PROJECT IS LOADED)
 ============================================================ */
 async function autoPromptLogin() {
   const email = prompt("Enter your email to access the portal:");
@@ -263,7 +263,7 @@ async function loadProjects() {
       pageTitle.textContent = "";
       tabs.style.display = "none";
 
-      document.getElementById("btnSetProject").addEventListener("click", () => {
+      document.getElementById("btnSetProject").addEventListener("click", async () => {
         const projectName =
           document.getElementById("projectInput").value.trim();
 
@@ -288,6 +288,11 @@ async function loadProjects() {
         injectConfig(match);
         const enabledTabs = normalizeTabs(match.enabled_tabs);
         renderTabs(enabledTabs);
+
+        /* ⭐ AUTO-PROMPT NOW THAT PROJECT IS KNOWN */
+        if (!portalState.userEmail) {
+          await autoPromptLogin();
+        }
 
         if (portalState.userEmail) {
           tabs.style.display = "block";
@@ -318,6 +323,11 @@ async function loadProjects() {
     injectConfig(match);
     const enabledTabs = normalizeTabs(match.enabled_tabs);
     renderTabs(enabledTabs);
+
+    /* ⭐ AUTO-PROMPT NOW THAT PROJECT IS KNOWN */
+    if (!portalState.userEmail) {
+      await autoPromptLogin();
+    }
 
     if (portalState.userEmail) {
       tabs.style.display = "block";
@@ -394,7 +404,6 @@ async function loadTab(tabId) {
 ============================================================ */
 window.addEventListener("DOMContentLoaded", async () => {
   await loadProjects();
-  await autoPromptLogin();
 });
 
 </script>
