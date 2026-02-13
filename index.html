@@ -117,15 +117,16 @@ const tabMap = {
 };
 
 /* ============================================================
-🔐 PORTAL LOGIN HANDLER
-
-// ⭐ ACTIVE PLACEHOLDER — does nothing except set the email
+🔐 PORTAL LOGIN HANDLER — PLACEHOLDER DISABLED
+============================================================ */
+/*
 async function handlePortalLogin(enteredEmail) {
   portalState.userEmail = enteredEmail;
   console.log("Logged in as:", portalState.userEmail);
 }
 window.handlePortalLogin = handlePortalLogin;
-  ============================================================ */
+*/
+
 
 document.getElementById("testLoginBtn").addEventListener("click", async () => {
   const email = prompt("Enter test email:");
@@ -155,15 +156,32 @@ async function handlePortalLogin(enteredEmail) {
     );
 
     const result = await res.json();
+
+    // 2. If not authorized → log failure + show alert
     if (!result.valid) {
+      await fetch(
+        "https://client-portal-api.dennis-e64.workers.dev/api/log_portal_login",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project: portalState.project,
+            email: enteredEmail,
+            status: "failed",
+            reason: "not_staff",
+            userAgent: navigator.userAgent
+          })
+        }
+      );
+
       alert("This email is not authorized for this project.");
       return;
     }
 
-    // 2. Set authenticated user
+    // 3. Authorized → set user
     portalState.userEmail = enteredEmail;
 
-    // 3. Log login event
+    // 4. Log success
     await fetch(
       "https://client-portal-api.dennis-e64.workers.dev/api/log_portal_login",
       {
@@ -172,14 +190,34 @@ async function handlePortalLogin(enteredEmail) {
         body: JSON.stringify({
           project: portalState.project,
           email: enteredEmail,
+          status: "success",
+          reason: "authorized",
           userAgent: navigator.userAgent
         })
       }
     );
 
     console.log("Logged in as:", portalState.userEmail);
+
   } catch (err) {
     console.error("Login error:", err);
+
+    // 5. Log server error
+    await fetch(
+      "https://client-portal-api.dennis-e64.workers.dev/api/log_portal_login",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project: portalState.project,
+          email: enteredEmail,
+          status: "failed",
+          reason: "server_error",
+          userAgent: navigator.userAgent
+        })
+      }
+    );
+
     alert("Unable to log in. Please try again.");
   }
 }
