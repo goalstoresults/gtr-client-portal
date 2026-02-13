@@ -13,43 +13,27 @@
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 
 <style>
-/* ============================================================
-   SHARED FORM LAYOUT (PROJECT + LOGIN)
-============================================================ */
-.form-screen {
-  text-align: center;
-  margin-top: 40px;
-}
-
-.form-screen img {
+.logo-waiting {
+  display: block;
+  margin: 20px auto;
   height: 80px;
-  margin-bottom: 20px;
 }
-
-.form-screen label {
+.project-entry {
+  text-align: center;
+  margin-top: 20px;
+}
+.project-entry label {
   display: block;
   margin-bottom: 8px;
   font-weight: bold;
 }
-
-.form-screen input {
+.project-entry input {
   padding: 6px;
   margin-right: 8px;
 }
-
-.form-screen button {
+.project-entry button {
   padding: 6px 12px;
 }
-
-.error-message {
-  color: red;
-  margin-top: 10px;
-  height: 18px; /* reserve space */
-}
-
-/* ============================================================
-   PORTAL FOOTER
-============================================================ */
 footer {
   margin-top: 20px;
   text-align: left;
@@ -65,19 +49,7 @@ footer {
 
 <body>
 
-<!-- ⭐ LOGIN SCREEN (HIDDEN UNTIL PROJECT IS KNOWN) -->
-<div id="loginScreen" class="form-screen" style="display:none;">
-  <img src="./RedUmbrellaPro Header2.png" alt="RedUmbrellaPro" />
-
-  <label for="loginEmailInput">Enter your email to continue:</label>
-  <input id="loginEmailInput" type="email" placeholder="Email address" />
-  <button id="loginSubmitBtn">Login</button>
-
-  <div id="loginError" class="error-message"></div>
-</div>
-
-<!-- ⭐ HEADER + LOGO (HIDDEN UNTIL LOGIN SUCCESS) -->
-<header id="portalHeader" style="display:none;">
+<header>
   <div id="logo-container" style="text-align:center; margin:20px 0;"></div>
 
   <h1 id="portal-title"
@@ -94,7 +66,7 @@ footer {
 <nav id="tabs" style="display:none;"></nav>
 <div id="tab-content"></div>
 
-<footer id="portalFooter" style="display:none;">
+<footer>
   <small style="display:block; opacity:0.7;">Portal Version: 2.0.0</small>
 </footer>
 
@@ -122,23 +94,16 @@ import { loadFilterTab } from "./js/filter.js";
 const portalState = {
   project: "",
   contactId: "",
-  userEmail: ""
+  userEmail: "" // blank = not logged in
 };
 window.portalState = portalState;
 
-const portalHeader = document.getElementById("portalHeader");
-const portalFooter = document.getElementById("portalFooter");
 const portalTitleText = document.getElementById("portal-title-text");
 const pageTitle = document.getElementById("page-title");
 const selectorRow = document.getElementById("project-selector-row");
 const tabs = document.getElementById("tabs");
 const tabContent = document.getElementById("tab-content");
 const logoContainer = document.getElementById("logo-container");
-
-const loginScreen = document.getElementById("loginScreen");
-const loginEmailInput = document.getElementById("loginEmailInput");
-const loginSubmitBtn = document.getElementById("loginSubmitBtn");
-const loginError = document.getElementById("loginError");
 
 const tabMap = {
   "1": { label: "Contacts", loader: loadContactsTab },
@@ -156,17 +121,18 @@ const tabMap = {
 };
 
 /* ============================================================
-   LOGIN HANDLER (NO POPUPS)
+   AUTO-PROMPT LOGIN
 ============================================================ */
-async function attemptLogin() {
-  const email = loginEmailInput.value.trim();
-  loginError.textContent = "";
+async function autoPromptLogin() {
+  const email = prompt("Enter your email to access the portal:");
+  if (!email) return;
+  await handlePortalLogin(email);
+}
 
-  if (!email) {
-    loginError.textContent = "Please enter an email.";
-    return;
-  }
-
+/* ============================================================
+   REAL LOGIN LOGIC — WITH RETRY ON INVALID
+============================================================ */
+async function handlePortalLogin(enteredEmail) {
   try {
     const res = await fetch(
       "https://client-portal-api.dennis-e64.workers.dev/api/check_staff",
@@ -175,7 +141,7 @@ async function attemptLogin() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           project: portalState.project,
-          email
+          email: enteredEmail
         })
       }
     );
@@ -183,28 +149,88 @@ async function attemptLogin() {
     const result = await res.json();
 
     if (!result.valid) {
-      loginEmailInput.value = "";
-      loginError.textContent = "Invalid email. Please try again.";
+      await fetch(
+        "https://client-portal-api.dennis-e64.workers.dev/api/log_portal_login",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project: portalState.project,
+            email: enteredEmail,
+            status: "failed",
+            reason: "not_staff",
+            userAgent: navigator.userAgent
+          })
+        }
+      );
+
+      alert("This email is not authorized for this project.");
+
+      /* ⭐ RETRY LOGIN IMMEDIATELY */
+      await autoPromptLogin();
       return;
     }
 
-    /* ⭐ SUCCESSFUL LOGIN */
-    portalState.userEmail = email;
+    portalState.userEmail = enteredEmail;
 
-    loginScreen.style.display = "none";
-    portalHeader.style.display = "block";
-    portalFooter.style.display = "block";
+    await fetch(
+      "https://client-portal-api.dennis-e64.workers.dev/api/log_portal_login",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project: portalState.project,
+          email: enteredEmail,
+          status: "success",
+          reason: "authorized",
+          userAgent: navigator.userAgent
+        })
+      }
+    );
+
+    console.log("Logged in as:", portalState.userEmail);
+
     tabs.style.display = "block";
 
   } catch (err) {
-    loginError.textContent = "Server error. Please try again.";
+    console.error("Login error:", err);
+
+    await fetch(
+      "https://client-portal-api.dennis-e64.workers.dev/api/log_portal_login",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project: portalState.project,
+          email: enteredEmail,
+          status: "failed",
+          reason: "server_error",
+          userAgent: navigator.userAgent
+        })
+      }
+    );
+
+    alert("Unable to log in. Please try again.");
+
+    /* ⭐ RETRY ON SERVER ERROR TOO */
+    await autoPromptLogin();
   }
 }
 
-loginSubmitBtn.addEventListener("click", attemptLogin);
+window.handlePortalLogin = handlePortalLogin;
 
 /* ============================================================
-   LOAD PROJECTS — SHOW LOGIN SCREEN WHEN PROJECT IS KNOWN
+   TEST LOGIN BUTTON — STILL WORKS
+============================================================ */
+document.getElementById("testLoginBtn").addEventListener("click", async () => {
+  const email = prompt("Enter test email:");
+  if (!email) return;
+
+  await handlePortalLogin(email);
+});
+
+/* ============================================================
+   LOAD PROJECTS — AUTO-PROMPT ONLY AFTER PROJECT IS KNOWN
 ============================================================ */
 async function loadProjects() {
   try {
@@ -223,15 +249,24 @@ async function loadProjects() {
 
     /* CASE 1 — No ?project param */
     if (!projectParam) {
+      logoContainer.innerHTML =
+        `<img src="./RedUmbrellaPro Header2.png"
+              alt="Red Umbrella Pro"
+              class="logo-waiting" />`;
+
       selectorRow.style.display = "block";
-      selectorRow.className = "form-screen";
+      selectorRow.className = "project-entry";
 
       selectorRow.innerHTML = `
-        <img src="./RedUmbrellaPro Header2.png" alt="RedUmbrellaPro" />
         <label for="projectInput">Enter Project Name:</label>
         <input id="projectInput" type="text" placeholder="Project name" />
         <button id="btnSetProject" class="primary">Enter</button>
       `;
+
+      portalState.project = "";
+      portalTitleText.textContent = "";
+      pageTitle.textContent = "";
+      tabs.style.display = "none";
 
       document.getElementById("btnSetProject").addEventListener("click", async () => {
         const projectName =
@@ -252,14 +287,24 @@ async function loadProjects() {
           return;
         }
 
+        logoContainer.innerHTML = "";
         selectorRow.style.display = "none";
 
         injectConfig(match);
         const enabledTabs = normalizeTabs(match.enabled_tabs);
         renderTabs(enabledTabs);
 
-        /* ⭐ SHOW LOGIN SCREEN */
-        loginScreen.style.display = "block";
+        /* ⭐ AUTO-PROMPT NOW THAT PROJECT IS KNOWN */
+        if (!portalState.userEmail) {
+          await autoPromptLogin();
+        }
+
+        if (portalState.userEmail) {
+          tabs.style.display = "block";
+          tabContent.innerHTML = "";
+        } else {
+          tabs.style.display = "none";
+        }
       });
 
       return;
@@ -271,19 +316,34 @@ async function loadProjects() {
     );
 
     if (!match) {
+      tabs.style.display = "none";
       tabContent.innerHTML =
         `<section class="card"><p>Invalid project specified. No UI available.</p></section>`;
       return;
     }
 
+    logoContainer.innerHTML = "";
+    selectorRow.style.display = "none";
+
     injectConfig(match);
     const enabledTabs = normalizeTabs(match.enabled_tabs);
     renderTabs(enabledTabs);
 
-    /* ⭐ SHOW LOGIN SCREEN */
-    loginScreen.style.display = "block";
+    /* ⭐ AUTO-PROMPT NOW THAT PROJECT IS KNOWN */
+    if (!portalState.userEmail) {
+      await autoPromptLogin();
+    }
+
+    if (portalState.userEmail) {
+      tabs.style.display = "block";
+    } else {
+      tabs.style.display = "none";
+    }
 
   } catch (err) {
+    console.error("Failed to load projects:", err);
+    selectorRow.style.display = "none";
+    tabs.style.display = "none";
     tabContent.innerHTML =
       `<section class="card"><p>Unable to load projects. Please try again later.</p></section>`;
   }
@@ -352,6 +412,24 @@ window.addEventListener("DOMContentLoaded", async () => {
 });
 
 </script>
+
+<!-- ⭐ TEST LOGIN BUTTON (UNCHANGED) -->
+<button id="testLoginBtn"
+style="
+position:fixed;
+bottom:60px;
+right:20px;
+z-index:9999;
+padding:8px 14px;
+background:#333;
+color:white;
+border:none;
+border-radius:4px;
+cursor:pointer;
+opacity:0.7;
+">
+  Test Login
+</button>
 
 </body>
 </html>
