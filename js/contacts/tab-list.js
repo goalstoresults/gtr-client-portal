@@ -31,7 +31,7 @@ export async function renderContactList(container, portalState) {
             <span id="searchLabel">Search Name or Business</span>
             <input type="text" id="unifiedSearch" style="min-width:240px;">
             <div style="font-size:0.75em; color:#666; margin-top:2px;">
-              Tip: Type “ALL” for full list.
+              Tip: Leave blank for full list.
             </div>
           </label>
 
