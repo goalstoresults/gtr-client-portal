@@ -1,6 +1,5 @@
 // js/setup/tab-staff.js
-// v2.0 — Staff Setup Subtab (UPDATED)
-// Replaces "role" with "allowed_tabs" multi-select
+// v2.2 — Staff Setup Subtab (Simple JSON + First/Last Name)
 
 import { escapeHtml } from "../utilities.js";
 
@@ -43,15 +42,15 @@ async function loadStaffGrid(staffGrid, portalState) {
     return;
   }
 
-  const enabledTabs = portalState.enabled_tabs || [];
-
   staffGrid.innerHTML = `
     <table class="notes-table" style="width:100%;">
       <thead>
         <tr>
-          <th>Name</th>
+          <th>Full Name</th>
+          <th>First</th>
+          <th>Last</th>
           <th>Email</th>
-          <th>Allowed Tabs</th>
+          <th>Allowed Tabs (JSON)</th>
           <th>Created</th>
           <th style="width:160px;">Actions</th>
         </tr>
@@ -62,10 +61,18 @@ async function loadStaffGrid(staffGrid, portalState) {
             r => `
           <tr data-id="${r.id}">
             <td><input type="text" class="staffNameInput" value="${escapeHtml(r.staff_name || "")}" style="width:100%;"></td>
+
+            <td><input type="text" class="staffFirstInput" value="${escapeHtml(r.first_name || "")}" style="width:100%;"></td>
+
+            <td><input type="text" class="staffLastInput" value="${escapeHtml(r.last_name || "")}" style="width:100%;"></td>
+
             <td><input type="text" class="staffEmailInput" value="${escapeHtml(r.staff_email || "")}" style="width:100%;"></td>
 
             <td>
-              ${renderAllowedTabsSelect(enabledTabs, r.allowed_tabs)}
+              <input type="text"
+                     class="allowedTabsInput"
+                     value='${escapeHtml(JSON.stringify(r.allowed_tabs || []))}'
+                     style="width:100%;">
             </td>
 
             <td>${escapeHtml(formatDate(r.created_at))}</td>
@@ -105,39 +112,24 @@ async function loadStaffGrid(staffGrid, portalState) {
 }
 
 /* ---------------------------------------------
-   RENDER ALLOWED TABS MULTI-SELECT
---------------------------------------------- */
-function renderAllowedTabsSelect(enabledTabs, selectedTabs) {
-  const selected = Array.isArray(selectedTabs) ? selectedTabs : [];
-
-  return `
-    <select class="allowedTabsSelect" multiple size="4" style="width:100%;">
-      ${enabledTabs
-        .map(
-          tabId => `
-        <option value="${tabId}" ${selected.includes(tabId) ? "selected" : ""}>
-          Tab ${tabId}
-        </option>
-      `
-        )
-        .join("")}
-    </select>
-  `;
-}
-
-/* ---------------------------------------------
    ADD NEW STAFF ROW
 --------------------------------------------- */
 function addNewStaffRow(staffGrid, portalState) {
   const tbody = staffGrid.querySelector("tbody");
-  const enabledTabs = portalState.enabled_tabs || [];
 
   const newRow = document.createElement("tr");
   newRow.innerHTML = `
-    <td><input type="text" class="staffNameInput" placeholder="Name" style="width:100%;"></td>
+    <td><input type="text" class="staffNameInput" placeholder="Full Name" style="width:100%;"></td>
+    <td><input type="text" class="staffFirstInput" placeholder="First" style="width:100%;"></td>
+    <td><input type="text" class="staffLastInput" placeholder="Last" style="width:100%;"></td>
     <td><input type="text" class="staffEmailInput" placeholder="email@example.com" style="width:100%;"></td>
 
-    <td>${renderAllowedTabsSelect(enabledTabs, [])}</td>
+    <td>
+      <input type="text"
+             class="allowedTabsInput"
+             placeholder='["1","2","3"]'
+             style="width:100%;">
+    </td>
 
     <td>—</td>
     <td>
@@ -163,22 +155,31 @@ function addNewStaffRow(staffGrid, portalState) {
 --------------------------------------------- */
 async function insertNewStaff(tr, portalState) {
   const name = tr.querySelector(".staffNameInput").value.trim();
+  const first = tr.querySelector(".staffFirstInput").value.trim();
+  const last = tr.querySelector(".staffLastInput").value.trim();
   const email = tr.querySelector(".staffEmailInput").value.trim().toLowerCase();
-
-  const allowedTabs = Array.from(
-    tr.querySelector(".allowedTabsSelect").selectedOptions
-  ).map(o => o.value);
+  const allowedTabsRaw = tr.querySelector(".allowedTabsInput").value.trim();
 
   if (!email || !email.includes("@")) {
     alert("Please enter a valid email.");
     return;
   }
 
+  let parsed;
+  try {
+    parsed = JSON.parse(allowedTabsRaw || "[]");
+  } catch {
+    alert('Allowed Tabs must be a JSON array like ["1","2","3"]');
+    return;
+  }
+
   const payload = {
     project: portalState.setup_project_id,
     staff_name: name,
+    first_name: first,
+    last_name: last,
     staff_email: email,
-    allowed_tabs: allowedTabs,
+    allowed_tabs: parsed,
     created_at: new Date().toISOString()
   };
 
@@ -196,21 +197,30 @@ async function saveStaffRow(tr, portalState) {
   const id = tr.dataset.id;
 
   const name = tr.querySelector(".staffNameInput").value.trim();
+  const first = tr.querySelector(".staffFirstInput").value.trim();
+  const last = tr.querySelector(".staffLastInput").value.trim();
   const email = tr.querySelector(".staffEmailInput").value.trim().toLowerCase();
-
-  const allowedTabs = Array.from(
-    tr.querySelector(".allowedTabsSelect").selectedOptions
-  ).map(o => o.value);
+  const allowedTabsRaw = tr.querySelector(".allowedTabsInput").value.trim();
 
   if (!email || !email.includes("@")) {
     alert("Please enter a valid email.");
     return;
   }
 
+  let parsed;
+  try {
+    parsed = JSON.parse(allowedTabsRaw || "[]");
+  } catch {
+    alert('Allowed Tabs must be a JSON array like ["1","2","3"]');
+    return;
+  }
+
   const updates = {
     staff_name: name,
+    first_name: first,
+    last_name: last,
     staff_email: email,
-    allowed_tabs: allowedTabs
+    allowed_tabs: parsed
   };
 
   await fetch(
