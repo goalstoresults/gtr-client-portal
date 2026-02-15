@@ -1,5 +1,5 @@
 // js/contacts/tab-list.js
-// Contact List Tab — Updated with Search Mode + Unified Search + Alignment Fix + Buttons in Row 1
+// Contact List Tab — Updated with Search Mode + Unified Search + 2‑Row Layout (Buttons on Row 2)
 
 import { escapeHtml, formatDateTime } from "../utilities.js";
 import { renderContactDetails } from "./tab-details.js";
@@ -17,25 +17,19 @@ export async function renderContactList(container, portalState) {
       <section class="card">
         <h2>Contact List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
 
-        <!-- ROW 1: SEARCH MODE + BUTTONS -->
-        <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:6px;">
-          <strong>Search Mode:</strong>
-          <label><input type="radio" name="searchMode" value="all" checked> All</label>
-          <label><input type="radio" name="searchMode" value="people"> People</label>
-          <label><input type="radio" name="searchMode" value="business"> Business</label>
+        <!-- ROW 1: SEARCH MODE + SEARCH INPUT + CONTACT TYPE -->
+        <div style="display:flex; align-items:flex-start; gap:20px; flex-wrap:wrap; margin-bottom:6px;">
 
-          <div style="display:flex; gap:8px; margin-left:auto;">
-            <button id="btnApplyContactsFilter" class="secondary">Apply Filter</button>
-            <button id="btnClearContactsFilter" class="secondary">Clear Filter</button>
+          <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+            <strong>Search Mode:</strong>
+            <label><input type="radio" name="searchMode" value="all" checked> All</label>
+            <label><input type="radio" name="searchMode" value="people"> People</label>
+            <label><input type="radio" name="searchMode" value="business"> Business</label>
           </div>
-        </div>
 
-        <!-- ROW 2: SEARCH INPUT + CONTACT TYPE -->
-        <div style="display:flex; align-items:flex-start; gap:20px; flex-wrap:wrap; margin-bottom:12px;">
-          
           <label style="display:flex; flex-direction:column;">
             <span id="searchLabel">Search Name or Business</span>
-            <input type="text" id="unifiedSearch" style="min-width:260px;">
+            <input type="text" id="unifiedSearch" style="min-width:240px;">
             <div style="font-size:0.75em; color:#666; margin-top:2px;">
               Tip: Type “ALL” for full list.
             </div>
@@ -48,6 +42,12 @@ export async function renderContactList(container, portalState) {
             </select>
           </label>
 
+        </div>
+
+        <!-- ROW 2: BUTTONS ONLY -->
+        <div style="display:flex; gap:10px; margin-bottom:12px;">
+          <button id="btnApplyContactsFilter" class="secondary">Apply Filter</button>
+          <button id="btnClearContactsFilter" class="secondary">Clear Filter</button>
         </div>
 
         <div id="contactTable">(loading…)</div>
@@ -343,4 +343,5 @@ export async function renderContactList(container, portalState) {
     console.error("[Contacts] Error in renderContactList:", err);
   }
 }
+
 
