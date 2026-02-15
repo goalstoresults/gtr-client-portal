@@ -161,6 +161,42 @@ export async function renderContactDetails(container, portalState, contactId) {
   }
 
   /* -------------------------------------------------------
+     SEARCH NAME MODE (PER-CONTACT OVERRIDE)
+  ------------------------------------------------------- */
+  const searchSectionHeader = document.createElement("h3");
+  searchSectionHeader.textContent = "Search Settings";
+  searchSectionHeader.className = "section-title";
+  form.appendChild(searchSectionHeader);
+
+  const searchRow = document.createElement("div");
+  searchRow.className = "notes-row";
+
+  const searchLabel = document.createElement("label");
+  searchLabel.textContent = "Search Name Mode";
+  searchLabel.className = "notes-label";
+
+  const searchSelect = document.createElement("select");
+  searchSelect.name = "search_name_source";
+  searchSelect.className = "form-control";
+
+  const optContact = document.createElement("option");
+  optContact.value = "contact";
+  optContact.textContent = "Contact (first/last)";
+  if (contact.search_name_source === "contact") optContact.selected = true;
+
+  const optBusiness = document.createElement("option");
+  optBusiness.value = "business";
+  optBusiness.textContent = "Business";
+  if (contact.search_name_source === "business") optBusiness.selected = true;
+
+  searchSelect.appendChild(optContact);
+  searchSelect.appendChild(optBusiness);
+
+  searchRow.appendChild(searchLabel);
+  searchRow.appendChild(searchSelect);
+  form.appendChild(searchRow);
+
+  /* -------------------------------------------------------
      SAVE BUTTON HANDLER
   ------------------------------------------------------- */
   document.getElementById("btnSaveContact").addEventListener("click", () => {
@@ -172,6 +208,7 @@ export async function renderContactDetails(container, portalState, contactId) {
     const formData = new FormData(form);
     const updates = {};
 
+    // Dynamic fields
     fields.forEach(f => {
       let val = formData.get(f.field_key);
 
@@ -184,6 +221,12 @@ export async function renderContactDetails(container, portalState, contactId) {
         updates[f.field_key] = val;
       }
     });
+
+    // Include search_name_source override
+    const mode = formData.get("search_name_source");
+    if (mode === "contact" || mode === "business") {
+      updates.search_name_source = mode;
+    }
 
     updates.updated_at = new Date().toISOString();
 
