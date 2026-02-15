@@ -1,5 +1,5 @@
 // js/contacts/tab-list.js
-// Contact List Tab — Updated with Search Mode + Unified Search
+// Contact List Tab — Updated with Search Mode + Unified Search + Alignment Fix
 
 import { escapeHtml, formatDateTime } from "../utilities.js";
 import { renderContactDetails } from "./tab-details.js";
@@ -9,6 +9,7 @@ import { renderContactDetails } from "./tab-details.js";
 ------------------------------------------------------- */
 export async function renderContactList(container, portalState) {
   try {
+
     /* -------------------------------------------------------
        RENDER FILTER BAR + TABLE SHELL
     ------------------------------------------------------- */
@@ -25,7 +26,7 @@ export async function renderContactList(container, portalState) {
         </div>
 
         <!-- ROW 2: SEARCH INPUT + TYPE + BUTTONS -->
-        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+        <div style="display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
           
           <label style="display:flex; flex-direction:column;">
             <span id="searchLabel">Search Name or Business</span>
@@ -35,25 +36,28 @@ export async function renderContactList(container, portalState) {
             </div>
           </label>
 
-          <label>
-            Contact Type:
+          <label style="display:flex; flex-direction:column;">
+            <span>Contact Type</span>
             <select id="filter-contact-type" class="form-control" style="min-width:160px;">
               <option value="">ALL</option>
             </select>
           </label>
 
-          <button id="btnApplyContactsFilter" class="secondary">Apply Filter</button>
-          <button id="btnClearContactsFilter" class="secondary">Clear Filter</button>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <button id="btnApplyContactsFilter" class="secondary">Apply Filter</button>
+            <button id="btnClearContactsFilter" class="secondary">Clear Filter</button>
+          </div>
+
         </div>
 
         <div id="contactTable">(loading…)</div>
       </section>
     `;
 
-    const tableDiv   = container.querySelector("#contactTable");
-    const typeSelect = document.getElementById("filter-contact-type");
-    const searchInput = document.getElementById("unifiedSearch");
-    const searchLabel = document.getElementById("searchLabel");
+    const tableDiv     = container.querySelector("#contactTable");
+    const typeSelect   = document.getElementById("filter-contact-type");
+    const searchInput  = document.getElementById("unifiedSearch");
+    const searchLabel  = document.getElementById("searchLabel");
 
     /* -------------------------------------------------------
        LOAD CONTACT TYPES
@@ -159,7 +163,7 @@ export async function renderContactList(container, portalState) {
 
       const params = new URLSearchParams({ project: portalState.project });
 
-      // "ALL" → return everything
+      // "ALL" or blank → return everything
       if (term.toLowerCase() === "all" || term === "") {
         if (type.length >= 1) params.set("contact_type", type);
         await fetchAll(params);
@@ -339,4 +343,3 @@ export async function renderContactList(container, portalState) {
     console.error("[Contacts] Error in renderContactList:", err);
   }
 }
-
