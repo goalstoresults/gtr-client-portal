@@ -1,5 +1,5 @@
 // js/contacts/tab-list.js
-// Contact List Tab — Updated with Search Mode + Unified Search + Alignment Fix
+// Contact List Tab — Updated with Search Mode + Unified Search + Alignment Fix + Buttons in Row 1
 
 import { escapeHtml, formatDateTime } from "../utilities.js";
 import { renderContactDetails } from "./tab-details.js";
@@ -17,16 +17,21 @@ export async function renderContactList(container, portalState) {
       <section class="card">
         <h2>Contact List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
 
-        <!-- ROW 1: SEARCH MODE -->
+        <!-- ROW 1: SEARCH MODE + BUTTONS -->
         <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:6px;">
           <strong>Search Mode:</strong>
           <label><input type="radio" name="searchMode" value="all" checked> All</label>
           <label><input type="radio" name="searchMode" value="people"> People</label>
           <label><input type="radio" name="searchMode" value="business"> Business</label>
+
+          <div style="display:flex; gap:8px; margin-left:auto;">
+            <button id="btnApplyContactsFilter" class="secondary">Apply Filter</button>
+            <button id="btnClearContactsFilter" class="secondary">Clear Filter</button>
+          </div>
         </div>
 
-        <!-- ROW 2: SEARCH INPUT + TYPE + BUTTONS -->
-        <div style="display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+        <!-- ROW 2: SEARCH INPUT + CONTACT TYPE -->
+        <div style="display:flex; align-items:flex-start; gap:20px; flex-wrap:wrap; margin-bottom:12px;">
           
           <label style="display:flex; flex-direction:column;">
             <span id="searchLabel">Search Name or Business</span>
@@ -42,11 +47,6 @@ export async function renderContactList(container, portalState) {
               <option value="">ALL</option>
             </select>
           </label>
-
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <button id="btnApplyContactsFilter" class="secondary">Apply Filter</button>
-            <button id="btnClearContactsFilter" class="secondary">Clear Filter</button>
-          </div>
 
         </div>
 
@@ -343,3 +343,4 @@ export async function renderContactList(container, portalState) {
     console.error("[Contacts] Error in renderContactList:", err);
   }
 }
+
