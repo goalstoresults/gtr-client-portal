@@ -1,5 +1,5 @@
 // js/contacts/tab-list.js
-// Modularized Contact List Tab
+// Contact List Tab — Updated with Search Mode + Unified Search
 
 import { escapeHtml, formatDateTime } from "../utilities.js";
 import { renderContactDetails } from "./tab-details.js";
@@ -9,11 +9,6 @@ import { renderContactDetails } from "./tab-details.js";
 ------------------------------------------------------- */
 export async function renderContactList(container, portalState) {
   try {
-    const prevFirst    = document.getElementById("filter-first")?.value.trim() || "";
-    const prevLast     = document.getElementById("filter-last")?.value.trim() || "";
-    const prevBusiness = document.getElementById("filter-business")?.value.trim() || "";
-    const prevType     = document.getElementById("filter-contact-type")?.value || "";
-
     /* -------------------------------------------------------
        RENDER FILTER BAR + TABLE SHELL
     ------------------------------------------------------- */
@@ -21,19 +16,27 @@ export async function renderContactList(container, portalState) {
       <section class="card">
         <h2>Contact List for ${escapeHtml(portalState.display_name || portalState.project)}</h2>
 
-        <div id="contactsFilters" style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-          <label>
-            First:
-            <input type="text" id="filter-first" value="${escapeHtml(prevFirst)}" />
+        <!-- ROW 1: SEARCH MODE -->
+        <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:6px;">
+          <strong>Search Mode:</strong>
+          <label><input type="radio" name="searchMode" value="all" checked> All</label>
+          <label><input type="radio" name="searchMode" value="people"> People</label>
+          <label><input type="radio" name="searchMode" value="business"> Business</label>
+        </div>
+
+        <!-- ROW 2: SEARCH INPUT + TYPE + BUTTONS -->
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+          
+          <label style="display:flex; flex-direction:column;">
+            <span id="searchLabel">Search Name or Business</span>
+            <input type="text" id="unifiedSearch" style="min-width:260px;">
             <div style="font-size:0.75em; color:#666; margin-top:2px;">
-              Tip: Type “ALL” for full list, or “A-J” for a range.
+              Tip: Type “ALL” for full list.
             </div>
           </label>
 
-          <label>Last: <input type="text" id="filter-last" value="${escapeHtml(prevLast)}" /></label>
-          <label>Business: <input type="text" id="filter-business" value="${escapeHtml(prevBusiness)}" /></label>
-
-          <label>Contact Type:
+          <label>
+            Contact Type:
             <select id="filter-contact-type" class="form-control" style="min-width:160px;">
               <option value="">ALL</option>
             </select>
@@ -49,6 +52,8 @@ export async function renderContactList(container, portalState) {
 
     const tableDiv   = container.querySelector("#contactTable");
     const typeSelect = document.getElementById("filter-contact-type");
+    const searchInput = document.getElementById("unifiedSearch");
+    const searchLabel = document.getElementById("searchLabel");
 
     /* -------------------------------------------------------
        LOAD CONTACT TYPES
@@ -65,7 +70,6 @@ export async function renderContactList(container, portalState) {
           const opt = document.createElement("option");
           opt.value = v.value;
           opt.textContent = v.label || v.value;
-          if (v.value === prevType) opt.selected = true;
           typeSelect.appendChild(opt);
         });
     }
@@ -79,21 +83,21 @@ export async function renderContactList(container, portalState) {
     let listFields = [];
 
     /* -------------------------------------------------------
-       FILTER DETECTOR
+       UPDATE LABEL WHEN MODE CHANGES
     ------------------------------------------------------- */
-    function filtersApplied() {
-      const first    = document.getElementById("filter-first").value.trim();
-      const last     = document.getElementById("filter-last").value.trim();
-      const business = document.getElementById("filter-business").value.trim();
-      const type     = document.getElementById("filter-contact-type").value;
+    document.querySelectorAll("input[name='searchMode']").forEach(radio => {
+      radio.addEventListener("change", () => {
+        const mode = document.querySelector("input[name='searchMode']:checked").value;
 
-      return (
-        first.length > 0 ||
-        last.length > 0 ||
-        business.length > 0 ||
-        type.length > 0
-      );
-    }
+        if (mode === "all") {
+          searchLabel.textContent = "Search Name or Business";
+        } else if (mode === "people") {
+          searchLabel.textContent = "Search First or Last Name";
+        } else {
+          searchLabel.textContent = "Search Business Name";
+        }
+      });
+    });
 
     /* -------------------------------------------------------
        LOAD LIST FIELDS (ONCE)
@@ -130,14 +134,12 @@ export async function renderContactList(container, portalState) {
 
       await fetchAll(params);
 
-      // Sort by updated_at DESC
       contacts.sort((a, b) => {
         const da = a.updated_at ? new Date(a.updated_at) : new Date(0);
         const db = b.updated_at ? new Date(b.updated_at) : new Date(0);
         return db - da;
       });
 
-      // Keep only top 50
       contacts = contacts.slice(0, 50);
 
       currentSortField = "updated_at";
@@ -148,50 +150,43 @@ export async function renderContactList(container, portalState) {
     }
 
     /* -------------------------------------------------------
-       APPLY FILTER
+       APPLY FILTER (NEW LOGIC)
     ------------------------------------------------------- */
-      async function applyFilter() {
-        const first = document.getElementById("filter-first").value.trim();
-        const last = document.getElementById("filter-last").value.trim();
-        const business = document.getElementById("filter-business").value.trim();
-       const type     = document.getElementById("filter-contact-type")?.value || "";
-      
-        const isAll = first.toLowerCase() === "all";
-        const rangeMatch = first.match(/^([a-z])-([a-z])$/i);
-      
-        const hasMinimumInput =
-          isAll ||
-          rangeMatch ||
-          first.length >= 1 ||
-          last.length >= 1 ||
-          business.length >= 1 ||
-          type.length >= 1;
-      
-        if (!hasMinimumInput) {
-          alert("Please enter at least one filter value.");
-          return;
-        }
-      
-        const params = new URLSearchParams({ project: portalState.project });
-      
-        if (!isAll && !rangeMatch && first.length >= 1) params.set("first", first);
-        if (last.length >= 1) params.set("last", last);
-        if (business.length >= 1) params.set("business", business);
-      
-        // ⭐ NEW: SEND CONTACT TYPE TO BACKEND
+    async function applyFilter() {
+      const mode = document.querySelector("input[name='searchMode']:checked").value;
+      const term = searchInput.value.trim();
+      const type = typeSelect.value;
+
+      const params = new URLSearchParams({ project: portalState.project });
+
+      // "ALL" → return everything
+      if (term.toLowerCase() === "all" || term === "") {
         if (type.length >= 1) params.set("contact_type", type);
-      
-        // Fetch from backend
         await fetchAll(params);
-      
-        // ⭐ REMOVE LOCAL FILTERING — BACKEND NOW DOES IT
-        // if (type) contacts = contacts.filter(c => c.contact_type === type);
-      
-        // Sort alphabetically for filtered results
         contacts.sort((a, b) => a.search_name.localeCompare(b.search_name));
-      
         renderSortedTable();
+        return;
       }
+
+      // Option B logic
+      if (mode === "all") {
+        params.set("first", term);
+        params.set("last", term);
+        params.set("business", term);
+      } else if (mode === "people") {
+        params.set("first", term);
+        params.set("last", term);
+      } else if (mode === "business") {
+        params.set("business", term);
+      }
+
+      if (type.length >= 1) params.set("contact_type", type);
+
+      await fetchAll(params);
+
+      contacts.sort((a, b) => a.search_name.localeCompare(b.search_name));
+      renderSortedTable();
+    }
 
     /* -------------------------------------------------------
        RENDER SORTED TABLE
@@ -326,11 +321,8 @@ export async function renderContactList(container, portalState) {
     document.getElementById("btnApplyContactsFilter").addEventListener("click", applyFilter);
 
     document.getElementById("btnClearContactsFilter").addEventListener("click", async () => {
-      document.getElementById("filter-first").value = "";
-      document.getElementById("filter-last").value = "";
-      document.getElementById("filter-business").value = "";
-      document.getElementById("filter-contact-type").value = "";
-
+      searchInput.value = "";
+      typeSelect.value = "";
       await loadDefaultRecentContacts();
     });
 
