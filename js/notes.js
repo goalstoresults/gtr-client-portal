@@ -71,14 +71,18 @@ function initNotes(portalState) {
     );
   });
 
-  // ⭐ DEFAULT TO HISTORY VIEW (MATCHES CONTACTS BEHAVIOR)
+  // ⭐ CONDITIONAL DEFAULT SUBTAB
+  // If coming from Contacts with a selected note, default to Review.
+  // Otherwise default to History.
+  let defaultSubtab = portalState.selectedNoteId ? "review" : "history";
+
   const defaultBtn = document.querySelector(
-    '#notes-subtabs button[data-subtab="history"]'
+    `#notes-subtabs button[data-subtab="${defaultSubtab}"]`
   );
 
   if (defaultBtn) {
     defaultBtn.classList.add("active");
-    loadNotesSubtab("history", portalState);
+    loadNotesSubtab(defaultSubtab, portalState);
   }
 }
 
