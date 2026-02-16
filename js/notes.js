@@ -71,11 +71,7 @@ function initNotes(portalState) {
     );
   });
 
-  // Disable review/relationships until a note is selected
-  setSubtabEnabled("review", false);
-  setSubtabEnabled("relationships", false);
-
-    // ⭐ DEFAULT TO HISTORY VIEW (MATCHES CONTACTS BEHAVIOR)
+  // ⭐ DEFAULT TO HISTORY VIEW (MATCHES CONTACTS BEHAVIOR)
   const defaultBtn = document.querySelector(
     '#notes-subtabs button[data-subtab="history"]'
   );
@@ -83,20 +79,6 @@ function initNotes(portalState) {
   if (defaultBtn) {
     defaultBtn.classList.add("active");
     loadNotesSubtab("history", portalState);
-  }
-
-}
-
-// ------------------------------------------------------------
-// Enable/disable subtabs
-// ------------------------------------------------------------
-function setSubtabEnabled(subtab, enabled) {
-  const btn = document.querySelector(
-    `#notes-subtabs button[data-subtab="${subtab}"]`
-  );
-  if (btn) {
-    btn.disabled = !enabled;
-    btn.classList.toggle("disabled", !enabled);
   }
 }
 
