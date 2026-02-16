@@ -3,7 +3,6 @@
 
 import { escapeHtml, formatDateTime } from "../utilities.js";
 
-
 /* -------------------------------------------------------
    MAIN ENTRY: Render Contact Notes
 ------------------------------------------------------- */
@@ -43,7 +42,7 @@ export async function renderContactNotes(container, portalState, contactId) {
             notes.length > 0
               ? notes.map((n, idx) => `
                   <tr>
-                     <td>${n.note_date ? formatDateTime(n.note_date) : ""}</td>
+                    <td>${n.note_date ? formatDateTime(n.note_date) : ""}</td>
                     <td>${escapeHtml(n.subject || "")}</td>
                     <td>${escapeHtml(n.summary || "")}</td>
                     <td>
@@ -60,7 +59,8 @@ export async function renderContactNotes(container, portalState, contactId) {
                       <div><strong>Needs Review:</strong> ${n.needs_review ? "Yes" : "No"}</div>
 
                       <div style="margin-top:8px;"><strong>Raw Text:</strong></div>
-${ /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(n.raw_text)
+${
+  /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(n.raw_text)
     ? `
         <div class="html-note-block">
           ${n.raw_text}
@@ -72,6 +72,11 @@ ${ /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(n.raw_text)
         </div>
       `
 }
+
+                      <!-- ⭐ NEW: REVIEW NOTE BUTTON -->
+                      <button class="btn-primary btn-review-note" data-id="${n.id}" style="margin-top:8px; margin-right:8px;">
+                        Review Note
+                      </button>
 
                       <button class="btn-danger btn-delete-note" data-id="${n.id}" style="margin-top:8px;">
                         Delete Note
@@ -119,6 +124,26 @@ ${ /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(n.raw_text)
 
       // Reload notes
       await renderContactNotes(container, portalState, contactId);
+    });
+  });
+
+  /* -------------------------------------------------------
+     ⭐ REVIEW NOTE HANDLER — JUMP TO NOTES → REVIEW
+  ------------------------------------------------------- */
+  container.querySelectorAll(".btn-review-note").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const noteId = btn.dataset.id;
+
+      // 1️⃣ Set selected note ID
+      portalState.selectedNoteId = noteId;
+
+      // 2️⃣ Switch to top-level Notes tab
+      const notesTabBtn = document.querySelector('#tabs button[data-tab="3"]');
+      if (notesTabBtn) notesTabBtn.click();
+
+      // 3️⃣ Switch to Review subtab
+      const reviewBtn = document.querySelector('#notes-subtabs button[data-subtab="review"]');
+      if (reviewBtn) reviewBtn.click();
     });
   });
 }
