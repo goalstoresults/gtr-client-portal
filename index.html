@@ -332,21 +332,15 @@ async function loadTab(tabId) {
   document.querySelector(`#tabs button[data-tab="${tabId}"]`)
     ?.classList.add("active");
 
-  // ⭐ CONTACT CONTEXT BAR HANDLING
+  // ⭐ ALWAYS CLEAR CONTACT CONTEXT BAR WHEN SWITCHING TOP-LEVEL TABS
   const contextBar = document.getElementById("contact-context-bar");
 
-  if (tabId === "1" || tabId === "3") {
-    // Contacts or Notes → show the bar
-    if (contextBar) contextBar.style.display = "block";
-  } else {
-    // Any other top-level tab → hide and clear
-    portalState.selectedContactName = null;
-    portalState.selectedNoteId = null;
+  portalState.selectedContactName = null;
+  portalState.selectedNoteId = null;
 
-    if (contextBar) {
-      contextBar.textContent = "";
-      contextBar.style.display = "none";
-    }
+  if (contextBar) {
+    contextBar.textContent = "";
+    contextBar.style.display = "none";
   }
 
   // Load the tab module
