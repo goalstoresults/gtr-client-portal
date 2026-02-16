@@ -128,7 +128,7 @@ ${
   });
 
 /* -------------------------------------------------------
-   REVIEW NOTE HANDLER — JUMP TO NOTES → REVIEW
+   ⭐ REVIEW NOTE HANDLER — JUMP TO NOTES → REVIEW
 ------------------------------------------------------- */
 container.querySelectorAll(".btn-review-note").forEach(btn => {
   btn.addEventListener("click", () => {
@@ -141,9 +141,14 @@ container.querySelectorAll(".btn-review-note").forEach(btn => {
     const notesTabBtn = document.querySelector('#tabs button[data-tab="3"]');
     if (notesTabBtn) notesTabBtn.click();
 
-    // 3️⃣ Switch to Review subtab
-    const reviewBtn = document.querySelector('#notes-subtabs button[data-subtab="review"]');
-    if (reviewBtn) reviewBtn.click();
+    // 3️⃣ Wait for Notes subtabs to load, then click Review
+    const waitForReviewTab = setInterval(() => {
+      const reviewBtn = document.querySelector('#notes-subtabs button[data-subtab="review"]');
+      if (reviewBtn) {
+        clearInterval(waitForReviewTab);
+        reviewBtn.click();
+      }
+    }, 50);
   });
 });
 
