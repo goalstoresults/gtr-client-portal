@@ -1,7 +1,8 @@
 // js/contacts/tab-notes.js
 // Modularized Contact Notes Tab
 
-import { escapeHtml } from "../utilities.js";
+import { escapeHtml, formatDateTime } from "../utilities.js";
+
 
 /* -------------------------------------------------------
    MAIN ENTRY: Render Contact Notes
@@ -42,7 +43,7 @@ export async function renderContactNotes(container, portalState, contactId) {
             notes.length > 0
               ? notes.map((n, idx) => `
                   <tr>
-                    <td>${escapeHtml(n.note_date || "")}</td>
+                     <td>${n.note_date ? formatDateTime(n.note_date) : ""}</td>
                     <td>${escapeHtml(n.subject || "")}</td>
                     <td>${escapeHtml(n.summary || "")}</td>
                     <td>
