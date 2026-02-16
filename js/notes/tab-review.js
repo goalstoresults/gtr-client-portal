@@ -1,7 +1,7 @@
 // /notes/tab-review.js
 // Handles: Note review, metadata editing, client assignment, deletion, relationships navigation
 
-import { escapeHtml, formatDateTime,getEasternDateOnly } from "../utilities.js";
+import { escapeHtml, formatDateTime, getEasternDateOnly } from "../utilities.js";
 import { renderRelationships } from "./tab-relationships.js";
 import { renderHistory } from "./tab-history.js";
 
@@ -68,6 +68,18 @@ export async function renderReview(container, portalState, noteId) {
         </section>
 
         <p><strong>Subject:</strong> ${escapeHtml(note.subject || "(no subject)")}</p>
+
+        <!-- ⭐ NEW: EDIT SUBJECT FIELD -->
+        <div class="row" style="gap:12px; align-items:center; margin-bottom:8px;">
+          <label>Edit Subject:</label>
+          <input 
+            type="text" 
+            id="editSubject" 
+            style="flex:1;" 
+            value="${escapeHtml(note.subject || "")}" 
+          />
+        </div>
+
         <p><strong>From:</strong> ${escapeHtml(note.from_name || "(unknown)")} (${escapeHtml(note.from_email || "no email")})</p>
 
         <p><strong>Created:</strong> ${
@@ -218,6 +230,12 @@ ${ /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(note.raw_text)
         review_status: status,
         needs_review: needsReview
       };
+
+      // ⭐ NEW: SUBJECT UPDATE
+      const newSubject = document.getElementById("editSubject").value.trim();
+      if (newSubject && newSubject !== note.subject) {
+        updates.subject = newSubject;
+      }
 
       if (newDateOnly && note.note_date) {
         const old = new Date(note.note_date);
@@ -443,3 +461,4 @@ async function attachClientToNote(contactId, contactName, contactType, contactEm
     console.error(err);
   }
 }
+
