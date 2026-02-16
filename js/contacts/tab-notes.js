@@ -127,38 +127,24 @@ ${
     });
   });
 
-   /* -------------------------------------------------------
-      ⭐ REVIEW NOTE HANDLER — JUMP TO NOTES → REVIEW
-   ------------------------------------------------------- */
-   container.querySelectorAll(".btn-review-note").forEach(btn => {
-     btn.addEventListener("click", () => {
-       const noteId = btn.dataset.id;
-   
-       // 1️⃣ Set selected note ID
-       portalState.selectedNoteId = noteId;
-   
-       // 2️⃣ Enable the Review subtab (it is disabled by default)
-       const reviewBtn = document.querySelector('#notes-subtabs button[data-subtab="review"]');
-       if (reviewBtn) {
-         reviewBtn.disabled = false;
-         reviewBtn.classList.remove("disabled");
-       }
-   
-       // 3️⃣ Switch to top-level Notes tab
-       const notesTabBtn = document.querySelector('#tabs button[data-tab="3"]');
-       if (notesTabBtn) notesTabBtn.click();
-   
-       // 4️⃣ Switch to Review subtab
-       if (reviewBtn) reviewBtn.click();
-   
-       // 5️⃣ Force-load the Review screen with the selected note
-       const container = document.getElementById("notesContent");
-       if (container) {
-         import("../notes/tab-review.js").then(module => {
-           module.renderReview(container, portalState, noteId);
-         });
-       }
-     });
-   });
+/* -------------------------------------------------------
+   REVIEW NOTE HANDLER — JUMP TO NOTES → REVIEW
+------------------------------------------------------- */
+container.querySelectorAll(".btn-review-note").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const noteId = btn.dataset.id;
+
+    // 1️⃣ Set selected note ID
+    portalState.selectedNoteId = noteId;
+
+    // 2️⃣ Switch to top-level Notes tab
+    const notesTabBtn = document.querySelector('#tabs button[data-tab="3"]');
+    if (notesTabBtn) notesTabBtn.click();
+
+    // 3️⃣ Switch to Review subtab
+    const reviewBtn = document.querySelector('#notes-subtabs button[data-subtab="review"]');
+    if (reviewBtn) reviewBtn.click();
+  });
+});
 
 }
