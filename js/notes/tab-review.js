@@ -63,8 +63,10 @@ export async function renderReview(container, portalState, noteId) {
         <div class="row" style="gap:12px; margin-bottom:12px;">
           <h2 style="margin:0;">Notes Review: ${escapeHtml(note.subject || "(no subject)")}</h2>
           <button id="btnSetClient" class="btn-secondary btn-edit">Set Contact</button>
-          <button id="btnDeleteNote" class="btn-danger btn-delete">Delete</button>
-        </div>
+          ${portalState.deleteAllowed
+           ? `<button id="btnDeleteNote" class="btn-danger btn-delete">Delete</button>`
+           : ``}
+         </div>
 
         <section id="setClientForm" class="card" style="display:none; margin-bottom:16px;">
           <h3>Attach Contact to Note</h3>
