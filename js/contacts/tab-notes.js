@@ -126,13 +126,14 @@ ${
 
       const noteId = btn.dataset.id;
 
-      await fetch(
-        `https://contacts-module.dennis-e64.workers.dev/notes_history/${noteId}?project=${portalState.project}`,
+       await fetch(
+        `https://notes-module.dennis-e64.workers.dev/notes_history/${noteId}?project=${portalState.project}`,
         {
           method: "DELETE",
-          headers: { "Content-Type": "application/json" }
+          headers: { "Content-Type": "application/json", "x-internal-call": "internal" }
         }
       );
+
 
       await renderContactNotes(container, portalState, contactId);
     });
