@@ -23,11 +23,16 @@ export async function renderContactNotes(container, portalState, contactId) {
   if (!Array.isArray(notes)) notes = [];
 
   /* -------------------------------------------------------
-     RENDER NOTES TABLE
+     RENDER NOTES TABLE + ADD BUTTON
   ------------------------------------------------------- */
   container.innerHTML = `
     <section class="card">
-      <h2>Notes</h2>
+
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2>Notes</h2>
+        <button id="contactAddNoteBtn" class="btn-primary">+ Add Note</button>
+      </div>
+
       <table class="notes-table">
         <thead>
           <tr>
@@ -73,7 +78,6 @@ ${
       `
 }
 
-                      <!-- ⭐ NEW: REVIEW NOTE BUTTON -->
                       <button class="btn-primary btn-review-note" data-id="${n.id}" style="margin-top:8px; margin-right:8px;">
                         Review Note
                       </button>
@@ -90,6 +94,14 @@ ${
       </table>
     </section>
   `;
+
+  /* -------------------------------------------------------
+     ADD NOTE BUTTON HANDLER
+  ------------------------------------------------------- */
+  document.getElementById("contactAddNoteBtn")
+    ?.addEventListener("click", () =>
+      showContactAddNoteForm(container, portalState, contactId)
+    );
 
   /* -------------------------------------------------------
      EXPAND / COLLAPSE HANDLERS
@@ -122,34 +134,114 @@ ${
         }
       );
 
-      // Reload notes
       await renderContactNotes(container, portalState, contactId);
     });
   });
 
-/* -------------------------------------------------------
-   ⭐ REVIEW NOTE HANDLER — JUMP TO NOTES → REVIEW
-------------------------------------------------------- */
-container.querySelectorAll(".btn-review-note").forEach(btn => {
-  btn.addEventListener("click", () => {
-    const noteId = btn.dataset.id;
+  /* -------------------------------------------------------
+     REVIEW NOTE HANDLER — JUMP TO NOTES → REVIEW
+  ------------------------------------------------------- */
+  container.querySelectorAll(".btn-review-note").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const noteId = btn.dataset.id;
 
-    // 1️⃣ Set selected note ID
-    portalState.selectedNoteId = noteId;
+      portalState.selectedNoteId = noteId;
 
-    // 2️⃣ Switch to top-level Notes tab
-    const notesTabBtn = document.querySelector('#tabs button[data-tab="3"]');
-    if (notesTabBtn) notesTabBtn.click();
+      const notesTabBtn = document.querySelector('#tabs button[data-tab="3"]');
+      if (notesTabBtn) notesTabBtn.click();
 
-    // 3️⃣ Wait for Notes subtabs to load, then click Review
-    const waitForReviewTab = setInterval(() => {
-      const reviewBtn = document.querySelector('#notes-subtabs button[data-subtab="review"]');
-      if (reviewBtn) {
-        clearInterval(waitForReviewTab);
-        reviewBtn.click();
-      }
-    }, 50);
+      const waitForReviewTab = setInterval(() => {
+        const reviewBtn = document.querySelector('#notes-subtabs button[data-subtab="review"]');
+        if (reviewBtn) {
+          clearInterval(waitForReviewTab);
+          reviewBtn.click();
+        }
+      }, 50);
+    });
   });
-});
+}
 
+/* -------------------------------------------------------
+   ADD NOTE FORM (Contacts → Notes)
+------------------------------------------------------- */
+function showContactAddNoteForm(container, portalState, contactId) {
+  container.innerHTML = `
+    <section class="card">
+      <h3>Add Note for ${portalState.selectedContactName}</h3>
+
+      <label>Date:</label>
+      <input type="date" id="noteDate"
+             value="${new Date().toISOString().split('T')[0]}"
+             style="width:200px;margin-bottom:8px;" />
+
+      <label>Subject:</label>
+      <input type="text" id="noteSubject" style="width:100%;margin-bottom:8px;" />
+
+      <label>Note:</label>
+      <textarea id="noteContent" rows="6" style="width:100%;"></textarea>
+
+      <div style="margin-top:12px;">
+        <button id="saveContactNoteBtn" class="btn-primary">Save Note</button>
+        <button id="cancelContactNoteBtn" class="btn-secondary" style="margin-left:8px;">Cancel</button>
+      </div>
+
+      <div id="contactNoteAddResult" style="margin-top:8px;"></div>
+    </section>
+  `;
+
+  document.getElementById("saveContactNoteBtn")
+    .addEventListener("click", () =>
+      saveContactNote(portalState, contactId, container)
+    );
+
+  document.getElementById("cancelContactNoteBtn")
+    .addEventListener("click", () =>
+      renderContactNotes(container, portalState, contactId)
+    );
+}
+
+/* -------------------------------------------------------
+   SAVE NOTE (same logic as Notes → Add)
+------------------------------------------------------- */
+async function saveContactNote(portalState, contactId, container) {
+  const noteDate = document.getElementById("noteDate").value;
+  const subject = document.getElementById("noteSubject").value.trim();
+  const content = document.getElementById("noteContent").value.trim();
+
+  if (!content) {
+    document.getElementById("contactNoteAddResult").textContent =
+      "Note text is required.";
+    return;
+  }
+
+  try {
+    const res = await fetch("https://add-note-module.dennis-e64.workers.dev", {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "x-internal-call": "internal"
+      },
+      body: JSON.stringify({
+        project: portalState.project,
+        raw_text: content,
+        note_date: noteDate || null,
+        subject: subject || null,
+        contact_id: contactId,
+        contact_name: portalState.selectedContactName,
+        contact_email: portalState.selectedContactEmail
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.success || data.status === "ok") {
+      await renderContactNotes(container, portalState, contactId);
+    } else {
+      document.getElementById("contactNoteAddResult").textContent =
+        `Error: ${data.error || "Unknown error"}`;
+    }
+  } catch (err) {
+    document.getElementById("contactNoteAddResult").textContent =
+      `Error: ${err.message}`;
+  }
 }
