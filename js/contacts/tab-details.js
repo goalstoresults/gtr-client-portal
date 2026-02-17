@@ -41,26 +41,30 @@ export async function renderContactDetails(container, portalState, contactId) {
 
   const headerName = contact.search_name || contact.contact_id;
 
-  /* -------------------------------------------------------
-     HEADER WITH SAVE + DELETE
-  ------------------------------------------------------- */
-  container.innerHTML = `
-    <section class="card">
-      <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-        <h2 style="margin:0;">Contact Details for ${escapeHtml(headerName)}</h2>
+   /* -------------------------------------------------------
+      HEADER WITH SAVE + DELETE
+   ------------------------------------------------------- */
+   container.innerHTML = `
+     <section class="card">
+       <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+         <h2 style="margin:0;">Contact Details for ${escapeHtml(headerName)}</h2>
+   
+         <button id="btnSaveContact" class="btn-primary">Save</button>
+   
+         ${portalState.deleteAllowed
+           ? `<button id="btnDeleteContact" class="btn-danger">Delete</button>`
+           : ``}
+       </div>
+   
+       <form id="editContactForm" class="notes-form"></form>
+   
+       <div class="audit-info" style="margin-top:12px; font-size:0.9em; color:#666;">
+         <p><strong>Created:</strong> ${escapeHtml(contact.created_at || "")}</p>
+         <p><strong>Updated:</strong> ${escapeHtml(contact.updated_at || "—")}</p>
+       </div>
+     </section>
+   `;
 
-        <button id="btnSaveContact" class="btn-primary">Save</button>
-        <button id="btnDeleteContact" class="btn-danger">Delete</button>
-      </div>
-
-      <form id="editContactForm" class="notes-form"></form>
-
-      <div class="audit-info" style="margin-top:12px; font-size:0.9em; color:#666;">
-        <p><strong>Created:</strong> ${escapeHtml(contact.created_at || "")}</p>
-        <p><strong>Updated:</strong> ${escapeHtml(contact.updated_at || "—")}</p>
-      </div>
-    </section>
-  `;
 
   const form = container.querySelector("#editContactForm");
 
