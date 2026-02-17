@@ -41,9 +41,8 @@ async function loadPartial(url, tabContent) {
 // ------------------------------------------------------------
 // Initialize Notes module
 // ------------------------------------------------------------
-function initNotes(portalState) {
-  // Expose for cross-tab navigation (consistent with Contacts)
-  window.portalState = portalState;
+function initNotes() {
+  const portalState = window.portalState;
 
   // Inject context bar above subtabs
   let contextBar = document.getElementById("contact-context-bar");
@@ -67,20 +66,13 @@ function initNotes(portalState) {
   // Wire subtab buttons
   document.querySelectorAll("#notes-subtabs button").forEach(btn => {
     btn.addEventListener("click", () =>
-      loadNotesSubtab(btn.dataset.subtab, portalState)
+      loadNotesSubtab(btn.dataset.subtab)
     );
   });
 
-  // ⭐ ALWAYS default to History.
-  // Contacts → Notes → Review will explicitly activate Review.
-  const defaultBtn = document.querySelector(
-    `#notes-subtabs button[data-subtab="history"]`
-  );
-
-  if (defaultBtn) {
-    defaultBtn.classList.add("active");
-    loadNotesSubtab("history", portalState);
-  }
+  // ⭐ IMPORTANT:
+  // DO NOT auto-load History or Review.
+  // Let Contacts → Review or user clicks decide.
 }
 
 // ------------------------------------------------------------
