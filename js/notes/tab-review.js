@@ -11,6 +11,12 @@ import { renderHistory } from "./tab-history.js";
 export async function renderReview(container, portalState, noteId) {
   console.log("[Review] Called with noteId:", noteId);
 
+  // ⭐ FIX #1 — If noteId wasn't passed but exists in portalState, use it.
+  if (!noteId && portalState.selectedNoteId) {
+    console.log("[Review] Using portalState.selectedNoteId:", portalState.selectedNoteId);
+    noteId = portalState.selectedNoteId;
+  }
+
   if (!noteId) {
     container.innerHTML = `<p>Select a note from History to review.</p>`;
     return;
@@ -33,6 +39,9 @@ export async function renderReview(container, portalState, noteId) {
 
     const note = data.note;
     const relationships = data.relationships || [];
+
+    // ⭐ FIX #2 — Clear selectedNoteId now that the note is successfully loaded
+    portalState.selectedNoteId = null;
 
     // Hydrate clientId
     portalState.clientId = note.client_id || note.contact_id || null;
@@ -260,7 +269,7 @@ ${ /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(note.raw_text)
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              id: portalState.selectedNoteId,
+              id: note.id,
               updates
             })
           }
@@ -461,4 +470,3 @@ async function attachClientToNote(contactId, contactName, contactType, contactEm
     console.error(err);
   }
 }
-
