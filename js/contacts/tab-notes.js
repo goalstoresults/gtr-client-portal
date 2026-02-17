@@ -81,10 +81,11 @@ ${
                       <button class="btn-primary btn-review-note" data-id="${n.id}" style="margin-top:8px; margin-right:8px;">
                         Review Note
                       </button>
-
-                      <button class="btn-danger btn-delete-note" data-id="${n.id}" style="margin-top:8px;">
+                      ${portalState.deleteAllowed
+                       ? `<button class="btn-danger btn-delete-note" data-id="${n.id}" style="margin-top:8px;">
                         Delete Note
-                      </button>
+                      </button>`
+                       : ``}
                     </td>
                   </tr>
                 `).join("")
