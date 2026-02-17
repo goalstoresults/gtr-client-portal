@@ -136,7 +136,9 @@ import { loadFilterTab } from "./js/filter.js";
 const portalState = {
   project: "",
   userEmail: "",
-  staffName: ""
+  staffName: "",
+  allowedTabs: [],        // ⭐ EXISTING
+  deleteAllowed: false    // ⭐ NEW — GLOBAL PERMISSION FLAG
 };
 window.portalState = portalState;
 
@@ -227,7 +229,8 @@ async function attemptLogin() {
     // 4️⃣ SUCCESS — STORE STATE
     portalState.project = project;
     portalState.userEmail = email;
-    portalState.allowedTabs = result.allowed_tabs || [];   // ⭐ NEW
+    portalState.allowedTabs = result.allowed_tabs || [];
+    portalState.deleteAllowed = result.delete_allowed === true;   // ⭐ NEW
 
     const friendly = result.first_name || "";
     welcomeHeader.textContent = `Welcome ${friendly}!`;
@@ -243,8 +246,6 @@ async function attemptLogin() {
     errorBox.textContent = "Server error. Try again.";
   }
 }
-
-
 
 loginBtn.addEventListener("click", attemptLogin);
 
@@ -297,7 +298,6 @@ async function loadPortalConfig(projectName) {
   }
 }
 
-  
 /* ============================================================
    SUPPORT FUNCTIONS
 ============================================================ */
@@ -349,7 +349,6 @@ async function loadTab(tabId) {
     await tab.loader({ portalState, tabContent });
   }
 }
-
 
 /* ============================================================
    INITIALIZE — HANDLE ?project PARAM
