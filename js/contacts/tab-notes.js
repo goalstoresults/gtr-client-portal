@@ -174,6 +174,7 @@ function showContactAddNoteForm(container, portalState, contactId) {
              value="${new Date().toISOString().split('T')[0]}"
              style="width:200px;margin-bottom:8px;" />
 
+      <br/>
       <label>Subject:</label>
       <input type="text" id="noteSubject" style="width:100%;margin-bottom:8px;" />
 
