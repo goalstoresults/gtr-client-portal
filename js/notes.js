@@ -41,10 +41,10 @@ async function loadPartial(url, tabContent) {
 // ------------------------------------------------------------
 // Initialize Notes module
 // ------------------------------------------------------------
-function initNotes() {
-  const portalState = window.portalState;
+function initNotes(portalState) {
+  window.portalState = portalState;
 
-  // Inject context bar above subtabs
+  // Inject context bar
   let contextBar = document.getElementById("contact-context-bar");
   if (!contextBar) {
     contextBar = document.createElement("div");
@@ -59,21 +59,34 @@ function initNotes() {
     ? `Contact: ${portalState.selectedContactName}`
     : "No contact selected";
 
-  // Base message
   const container = document.getElementById("notesContent");
   if (container) container.innerHTML = `<p>Select a subtab to begin.</p>`;
 
   // Wire subtab buttons
   document.querySelectorAll("#notes-subtabs button").forEach(btn => {
     btn.addEventListener("click", () =>
-      loadNotesSubtab(btn.dataset.subtab)
+      loadNotesSubtab(btn.dataset.subtab, portalState)
     );
   });
 
-  // ⭐ IMPORTANT:
-  // DO NOT auto-load History or Review.
-  // Let Contacts → Review or user clicks decide.
+  // ⭐ DELAYED DEFAULT SUBTAB LOGIC
+  // Wait until the subtabs exist before deciding default
+  setTimeout(() => {
+    // If coming from Contacts with a selected note, default to Review.
+    // Otherwise default to History.
+    const defaultSubtab = portalState.selectedNoteId ? "review" : "history";
+
+    const defaultBtn = document.querySelector(
+      `#notes-subtabs button[data-subtab="${defaultSubtab}"]`
+    );
+
+    if (defaultBtn) {
+      defaultBtn.classList.add("active");
+      loadNotesSubtab(defaultSubtab, portalState);
+    }
+  }, 0);
 }
+
 
 // ------------------------------------------------------------
 // Subtab Router
