@@ -127,7 +127,7 @@ ${
       const noteId = btn.dataset.id;
 
        await fetch(
-        `https://notes-module.dennis-e64.workers.dev/notes_history/${noteId}?project=${portalState.project}`,
+        `https://notes-module.dennis-e64.workers.dev/notes_history?id=${noteId}&project=${portalState.project}`,
         {
           method: "DELETE",
           headers: { "Content-Type": "application/json", "x-internal-call": "internal" }
