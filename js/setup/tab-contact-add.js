@@ -4,19 +4,32 @@
 import { escapeHtml } from "../utilities.js";
 
 const CONTACT_FIELD_OPTIONS = [
-  "first_name",
-  "last_name",
-  "contact_name",
-  "business_name",
-  "email",
-  "phone",
-  "website",
-  "title",
-  "source",
-  "contact_type",
-  "search_name",
-  "updated_at",
-  "group_id"
+“contact_id”,
+“first_name”,
+“last_name”,
+“business_name”,
+“phone”,
+“email”,
+“source”,
+“contact_type”,
+“last_activity”,
+“last_appointment”,
+“address_full”,
+“street_address”,
+“city”,
+“postal_code”,
+“state”,
+“loa_sent_date”,
+“loa_signed_date”,
+“onboarding_start_date”,
+“onboarding_completed_date”,
+“title”,
+“additional_emails”,
+“additional_phones”,
+“website”,
+“occupation_type”
+“updated_at”,
+“group_id”
 ];
 
 // Save helper (unchanged logic)
