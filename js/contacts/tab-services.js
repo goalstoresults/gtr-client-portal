@@ -132,7 +132,9 @@ export async function renderContactServicesTab(container, portalState) {
           <td>${escapeHtml(s.notes || "")}</td>
           <td>
             <button class="btn-small" data-edit="${s.id}">Edit</button>
-            <button class="btn-small btn-danger" data-delete="${s.id}">Delete</button>
+            ${portalState.deleteAllowed
+           ? `<button class="btn-small btn-danger" data-delete="${s.id}">Delete</button>`
+           : ``}
           </td>
         </tr>
       `)
