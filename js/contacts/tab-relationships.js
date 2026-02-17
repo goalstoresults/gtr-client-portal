@@ -103,7 +103,9 @@ async function renderContactRelationshipsSource(container, portalState, contactI
                   >
                     Edit
                   </button>
-                  <button class="btn-danger btn-delete" data-id="${r.id}">Delete</button>
+                  ${portalState.deleteAllowed
+                    ? `<button class="btn-danger btn-delete" data-id="${r.id}">Delete</button>`
+                    : ``}
                 </td>
               </tr>
             `).join("")
