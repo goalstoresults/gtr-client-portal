@@ -71,18 +71,15 @@ function initNotes(portalState) {
     );
   });
 
-  // ⭐ CONDITIONAL DEFAULT SUBTAB
-  // If coming from Contacts with a selected note, default to Review.
-  // Otherwise default to History.
-  let defaultSubtab = portalState.selectedNoteId ? "review" : "history";
-
+  // ⭐ ALWAYS default to History.
+  // Contacts → Notes → Review will explicitly activate Review.
   const defaultBtn = document.querySelector(
-    `#notes-subtabs button[data-subtab="${defaultSubtab}"]`
+    `#notes-subtabs button[data-subtab="history"]`
   );
 
   if (defaultBtn) {
     defaultBtn.classList.add("active");
-    loadNotesSubtab(defaultSubtab, portalState);
+    loadNotesSubtab("history", portalState);
   }
 }
 
@@ -112,8 +109,13 @@ async function loadNotesSubtab(subtab, portalState) {
   // Route to tab modules
   if (subtab === "history") return renderHistory(container, portalState);
   if (subtab === "add") return renderAdd(container, portalState);
-  if (subtab === "review")
+
+  if (subtab === "review") {
+    // ⭐ Pass whatever is in portalState.selectedNoteId.
+    // renderReview() now handles fallback logic internally.
     return renderReview(container, portalState, portalState.selectedNoteId);
+  }
+
   if (subtab === "relationships")
     return renderRelationships(container, portalState);
 
