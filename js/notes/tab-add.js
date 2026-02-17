@@ -22,6 +22,9 @@ export function renderAdd(container, portalState) {
       Enter a first or last name and click Find.
     </div>
 
+    <label>Subject:</label>
+    <input type="text" id="noteSubject" style="width:100%;margin-bottom:8px;" />
+
     <textarea id="noteContent" placeholder="Enter note text..." style="width:100%;min-height:100px;"></textarea>
 
     <div style="margin-top:8px;">
@@ -36,9 +39,7 @@ export function renderAdd(container, portalState) {
   portalState.clientName = null;
   portalState.clientEmail = null;
 
-  // --------------------------
-  // FIND CLIENT
-  // --------------------------
+  // FIND CLIENT (unchanged)
   document.getElementById("btnAddFindClient").addEventListener("click", async () => {
     const first = document.getElementById("add-first").value.trim();
     const last = document.getElementById("add-last").value.trim();
@@ -77,7 +78,6 @@ export function renderAdd(container, portalState) {
         return;
       }
 
-      // Render results
       resultsDiv.innerHTML = contacts
         .map(
           c => `
@@ -93,7 +93,6 @@ export function renderAdd(container, portalState) {
         )
         .join("");
 
-      // Wire click handlers
       resultsDiv.querySelectorAll(".contact-result").forEach(el => {
         el.addEventListener("click", () => {
           portalState.clientId = el.dataset.id;
@@ -112,12 +111,11 @@ export function renderAdd(container, portalState) {
     }
   });
 
-  // --------------------------
-  // SAVE NOTE
-  // --------------------------
+  // SAVE NOTE (now includes subject)
   document.getElementById("btnSaveNote").addEventListener("click", async () => {
     const content = document.getElementById("noteContent").value.trim();
     const noteDate = document.getElementById("noteDate").value;
+    const subject = document.getElementById("noteSubject").value.trim();
 
     if (!content) return;
 
@@ -132,6 +130,7 @@ export function renderAdd(container, portalState) {
           project: portalState.project,
           raw_text: content,
           note_date: noteDate || null,
+          subject: subject || null,
           contact_id: portalState.clientId || null,
           contact_name: portalState.clientName || null,
           contact_email: portalState.clientEmail || null
