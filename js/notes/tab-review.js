@@ -315,34 +315,38 @@ ${ /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(note.raw_text)
       });
     }
 
-    // ------------------------------------------------------------
-    // DELETE NOTE
-    // ------------------------------------------------------------
-    document.getElementById("btnDeleteNote").addEventListener("click", async () => {
-      if (!confirm("Are you sure you want to delete this note and all its relationships?")) return;
+// ------------------------------------------------------------
+// DELETE NOTE (safe for junior staff)
+// ------------------------------------------------------------
+const deleteBtn = document.getElementById("btnDeleteNote");
+if (deleteBtn) {
+  deleteBtn.addEventListener("click", async () => {
+    if (!confirm("Are you sure you want to delete this note and all its relationships?")) return;
 
-      try {
-        const relUrl = `https://notes-history-module.dennis-e64.workers.dev/note_relationships?project=${portalState.project}&note_id=${noteId}`;
-        await fetch(relUrl, { method: "DELETE" });
+    try {
+      const relUrl = `https://notes-history-module.dennis-e64.workers.dev/note_relationships?project=${portalState.project}&note_id=${noteId}`;
+      await fetch(relUrl, { method: "DELETE" });
 
-        const noteUrl = `https://notes-history-module.dennis-e64.workers.dev/note_history?id=${noteId}&project=${portalState.project}`;
-        await fetch(noteUrl, { method: "DELETE" });
+      const noteUrl = `https://notes-history-module.dennis-e64.workers.dev/note_history?id=${noteId}&project=${portalState.project}`;
+      await fetch(noteUrl, { method: "DELETE" });
 
-        alert("✅ Note and relationships deleted.");
+      alert("✅ Note and relationships deleted.");
 
-        await renderHistory(container, portalState);
+      await renderHistory(container, portalState);
 
-        document.querySelectorAll("#notes-subtabs button").forEach(b =>
-          b.classList.remove("active")
-        );
-        document
-          .querySelector('#notes-subtabs button[data-subtab="history"]')
-          ?.classList.add("active");
-      } catch (err) {
-        alert("Error deleting note: " + err.message);
-        console.error(err);
-      }
-    });
+      document.querySelectorAll("#notes-subtabs button").forEach(b =>
+        b.classList.remove("active")
+      );
+      document
+        .querySelector('#notes-subtabs button[data-subtab="history"]')
+        ?.classList.add("active");
+    } catch (err) {
+      alert("Error deleting note: " + err.message);
+      console.error(err);
+    }
+  });
+}
+
 
     // ------------------------------------------------------------
     // FIND CLIENT
