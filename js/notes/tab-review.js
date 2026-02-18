@@ -40,8 +40,9 @@ export async function renderReview(container, portalState, noteId) {
     const note = data.note;
     const relationships = data.relationships || [];
 
-    // ⭐ FIX #2 — Clear selectedNoteId now that the note is successfully loaded
-    portalState.selectedNoteId = null;
+    // Always keep the current note ID available for attach/delete/etc.
+    portalState.selectedNoteId = note.id;
+
 
     // Hydrate clientId
     portalState.clientId = note.client_id || note.contact_id || null;
