@@ -4,7 +4,6 @@
 import { escapeHtml } from "../utilities.js";
 
 const CONTACT_FIELD_OPTIONS = [
-  "contact_id",
   "first_name",
   "last_name",
   "business_name",
