@@ -13,7 +13,6 @@ const CONTACT_FIELD_OPTIONS = [
   "contact_type",
   "last_activity",
   "last_appointment",
-  "address_full",
   "street_address",
   "city",
   "postal_code",
