@@ -156,41 +156,45 @@ export async function renderContactList(container, portalState) {
     /* -------------------------------------------------------
        APPLY FILTER (NEW LOGIC)
     ------------------------------------------------------- */
-    async function applyFilter() {
-      const mode = document.querySelector("input[name='searchMode']:checked").value;
-      const term = searchInput.value.trim();
-      const type = typeSelect.value;
+   async function applyFilter() {
+  const mode = document.querySelector("input[name='searchMode']:checked").value;
+  const term = searchInput.value.trim();
+  const type = typeSelect.value;
 
-      const params = new URLSearchParams({ project: portalState.project });
+  const params = new URLSearchParams({ project: portalState.project });
 
-      // "ALL" or blank → return everything
-      if (term.toLowerCase() === "all" || term === "") {
-        if (type.length >= 1) params.set("contact_type", type);
-        await fetchAll(params);
-        contacts.sort((a, b) => a.search_name.localeCompare(b.search_name));
-        renderSortedTable();
-        return;
-      }
+  // If blank or "all" → return full list (optionally filtered by type)
+  if (term.toLowerCase() === "all" || term === "") {
+    if (type.length >= 1) params.set("contact_type", type);
+    await fetchAll(params);
+    contacts.sort((a, b) => a.search_name.localeCompare(b.search_name));
+    renderSortedTable();
+    return;
+  }
 
-      // Option B logic
-      if (mode === "all") {
-        params.set("first", term);
-        params.set("last", term);
-        params.set("business", term);
-      } else if (mode === "people") {
-        params.set("first", term);
-        params.set("last", term);
-      } else if (mode === "business") {
-        params.set("business", term);
-      }
+  // ALWAYS search email — universal identifier
+  params.set("email", term);
 
-      if (type.length >= 1) params.set("contact_type", type);
+  // Mode-specific name/business fields
+  if (mode === "all") {
+    params.set("first", term);
+    params.set("last", term);
+    params.set("business", term);
+  } else if (mode === "people") {
+    params.set("first", term);
+    params.set("last", term);
+  } else if (mode === "business") {
+    params.set("business", term);
+  }
 
-      await fetchAll(params);
+  // Optional contact type
+  if (type.length >= 1) params.set("contact_type", type);
 
-      contacts.sort((a, b) => a.search_name.localeCompare(b.search_name));
-      renderSortedTable();
-    }
+  await fetchAll(params);
+
+  contacts.sort((a, b) => a.search_name.localeCompare(b.search_name));
+  renderSortedTable();
+}
 
     /* -------------------------------------------------------
        RENDER SORTED TABLE
