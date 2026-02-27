@@ -351,7 +351,7 @@ export async function renderReview(container, portalState, noteId) {
 
       const url = `
         https://client-portal-api.dennis-e64.workers.dev/api/contacts?
-        project=eq.${portalState.project}&
+        project=${portalState.project}&
         or=(
           first_name.ilike.${encoded},
           last_name.ilike.${encoded},
