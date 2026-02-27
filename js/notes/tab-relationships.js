@@ -315,7 +315,7 @@ export async function renderRelationships(container, portalState) {
 
           const searchUrl = `
 https://client-portal-api.dennis-e64.workers.dev/api/contacts?
-project=eq.${project}&
+project=${project}&
 or=(
   first_name.ilike.${encoded},
   last_name.ilike.${encoded},
