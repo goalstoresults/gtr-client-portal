@@ -1,4 +1,5 @@
 // /notes/tab-review.js
+
 // Handles: Note review, metadata editing, client assignment, deletion, relationships navigation
 
 import { escapeHtml, formatDateTime, getEasternDateOnly } from "../utilities.js";
@@ -43,7 +44,6 @@ export async function renderReview(container, portalState, noteId) {
     // Always keep the current note ID available for attach/delete/etc.
     portalState.selectedNoteId = note.id;
 
-
     // Hydrate clientId
     portalState.clientId = note.client_id || note.contact_id || null;
 
@@ -59,167 +59,148 @@ export async function renderReview(container, portalState, noteId) {
     // UI RENDER
     // ------------------------------------------------------------
     container.innerHTML = `
-      <section class="card">
+<section class="card">
 
-        <div class="row" style="gap:12px; margin-bottom:12px;">
-          <h2 style="margin:0;">Notes Review: ${escapeHtml(note.subject || "(no subject)")}</h2>
-          <button id="btnSetClient" class="btn-secondary btn-edit">Set Contact</button>
+  <div class="row" style="gap:12px; margin-bottom:12px;">
+    <h2 style="margin:0;">Notes Review: ${escapeHtml(note.subject || "(no subject)")}</h2>
+    <button id="btnSetClient" class="btn-secondary btn-edit">Set Contact</button>
+    ${portalState.deleteAllowed ? `<button id="btnDeleteNote" class="btn-danger btn-delete">Delete</button>` : ``}
+  </div>
 
-          ${portalState.deleteAllowed
-            ? `<button id="btnDeleteNote" class="btn-danger btn-delete">Delete</button>`
-            : ``}
-        </div>
+  <!-- ⭐ UPDATED: Unified Search Box -->
+  <section id="setClientForm" class="card" style="display:none; margin-bottom:16px;">
+    <h3>Attach Contact to Note</h3>
 
-        <section id="setClientForm" class="card" style="display:none; margin-bottom:16px;">
-          <h3>Attach Contact to Note</h3>
-          <div class="row" style="gap:12px; margin-bottom:12px;">
-            <input id="filter-first" placeholder="First name" />
-            <input id="filter-last" placeholder="Last name" />
-            <button id="btnFindClient" class="btn-primary">Find</button>
-          </div>
-          <div id="clientSearchResults" class="muted">Enter criteria and click Find.</div>
-        </section>
+    <div class="row" style="gap:12px; margin-bottom:12px;">
+      <input id="filter-any" placeholder="Search name, business, or email" style="flex:1;" />
+      <button id="btnFindClient" class="btn-primary">Find</button>
+    </div>
 
-        <p><strong>Subject:</strong> ${escapeHtml(note.subject || "(no subject)")}</p>
+    <div id="clientSearchResults" class="muted">Enter criteria and click Find.</div>
+  </section>
 
-        <!-- ⭐ NEW: EDIT SUBJECT FIELD -->
-        <div class="row" style="gap:12px; align-items:center; margin-bottom:8px;">
-          <label>Edit Subject:</label>
-          <input 
-            type="text" 
-            id="editSubject" 
-            style="flex:1;" 
-            value="${escapeHtml(note.subject || "")}" 
-          />
-        </div>
+  <p><strong>Subject:</strong> ${escapeHtml(note.subject || "(no subject)")}</p>
 
-        <p><strong>From:</strong> ${escapeHtml(note.from_name || "(unknown)")} (${escapeHtml(note.from_email || "no email")})</p>
+  <!-- ⭐ NEW: EDIT SUBJECT FIELD -->
+  <div class="row" style="gap:12px; align-items:center; margin-bottom:8px;">
+    <label>Edit Subject:</label>
+    <input type="text" id="editSubject" style="flex:1;" value="${escapeHtml(note.subject || "")}" />
+  </div>
 
-        <p><strong>Created:</strong> ${
-          note.created_at ? formatDateTime(note.created_at) : "(unknown)"
-        }</p>
+  <p><strong>From:</strong> ${escapeHtml(note.from_name || "(unknown)")} (${escapeHtml(note.from_email || "no email")})</p>
+  <p><strong>Created:</strong> ${note.created_at ? formatDateTime(note.created_at) : "(unknown)"}</p>
+  <p><strong>Note Date:</strong> ${note.note_date ? formatDateTime(note.note_date) : "(unknown)"}</p>
 
-        <p><strong>Note Date:</strong> ${
-          note.note_date ? formatDateTime(note.note_date) : "(unknown)"
-        }</p>
+  <div class="row" style="gap:12px; align-items:center; margin-bottom:8px;">
+    <label>Edit Note Date:</label>
+    <input type="date" id="editNoteDate" style="min-width:180px;" />
+  </div>
 
-        <div class="row" style="gap:12px; align-items:center; margin-bottom:8px;">
-          <label>Edit Note Date:</label>
-          <input type="date" id="editNoteDate" style="min-width:180px;" />
-        </div>
+  <p><strong>Contact:</strong> ${escapeHtml(note.contact_name || "(unknown)")} (${escapeHtml(note.contact_email || "")})</p>
 
-        <p><strong>Contact:</strong> ${escapeHtml(note.contact_name || "(unknown)")} (${escapeHtml(note.contact_email || "")})</p>
+  <div class="row" style="gap:12px; margin-top:12px; align-items:center;">
+    <label>Review Status:
+      <select id="noteStatus" class="form-control" style="min-width:160px;">
+        <option value="pending">Pending</option>
+        <option value="important">Important</option>
+        <option value="not_important">Not Important</option>
+      </select>
+    </label>
 
-        <div class="row" style="gap:12px; margin-top:12px; align-items:center;">
-          <label>Review Status:
-            <select id="noteStatus" class="form-control" style="min-width:160px;">
-              <option value="pending">Pending</option>
-              <option value="important">Important</option>
-              <option value="not_important">Not Important</option>
-            </select>
-          </label>
+    <label>
+      <input type="checkbox" id="noteNeedsReview" />
+      Needs Review
+    </label>
 
-          <label>
-            <input type="checkbox" id="noteNeedsReview" />
-            Needs Review
-          </label>
+    <button id="btnSaveNoteMeta" class="btn-primary">Save</button>
+  </div>
 
-          <button id="btnSaveNoteMeta" class="btn-primary">Save</button>
-        </div>
+  <p style="margin-top:16px;"><strong>Summary:</strong></p>
+  <p>${note.summary ? escapeHtml(note.summary) : "(no summary available)"}</p>
 
-        <p style="margin-top:16px;"><strong>Summary:</strong></p>
-        <p>${note.summary ? escapeHtml(note.summary) : "(no summary available)"}</p>
+  <details style="margin-top:20px;">
+    <summary><strong>AI‑Detected Follow‑Ups</strong></summary>
+    ${
+      Array.isArray(note.followups_raw) && note.followups_raw.length > 0
+        ? `
+      <ul style="margin-top:12px; padding-left:20px;">
+        ${note.followups_raw
+          .map(
+            f => `
+          <li style="margin-bottom:8px;">
+            <strong>${escapeHtml(f.text || "")}</strong><br/>
+            <span class="muted" style="font-size:0.9em;">
+              Source: ${escapeHtml(f.source_text || "")}
+            </span>
+          </li>
+        `
+          )
+          .join("")}
+      </ul>
+    `
+        : `<p class="muted" style="margin-top:12px;">(none detected)</p>`
+    }
+  </details>
 
-        <details style="margin-top:20px;">
-          <summary><strong>AI‑Detected Follow‑Ups</strong></summary>
-          ${
-            Array.isArray(note.followups_raw) && note.followups_raw.length > 0
-              ? `
-                <ul style="margin-top:12px; padding-left:20px;">
-                  ${note.followups_raw
-                    .map(
-                      f => `
-                      <li style="margin-bottom:8px;">
-                        <strong>${escapeHtml(f.text || "")}</strong><br/>
-                        <span class="muted" style="font-size:0.9em;">
-                          Source: ${escapeHtml(f.source_text || "")}
-                        </span>
-                      </li>
-                    `
-                    )
-                    .join("")}
-                </ul>
-              `
-              : `<p class="muted" style="margin-top:12px;">(none detected)</p>`
-          }
-        </details>
+  ${
+    note.raw_text
+      ? `
+    <details style="margin-top:12px;">
+      <summary>Raw Text (click to expand)</summary>
+      ${
+        /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(note.raw_text)
+          ? `<div class="html-note-block">${note.raw_text}</div>`
+          : `<div class="raw-text-block">${note.raw_text}</div>`
+      }
+    </details>
+  `
+      : ""
+  }
 
-        ${
-          note.raw_text
-            ? `
-              <details style="margin-top:12px;">
-                <summary>Raw Text (click to expand)</summary>
-${ /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(note.raw_text)
-    ? `
-        <div class="html-note-block">
-          ${note.raw_text}
-        </div>
-      `
-    : `
-        <div class="raw-text-block">
-          ${note.raw_text}
-        </div>
-      `
-}
+  ${
+    Array.isArray(relationships) && relationships.length > 0
+      ? `
+    <div class="row" style="gap:12px; margin-top:20px;">
+      <h3 style="margin:0;">Relationships Detected in Note</h3>
+      ${
+        note.contact_id
+          ? `<button id="btnRelationships" class="btn-primary">Notes Relationships</button>`
+          : `<span class="muted">(need to set client to continue)</span>`
+      }
+    </div>
 
-              </details>
-            `
-            : ""
-        }
+    <table class="notes-table" style="margin-top:12px;">
+      <thead>
+        <tr>
+          <th>Raw Name</th>
+          <th>AI First</th>
+          <th>AI Last</th>
+          <th>Role/Type</th>
+          <th>Context</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${relationships
+          .map(
+            r => `
+          <tr>
+            <td>${escapeHtml(r.raw_name || "")}</td>
+            <td>${escapeHtml(r.first_name_ai || "")}</td>
+            <td>${escapeHtml(r.last_name_ai || "")}</td>
+            <td>${escapeHtml(r.role_label_ai || "")}</td>
+            <td>${escapeHtml(r.context_description_ai || "")}</td>
+          </tr>
+        `
+          )
+          .join("")}
+      </tbody>
+    </table>
+  `
+      : ""
+  }
 
-        ${
-          Array.isArray(relationships) && relationships.length > 0
-            ? `
-              <div class="row" style="gap:12px; margin-top:20px;">
-                <h3 style="margin:0;">Relationships Detected in Note</h3>
-                ${
-                  note.contact_id
-                    ? `<button id="btnRelationships" class="btn-primary">Notes Relationships</button>`
-                    : `<span class="muted">(need to set client to continue)</span>`
-                }
-              </div>
-
-              <table class="notes-table" style="margin-top:12px;">
-                <thead>
-                  <tr>
-                    <th>Raw Name</th>
-                    <th>AI First</th>
-                    <th>AI Last</th>
-                    <th>Role/Type</th>
-                    <th>Context</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${relationships
-                    .map(
-                      r => `
-                        <tr>
-                          <td>${escapeHtml(r.raw_name || "")}</td>
-                          <td>${escapeHtml(r.first_name_ai || "")}</td>
-                          <td>${escapeHtml(r.last_name_ai || "")}</td>
-                          <td>${escapeHtml(r.role_label_ai || "")}</td>
-                          <td>${escapeHtml(r.context_description_ai || "")}</td>
-                        </tr>
-                      `
-                    )
-                    .join("")}
-                </tbody>
-              </table>
-            `
-            : ""
-        }
-      </section>
-    `;
+</section>
+`;
 
     // ------------------------------------------------------------
     // PREFILL FIELDS
@@ -253,7 +234,6 @@ ${ /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(note.raw_text)
       if (newDateOnly && note.note_date) {
         const old = new Date(note.note_date);
         const [year, month, day] = newDateOnly.split("-");
-
         const merged = new Date(
           Number(year),
           Number(month) - 1,
@@ -262,7 +242,6 @@ ${ /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(note.raw_text)
           old.getMinutes(),
           old.getSeconds()
         );
-
         updates.note_date = merged.toISOString();
       }
 
@@ -306,13 +285,13 @@ ${ /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(note.raw_text)
     const relBtn = document.getElementById("btnRelationships");
     if (relBtn) {
       relBtn.addEventListener("click", () => {
-
         // ⭐ FIX: Ensure Relationships tab knows which note to load
         portalState.selectedNoteId = note.id;
 
         document.querySelectorAll("#notes-subtabs button").forEach(b =>
           b.classList.remove("active")
         );
+
         document
           .querySelector('#notes-subtabs button[data-subtab="relationships"]')
           ?.classList.add("active");
@@ -343,6 +322,7 @@ ${ /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(note.raw_text)
           document.querySelectorAll("#notes-subtabs button").forEach(b =>
             b.classList.remove("active")
           );
+
           document
             .querySelector('#notes-subtabs button[data-subtab="history"]')
             ?.classList.add("active");
@@ -354,28 +334,33 @@ ${ /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(note.raw_text)
     }
 
     // ------------------------------------------------------------
-    // FIND CLIENT
+    // ⭐⭐ FIND CLIENT — UNIFIED SEARCH BOX ⭐⭐
     // ------------------------------------------------------------
     document.getElementById("btnFindClient").addEventListener("click", async () => {
-      const first = document.getElementById("filter-first").value.trim();
-      const last = document.getElementById("filter-last").value.trim();
+      const term = document.getElementById("filter-any").value.trim();
       const resultsDiv = document.getElementById("clientSearchResults");
 
-      resultsDiv.innerHTML = "Searching...";
-
-      if (!first && !last) {
-        resultsDiv.textContent = "❌ Enter at least a first or last name.";
+      if (!term) {
+        resultsDiv.textContent = "Enter something to search.";
         return;
       }
 
-      const filters = [`project.eq.${portalState.project}`];
-      if (first) filters.push(`first_name.ilike.${first}*`);
-      if (last) filters.push(`last_name.ilike.${last}*`);
+      resultsDiv.textContent = "Searching...";
 
-      const query =
-        filters.length > 1 ? `and=(${filters.join(",")})` : filters[0];
+      const encoded = encodeURIComponent(`*${term}*`);
 
-      const url = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${query}&select=contact_id,first_name,last_name,email,contact_type`;
+      const url = `
+        https://client-portal-api.dennis-e64.workers.dev/api/contacts?
+        project=eq.${portalState.project}&
+        or=(
+          first_name.ilike.${encoded},
+          last_name.ilike.${encoded},
+          business_name.ilike.${encoded},
+          search_name.ilike.${encoded},
+          email.ilike.${encoded}
+        )
+        &select=contact_id,first_name,last_name,email,contact_type
+      `.replace(/\s+/g, "");
 
       try {
         const res = await fetch(url);
@@ -395,16 +380,16 @@ ${ /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(note.raw_text)
         resultsDiv.innerHTML = contacts
           .map(
             c => `
-              <div class="contact-result"
-                   data-id="${c.contact_id}"
-                   data-name="${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}"
-                   data-type="${escapeHtml(c.contact_type || "")}"
-                   data-email="${escapeHtml(c.email || "")}">
-                <strong>${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}</strong>
-                (${escapeHtml(c.contact_type || "No type")})<br/>
-                <small>${escapeHtml(c.email || "No email")}</small>
-              </div>
-            `
+          <div class="contact-result"
+            data-id="${c.contact_id}"
+            data-name="${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}"
+            data-type="${escapeHtml(c.contact_type || "")}"
+            data-email="${escapeHtml(c.email || "")}">
+            <strong>${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}</strong>
+            (${escapeHtml(c.contact_type || "No type")})<br/>
+            <small>${escapeHtml(c.email || "No email")}</small>
+          </div>
+        `
           )
           .join("");
 
@@ -429,6 +414,7 @@ ${ /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(note.raw_text)
         console.error(err);
       }
     });
+
   } catch (err) {
     container.innerHTML = `<p>Error loading note review: ${escapeHtml(err.message)}</p>`;
     console.error(err);
