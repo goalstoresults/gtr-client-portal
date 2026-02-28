@@ -1,16 +1,19 @@
 // /js/setup/tab-contact-diagnostics.js
 
-export default async function renderContactDiagnostics(container, project) {
-  container.innerHTML = `
-    <div class="setup-section">
+// IMPORTANT: Named export — this is what setup.js expects
+export async function renderContactDiagnostics(setupContent, portalState) {
+  const project = portalState.project;
+
+  setupContent.innerHTML = `
+    <section class="card">
       <h2>Contact Diagnostics</h2>
 
-      <div class="setup-actions">
+      <div style="margin-bottom: 15px;">
         <button id="cd-refresh" class="btn btn-primary">Refresh</button>
         <button id="cd-bulk-sync" class="btn btn-success">Bulk Sync</button>
       </div>
 
-      <table class="setup-table" id="cd-table">
+      <table class="table">
         <thead>
           <tr>
             <th><input type="checkbox" id="cd-select-all"></th>
@@ -25,7 +28,7 @@ export default async function renderContactDiagnostics(container, project) {
           <tr><td colspan="6">Loading...</td></tr>
         </tbody>
       </table>
-    </div>
+    </section>
   `;
 
   loadContacts(project);
@@ -56,7 +59,7 @@ async function loadContacts(project) {
           <td>${c.first_name || ""} ${c.last_name || ""}</td>
           <td>${c.email || ""}</td>
           <td>${c.phone || ""}</td>
-          <td>${c.crm_id || "<span class='missing'>None</span>"}</td>
+          <td>${c.crm_id || "<span style='color:red;font-weight:bold;'>None</span>"}</td>
           <td>
             <button class="btn btn-secondary" onclick="cdPreview('${c.id}', '${project}')">Preview</button>
             <button class="btn btn-success" onclick="cdSync('${c.id}', '${project}')">Sync</button>
