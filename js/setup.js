@@ -1,11 +1,12 @@
 // js/setup.js
-// v3.0 — Modular Setup Loader (Client, Contact Add, Contact List, Lookups, Staff)
+// v3.1 — Modular Setup Loader (Client, Contact Add, Contact List, Lookups, Staff, Contact Diagnostics)
 
 import { renderClientSetup } from "./setup/tab-client.js";
 import { renderContactAddSetup } from "./setup/tab-contact-add.js";
 import { renderContactListSetup } from "./setup/tab-contact-list.js";
 import { renderLookupsSetup } from "./setup/tab-lookups.js";
 import { renderStaffSetup } from "./setup/tab-staff.js";
+import { renderContactDiagnostics } from "./setup/tab-contact-diagnostics.js";   // ✅ NEW
 
 export async function loadSetupTab({ portalState, tabContent }) {
   // Load base HTML template
@@ -60,6 +61,10 @@ export async function loadSetupTab({ portalState, tabContent }) {
           await renderStaffSetup(setupContent, portalState);
           break;
 
+        case "contact-diagnostics":                                // ✅ NEW
+          await renderContactDiagnostics(setupContent, portalState);
+          break;
+
         default:
           setupContent.innerHTML = `
             <section class="card">
@@ -77,4 +82,3 @@ export async function loadSetupTab({ portalState, tabContent }) {
     await renderClientSetup(setupContent, portalState);
   }
 }
-
