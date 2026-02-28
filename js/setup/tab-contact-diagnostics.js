@@ -9,9 +9,18 @@ export async function renderContactDiagnostics(setupContent, portalState) {
     <section class="card">
       <h2>Contact Diagnostics</h2>
 
-      <div style="margin-bottom: 15px; display:flex; gap:10px;">
+      <div style="margin-bottom: 15px; display:flex; gap:10px; align-items:center;">
         <button id="cd-refresh" class="btn btn-primary">Refresh</button>
         <button id="cd-bulk-sync" class="btn btn-success">Bulk Sync</button>
+
+        <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+          <label style="font-weight:bold;">Filter:</label>
+          <select id="cd-filter" class="form-select" style="width:220px;">
+            <option value="all">All Contacts</option>
+            <option value="missing_crm">CRM ID Missing</option>
+            <option value="has_crm">Has CRM ID</option>
+          </select>
+        </div>
       </div>
 
       <table class="notes-table" style="width:100%;">
@@ -39,7 +48,10 @@ export async function renderContactDiagnostics(setupContent, portalState) {
   document.getElementById("cd-refresh").onclick = () => loadContacts(project);
   document.getElementById("cd-select-all").onclick = toggleSelectAll;
   document.getElementById("cd-bulk-sync").onclick = () => bulkSync(project);
+  document.getElementById("cd-filter").onchange = () => applyFilter();
 }
+
+let CD_CACHE = []; // store full dataset for filtering
 
 async function loadContacts(project) {
   const tbody = document.getElementById("cd-body");
@@ -50,22 +62,48 @@ async function loadContacts(project) {
     const data = await res.json();
 
     if (!data.contacts || data.contacts.length === 0) {
+      CD_CACHE = [];
       tbody.innerHTML = `<tr><td colspan="6">No contacts found.</td></tr>`;
       return;
     }
 
-    tbody.innerHTML = data.contacts
-      .map((c) => {
-        const name =
-          c.search_name ||
-          `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
-          "(no name)";
+    CD_CACHE = data.contacts;
+    applyFilter(); // render with filter applied
 
-        const crmDisplay = c.crm_id
-          ? c.crm_id
-          : `<span style="color:red; font-weight:bold;">None</span>`;
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6">Error loading contacts.</td></tr>`;
+  }
+}
 
-        return `
+function applyFilter() {
+  const filter = document.getElementById("cd-filter").value;
+  const tbody = document.getElementById("cd-body");
+
+  let rows = CD_CACHE;
+
+  if (filter === "missing_crm") {
+    rows = rows.filter(c => !c.crm_id);
+  } else if (filter === "has_crm") {
+    rows = rows.filter(c => c.crm_id);
+  }
+
+  if (rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6">No matching contacts.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows
+    .map((c) => {
+      const name =
+        c.search_name ||
+        `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
+        "(no name)";
+
+      const crmDisplay = c.crm_id
+        ? c.crm_id
+        : `<span style="color:red; font-weight:bold;">None</span>`;
+
+      return `
         <tr data-id="${c.contact_id}">
           <td style="text-align:center;">
             <input type="checkbox" class="cd-row">
@@ -77,16 +115,13 @@ async function loadContacts(project) {
           <td>${crmDisplay}</td>
 
           <td style="text-align:center;">
-            <button class="btn btn-secondary" onclick="cdPreview('${c.contact_id}', '${project}')">Preview</button>
-            <button class="btn btn-success" onclick="cdSync('${c.contact_id}', '${project}')">Sync</button>
+            <button class="btn btn-secondary" onclick="cdPreview('${c.contact_id}', '${c.project}')">Preview</button>
+            <button class="btn btn-success" onclick="cdSync('${c.contact_id}', '${c.project}')">Sync</button>
           </td>
         </tr>
       `;
-      })
-      .join("");
-  } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6">Error loading contacts.</td></tr>`;
-  }
+    })
+    .join("");
 }
 
 window.cdPreview = async function (contactId, project) {
@@ -139,4 +174,3 @@ async function bulkSync(project) {
 
   loadContacts(project);
 }
-
