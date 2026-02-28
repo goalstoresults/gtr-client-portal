@@ -1,6 +1,6 @@
 // /js/setup/tab-contact-diagnostics.js
 
-const CD_BASE_URL = "https://lookups-module.dennis-e64.workers.dev";
+const CD_BASE_URL = "https://contact-diagnostics.dennis-e64.workers.dev";
 
 export async function renderContactDiagnostics(setupContent, portalState) {
   const project = portalState.project;
