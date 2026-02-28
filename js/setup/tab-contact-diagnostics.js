@@ -9,20 +9,22 @@ export async function renderContactDiagnostics(setupContent, portalState) {
     <section class="card">
       <h2>Contact Diagnostics</h2>
 
-      <div style="margin-bottom: 15px;">
+      <div style="margin-bottom: 15px; display:flex; gap:10px;">
         <button id="cd-refresh" class="btn btn-primary">Refresh</button>
         <button id="cd-bulk-sync" class="btn btn-success">Bulk Sync</button>
       </div>
 
-      <table class="table">
+      <table class="notes-table" style="width:100%;">
         <thead>
           <tr>
-            <th><input type="checkbox" id="cd-select-all"></th>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Phone</th>
-            <th>CRM ID</th>
-            <th>Actions</th>
+            <th style="width:40px; text-align:center;">
+              <input type="checkbox" id="cd-select-all">
+            </th>
+            <th style="width:220px;">Name</th>
+            <th style="width:240px;">Email</th>
+            <th style="width:160px;">Phone</th>
+            <th style="width:160px;">CRM ID</th>
+            <th style="width:180px; text-align:center;">Actions</th>
           </tr>
         </thead>
         <tbody id="cd-body">
@@ -53,21 +55,34 @@ async function loadContacts(project) {
     }
 
     tbody.innerHTML = data.contacts
-      .map(
-        (c) => `
-        <tr data-id="${c.id}">
-          <td><input type="checkbox" class="cd-row"></td>
-          <td>${c.first_name || ""} ${c.last_name || ""}</td>
+      .map((c) => {
+        const name =
+          c.search_name ||
+          `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
+          "(no name)";
+
+        const crmDisplay = c.crm_id
+          ? c.crm_id
+          : `<span style="color:red; font-weight:bold;">None</span>`;
+
+        return `
+        <tr data-id="${c.contact_id}">
+          <td style="text-align:center;">
+            <input type="checkbox" class="cd-row">
+          </td>
+
+          <td>${name}</td>
           <td>${c.email || ""}</td>
           <td>${c.phone || ""}</td>
-          <td>${c.crm_id || "<span style='color:red;font-weight:bold;'>None</span>"}</td>
-          <td>
-            <button class="btn btn-secondary" onclick="cdPreview('${c.id}', '${project}')">Preview</button>
-            <button class="btn btn-success" onclick="cdSync('${c.id}', '${project}')">Sync</button>
+          <td>${crmDisplay}</td>
+
+          <td style="text-align:center;">
+            <button class="btn btn-secondary" onclick="cdPreview('${c.contact_id}', '${project}')">Preview</button>
+            <button class="btn btn-success" onclick="cdSync('${c.contact_id}', '${project}')">Sync</button>
           </td>
         </tr>
-      `
-      )
+      `;
+      })
       .join("");
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="6">Error loading contacts.</td></tr>`;
@@ -80,8 +95,8 @@ window.cdPreview = async function (contactId, project) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ project, contact_id: contactId }),
   });
-  const data = await res.json();
 
+  const data = await res.json();
   alert(JSON.stringify(data.payload, null, 2));
 };
 
@@ -91,9 +106,10 @@ window.cdSync = async function (contactId, project) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ project, contact_id: contactId }),
   });
-  const data = await res.json();
 
+  const data = await res.json();
   alert("Sync complete:\n" + JSON.stringify(data, null, 2));
+
   loadContacts(project);
 };
 
@@ -123,3 +139,4 @@ async function bulkSync(project) {
 
   loadContacts(project);
 }
+
