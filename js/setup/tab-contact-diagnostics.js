@@ -1,6 +1,7 @@
 // /js/setup/tab-contact-diagnostics.js
 
-// IMPORTANT: Named export — this is what setup.js expects
+const CD_BASE_URL = "https://contacts-diagnostics.dennis-e64.workers.dev";
+
 export async function renderContactDiagnostics(setupContent, portalState) {
   const project = portalState.project;
 
@@ -43,7 +44,7 @@ async function loadContacts(project) {
   tbody.innerHTML = `<tr><td colspan="6">Loading...</td></tr>`;
 
   try {
-    const res = await fetch(`/contact_diag/list?project=${project}&limit=200`);
+    const res = await fetch(`${CD_BASE_URL}/contact_diag/list?project=${project}&limit=200`);
     const data = await res.json();
 
     if (!data.contacts || data.contacts.length === 0) {
@@ -74,8 +75,9 @@ async function loadContacts(project) {
 }
 
 window.cdPreview = async function (contactId, project) {
-  const res = await fetch(`/contact_diag/preview`, {
+  const res = await fetch(`${CD_BASE_URL}/contact_diag/preview`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ project, contact_id: contactId }),
   });
   const data = await res.json();
@@ -84,8 +86,9 @@ window.cdPreview = async function (contactId, project) {
 };
 
 window.cdSync = async function (contactId, project) {
-  const res = await fetch(`/contact_diag/sync`, {
+  const res = await fetch(`${CD_BASE_URL}/contact_diag/sync`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ project, contact_id: contactId }),
   });
   const data = await res.json();
@@ -109,8 +112,9 @@ async function bulkSync(project) {
     return;
   }
 
-  const res = await fetch(`/contact_diag/bulk_sync`, {
+  const res = await fetch(`${CD_BASE_URL}/contact_diag/bulk_sync`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ project, contact_ids: ids }),
   });
 
