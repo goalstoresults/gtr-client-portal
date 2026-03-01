@@ -5,6 +5,14 @@ const CD_BASE_URL = "https://contact-diagnostics.dennis-e64.workers.dev";
 export async function renderContactDiagnostics(setupContent, portalState) {
   const project = portalState.project;
 
+  // Initialize sort state if missing
+  if (!portalState.contactDiagSort) {
+    portalState.contactDiagSort = {
+      column: "name",
+      direction: "asc"
+    };
+  }
+
   setupContent.innerHTML = `
     <section class="card">
       <h2>Contact Diagnostics</h2>
@@ -36,68 +44,94 @@ export async function renderContactDiagnostics(setupContent, portalState) {
             <th style="width:40px; text-align:center;">
               <input type="checkbox" id="cd-select-all">
             </th>
-            <th style="width:220px;">Name</th>
-            <th style="width:240px;">Email</th>
-            <th style="width:160px;">Phone</th>
+
+            <th class="cd-sortable" data-field="name">
+              Name
+              <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+                <span class="sort-up">△</span>
+                <span class="sort-down">▽</span>
+              </span>
+            </th>
+
+            <th class="cd-sortable" data-field="email">
+              Email
+              <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+                <span class="sort-up">△</span>
+                <span class="sort-down">▽</span>
+              </span>
+            </th>
+
+            <th class="cd-sortable" data-field="phone">
+              Phone
+              <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+                <span class="sort-up">△</span>
+                <span class="sort-down">▽</span>
+              </span>
+            </th>
+
+            <th class="cd-sortable" data-field="contact_type">
+              Contact Type
+              <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+                <span class="sort-up">△</span>
+                <span class="sort-down">▽</span>
+              </span>
+            </th>
+
             <th style="width:160px;">CRM ID</th>
+
             <th style="width:180px; text-align:center;">Actions</th>
           </tr>
         </thead>
+
         <tbody id="cd-body">
-          <tr><td colspan="6">Loading...</td></tr>
+          <tr><td colspan="7">Loading...</td></tr>
         </tbody>
       </table>
     </section>
   `;
 
-  loadContacts(project);
-
-  document.getElementById("cd-refresh").onclick = () => loadContacts(project);
+  document.getElementById("cd-refresh").onclick = () => loadContacts(project, portalState);
   document.getElementById("cd-select-all").onclick = toggleSelectAll;
   document.getElementById("cd-clear-all").onclick = clearAll;
   document.getElementById("cd-export").onclick = exportSelected;
   document.getElementById("cd-bulk-sync").onclick = () => bulkSync(project);
-  document.getElementById("cd-filter").onchange = () => applyFilter();
+  document.getElementById("cd-filter").onchange = () => applyFilter(portalState);
+
+  loadContacts(project, portalState);
 }
 
-let CD_CACHE = []; // store full dataset for filtering
+let CD_CACHE = [];
 
-async function loadContacts(project) {
+async function loadContacts(project, portalState) {
   const tbody = document.getElementById("cd-body");
-  tbody.innerHTML = `<tr><td colspan="6">Loading...</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="7">Loading...</td></tr>`;
 
   try {
     const res = await fetch(`${CD_BASE_URL}/contact_diag/list?project=${project}&limit=200`);
     const data = await res.json();
 
-    if (!data.contacts || data.contacts.length === 0) {
-      CD_CACHE = [];
-      tbody.innerHTML = `<tr><td colspan="6">No contacts found.</td></tr>`;
-      return;
-    }
-
-    CD_CACHE = data.contacts;
-    applyFilter(); // render with filter applied
+    CD_CACHE = data.contacts || [];
+    applyFilter(portalState);
 
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6">Error loading contacts.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7">Error loading contacts.</td></tr>`;
   }
 }
 
-function applyFilter() {
+function applyFilter(portalState) {
   const filter = document.getElementById("cd-filter").value;
   const tbody = document.getElementById("cd-body");
 
   let rows = CD_CACHE;
 
-  if (filter === "missing_crm") {
-    rows = rows.filter(c => !c.crm_id);
-  } else if (filter === "has_crm") {
-    rows = rows.filter(c => c.crm_id);
-  }
+  if (filter === "missing_crm") rows = rows.filter(c => !c.crm_id);
+  if (filter === "has_crm") rows = rows.filter(c => c.crm_id);
+
+  // Apply sorting
+  rows = sortRows(rows, portalState);
 
   if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6">No matching contacts.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7">No matching contacts.</td></tr>`;
     updateSelectedCount();
     return;
   }
@@ -122,6 +156,7 @@ function applyFilter() {
           <td>${name}</td>
           <td>${c.email || ""}</td>
           <td>${c.phone || ""}</td>
+          <td>${c.contact_type || ""}</td>
           <td>${crmDisplay}</td>
 
           <td style="text-align:center;">
@@ -133,12 +168,70 @@ function applyFilter() {
     })
     .join("");
 
-  // Attach checkbox listeners for live count
+  // Attach checkbox listeners
   document.querySelectorAll(".cd-row").forEach(cb => {
     cb.addEventListener("change", updateSelectedCount);
   });
 
+  // Attach sorting listeners
+  document.querySelectorAll(".cd-sortable").forEach(th => {
+    th.onclick = () => handleSortClick(th, portalState);
+  });
+
+  updateSortArrows(portalState);
   updateSelectedCount();
+}
+
+function sortRows(rows, portalState) {
+  const { column, direction } = portalState.contactDiagSort;
+
+  return rows.sort((a, b) => {
+    let A, B;
+
+    if (column === "name") {
+      A = a.search_name || `${a.first_name || ""} ${a.last_name || ""}`.trim();
+      B = b.search_name || `${b.first_name || ""} ${b.last_name || ""}`.trim();
+    } else {
+      A = (a[column] || "").toString().toLowerCase();
+      B = (b[column] || "").toString().toLowerCase();
+    }
+
+    if (A < B) return direction === "asc" ? -1 : 1;
+    if (A > B) return direction === "asc" ? 1 : -1;
+    return 0;
+  });
+}
+
+function handleSortClick(th, portalState) {
+  const field = th.dataset.field;
+
+  if (portalState.contactDiagSort.column === field) {
+    portalState.contactDiagSort.direction =
+      portalState.contactDiagSort.direction === "asc" ? "desc" : "asc";
+  } else {
+    portalState.contactDiagSort.column = field;
+    portalState.contactDiagSort.direction = "asc";
+  }
+
+  applyFilter(portalState);
+}
+
+function updateSortArrows(portalState) {
+  const { column, direction } = portalState.contactDiagSort;
+
+  document.querySelectorAll(".cd-sortable").forEach(th => {
+    const field = th.dataset.field;
+    const up = th.querySelector(".sort-up");
+    const down = th.querySelector(".sort-down");
+
+    if (field === column) {
+      up.textContent = direction === "asc" ? "▲" : "△";
+      down.textContent = direction === "desc" ? "▼" : "▽";
+    } else {
+      up.textContent = "△";
+      down.textContent = "▽";
+    }
+  });
 }
 
 window.cdPreview = async function (contactId, project) {
@@ -167,12 +260,12 @@ window.cdSync = async function (contactId, project) {
 
 function toggleSelectAll() {
   const checked = document.getElementById("cd-select-all").checked;
-  document.querySelectorAll(".cd-row").forEach((cb) => (cb.checked = checked));
+  document.querySelectorAll(".cd-row").forEach(cb => (cb.checked = checked));
   updateSelectedCount();
 }
 
 function clearAll() {
-  document.querySelectorAll(".cd-row").forEach((cb) => (cb.checked = false));
+  document.querySelectorAll(".cd-row").forEach(cb => (cb.checked = false));
   document.getElementById("cd-select-all").checked = false;
   updateSelectedCount();
 }
@@ -235,9 +328,9 @@ function exportSelected() {
 }
 
 async function bulkSync(project) {
-  const ids = [...document.querySelectorAll(".cd-row")]
-    .filter((cb) => cb.checked)
-    .map((cb) => cb.closest("tr").dataset.id);
+  const ids = [...document.querySelectorAll(".cd-row:checked")].map(cb =>
+    cb.closest("tr").dataset.id
+  );
 
   if (ids.length === 0) {
     alert("No contacts selected.");
@@ -255,4 +348,3 @@ async function bulkSync(project) {
 
   loadContacts(project);
 }
-
