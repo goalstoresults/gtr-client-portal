@@ -16,6 +16,10 @@ export async function renderContactDiagnostics(setupContent, portalState) {
         <button id="cd-export" class="btn btn-secondary">Export Selected</button>
         <button id="cd-clear-all" class="btn btn-secondary">Clear All</button>
 
+        <span id="cd-selected-count" style="font-weight:bold; margin-left:10px;">
+          Selected: 0
+        </span>
+
         <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
           <label style="font-weight:bold;">Filter:</label>
           <select id="cd-filter" class="form-select" style="width:220px;">
@@ -94,6 +98,7 @@ function applyFilter() {
 
   if (rows.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6">No matching contacts.</td></tr>`;
+    updateSelectedCount();
     return;
   }
 
@@ -127,6 +132,13 @@ function applyFilter() {
       `;
     })
     .join("");
+
+  // Attach checkbox listeners for live count
+  document.querySelectorAll(".cd-row").forEach(cb => {
+    cb.addEventListener("change", updateSelectedCount);
+  });
+
+  updateSelectedCount();
 }
 
 window.cdPreview = async function (contactId, project) {
@@ -156,11 +168,18 @@ window.cdSync = async function (contactId, project) {
 function toggleSelectAll() {
   const checked = document.getElementById("cd-select-all").checked;
   document.querySelectorAll(".cd-row").forEach((cb) => (cb.checked = checked));
+  updateSelectedCount();
 }
 
 function clearAll() {
   document.querySelectorAll(".cd-row").forEach((cb) => (cb.checked = false));
   document.getElementById("cd-select-all").checked = false;
+  updateSelectedCount();
+}
+
+function updateSelectedCount() {
+  const count = document.querySelectorAll(".cd-row:checked").length;
+  document.getElementById("cd-selected-count").innerText = `Selected: ${count}`;
 }
 
 function exportSelected() {
@@ -168,7 +187,6 @@ function exportSelected() {
     const tr = cb.closest("tr");
     const id = tr.dataset.id;
 
-    // Find the full contact record from CD_CACHE
     const contact = CD_CACHE.find(c => c.contact_id === id);
 
     return {
@@ -188,7 +206,6 @@ function exportSelected() {
     return;
   }
 
-  // Build CSV header
   const headers = [
     "first_name",
     "last_name",
@@ -202,12 +219,10 @@ function exportSelected() {
 
   let csv = headers.join(",") + "\n";
 
-  // Add rows
   selected.forEach(row => {
     csv += headers.map(h => (row[h] || "").toString().replace(/,/g, "")).join(",") + "\n";
   });
 
-  // Download CSV
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
 
@@ -218,7 +233,6 @@ function exportSelected() {
 
   URL.revokeObjectURL(url);
 }
-
 
 async function bulkSync(project) {
   const ids = [...document.querySelectorAll(".cd-row")]
