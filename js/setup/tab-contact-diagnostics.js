@@ -13,6 +13,9 @@ export async function renderContactDiagnostics(setupContent, portalState) {
         <button id="cd-refresh" class="btn btn-primary">Refresh</button>
         <button id="cd-bulk-sync" class="btn btn-success">Bulk Sync</button>
 
+        <button id="cd-export" class="btn btn-secondary">Export Selected</button>
+        <button id="cd-clear-all" class="btn btn-secondary">Clear All</button>
+
         <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
           <label style="font-weight:bold;">Filter:</label>
           <select id="cd-filter" class="form-select" style="width:220px;">
@@ -47,6 +50,8 @@ export async function renderContactDiagnostics(setupContent, portalState) {
 
   document.getElementById("cd-refresh").onclick = () => loadContacts(project);
   document.getElementById("cd-select-all").onclick = toggleSelectAll;
+  document.getElementById("cd-clear-all").onclick = clearAll;
+  document.getElementById("cd-export").onclick = exportSelected;
   document.getElementById("cd-bulk-sync").onclick = () => bulkSync(project);
   document.getElementById("cd-filter").onchange = () => applyFilter();
 }
@@ -153,6 +158,40 @@ function toggleSelectAll() {
   document.querySelectorAll(".cd-row").forEach((cb) => (cb.checked = checked));
 }
 
+function clearAll() {
+  document.querySelectorAll(".cd-row").forEach((cb) => (cb.checked = false));
+  document.getElementById("cd-select-all").checked = false;
+}
+
+function exportSelected() {
+  const selectedRows = [...document.querySelectorAll(".cd-row:checked")].map(cb => {
+    const tr = cb.closest("tr");
+    return [...tr.querySelectorAll("td")]
+      .slice(1, 5) // skip checkbox, take Name, Email, Phone, CRM ID
+      .map(td => td.innerText.replace(/,/g, "")); // remove commas
+  });
+
+  if (selectedRows.length === 0) {
+    alert("No rows selected.");
+    return;
+  }
+
+  let csv = "Name,Email,Phone,CRM_ID\n";
+  selectedRows.forEach(r => {
+    csv += r.join(",") + "\n";
+  });
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "selected_contacts.csv";
+  a.click();
+
+  URL.revokeObjectURL(url);
+}
+
 async function bulkSync(project) {
   const ids = [...document.querySelectorAll(".cd-row")]
     .filter((cb) => cb.checked)
@@ -174,3 +213,4 @@ async function bulkSync(project) {
 
   loadContacts(project);
 }
+
