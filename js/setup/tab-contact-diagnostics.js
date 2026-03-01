@@ -3,7 +3,8 @@
 const CD_BASE_URL = "https://contact-diagnostics.dennis-e64.workers.dev";
 
 export async function renderContactDiagnostics(setupContent, portalState) {
-  const project = portalState.project;
+  const project = portalState.setup_project_id;
+
 
   // Initialize sort state if missing
   if (!portalState.contactDiagSort) {
