@@ -164,23 +164,50 @@ function clearAll() {
 }
 
 function exportSelected() {
-  const selectedRows = [...document.querySelectorAll(".cd-row:checked")].map(cb => {
+  const selected = [...document.querySelectorAll(".cd-row:checked")].map(cb => {
     const tr = cb.closest("tr");
-    return [...tr.querySelectorAll("td")]
-      .slice(1, 5) // skip checkbox, take Name, Email, Phone, CRM ID
-      .map(td => td.innerText.replace(/,/g, "")); // remove commas
+    const id = tr.dataset.id;
+
+    // Find the full contact record from CD_CACHE
+    const contact = CD_CACHE.find(c => c.contact_id === id);
+
+    return {
+      first_name: contact.first_name || "",
+      last_name: contact.last_name || "",
+      business_name: contact.business_name || "",
+      contact_type: contact.contact_type || "",
+      email: contact.email || "",
+      phone: contact.phone || "",
+      crm_id: contact.crm_id || "",
+      selected_for_export: "true"
+    };
   });
 
-  if (selectedRows.length === 0) {
+  if (selected.length === 0) {
     alert("No rows selected.");
     return;
   }
 
-  let csv = "Name,Email,Phone,CRM_ID\n";
-  selectedRows.forEach(r => {
-    csv += r.join(",") + "\n";
+  // Build CSV header
+  const headers = [
+    "first_name",
+    "last_name",
+    "business_name",
+    "contact_type",
+    "email",
+    "phone",
+    "crm_id",
+    "selected_for_export"
+  ];
+
+  let csv = headers.join(",") + "\n";
+
+  // Add rows
+  selected.forEach(row => {
+    csv += headers.map(h => (row[h] || "").toString().replace(/,/g, "")).join(",") + "\n";
   });
 
+  // Download CSV
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
 
@@ -191,6 +218,7 @@ function exportSelected() {
 
   URL.revokeObjectURL(url);
 }
+
 
 async function bulkSync(project) {
   const ids = [...document.querySelectorAll(".cd-row")]
