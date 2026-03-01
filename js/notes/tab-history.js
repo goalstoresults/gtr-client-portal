@@ -1,259 +1,350 @@
-// /notes/tab-history.js
-// Handles: Notes list, sorting, filtering, navigation to Review tab
+// /js/setup/tab-contact-diagnostics.js
 
-import { escapeHtml, formatDateTime } from "../utilities.js";
-import { renderReview } from "./tab-review.js";
+const CD_BASE_URL = "https://contact-diagnostics.dennis-e64.workers.dev";
 
-// ------------------------------------------------------------
-// Main Renderer
-// ------------------------------------------------------------
-export async function renderHistory(container, portalState) {
-  try {
-    const reviewOnly =
-      document.getElementById("filter-review-only")?.checked ?? true;
-    const name =
-      document.getElementById("filter-name")?.value.trim() || "";
+export async function renderContactDiagnostics(setupContent, portalState) {
+  const project = portalState.project;
 
-    // ------------------------------------------------------------
-    // Fetch notes
-    // ------------------------------------------------------------
-    const params = new URLSearchParams({
-      project: portalState.project,
-      limit: "500"
-    });
+  // Initialize sort state if missing
+  if (!portalState.contactDiagSort) {
+    portalState.contactDiagSort = {
+      column: "name",
+      direction: "asc"
+    };
+  }
 
-    if (reviewOnly) params.set("needs_review", "true");
+  setupContent.innerHTML = `
+    <section class="card">
+      <h2>Contact Diagnostics</h2>
 
-    const url = `https://notes-history-module.dennis-e64.workers.dev/notes_history?${params}`;
-    const res = await fetch(url, { cache: "no-cache" });
-    const data = await res.json();
+      <div style="margin-bottom: 15px; display:flex; gap:10px; align-items:center;">
+        <button id="cd-refresh" class="btn btn-primary">Refresh</button>
+        <button id="cd-bulk-sync" class="btn btn-success">Bulk Sync</button>
 
-    let notes = Array.isArray(data?.notes) ? data.notes : [];
+        <button id="cd-export" class="btn btn-secondary">Export Selected</button>
+        <button id="cd-clear-all" class="btn btn-secondary">Clear All</button>
 
-    // ------------------------------------------------------------
-    // Client-side name filter
-    // ------------------------------------------------------------
-    if (name) {
-      const term = name.toLowerCase();
-      notes = notes.filter(n =>
-        (n.from_name || "").toLowerCase().includes(term)
-      );
-    }
+        <span id="cd-selected-count" style="font-weight:bold; margin-left:10px;">
+          Selected: 0
+        </span>
 
-    // ------------------------------------------------------------
-    // Initialize sort state
-    // ------------------------------------------------------------
-    if (!portalState.notesSort) {
-      portalState.notesSort = {
-        column: "created_at",
-        direction: "desc"
-      };
-    }
+        <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+          <label style="font-weight:bold;">Filter:</label>
+          <select id="cd-filter" class="form-select" style="width:220px;">
+            <option value="all">All Contacts</option>
+            <option value="missing_crm">CRM ID Missing</option>
+            <option value="has_crm">Has CRM ID</option>
+          </select>
+        </div>
+      </div>
 
-    const columns = [
-      { key: "created_at", label: "Created", isDate: true },
-      { key: "subject", label: "Subject" },
-      { key: "from_name", label: "From" },
-      { key: "contact_name", label: "Contact" },
-      { key: "needs_review", label: "Needs Review" }
-    ];
+      <table class="notes-table" style="width:100%;">
+        <thead>
+          <tr>
+            <th style="width:40px; text-align:center;">
+              <input type="checkbox" id="cd-select-all">
+            </th>
 
-    // ------------------------------------------------------------
-    // Sorting helper
-    // ------------------------------------------------------------
-    function sortNotes() {
-      const { column, direction } = portalState.notesSort;
-
-      notes.sort((a, b) => {
-        let A = a[column];
-        let B = b[column];
-
-        if (column === "created_at") {
-          A = new Date(A);
-          B = new Date(B);
-        } else {
-          A = (A || "").toString().toLowerCase();
-          B = (B || "").toString().toLowerCase();
-        }
-
-        if (A < B) return direction === "asc" ? -1 : 1;
-        if (A > B) return direction === "asc" ? 1 : -1;
-        return 0;
-      });
-    }
-
-    // ------------------------------------------------------------
-    // Table Renderer
-    // ------------------------------------------------------------
-    function renderTable() {
-      sortNotes();
-
-      const headerHtml = columns
-        .map(col => {
-          const isSorted = portalState.notesSort.column === col.key;
-          const upArrow =
-            isSorted && portalState.notesSort.direction === "asc"
-              ? "▲"
-              : "△";
-          const downArrow =
-            isSorted && portalState.notesSort.direction === "desc"
-              ? "▼"
-              : "▽";
-
-          return `
-            <th class="sortable" data-field="${col.key}">
-              ${col.label}
+            <th class="cd-sortable" data-field="name">
+              Name
               <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-                <span class="sort-up">${upArrow}</span>
-                <span class="sort-down">${downArrow}</span>
+                <span class="sort-up">△</span>
+                <span class="sort-down">▽</span>
               </span>
             </th>
-          `;
-        })
-        .join("");
 
-      const rowsHtml = notes
-        .map(
-          n => `
-          <tr>
-            <td>${formatDateTime(n.created_at)}</td>
-            <td>${escapeHtml(n.subject || "")}</td>
-            <td>${escapeHtml(n.from_name || "")}</td>
-            <td>${escapeHtml(n.contact_name || "")}</td>
-            <td>${n.needs_review ? "Yes" : "No"}</td>
-            <td><button class="btn-primary btn-review" data-id="${n.id}">Review</button></td>
+            <th class="cd-sortable" data-field="email">
+              Email
+              <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+                <span class="sort-up">△</span>
+                <span class="sort-down">▽</span>
+              </span>
+            </th>
+
+            <th class="cd-sortable" data-field="phone">
+              Phone
+              <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+                <span class="sort-up">△</span>
+                <span class="sort-down">▽</span>
+              </span>
+            </th>
+
+            <th class="cd-sortable" data-field="contact_type">
+              Contact Type
+              <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+                <span class="sort-up">△</span>
+                <span class="sort-down">▽</span>
+              </span>
+            </th>
+
+            <th style="width:160px;">CRM ID</th>
+
+            <th style="width:180px; text-align:center;">Actions</th>
           </tr>
-        `
-        )
-        .join("");
+        </thead>
 
-      container.innerHTML = `
-        <h4>Notes History (Total: ${notes.length})</h4>
+        <tbody id="cd-body">
+          <tr><td colspan="7">Loading...</td></tr>
+        </tbody>
+      </table>
+    </section>
+  `;
 
-        <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-          <label>
-            <input type="checkbox" id="filter-review-only" ${reviewOnly ? "checked" : ""}>
-            Needs Review Only
-          </label>
+  document.getElementById("cd-refresh").onclick = () => loadContacts(project, portalState);
+  document.getElementById("cd-select-all").onclick = toggleSelectAll;
+  document.getElementById("cd-clear-all").onclick = clearAll;
+  document.getElementById("cd-export").onclick = exportSelected;
+  document.getElementById("cd-bulk-sync").onclick = () => bulkSync(project);
+  document.getElementById("cd-filter").onchange = () => applyFilter(portalState);
 
-          <label>Name:
-            <input type="text" id="filter-name" value="${escapeHtml(name)}">
-          </label>
+  loadContacts(project, portalState);
+}
 
-          <button id="btnApplyFilter" class="secondary">Apply Filter</button>
-          <button id="btnClearFilter" class="secondary">Clear Filter</button>
-        </div>
+let CD_CACHE = [];
 
-        <table class="notes-table">
-          <thead>
-            <tr>
-              ${headerHtml}
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${
-              rowsHtml ||
-              `<tr><td colspan="6" class="muted">(no notes found)</td></tr>`
-            }
-          </tbody>
-        </table>
+async function loadContacts(project, portalState) {
+  const tbody = document.getElementById("cd-body");
+  tbody.innerHTML = `<tr><td colspan="7">Loading...</td></tr>`;
+
+  try {
+    const res = await fetch(`${CD_BASE_URL}/contact_diag/list?project=${project}&limit=200`);
+    const data = await res.json();
+
+    CD_CACHE = data.contacts || [];
+    applyFilter(portalState);
+
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7">Error loading contacts.</td></tr>`;
+  }
+}
+
+function applyFilter(portalState) {
+  const filter = document.getElementById("cd-filter").value;
+  const tbody = document.getElementById("cd-body");
+
+  let rows = CD_CACHE;
+
+  if (filter === "missing_crm") rows = rows.filter(c => !c.crm_id);
+  if (filter === "has_crm") rows = rows.filter(c => c.crm_id);
+
+  // Apply sorting
+  rows = sortRows(rows, portalState);
+
+  if (rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7">No matching contacts.</td></tr>`;
+    updateSelectedCount();
+    return;
+  }
+
+  tbody.innerHTML = rows
+    .map((c) => {
+      const name =
+        c.search_name ||
+        `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
+        "(no name)";
+
+      const crmDisplay = c.crm_id
+        ? c.crm_id
+        : `<span style="color:red; font-weight:bold;">None</span>`;
+
+      return `
+        <tr data-id="${c.contact_id}">
+          <td style="text-align:center;">
+            <input type="checkbox" class="cd-row">
+          </td>
+
+          <td>${name}</td>
+          <td>${c.email || ""}</td>
+          <td>${c.phone || ""}</td>
+          <td>${c.contact_type || ""}</td>
+          <td>${crmDisplay}</td>
+
+          <td style="text-align:center;">
+            <button class="btn btn-secondary" onclick="cdPreview('${c.contact_id}', '${c.project}')">Preview</button>
+            <button class="btn btn-success" onclick="cdSync('${c.contact_id}', '${c.project}')">Sync</button>
+          </td>
+        </tr>
       `;
+    })
+    .join("");
 
-      // ------------------------------------------------------------
-      // Sorting events
-      // ------------------------------------------------------------
-      container.querySelectorAll("th.sortable").forEach(th => {
-        th.addEventListener("click", () => {
-          const field = th.dataset.field;
+  // Attach checkbox listeners
+  document.querySelectorAll(".cd-row").forEach(cb => {
+    cb.addEventListener("change", updateSelectedCount);
+  });
 
-          if (portalState.notesSort.column === field) {
-            portalState.notesSort.direction =
-              portalState.notesSort.direction === "asc"
-                ? "desc"
-                : "asc";
-          } else {
-            portalState.notesSort.column = field;
-            portalState.notesSort.direction = "asc";
-          }
+  // Attach sorting listeners
+  document.querySelectorAll(".cd-sortable").forEach(th => {
+    th.onclick = () => handleSortClick(th, portalState);
+  });
 
-          renderTable();
-        });
-      });
+  updateSortArrows(portalState);
+  updateSelectedCount();
+}
 
-      // ------------------------------------------------------------
-      // Review button events
-      // ------------------------------------------------------------
-      container.querySelectorAll(".btn-review").forEach(btn => {
-        btn.addEventListener("click", () => {
-          const noteId = btn.dataset.id;
-          portalState.selectedNoteId = noteId;
+function sortRows(rows, portalState) {
+  const { column, direction } = portalState.contactDiagSort;
 
-          const clientName =
-            btn.closest("tr").querySelector("td:nth-child(4)")
-              ?.textContent || "";
+  return rows.sort((a, b) => {
+    let A, B;
 
-          const contextBar = document.getElementById(
-            "contact-context-bar"
-          );
-          if (contextBar) {
-            contextBar.textContent = clientName
-              ? `Contact: ${clientName}`
-              : "Contact not linked yet";
-          }
-
-          // ✅ Enable Review and Relationships subtabs locally
-          ["review", "relationships"].forEach(subtab => {
-            const btn = document.querySelector(
-              `#notes-subtabs button[data-subtab="${subtab}"]`
-            );
-            if (btn) {
-              btn.disabled = false;
-              btn.classList.remove("disabled");
-            }
-          });
-
-          // Switch tab
-          document
-            .querySelectorAll("#notes-subtabs button")
-            .forEach(b => b.classList.remove("active"));
-
-          document
-            .querySelector(
-              '#notes-subtabs button[data-subtab="review"]'
-            )
-            ?.classList.add("active");
-
-          renderReview(container, portalState, noteId);
-        });
-      });
-
-      // ------------------------------------------------------------
-      // Filter buttons
-      // ------------------------------------------------------------
-      document
-        .getElementById("btnApplyFilter")
-        .addEventListener("click", () => {
-          renderHistory(container, portalState);
-        });
-
-      document
-        .getElementById("btnClearFilter")
-        .addEventListener("click", () => {
-          document.getElementById("filter-review-only").checked = true;
-          document.getElementById("filter-name").value = "";
-          renderHistory(container, portalState);
-        });
+    if (column === "name") {
+      A = a.search_name || `${a.first_name || ""} ${a.last_name || ""}`.trim();
+      B = b.search_name || `${b.first_name || ""} ${b.last_name || ""}`.trim();
+    } else {
+      A = (a[column] || "").toString().toLowerCase();
+      B = (b[column] || "").toString().toLowerCase();
     }
 
-    // ------------------------------------------------------------
-    // Initial render
-    // ------------------------------------------------------------
-    renderTable();
-  } catch (err) {
-    container.innerHTML = `
-      <h4>Notes History</h4>
-      <p>Error loading history: ${escapeHtml(err.message)}</p>
-    `;
+    if (A < B) return direction === "asc" ? -1 : 1;
+    if (A > B) return direction === "asc" ? 1 : -1;
+    return 0;
+  });
+}
+
+function handleSortClick(th, portalState) {
+  const field = th.dataset.field;
+
+  if (portalState.contactDiagSort.column === field) {
+    portalState.contactDiagSort.direction =
+      portalState.contactDiagSort.direction === "asc" ? "desc" : "asc";
+  } else {
+    portalState.contactDiagSort.column = field;
+    portalState.contactDiagSort.direction = "asc";
   }
+
+  applyFilter(portalState);
+}
+
+function updateSortArrows(portalState) {
+  const { column, direction } = portalState.contactDiagSort;
+
+  document.querySelectorAll(".cd-sortable").forEach(th => {
+    const field = th.dataset.field;
+    const up = th.querySelector(".sort-up");
+    const down = th.querySelector(".sort-down");
+
+    if (field === column) {
+      up.textContent = direction === "asc" ? "▲" : "△";
+      down.textContent = direction === "desc" ? "▼" : "▽";
+    } else {
+      up.textContent = "△";
+      down.textContent = "▽";
+    }
+  });
+}
+
+window.cdPreview = async function (contactId, project) {
+  const res = await fetch(`${CD_BASE_URL}/contact_diag/preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ project, contact_id: contactId }),
+  });
+
+  const data = await res.json();
+  alert(JSON.stringify(data.payload, null, 2));
+};
+
+window.cdSync = async function (contactId, project) {
+  const res = await fetch(`${CD_BASE_URL}/contact_diag/sync`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ project, contact_id: contactId }),
+  });
+
+  const data = await res.json();
+  alert("Sync complete:\n" + JSON.stringify(data, null, 2));
+
+  loadContacts(project);
+};
+
+function toggleSelectAll() {
+  const checked = document.getElementById("cd-select-all").checked;
+  document.querySelectorAll(".cd-row").forEach(cb => (cb.checked = checked));
+  updateSelectedCount();
+}
+
+function clearAll() {
+  document.querySelectorAll(".cd-row").forEach(cb => (cb.checked = false));
+  document.getElementById("cd-select-all").checked = false;
+  updateSelectedCount();
+}
+
+function updateSelectedCount() {
+  const count = document.querySelectorAll(".cd-row:checked").length;
+  document.getElementById("cd-selected-count").innerText = `Selected: ${count}`;
+}
+
+function exportSelected() {
+  const selected = [...document.querySelectorAll(".cd-row:checked")].map(cb => {
+    const tr = cb.closest("tr");
+    const id = tr.dataset.id;
+
+    const contact = CD_CACHE.find(c => c.contact_id === id);
+
+    return {
+      first_name: contact.first_name || "",
+      last_name: contact.last_name || "",
+      business_name: contact.business_name || "",
+      contact_type: contact.contact_type || "",
+      email: contact.email || "",
+      phone: contact.phone || "",
+      crm_id: contact.crm_id || "",
+      selected_for_export: "true"
+    };
+  });
+
+  if (selected.length === 0) {
+    alert("No rows selected.");
+    return;
+  }
+
+  const headers = [
+    "first_name",
+    "last_name",
+    "business_name",
+    "contact_type",
+    "email",
+    "phone",
+    "crm_id",
+    "selected_for_export"
+  ];
+
+  let csv = headers.join(",") + "\n";
+
+  selected.forEach(row => {
+    csv += headers.map(h => (row[h] || "").toString().replace(/,/g, "")).join(",") + "\n";
+  });
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "selected_contacts.csv";
+  a.click();
+
+  URL.revokeObjectURL(url);
+}
+
+async function bulkSync(project) {
+  const ids = [...document.querySelectorAll(".cd-row:checked")].map(cb =>
+    cb.closest("tr").dataset.id
+  );
+
+  if (ids.length === 0) {
+    alert("No contacts selected.");
+    return;
+  }
+
+  const res = await fetch(`${CD_BASE_URL}/contact_diag/bulk_sync`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ project, contact_ids: ids }),
+  });
+
+  const data = await res.json();
+  alert("Bulk sync complete:\n" + JSON.stringify(data, null, 2));
+
+  loadContacts(project);
 }
