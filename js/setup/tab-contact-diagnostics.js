@@ -35,7 +35,7 @@ export async function renderContactDiagnostics(setupContent, portalState) {
     <button id="cd-clear-all" class="btn btn-secondary">Clear All</button>
 
     <span id="cd-selected-count" style="font-weight:bold; margin-left:10px;">
-      Selected: 0
+      Total: 0   Selected: 0
     </span>
 
     <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
@@ -104,7 +104,7 @@ export async function renderContactDiagnostics(setupContent, portalState) {
   document.getElementById("cd-filter").onchange = () =>
     loadContacts(project, portalState);
 
-  // Initial load respects default filter (missing_crm)
+  // Initial load
   loadContacts(project, portalState);
 }
 
@@ -262,7 +262,6 @@ window.cdSync = async function (contactId, project) {
   const data = await res.json();
   alert("Sync complete:\n" + JSON.stringify(data, null, 2));
 
-  // After sync, reload with current filter
   const portalState = window.portalState || {};
   const effectiveProject = portalState.setup_project_id || project;
   loadContacts(effectiveProject, portalState);
@@ -282,9 +281,10 @@ function clearAll() {
 }
 
 function updateSelectedCount() {
-  const count = document.querySelectorAll(".cd-row:checked").length;
-  const el = document.getElementById("cd-selected-count");
-  if (el) el.innerText = `Selected: ${count}`;
+  const selected = document.querySelectorAll(".cd-row:checked").length;
+  const total = CD_CACHE.length;
+  document.getElementById("cd-selected-count").innerText =
+    `Total: ${total}   Selected: ${selected}`;
 }
 
 function exportSelected() {
@@ -364,4 +364,3 @@ async function bulkSync(project) {
   const effectiveProject = portalState.setup_project_id || project;
   loadContacts(effectiveProject, portalState);
 }
-
