@@ -31,11 +31,13 @@ export async function renderContactDiagnostics(setupContent, portalState) {
 
         <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
           <label style="font-weight:bold;">Filter:</label>
-          <select id="cd-filter" class="form-select" style="width:220px;">
+
+           <select id="cd-filter" class="form-select" style="width:220px;">
+            <option value="missing_crm">Missing CRM</option>
+            <option value="has_crm">Has CRM</option>
             <option value="all">All Contacts</option>
-            <option value="missing_crm">CRM ID Missing</option>
-            <option value="has_crm">Has CRM ID</option>
           </select>
+
         </div>
       </div>
 
