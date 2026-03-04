@@ -390,10 +390,8 @@ function summarizeByGroupYear(payments, groupByContactId) {
 /* =========================================================
    RENDER SUMMARY GRID (SORTABLE)
 ========================================================= */
-
 function renderSummaryGrid(rows, type) {
   const container = document.getElementById("summaryGrid");
-
   if (!rows.length) {
     container.innerHTML = "<p>No data found.</p>";
     return;
@@ -401,18 +399,21 @@ function renderSummaryGrid(rows, type) {
 
   const columnSets = {
     client: [
+      { key: "expand", label: "" },
       { key: "client_name", label: "Client" },
       { key: "total_amount", label: "Total Amount", numeric: true },
       { key: "count", label: "# of Payments", numeric: true },
       { key: "referral_name", label: "Referral" }
     ],
     referral: [
+      { key: "expand", label: "" },
       { key: "referral_name", label: "Referral" },
       { key: "total_amount", label: "Total Amount", numeric: true },
       { key: "count", label: "# of Payments", numeric: true },
       { key: "clients", label: "# of Clients", numeric: true }
     ],
     year: [
+      { key: "expand", label: "" },
       { key: "year", label: "Year", numeric: true },
       { key: "total_amount", label: "Total Amount", numeric: true },
       { key: "count", label: "# of Payments", numeric: true },
@@ -420,6 +421,7 @@ function renderSummaryGrid(rows, type) {
       { key: "referrals", label: "# of Referrals", numeric: true }
     ],
     year_client: [
+      { key: "expand", label: "" },
       { key: "year", label: "Year", numeric: true },
       { key: "client_name", label: "Client" },
       { key: "total_amount", label: "Total Amount", numeric: true },
@@ -427,12 +429,14 @@ function renderSummaryGrid(rows, type) {
       { key: "referral_name", label: "Referral" }
     ],
     year_referral: [
+      { key: "expand", label: "" },
       { key: "year", label: "Year", numeric: true },
       { key: "referral_name", label: "Referral" },
       { key: "total_amount", label: "Total Amount", numeric: true },
       { key: "count", label: "# of Payments", numeric: true }
     ],
     group: [
+      { key: "expand", label: "" },
       { key: "group_name", label: "Group" },
       { key: "total_amount", label: "Total Amount", numeric: true },
       { key: "count", label: "# of Payments", numeric: true },
@@ -440,6 +444,7 @@ function renderSummaryGrid(rows, type) {
       { key: "referrals", label: "# of Referrals", numeric: true }
     ],
     group_year: [
+      { key: "expand", label: "" },
       { key: "year", label: "Year", numeric: true },
       { key: "group_name", label: "Group" },
       { key: "total_amount", label: "Total Amount", numeric: true },
@@ -451,14 +456,13 @@ function renderSummaryGrid(rows, type) {
 
   const columns = columnSets[type];
 
-  let currentSortField = columns[0].key;
+  let currentSortField = columns[1].key;
   let currentSortDirection = "asc";
 
   function sortRows() {
     rows.sort((a, b) => {
       let A = a[currentSortField];
       let B = b[currentSortField];
-
       const col = columns.find(c => c.key === currentSortField);
 
       if (col?.numeric) {
@@ -486,7 +490,6 @@ function renderSummaryGrid(rows, type) {
 
   function computeTotals(rows, columns) {
     const totals = {};
-
     for (const col of columns) {
       if (col.numeric && col.key !== "year") {
         totals[col.key] = rows.reduce((sum, r) => {
@@ -494,21 +497,34 @@ function renderSummaryGrid(rows, type) {
         }, 0);
       }
     }
-
     return totals;
+  }
+
+  async function loadDetails(row) {
+    const year = document.getElementById("summaryYear").value;
+    const project = portalState.project;
+
+    let url = `https://financials-module.dennis-e64.workers.dev/payments/details?project=${project}`;
+
+    if (type.includes("client")) url += `&contact_id=${row.contact_id}`;
+    if (type.includes("referral")) url += `&referral_id=${row.referral_id}`;
+    if (type.includes("group")) url += `&group_id=${row.group_id}`;
+    if (year !== "all") url += `&year=${year}`;
+
+    const res = await fetch(url);
+    return await res.json();
   }
 
   function render() {
     sortRows();
-
     const totals = computeTotals(rows, columns);
 
     const headerHtml = columns
       .map(col => {
+        if (col.key === "expand") return `<th></th>`;
         const isSorted = currentSortField === col.key;
         const upArrow = isSorted && currentSortDirection === "asc" ? "▲" : "△";
         const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
-
         return `
           <th class="sortable" data-field="${col.key}">
             ${col.label}
@@ -522,28 +538,36 @@ function renderSummaryGrid(rows, type) {
       .join("");
 
     const rowsHtml = rows
-      .map(
-        (r, i) => `
-      <tr style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};">
-        ${columns
-          .map(col => {
-            let val = r[col.key];
-
-            if (col.numeric && col.key === "total_amount") {
-              val = formatCurrency(val);
-            }
-
-            return `<td style="${col.numeric ? "text-align:right;" : ""}">${val}</td>`;
-          })
-          .join("")}
-      </tr>
-    `
-      )
+      .map((r, i) => {
+        const detailRowId = `detail-${i}`;
+        return `
+          <tr style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};">
+            <td style="width:24px; text-align:center; cursor:pointer;" data-expand="${detailRowId}">▶</td>
+            ${columns
+              .filter(c => c.key !== "expand")
+              .map(col => {
+                let val = r[col.key];
+                if (col.numeric && col.key === "total_amount") {
+                  val = formatCurrency(val);
+                }
+                return `<td style="${col.numeric ? "text-align:right;" : ""}">${val}</td>`;
+              })
+              .join("")}
+          </tr>
+          <tr id="${detailRowId}" style="display:none; background:#f1f5ff;">
+            <td colspan="${columns.length}">
+              <div class="detail-container" style="padding:10px; font-size:0.9em;">Loading...</div>
+            </td>
+          </tr>
+        `;
+      })
       .join("");
 
     const totalsRowHtml = `
       <tr style="background:#e8f0fe; font-weight:bold;">
+        <td></td>
         ${columns
+          .filter(c => c.key !== "expand")
           .map(col => {
             if (col.numeric && col.key !== "year") {
               const raw = totals[col.key] || 0;
@@ -551,7 +575,6 @@ function renderSummaryGrid(rows, type) {
                 col.key === "total_amount"
                   ? formatCurrency(raw)
                   : raw.toLocaleString("en-US");
-
               return `<td style="text-align:right;">${val}</td>`;
             }
             return `<td></td>`;
@@ -573,7 +596,6 @@ function renderSummaryGrid(rows, type) {
     container.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
-
         if (currentSortField === field) {
           currentSortDirection =
             currentSortDirection === "asc" ? "desc" : "asc";
@@ -581,12 +603,62 @@ function renderSummaryGrid(rows, type) {
           currentSortField = field;
           currentSortDirection = "asc";
         }
-
         render();
+      });
+    });
+
+    container.querySelectorAll("[data-expand]").forEach(cell => {
+      cell.addEventListener("click", async () => {
+        const id = cell.dataset.expand;
+        const rowEl = document.getElementById(id);
+        const icon = cell;
+
+        if (rowEl.style.display === "none") {
+          icon.textContent = "▼";
+          rowEl.style.display = "";
+          const index = Number(id.replace("detail-", ""));
+          const detailData = await loadDetails(rows[index]);
+
+          const html = `
+            <table style="width:100%; border-collapse:collapse;">
+              <thead>
+                <tr style="background:#dce6ff;">
+                  <th>Date</th>
+                  <th>Amount</th>
+                  <th>Description</th>
+                  <th>Invoice</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${detailData
+                  .map(d => {
+                    return `
+                      <tr>
+                        <td>${d.transaction_date}</td>
+                        <td style="text-align:right;">${formatCurrency(
+                          d.amount
+                        )}</td>
+                        <td>${d.description || ""}</td>
+                        <td>${d.invoice_number || ""}</td>
+                      </tr>
+                    `;
+                  })
+                  .join("")}
+              </tbody>
+            </table>
+          `;
+
+          rowEl.querySelector(".detail-container").innerHTML = html;
+        } else {
+          icon.textContent = "▶";
+          rowEl.style.display = "none";
+        }
       });
     });
   }
 
   render();
 }
+
+
 
