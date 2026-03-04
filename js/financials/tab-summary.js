@@ -1,38 +1,34 @@
 // financials/tab-summary.js
-// Summary tab: grouped financial summaries with sorting + totals
 
 import { escapeHtml } from "../utilities.js";
 
 /* =========================================================
-   ENTRY POINT: Render Summary Tab
+ENTRY POINT: Render Summary Tab
 ========================================================= */
 
 export async function renderFinancialSummary(container, portalState) {
   container.innerHTML = `
-    <section class="card">
-      <h3>Financial Summary</h3>
-
-      <div id="summaryFilters" style="margin-bottom: 12px;">
-        <label>Summary Type:</label>
-        <select id="summaryType">
-          <option value="client">By Client</option>
-          <option value="referral">By Referral</option>
-          <option value="year">By Year</option>
-          <option value="year_client">By Year + Client</option>
-          <option value="year_referral">By Year + Referral</option>
-          <option value="group">By Group</option>
-          <option value="group_year">By Group + Year</option>
-        </select>
-
-        <label style="margin-left: 20px;">Year:</label>
-        <select id="summaryYear">
-          <option value="all">All</option>
-        </select>
-      </div>
-
-      <div id="summaryGrid"></div>
-    </section>
-  `;
+<section class="card">
+  <h3>Financial Summary</h3>
+  <div id="summaryFilters" style="margin-bottom: 12px;">
+    <label>Summary Type:</label>
+    <select id="summaryType">
+      <option value="client">By Client</option>
+      <option value="referral">By Referral</option>
+      <option value="year">By Year</option>
+      <option value="year_client">By Year + Client</option>
+      <option value="year_referral">By Year + Referral</option>
+      <option value="group">By Group</option>
+      <option value="group_year">By Group + Year</option>
+    </select>
+    <label style="margin-left: 20px;">Year:</label>
+    <select id="summaryYear">
+      <option value="all">All</option>
+    </select>
+  </div>
+  <div id="summaryGrid"></div>
+</section>
+`;
 
   await loadSummaryYears(portalState);
   await loadSummaryData(portalState);
@@ -47,7 +43,7 @@ export async function renderFinancialSummary(container, portalState) {
 }
 
 /* =========================================================
-   LOAD YEARS (using transaction_year)
+LOAD YEARS (using transaction_year)
 ========================================================= */
 
 async function loadSummaryYears(portalState) {
@@ -72,23 +68,24 @@ async function loadSummaryYears(portalState) {
     }
   }
 
-  [...years].sort((a, b) => b - a).forEach(y => {
-    const opt = document.createElement("option");
-    opt.value = y;
-    opt.textContent = y;
-    yearSelect.appendChild(opt);
-  });
+  [...years]
+    .sort((a, b) => b - a)
+    .forEach(y => {
+      const opt = document.createElement("option");
+      opt.value = y;
+      opt.textContent = y;
+      yearSelect.appendChild(opt);
+    });
 }
 
 /* =========================================================
-   LOAD SUMMARY DATA
+LOAD SUMMARY DATA
 ========================================================= */
 
 async function loadSummaryData(portalState) {
   const type = document.getElementById("summaryType").value;
   const year = document.getElementById("summaryYear").value;
 
-  // Fetch revenue rows (now guaranteed to include transaction_year)
   const payRes = await fetch(
     `https://financials-module.dennis-e64.workers.dev/payments/list?project=${portalState.project}&limit=2000`,
     { cache: "no-cache" }
@@ -101,7 +98,6 @@ async function loadSummaryData(portalState) {
     payments = [];
   }
 
-  // Fetch contacts (with or without groups)
   const isGroupSummary = type === "group" || type === "group_year";
   const contactsEndpointPath = isGroupSummary
     ? "/contacts/list-with-groups"
@@ -119,7 +115,6 @@ async function loadSummaryData(portalState) {
     contacts = [];
   }
 
-  // Build lookup maps
   const nameById = new Map();
   const groupByContactId = new Map();
 
@@ -128,61 +123,51 @@ async function loadSummaryData(portalState) {
       c.contact_id,
       c.search_name || c.contact_name || c.contact_id
     );
-
     const groupId = c.group_id || null;
     const groupName = c.group_name || (groupId || "(none)");
-
     groupByContactId.set(c.contact_id, {
       group_id: groupId,
       group_name: groupName
     });
   }
 
-  // Filter by year (using transaction_year)
   if (year !== "all") {
     payments = payments.filter(p => {
       return String(p.transaction_year) === String(year);
     });
   }
 
-  // Summary selection
   let summaryRows = [];
 
   switch (type) {
     case "client":
       summaryRows = summarizeByClient(payments, nameById);
       break;
-
     case "referral":
       summaryRows = summarizeByReferral(payments, nameById);
       break;
-
     case "year":
       summaryRows = summarizeByYear(payments);
       break;
-
     case "year_client":
       summaryRows = summarizeByYearClient(payments, nameById);
       break;
-
     case "year_referral":
       summaryRows = summarizeByYearReferral(payments, nameById);
       break;
-
     case "group":
       summaryRows = summarizeByGroup(payments, groupByContactId);
       break;
-
     case "group_year":
       summaryRows = summarizeByGroupYear(payments, groupByContactId);
       break;
   }
 
-  renderSummaryGrid(summaryRows, type);
+  renderSummaryGrid(summaryRows, type, portalState);
 }
 
 /* =========================================================
-   SUMMARY LOGIC (transaction_year-native)
+SUMMARY LOGIC (transaction_year-native)
 ========================================================= */
 
 function summarizeByClient(payments, nameById) {
@@ -192,6 +177,8 @@ function summarizeByClient(payments, nameById) {
     const key = p.contact_id;
     if (!map.has(key)) {
       map.set(key, {
+        contact_id: p.contact_id,
+        referral_id: p.referral_id,
         client_name: nameById.get(p.contact_id) || "(unknown)",
         referral_name: nameById.get(p.referral_id) || "(none)",
         total_amount: 0,
@@ -213,6 +200,7 @@ function summarizeByReferral(payments, nameById) {
     const key = p.referral_id;
     if (!map.has(key)) {
       map.set(key, {
+        referral_id: p.referral_id,
         referral_name: nameById.get(p.referral_id) || "(none)",
         total_amount: 0,
         count: 0,
@@ -270,10 +258,11 @@ function summarizeByYearClient(payments, nameById) {
     if (!year) continue;
 
     const key = `${year}-${p.contact_id}`;
-
     if (!map.has(key)) {
       map.set(key, {
         year,
+        contact_id: p.contact_id,
+        referral_id: p.referral_id,
         client_name: nameById.get(p.contact_id) || "(unknown)",
         referral_name: nameById.get(p.referral_id) || "(none)",
         total_amount: 0,
@@ -297,10 +286,10 @@ function summarizeByYearReferral(payments, nameById) {
     if (!year) continue;
 
     const key = `${year}-${p.referral_id}`;
-
     if (!map.has(key)) {
       map.set(key, {
         year,
+        referral_id: p.referral_id,
         referral_name: nameById.get(p.referral_id) || "(none)",
         total_amount: 0,
         count: 0
@@ -320,8 +309,10 @@ function summarizeByGroup(payments, groupByContactId) {
 
   for (const p of payments) {
     const groupInfo =
-      groupByContactId.get(p.referral_id) || { group_id: null, group_name: "(none)" };
-
+      groupByContactId.get(p.referral_id) || {
+        group_id: null,
+        group_name: "(none)"
+      };
     const key = groupInfo.group_id || "(none)";
 
     if (!map.has(key)) {
@@ -357,8 +348,10 @@ function summarizeByGroupYear(payments, groupByContactId) {
     if (!year) continue;
 
     const groupInfo =
-      groupByContactId.get(p.referral_id) || { group_id: null, group_name: "(none)" };
-
+      groupByContactId.get(p.referral_id) || {
+        group_id: null,
+        group_name: "(none)"
+      };
     const key = `${groupInfo.group_id || "(none)"}-${year}`;
 
     if (!map.has(key)) {
@@ -388,10 +381,12 @@ function summarizeByGroupYear(payments, groupByContactId) {
 }
 
 /* =========================================================
-   RENDER SUMMARY GRID (SORTABLE)
+RENDER SUMMARY GRID (SORTABLE + EXPANDABLE)
 ========================================================= */
-function renderSummaryGrid(rows, type) {
+
+function renderSummaryGrid(rows, type, portalState) {
   const container = document.getElementById("summaryGrid");
+
   if (!rows.length) {
     container.innerHTML = "<p>No data found.</p>";
     return;
@@ -463,6 +458,7 @@ function renderSummaryGrid(rows, type) {
     rows.sort((a, b) => {
       let A = a[currentSortField];
       let B = b[currentSortField];
+
       const col = columns.find(c => c.key === currentSortField);
 
       if (col?.numeric) {
@@ -490,6 +486,7 @@ function renderSummaryGrid(rows, type) {
 
   function computeTotals(rows, columns) {
     const totals = {};
+
     for (const col of columns) {
       if (col.numeric && col.key !== "year") {
         totals[col.key] = rows.reduce((sum, r) => {
@@ -497,34 +494,67 @@ function renderSummaryGrid(rows, type) {
         }, 0);
       }
     }
+
     return totals;
   }
 
   async function loadDetails(row) {
-    const year = document.getElementById("summaryYear").value;
+    const yearFilter = document.getElementById("summaryYear").value;
     const project = portalState.project;
 
     let url = `https://financials-module.dennis-e64.workers.dev/payments/details?project=${project}`;
 
-    if (type.includes("client")) url += `&contact_id=${row.contact_id}`;
-    if (type.includes("referral")) url += `&referral_id=${row.referral_id}`;
-    if (type.includes("group")) url += `&group_id=${row.group_id}`;
-    if (year !== "all") url += `&year=${year}`;
+    if (type === "client" || type === "year_client") {
+      if (row.contact_id) {
+        url += `&contact_id=${encodeURIComponent(row.contact_id)}`;
+      }
+    }
 
-    const res = await fetch(url);
-    return await res.json();
+    if (type === "referral" || type === "year_referral") {
+      if (row.referral_id) {
+        url += `&referral_id=${encodeURIComponent(row.referral_id)}`;
+      }
+    }
+
+    if (type === "group" || type === "group_year") {
+      if (row.group_id) {
+        url += `&group_id=${encodeURIComponent(row.group_id)}`;
+      }
+    }
+
+    if (type === "year") {
+      if (row.year) {
+        url += `&year=${encodeURIComponent(row.year)}`;
+      }
+    } else if (yearFilter !== "all") {
+      url += `&year=${encodeURIComponent(yearFilter)}`;
+    }
+
+    const res = await fetch(url, { cache: "no-cache" });
+    let data = [];
+    try {
+      data = await res.json();
+    } catch {
+      data = [];
+    }
+    return Array.isArray(data) ? data : [];
   }
 
   function render() {
     sortRows();
+
     const totals = computeTotals(rows, columns);
 
     const headerHtml = columns
       .map(col => {
-        if (col.key === "expand") return `<th></th>`;
+        if (col.key === "expand") {
+          return `<th style="width:24px;"></th>`;
+        }
         const isSorted = currentSortField === col.key;
         const upArrow = isSorted && currentSortDirection === "asc" ? "▲" : "△";
-        const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+        const downArrow =
+          isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+
         return `
           <th class="sortable" data-field="${col.key}">
             ${col.label}
@@ -541,61 +571,62 @@ function renderSummaryGrid(rows, type) {
       .map((r, i) => {
         const detailRowId = `detail-${i}`;
         return `
-          <tr style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};">
-            <td style="width:24px; text-align:center; cursor:pointer;" data-expand="${detailRowId}">▶</td>
-            ${columns
-              .filter(c => c.key !== "expand")
-              .map(col => {
-                let val = r[col.key];
-                if (col.numeric && col.key === "total_amount") {
-                  val = formatCurrency(val);
-                }
-                return `<td style="${col.numeric ? "text-align:right;" : ""}">${val}</td>`;
-              })
-              .join("")}
-          </tr>
-          <tr id="${detailRowId}" style="display:none; background:#f1f5ff;">
-            <td colspan="${columns.length}">
-              <div class="detail-container" style="padding:10px; font-size:0.9em;">Loading...</div>
-            </td>
-          </tr>
-        `;
+<tr style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};">
+  <td style="width:24px; text-align:center; cursor:pointer;" data-expand="${detailRowId}">▶</td>
+  ${columns
+    .filter(c => c.key !== "expand")
+    .map(col => {
+      let val = r[col.key];
+      if (col.numeric && col.key === "total_amount") {
+        val = formatCurrency(val);
+      }
+      return `<td style="${col.numeric ? "text-align:right;" : ""}">${val}</td>`;
+    })
+    .join("")}
+</tr>
+<tr id="${detailRowId}" style="display:none; background:#f1f5ff;">
+  <td colspan="${columns.length}">
+    <div class="detail-container" style="padding:10px; font-size:0.9em;">Loading...</div>
+  </td>
+</tr>
+`;
       })
       .join("");
 
     const totalsRowHtml = `
-      <tr style="background:#e8f0fe; font-weight:bold;">
-        <td></td>
-        ${columns
-          .filter(c => c.key !== "expand")
-          .map(col => {
-            if (col.numeric && col.key !== "year") {
-              const raw = totals[col.key] || 0;
-              const val =
-                col.key === "total_amount"
-                  ? formatCurrency(raw)
-                  : raw.toLocaleString("en-US");
-              return `<td style="text-align:right;">${val}</td>`;
-            }
-            return `<td></td>`;
-          })
-          .join("")}
-      </tr>
-    `;
+<tr style="background:#e8f0fe; font-weight:bold;">
+  <td></td>
+  ${columns
+    .filter(c => c.key !== "expand")
+    .map(col => {
+      if (col.numeric && col.key !== "year") {
+        const raw = totals[col.key] || 0;
+        const val =
+          col.key === "total_amount"
+            ? formatCurrency(raw)
+            : raw.toLocaleString("en-US");
+        return `<td style="text-align:right;">${val}</td>`;
+      }
+      return `<td></td>`;
+    })
+    .join("")}
+</tr>
+`;
 
     container.innerHTML = `
-      <table class="notes-table" style="width:100%; border-collapse:collapse;">
-        <thead><tr>${headerHtml}</tr></thead>
-        <tbody>
-          ${rowsHtml}
-          ${totalsRowHtml}
-        </tbody>
-      </table>
-    `;
+<table class="notes-table" style="width:100%; border-collapse:collapse;">
+  <thead><tr>${headerHtml}</tr></thead>
+  <tbody>
+    ${rowsHtml}
+    ${totalsRowHtml}
+  </tbody>
+</table>
+`;
 
     container.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
+
         if (currentSortField === field) {
           currentSortDirection =
             currentSortDirection === "asc" ? "desc" : "asc";
@@ -603,6 +634,7 @@ function renderSummaryGrid(rows, type) {
           currentSortField = field;
           currentSortDirection = "asc";
         }
+
         render();
       });
     });
@@ -616,37 +648,38 @@ function renderSummaryGrid(rows, type) {
         if (rowEl.style.display === "none") {
           icon.textContent = "▼";
           rowEl.style.display = "";
+
           const index = Number(id.replace("detail-", ""));
           const detailData = await loadDetails(rows[index]);
 
-          const html = `
-            <table style="width:100%; border-collapse:collapse;">
-              <thead>
-                <tr style="background:#dce6ff;">
-                  <th>Date</th>
-                  <th>Amount</th>
-                  <th>Description</th>
-                  <th>Invoice</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${detailData
-                  .map(d => {
-                    return `
-                      <tr>
-                        <td>${d.transaction_date}</td>
-                        <td style="text-align:right;">${formatCurrency(
-                          d.amount
-                        )}</td>
-                        <td>${d.description || ""}</td>
-                        <td>${d.invoice_number || ""}</td>
-                      </tr>
-                    `;
-                  })
-                  .join("")}
-              </tbody>
-            </table>
-          `;
+          const html = detailData.length
+            ? `
+<table style="width:100%; border-collapse:collapse;">
+  <thead>
+    <tr style="background:#dce6ff;">
+      <th>Date</th>
+      <th>Amount</th>
+      <th>Description</th>
+      <th>Invoice</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${detailData
+      .map(d => {
+        return `
+<tr>
+  <td>${d.transaction_date || ""}</td>
+  <td style="text-align:right;">${formatCurrency(d.amount || 0)}</td>
+  <td>${escapeHtml(d.description || "")}</td>
+  <td>${escapeHtml(d.invoice_number || "")}</td>
+</tr>
+`;
+      })
+      .join("")}
+  </tbody>
+</table>
+`
+            : `<div>No detail rows found.</div>`;
 
           rowEl.querySelector(".detail-container").innerHTML = html;
         } else {
@@ -659,6 +692,3 @@ function renderSummaryGrid(rows, type) {
 
   render();
 }
-
-
-
