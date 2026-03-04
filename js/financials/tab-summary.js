@@ -504,6 +504,7 @@ function renderSummaryGrid(rows, type, portalState) {
 
     let url = `https://financials-module.dennis-e64.workers.dev/payments/details?project=${project}`;
 
+    // ID filters
     if (type === "client" || type === "year_client") {
       if (row.contact_id) {
         url += `&contact_id=${encodeURIComponent(row.contact_id)}`;
@@ -522,11 +523,14 @@ function renderSummaryGrid(rows, type, portalState) {
       }
     }
 
-    if (type === "year") {
+    // Year filters
+    if (type === "year" || type === "year_client" || type === "year_referral" || type === "group_year") {
+      // For all *year_* summaries, always use the row's year
       if (row.year) {
         url += `&year=${encodeURIComponent(row.year)}`;
       }
     } else if (yearFilter !== "all") {
+      // For non-year summaries, use the global filter if set
       url += `&year=${encodeURIComponent(yearFilter)}`;
     }
 
@@ -539,6 +543,7 @@ function renderSummaryGrid(rows, type, portalState) {
     }
     return Array.isArray(data) ? data : [];
   }
+
 
   function render() {
     sortRows();
