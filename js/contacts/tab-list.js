@@ -172,9 +172,10 @@ export async function renderContactList(container, portalState) {
     return;
   }
 
-  // ALWAYS search email — universal identifier
+  // ALWAYS search email & search_name — universal identifier
   params.set("email", term);
-
+  params.set("search", term);
+    
   // Mode-specific name/business fields
   if (mode === "all") {
     params.set("first", term);
