@@ -544,6 +544,12 @@ th.sortable:hover .sort-arrows {
   font-size: 14px;
 }
 
+.notes-table .totals-row {
+  background: #f7f2d4; /* light gold from your top menus */
+  font-weight: 600;
+}
+
+
 /* Subtle fade-in animation */
 @keyframes loginFadeIn {
   from {
