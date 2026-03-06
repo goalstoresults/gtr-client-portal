@@ -46,7 +46,7 @@ export async function loadRevenueTab({ portalState, content }) {
   }
 
   // ------------------------------------------------------------
-  // RENDER GRID — totals + contacts
+  // RENDER GRID — totals + contacts + arrows + color coding
   // ------------------------------------------------------------
   function renderGrid(data) {
     if (!data || !data.months) {
@@ -55,39 +55,61 @@ export async function loadRevenueTab({ portalState, content }) {
     }
 
     const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec"
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
     ];
 
     const headerHtml = months.map((m) => `<th>${m}</th>`).join("");
 
-    // --- Totals row ---
-    const totalsRow = months
-      .map((_, idx) => {
-        const key = String(idx + 1).padStart(2, "0");
-        return `<td>${formatCurrency(data.months[key] || 0)}</td>`;
-      })
-      .join("");
+    // --- Totals row with arrows + color ---
+    const totalsRow = months.map((_, idx) => {
+      const key = String(idx + 1).padStart(2, "0");
+      const prevKey = String(idx).padStart(2, "0");
 
-    // --- Contact rows ---
+      const value = data.months[key] || 0;
+      const prev = idx === 0 ? null : (data.months[prevKey] || 0);
+
+      let cls = "rev-same";
+      let arrow = "";
+
+      if (prev !== null) {
+        if (value > prev) {
+          cls = "rev-up";
+          arrow = " ▲";
+        } else if (value < prev) {
+          cls = "rev-down";
+          arrow = " ▼";
+        }
+      }
+
+      return `<td class="${cls}">${formatCurrency(value)}${arrow}</td>`;
+    }).join("");
+
+    // --- Contact rows with arrows + color ---
     const contactRows = data.contacts
       .map((c) => {
-        const monthCells = months
-          .map((_, idx) => {
-            const key = String(idx + 1).padStart(2, "0");
-            return `<td>${formatCurrency(c.months[key] || 0)}</td>`;
-          })
-          .join("");
+        const monthCells = months.map((_, idx) => {
+          const key = String(idx + 1).padStart(2, "0");
+          const prevKey = String(idx).padStart(2, "0");
+
+          const value = c.months[key] || 0;
+          const prev = idx === 0 ? null : (c.months[prevKey] || 0);
+
+          let cls = "rev-same";
+          let arrow = "";
+
+          if (prev !== null) {
+            if (value > prev) {
+              cls = "rev-up";
+              arrow = " ▲";
+            } else if (value < prev) {
+              cls = "rev-down";
+              arrow = " ▼";
+            }
+          }
+
+          return `<td class="${cls}">${formatCurrency(value)}${arrow}</td>`;
+        }).join("");
 
         return `
         <tr>
@@ -110,11 +132,12 @@ export async function loadRevenueTab({ portalState, content }) {
   </thead>
 
   <tbody>
-  <tr class="totals-row">
-  <td><strong>Total Revenue</strong></td>
-  ${totalsRow}
-  <td><strong>${formatCurrency(data.total)}</strong></td>
-</tr>
+    <tr class="totals-row">
+      <td><strong>Total Revenue</strong></td>
+      ${totalsRow}
+      <td><strong>${formatCurrency(data.total)}</strong></td>
+    </tr>
+
     ${contactRows}
   </tbody>
 </table>
