@@ -4,33 +4,32 @@ import { formatCurrency } from "../utilities.js";
 
 export async function loadRevenueTab({ portalState, content }) {
   content.innerHTML = `
-    <section class="card">
-      <h2>Revenue Structure</h2>
+<section class="card">
+  <h2>Revenue Structure</h2>
 
-      <div style="margin-bottom: 16px;">
-        <label for="rev-year-select"><strong>Select Year:</strong></label>
-        <select id="rev-year-select"></select>
-      </div>
+  <div style="margin-bottom: 16px;">
+    <label for="rev-year-select"><strong>Select Year:</strong></label>
+    <select id="rev-year-select"></select>
+  </div>
 
-      <div id="rev-grid"></div>
-    </section>
-  `;
+  <div id="rev-grid"></div>
+</section>
+`;
 
   const yearSelect = document.getElementById("rev-year-select");
   const grid = document.getElementById("rev-grid");
 
-  // Load available years from operations-module
+  // Load available years
   const years = await fetchYears(portalState.project);
 
   if (Array.isArray(years) && years.length > 0) {
-    years.forEach(y => {
+    years.forEach((y) => {
       const opt = document.createElement("option");
       opt.value = y;
       opt.textContent = y;
       yearSelect.appendChild(opt);
     });
 
-    // Default to latest year
     yearSelect.value = years[years.length - 1];
     loadYear(yearSelect.value);
   } else {
@@ -42,12 +41,12 @@ export async function loadRevenueTab({ portalState, content }) {
   });
 
   async function loadYear(year) {
-    const data = await fetchMonthlyRevenue(portalState.project, year);
+    const data = await fetchMonthlyDetailed(portalState.project, year);
     renderGrid(data);
   }
 
   // ------------------------------------------------------------
-  // RENDER GRID (striped table using notes-table class)
+  // RENDER GRID — totals + contacts
   // ------------------------------------------------------------
   function renderGrid(data) {
     if (!data || !data.months) {
@@ -55,45 +54,79 @@ export async function loadRevenueTab({ portalState, content }) {
       return;
     }
 
-    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec"
+    ];
 
-    const headerHtml = months
-      .map(m => `<th>${m}</th>`)
-      .join("");
+    const headerHtml = months.map((m) => `<th>${m}</th>`).join("");
 
-    const rowHtml = months
+    // --- Totals row ---
+    const totalsRow = months
       .map((_, idx) => {
         const key = String(idx + 1).padStart(2, "0");
         return `<td>${formatCurrency(data.months[key] || 0)}</td>`;
       })
       .join("");
 
+    // --- Contact rows ---
+    const contactRows = data.contacts
+      .map((c) => {
+        const monthCells = months
+          .map((_, idx) => {
+            const key = String(idx + 1).padStart(2, "0");
+            return `<td>${formatCurrency(c.months[key] || 0)}</td>`;
+          })
+          .join("");
+
+        return `
+        <tr>
+          <td>${c.contact_name}</td>
+          ${monthCells}
+          <td><strong>${formatCurrency(c.total)}</strong></td>
+        </tr>
+      `;
+      })
+      .join("");
+
     grid.innerHTML = `
-      <table class="notes-table">
-        <thead>
-          <tr>
-            <th></th>
-            ${headerHtml}
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>Total Revenue</strong></td>
-            ${rowHtml}
-            <td><strong>${formatCurrency(data.total)}</strong></td>
-          </tr>
-        </tbody>
-      </table>
-    `;
+<table class="notes-table">
+  <thead>
+    <tr>
+      <th>Contact</th>
+      ${headerHtml}
+      <th>Total</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    <tr>
+      <td><strong>Total Revenue</strong></td>
+      ${totalsRow}
+      <td><strong>${formatCurrency(data.total)}</strong></td>
+    </tr>
+
+    ${contactRows}
+  </tbody>
+</table>
+`;
   }
 }
 
 // -----------------------------
-// API Helpers (Supabase only)
+// API Helpers
 // -----------------------------
 
-// YEARS
 async function fetchYears(project) {
   try {
     const url = `https://operations-module.dennis-e64.workers.dev/revenue/years?project=${project}`;
@@ -105,14 +138,13 @@ async function fetchYears(project) {
   }
 }
 
-// MONTHLY
-async function fetchMonthlyRevenue(project, year) {
+async function fetchMonthlyDetailed(project, year) {
   try {
-    const url = `https://operations-module.dennis-e64.workers.dev/revenue/monthly?project=${project}&year=${year}`;
+    const url = `https://operations-module.dennis-e64.workers.dev/revenue/monthly-detailed?project=${project}&year=${year}`;
     const res = await fetch(url, { cache: "no-cache" });
     return await res.json();
   } catch (err) {
-    console.error("Failed to fetch monthly revenue:", err);
-    return { months: {}, total: 0 };
+    console.error("Failed to fetch detailed revenue:", err);
+    return { months: {}, total: 0, contacts: [] };
   }
 }
