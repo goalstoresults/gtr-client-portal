@@ -550,6 +550,21 @@ th.sortable:hover .sort-arrows {
 }
 
 
+.rev-up {
+  color: #0a8a0a; /* green */
+  font-weight: 600;
+}
+
+.rev-down {
+  color: #c62828; /* red */
+  font-weight: 600;
+}
+
+.rev-same {
+  color: #000;
+}
+
+
 /* Subtle fade-in animation */
 @keyframes loginFadeIn {
   from {
