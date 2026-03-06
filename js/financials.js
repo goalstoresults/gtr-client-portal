@@ -4,6 +4,8 @@
 import { renderFinancialAdd } from "./financials/tab-add.js";
 import { renderFinancialList } from "./financials/tab-list.js";
 import { renderFinancialSummary } from "./financials/tab-summary.js";
+import { loadRevenueTab } from "../operations/revenue.js";
+
 
 export async function loadFinancialsTab({ portalState, tabContent }) {
   // Load base HTML template
@@ -49,6 +51,11 @@ export async function loadFinancialsTab({ portalState, tabContent }) {
         return;
       }
 
+      if (subtab === "revenue") {
+        await loadRevenueTab({ portalState, content });
+        return;
+      }
+    
       content.innerHTML = `
         <section class="card">
           <p>Select a subtab to begin.</p>
