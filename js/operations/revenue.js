@@ -110,12 +110,11 @@ export async function loadRevenueTab({ portalState, content }) {
   </thead>
 
   <tbody>
-    <tr>
-      <td><strong>Total Revenue</strong></td>
-      ${totalsRow}
-      <td><strong>${formatCurrency(data.total)}</strong></td>
-    </tr>
-
+  <tr class="totals-row">
+  <td><strong>Total Revenue</strong></td>
+  ${totalsRow}
+  <td><strong>${formatCurrency(data.total)}</strong></td>
+</tr>
     ${contactRows}
   </tbody>
 </table>
