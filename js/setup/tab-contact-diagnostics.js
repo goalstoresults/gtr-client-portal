@@ -16,7 +16,6 @@ export async function renderContactDiagnostics(setupContent, portalState) {
     return;
   }
 
-  // Initialize sort state if missing
   if (!portalState.contactDiagSort) {
     portalState.contactDiagSort = {
       column: "name",
@@ -25,73 +24,74 @@ export async function renderContactDiagnostics(setupContent, portalState) {
   }
 
   setupContent.innerHTML = `
-<section class="card">
-  <h2>Contact Diagnostics</h2>
+    <section class="card">
+      <h2>Contact Diagnostics</h2>
 
-  <div style="margin-bottom: 15px; display:flex; gap:10px; align-items:center;">
-    <button id="cd-refresh" class="btn btn-primary">Refresh</button>
-    <button id="cd-bulk-sync" class="btn btn-success">Bulk Sync</button>
-    <button id="cd-export" class="btn btn-secondary">Export Selected</button>
-    <button id="cd-clear-all" class="btn btn-secondary">Clear All</button>
+      <div style="margin-bottom: 15px; display:flex; gap:10px; align-items:center;">
+        <button id="cd-refresh" class="btn btn-primary">Refresh</button>
+        <button id="cd-bulk-sync" class="btn btn-success">Bulk Sync</button>
+        <button id="cd-export" class="btn btn-secondary">Export Selected</button>
+        <button id="cd-clear-all" class="btn btn-secondary">Clear All</button>
 
-    <span id="cd-selected-count" style="font-weight:bold; margin-left:10px;">
-      Total: 0   Selected: 0
-    </span>
+        <span id="cd-selected-count" style="font-weight:bold; margin-left:10px;">
+          Total: 0 Selected: 0
+        </span>
 
-    <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
-      <label style="font-weight:bold;">Filter:</label>
-      <select id="cd-filter" class="form-select" style="width:220px;">
-        <option value="missing_crm">Missing CRM</option>
-        <option value="has_crm">Has CRM</option>
-        <option value="all">All Contacts</option>
-      </select>
-    </div>
-  </div>
+        <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+          <label style="font-weight:bold;">Filter:</label>
+          <select id="cd-filter" class="form-select" style="width:220px;">
+            <option value="missing_crm">Missing CRM</option>
+            <option value="has_crm">Has CRM</option>
+            <option value="all">All Contacts</option>
+          </select>
+        </div>
+      </div>
 
-  <table class="notes-table" style="width:100%;">
-    <thead>
-      <tr>
-        <th style="width:40px; text-align:center;">
-          <input type="checkbox" id="cd-select-all">
-        </th>
-        <th class="cd-sortable" data-field="name">
-          Name
-          <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-            <span class="sort-up">△</span>
-            <span class="sort-down">▽</span>
-          </span>
-        </th>
-        <th class="cd-sortable" data-field="email">
-          Email
-          <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-            <span class="sort-up">△</span>
-            <span class="sort-down">▽</span>
-          </span>
-        </th>
-        <th class="cd-sortable" data-field="phone">
-          Phone
-          <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-            <span class="sort-up">△</span>
-            <span class="sort-down">▽</span>
-          </span>
-        </th>
-        <th class="cd-sortable" data-field="contact_type">
-          Contact Type
-          <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-            <span class="sort-up">△</span>
-            <span class="sort-down">▽</span>
-          </span>
-        </th>
-        <th style="width:160px;">CRM ID</th>
-        <th style="width:180px; text-align:center;">Actions</th>
-      </tr>
-    </thead>
-    <tbody id="cd-body">
-      <tr><td colspan="7">Loading...</td></tr>
-    </tbody>
-  </table>
-</section>
-`;
+      <table class="notes-table" style="width:100%;">
+        <thead>
+          <tr>
+            <th style="width:40px; text-align:center;">
+              <input type="checkbox" id="cd-select-all">
+            </th>
+            <th class="cd-sortable" data-field="name">
+              Name
+              <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+                <span class="sort-up">△</span>
+                <span class="sort-down">▽</span>
+              </span>
+            </th>
+            <th class="cd-sortable" data-field="email">
+              Email
+              <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+                <span class="sort-up">△</span>
+                <span class="sort-down">▽</span>
+              </span>
+            </th>
+            <th class="cd-sortable" data-field="phone">
+              Phone
+              <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+                <span class="sort-up">△</span>
+                <span class="sort-down">▽</span>
+              </span>
+            </th>
+            <th class="cd-sortable" data-field="contact_type">
+              Contact Type
+              <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+                <span class="sort-up">△</span>
+                <span class="sort-down">▽</span>
+              </span>
+            </th>
+            <th style="width:160px;">CRM ID</th>
+            <th style="width:180px; text-align:center;">Actions</th>
+          </tr>
+        </thead>
+
+        <tbody id="cd-body">
+          <tr><td colspan="7">Loading...</td></tr>
+        </tbody>
+      </table>
+    </section>
+  `;
 
   document.getElementById("cd-refresh").onclick = () =>
     loadContacts(project, portalState);
@@ -100,11 +100,9 @@ export async function renderContactDiagnostics(setupContent, portalState) {
   document.getElementById("cd-clear-all").onclick = clearAll;
   document.getElementById("cd-export").onclick = exportSelected;
   document.getElementById("cd-bulk-sync").onclick = () => bulkSync(project);
-
   document.getElementById("cd-filter").onchange = () =>
     loadContacts(project, portalState);
 
-  // Initial load
   loadContacts(project, portalState);
 }
 
@@ -121,8 +119,8 @@ async function loadContacts(project, portalState) {
     const res = await fetch(
       `${CD_BASE_URL}/contact_diag/list?project=${project}&filter=${filter}`
     );
-    const data = await res.json();
 
+    const data = await res.json();
     CD_CACHE = Array.isArray(data.contacts) ? data.contacts : [];
 
     renderRows(portalState);
@@ -155,21 +153,21 @@ function renderRows(portalState) {
         : `<span style="color:red; font-weight:bold;">None</span>`;
 
       return `
-<tr data-id="${c.contact_id}">
-  <td style="text-align:center;">
-    <input type="checkbox" class="cd-row">
-  </td>
-  <td>${name}</td>
-  <td>${c.email || ""}</td>
-  <td>${c.phone || ""}</td>
-  <td>${c.contact_type || ""}</td>
-  <td>${crmDisplay}</td>
-  <td style="text-align:center;">
-    <button class="btn btn-secondary" onclick="cdPreview('${c.contact_id}', '${c.project}')">Preview</button>
-    <button class="btn btn-success" onclick="cdSync('${c.contact_id}', '${c.project}')">Sync</button>
-  </td>
-</tr>
-`;
+        <tr data-id="${c.contact_id}">
+          <td style="text-align:center;">
+            <input type="checkbox" class="cd-row">
+          </td>
+          <td>${name}</td>
+          <td>${c.email || ""}</td>
+          <td>${c.phone || ""}</td>
+          <td>${c.contact_type || ""}</td>
+          <td>${crmDisplay}</td>
+          <td style="text-align:center;">
+            <button class="btn btn-secondary" onclick="cdPreview('${c.contact_id}', '${c.project}')">Preview</button>
+            <button class="btn btn-success" onclick="cdSync('${c.contact_id}', '${c.project}')">Sync</button>
+          </td>
+        </tr>
+      `;
     })
     .join("");
 
@@ -284,7 +282,7 @@ function updateSelectedCount() {
   const selected = document.querySelectorAll(".cd-row:checked").length;
   const total = CD_CACHE.length;
   document.getElementById("cd-selected-count").innerText =
-    `Total: ${total}   Selected: ${selected}`;
+    `Total: ${total} Selected: ${selected}`;
 }
 
 function exportSelected() {
