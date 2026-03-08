@@ -383,7 +383,6 @@ function summarizeByGroupYear(payments, groupByContactId) {
 /* =========================================================
 RENDER SUMMARY GRID (SORTABLE + EXPANDABLE)
 ========================================================= */
-
 function renderSummaryGrid(rows, type, portalState) {
 
   const container = document.getElementById("summaryGrid");
@@ -666,10 +665,11 @@ function renderSummaryGrid(rows, type, portalState) {
   <tbody>
     ${detailData
       .map(d => {
+        const clientName = nameById.get(d.contact_id) || "(unknown)";
         return `
         <tr>
           <td>${d.transaction_date || ""}</td>
-          <td>${escapeHtml(d.contacts?.search_name || "(unknown)")}</td>
+          <td>${escapeHtml(clientName)}</td>
           <td style="text-align:right;">${formatCurrency(d.amount || 0)}</td>
           <td>${escapeHtml(d.invoice_number || "")}</td>
         </tr>`;
@@ -717,3 +717,4 @@ function renderSummaryGrid(rows, type, portalState) {
 
   render();
 }
+
