@@ -385,175 +385,45 @@ function buildName(c) {
 }
 
 function renderStagingGrid(rows) {
-  const container = document.getElementById("stagingGrid");
+  const container = document.getElementById("staging-grid");
+  container.innerHTML = "";
 
-  // Sorting state
-  let currentSortField = "transaction_date";
-  let currentSortDirection = "asc";
+  rows.forEach(row => {
+    const div = document.createElement("div");
+    div.className = "staging-row";
 
-  // FINAL column list (unchanged labels)
-  const columns = [
-    { key: "customer_name", label: "Customer Name" },
-    { key: "invoice_number", label: "Invoice #" },
-    { key: "transaction_date", label: "Date", isDate: true },
-    { key: "amount", label: "Amount", numeric: true },
-    { key: "contact_name", label: "Contact" },      // ⭐ updated
-    { key: "referral_name", label: "Referral" },    // ⭐ updated
-    { key: "status", label: "Status" },
-    { key: "error_message", label: "Error" },
-    { key: "action", label: "Action" }
-  ];
+    // ⭐ CONTACT NAME (search_name)
+    const contactName =
+      row.contact?.search_name && row.contact?.search_name.trim() !== ""
+        ? row.contact.search_name
+        : "(none)";
 
-  function sortRows() {
-    rows.sort((a, b) => {
-      let A = a[currentSortField];
-      let B = b[currentSortField];
+    // ⭐ REFERRAL NAME (search_name)
+    const referralName =
+      row.referral?.search_name && row.referral?.search_name.trim() !== ""
+        ? row.referral.search_name
+        : "(none)";
 
-      const col = columns.find((c) => c.key === currentSortField);
-
-      if (col?.isDate) {
-        A = new Date(A);
-        B = new Date(B);
-      } else if (col?.numeric) {
-        A = Number(A) || 0;
-        B = Number(B) || 0;
-      } else {
-        A = (A || "").toString().toLowerCase();
-        B = (B || "").toString().toLowerCase();
-      }
-
-      if (A < B) return currentSortDirection === "asc" ? -1 : 1;
-      if (A > B) return currentSortDirection === "asc" ? 1 : -1;
-      return 0;
-    });
-  }
-
-  function renderTable() {
-    sortRows();
-
-    // Header
-    const headerHtml = columns
-      .map((col) => {
-        const isSorted = currentSortField === col.key;
-        const upArrow = isSorted && currentSortDirection === "asc" ? "▲" : "△";
-        const downArrow =
-          isSorted && currentSortDirection === "desc" ? "▼" : "▽";
-
-        return `
-          <th class="sortable" data-field="${col.key}">
-            ${escapeHtml(col.label)}
-            <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-              <span class="sort-up">${upArrow}</span>
-              <span class="sort-down">${downArrow}</span>
-            </span>
-          </th>
-        `;
-      })
-      .join("");
-
-    // Rows
-    const rowsHtml = rows
-      .map((row, i) => {
-        const contactName = buildName(row.contact) || "(none)";
-        const referralName = buildName(row.referral) || "(none)";
-
-        return `
-        <tr
-          id="row-${row.id}"
-          data-description="${escapeHtml(row.description || "")}"
-          style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};"
-        >
-          <td class="expand-cell">
-            <a href="#" onclick="toggleEdit('${row.id}'); return false;">
-              ${escapeHtml(row.customer_name || "")}
-            </a>
-          </td>
-
-          <td>${escapeHtml(row.invoice_number || "")}</td>
-          <td>${escapeHtml(row.transaction_date || "")}</td>
-          <td>${escapeHtml((Number(row.amount) || 0).toFixed(2))}</td>
-
-          <!-- ⭐ CONTACT NAME -->
-          <td class="contact-cell">
-            ${escapeHtml(contactName)}
-            <div style="font-size:0.75em; color:#888;">
-              ${escapeHtml(row.contact_id || "")}
-            </div>
-          </td>
-
-          <!-- ⭐ REFERRAL NAME -->
-          <td class="referral-cell" style="color:${row.referral_id ? "#000" : "red"};">
-            ${escapeHtml(referralName)}
-            <div style="font-size:0.75em; color:#888;">
-              ${escapeHtml(row.referral_id || "")}
-            </div>
-          </td>
-
-          <td class="status-cell">${escapeHtml(row.status || "")}</td>
-
-          <td class="error-cell" style="color:red;">
-            ${escapeHtml(row.error_message || "")}
-          </td>
-
-          <td class="action-cell">
-            ${renderStagingActionButton(row)}
-          </td>
-        </tr>
-      `;
-      })
-      .join("");
-
-    container.innerHTML = `
-      <div style="margin-bottom:10px; display:flex; gap:12px; align-items:center;">
-        <button id="refreshStagingGrid" class="btn-primary">Refresh Grid</button>
-        <select id="stagingFilter" style="padding:4px 6px;">
-          <option value="">All (except imported)</option>
-          <option value="uploaded">Uploaded</option>
-          <option value="ready">Ready</option>
-          <option value="error">Error</option>
-          <option value="imported">Imported</option>
-          <option value="missing_contact">Missing Contact</option>
-          <option value="missing_referral">Missing Referral</option>
-          <option value="needs_review">Needs Review</option>
-        </select>
+    div.innerHTML = `
+      <div class="cell contact">
+        <div class="top">${contactName}</div>
+        <div class="bottom">${row.contact_id || ""}</div>
       </div>
 
-      <table class="notes-table" style="width:100%; border-collapse:collapse; margin-top:12px;">
-        <thead><tr>${headerHtml}</tr></thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>
+      <div class="cell referral">
+        <div class="top">${referralName}</div>
+        <div class="bottom">${row.referral_id || ""}</div>
+      </div>
+
+      <div class="cell amount">$${row.amount || 0}</div>
+      <div class="cell date">${row.transaction_date || ""}</div>
+      <div class="cell status">${row.status}</div>
     `;
 
-    // Sorting events
-    container.querySelectorAll("th.sortable").forEach((th) => {
-      th.addEventListener("click", () => {
-        const field = th.dataset.field;
-        if (currentSortField === field) {
-          currentSortDirection =
-            currentSortDirection === "asc" ? "desc" : "asc";
-        } else {
-          currentSortField = field;
-          currentSortDirection = "asc";
-        }
-        renderTable();
-      });
-    });
-
-    // Refresh button
-    let refreshBtn = document.getElementById("refreshStagingGrid");
-    refreshBtn.replaceWith(refreshBtn.cloneNode(true));
-    refreshBtn = document.getElementById("refreshStagingGrid");
-    refreshBtn.addEventListener("click", loadStagingData);
-
-    // Filter dropdown
-    let filter = document.getElementById("stagingFilter");
-    filter.replaceWith(filter.cloneNode(true));
-    filter = document.getElementById("stagingFilter");
-    filter.addEventListener("change", loadStagingData);
-  }
-
-  renderTable();
+    container.appendChild(div);
+  });
 }
+
 
 
 /* =========================================================
