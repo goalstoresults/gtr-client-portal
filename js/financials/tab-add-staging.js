@@ -146,6 +146,7 @@ window.toggleEdit = function (id) {
   const date = row.children[2].textContent.trim();
   const amount = row.children[3].textContent.trim();
   const contact = row.querySelector(".contact-cell")?.textContent.trim() || "";
+  const description = row.dataset.description || "";   // ⭐ NEW
 
   const editRow = document.createElement("tr");
   editRow.id = `edit-${id}`;
@@ -157,16 +158,17 @@ window.toggleEdit = function (id) {
 
         <div>
           <label>Customer</label>
-          <input id="edit_customer_${id}" class="form-control" value="${escapeHtml(
-            customer
-          )}">
+          <input id="edit_customer_${id}" class="form-control" value="${escapeHtml(customer)}">
         </div>
 
         <div>
           <label>Invoice #</label>
-          <input id="edit_invoice_${id}" class="form-control" value="${escapeHtml(
-            invoice
-          )}">
+          <input id="edit_invoice_${id}" class="form-control" value="${escapeHtml(invoice)}">
+        </div>
+
+        <div>
+          <label>Description</label>
+          <input id="edit_description_${id}" class="form-control" value="${escapeHtml(description)}">
         </div>
 
         <div>
@@ -181,9 +183,7 @@ window.toggleEdit = function (id) {
 
         <div>
           <label>Contact ID</label>
-          <input id="edit_contact_${id}" class="form-control" value="${escapeHtml(
-            contact === "(none)" ? "" : contact
-          )}">
+          <input id="edit_contact_${id}" class="form-control" value="${escapeHtml(contact === "(none)" ? "" : contact)}">
         </div>
 
       </div>
@@ -198,6 +198,7 @@ window.toggleEdit = function (id) {
 
   row.insertAdjacentElement("afterend", editRow);
 };
+
 
 // fixRow now just opens the inline editor
 window.fixRow = function (id) {
@@ -214,7 +215,7 @@ window.saveEdit = async function(id) {
   // Extract values
   const customer_name = document.getElementById(`edit_customer_${id}`).value.trim();
   const invoice_number = document.getElementById(`edit_invoice_${id}`).value.trim();
-
+  const description = document.getElementById(`edit_description_${id}`).value.trim();   // ⭐ NEW
   const transaction_date_raw = document.getElementById(`edit_date_${id}`).value.trim();
   const amount_raw = document.getElementById(`edit_amount_${id}`).value.trim();
   const contact_id_raw = document.getElementById(`edit_contact_${id}`).value.trim();
@@ -228,6 +229,7 @@ window.saveEdit = async function(id) {
     id,
     customer_name,
     invoice_number,
+    description,        // ⭐ NEW
     transaction_date,
     amount,
     contact_id,
@@ -247,9 +249,7 @@ window.saveEdit = async function(id) {
   );
 
   let data = {};
-  try {
-    data = await res.json();
-  } catch {}
+  try { data = await res.json(); } catch {}
 
   console.log("INLINE UPDATE RESPONSE:", res.status, data);
 
@@ -258,11 +258,9 @@ window.saveEdit = async function(id) {
     return;
   }
 
-  // 🔥 CRITICAL FIX:
-  // Wait for the grid to reload BEFORE allowing any further actions.
+  // Reload grid before closing editor
   await loadStagingData();
 
-  // Close the editor AFTER the grid refreshes
   const editRow = document.querySelector(`#edit-${id}`);
   if (editRow) editRow.remove();
 };
