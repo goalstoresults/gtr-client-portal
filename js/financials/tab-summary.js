@@ -383,7 +383,7 @@ function summarizeByGroupYear(payments, groupByContactId) {
 /* =========================================================
 RENDER SUMMARY GRID (SORTABLE + EXPANDABLE)
 ========================================================= */
-function renderSummaryGrid(rows, type, portalState) {
+function renderSummaryGrid(rows, type, portalState, nameById) {
 
   const container = document.getElementById("summaryGrid");
 
