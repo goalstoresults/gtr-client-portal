@@ -447,9 +447,11 @@ function renderStagingGrid(rows) {
     const rowsHtml = rows
       .map(
         (row, i) => `
-        <tr id="row-${row.id}" style="background:${
-          i % 2 === 0 ? "#ffffff" : "#f9f9f9"
-        };">
+           <tr 
+              id="row-${row.id}"
+              data-description="${escapeHtml(row.description || "")}"
+              style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};"
+            >
           <td class="expand-cell">
             <a href="#" onclick="toggleEdit('${row.id}'); return false;">
               ${escapeHtml(row.customer_name || "")}
