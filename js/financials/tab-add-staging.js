@@ -372,9 +372,17 @@ export async function loadStagingData() {
 window.loadStagingData = loadStagingData;
 
 /* =========================================================
-   STAGING GRID RENDERING
-   Updated for referral_id + group_id + filters
+STAGING GRID RENDERING
+Updated to show contact/referral NAMES instead of IDs
 ========================================================= */
+
+function buildName(c) {
+  if (!c) return null;
+  if (c.business_name) return c.business_name;
+  if (c.first_name || c.last_name)
+    return `${c.first_name || ""} ${c.last_name || ""}`.trim();
+  return null;
+}
 
 function renderStagingGrid(rows) {
   const container = document.getElementById("stagingGrid");
@@ -383,14 +391,14 @@ function renderStagingGrid(rows) {
   let currentSortField = "transaction_date";
   let currentSortDirection = "asc";
 
-  // FINAL column list (group_id removed)
+  // FINAL column list (unchanged labels)
   const columns = [
     { key: "customer_name", label: "Customer Name" },
     { key: "invoice_number", label: "Invoice #" },
     { key: "transaction_date", label: "Date", isDate: true },
     { key: "amount", label: "Amount", numeric: true },
-    { key: "contact_id", label: "Contact ID" },
-    { key: "referral_id", label: "Referral ID" },
+    { key: "contact_name", label: "Contact" },      // ⭐ updated
+    { key: "referral_name", label: "Referral" },    // ⭐ updated
     { key: "status", label: "Status" },
     { key: "error_message", label: "Error" },
     { key: "action", label: "Action" }
@@ -445,37 +453,54 @@ function renderStagingGrid(rows) {
 
     // Rows
     const rowsHtml = rows
-      .map(
-        (row, i) => `
-           <tr 
-              id="row-${row.id}"
-              data-description="${escapeHtml(row.description || "")}"
-              style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};"
-            >
+      .map((row, i) => {
+        const contactName = buildName(row.contact) || "(none)";
+        const referralName = buildName(row.referral) || "(none)";
+
+        return `
+        <tr
+          id="row-${row.id}"
+          data-description="${escapeHtml(row.description || "")}"
+          style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};"
+        >
           <td class="expand-cell">
             <a href="#" onclick="toggleEdit('${row.id}'); return false;">
               ${escapeHtml(row.customer_name || "")}
             </a>
           </td>
+
           <td>${escapeHtml(row.invoice_number || "")}</td>
           <td>${escapeHtml(row.transaction_date || "")}</td>
           <td>${escapeHtml((Number(row.amount) || 0).toFixed(2))}</td>
-          <td class="contact-cell">${escapeHtml(row.contact_id || "(none)")}</td>
-          <td class="referral-cell" style="color:${
-            row.referral_id ? "#000" : "red"
-          };">
-            ${escapeHtml(row.referral_id || "(none)")}
+
+          <!-- ⭐ CONTACT NAME -->
+          <td class="contact-cell">
+            ${escapeHtml(contactName)}
+            <div style="font-size:0.75em; color:#888;">
+              ${escapeHtml(row.contact_id || "")}
+            </div>
           </td>
+
+          <!-- ⭐ REFERRAL NAME -->
+          <td class="referral-cell" style="color:${row.referral_id ? "#000" : "red"};">
+            ${escapeHtml(referralName)}
+            <div style="font-size:0.75em; color:#888;">
+              ${escapeHtml(row.referral_id || "")}
+            </div>
+          </td>
+
           <td class="status-cell">${escapeHtml(row.status || "")}</td>
+
           <td class="error-cell" style="color:red;">
             ${escapeHtml(row.error_message || "")}
           </td>
+
           <td class="action-cell">
             ${renderStagingActionButton(row)}
           </td>
         </tr>
-      `
-      )
+      `;
+      })
       .join("");
 
     container.innerHTML = `
@@ -492,10 +517,9 @@ function renderStagingGrid(rows) {
           <option value="needs_review">Needs Review</option>
         </select>
       </div>
+
       <table class="notes-table" style="width:100%; border-collapse:collapse; margin-top:12px;">
-        <thead>
-          <tr>${headerHtml}</tr>
-        </thead>
+        <thead><tr>${headerHtml}</tr></thead>
         <tbody>${rowsHtml}</tbody>
       </table>
     `;
@@ -515,8 +539,6 @@ function renderStagingGrid(rows) {
       });
     });
 
-    // 🔥 FIX: Remove old listeners by cloning nodes
-
     // Refresh button
     let refreshBtn = document.getElementById("refreshStagingGrid");
     refreshBtn.replaceWith(refreshBtn.cloneNode(true));
@@ -532,6 +554,7 @@ function renderStagingGrid(rows) {
 
   renderTable();
 }
+
 
 /* =========================================================
    Bulk CSV File Upload
