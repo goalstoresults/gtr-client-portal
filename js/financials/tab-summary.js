@@ -81,11 +81,12 @@ async function loadSummaryYears(portalState) {
 /* =========================================================
 LOAD SUMMARY DATA
 ========================================================= */
-
 async function loadSummaryData(portalState) {
+
   const type = document.getElementById("summaryType").value;
   const year = document.getElementById("summaryYear").value;
 
+  // --- Load payments ---
   const payRes = await fetch(
     `https://financials-module.dennis-e64.workers.dev/payments/list?project=${portalState.project}&limit=2000`,
     { cache: "no-cache" }
@@ -98,6 +99,7 @@ async function loadSummaryData(portalState) {
     payments = [];
   }
 
+  // --- Load contacts (with groups only for group summaries) ---
   const isGroupSummary = type === "group" || type === "group_year";
   const contactsEndpointPath = isGroupSummary
     ? "/contacts/list-with-groups"
@@ -115,6 +117,7 @@ async function loadSummaryData(portalState) {
     contacts = [];
   }
 
+  // --- Build lookup maps ---
   const nameById = new Map();
   const groupByContactId = new Map();
 
@@ -123,48 +126,60 @@ async function loadSummaryData(portalState) {
       c.contact_id,
       c.search_name || c.contact_name || c.contact_id
     );
+
     const groupId = c.group_id || null;
     const groupName = c.group_name || (groupId || "(none)");
+
     groupByContactId.set(c.contact_id, {
       group_id: groupId,
       group_name: groupName
     });
   }
 
+  // --- Filter by year ---
   if (year !== "all") {
     payments = payments.filter(p => {
       return String(p.transaction_year) === String(year);
     });
   }
 
+  // --- Build summary rows ---
   let summaryRows = [];
 
   switch (type) {
     case "client":
       summaryRows = summarizeByClient(payments, nameById);
       break;
+
     case "referral":
       summaryRows = summarizeByReferral(payments, nameById);
       break;
+
     case "year":
       summaryRows = summarizeByYear(payments);
       break;
+
     case "year_client":
       summaryRows = summarizeByYearClient(payments, nameById);
       break;
+
     case "year_referral":
       summaryRows = summarizeByYearReferral(payments, nameById);
       break;
+
     case "group":
       summaryRows = summarizeByGroup(payments, groupByContactId);
       break;
+
     case "group_year":
       summaryRows = summarizeByGroupYear(payments, groupByContactId);
       break;
   }
 
-  renderSummaryGrid(summaryRows, type, portalState);
+  // ⭐⭐⭐ CRITICAL FIX — pass nameById into renderSummaryGrid
+  renderSummaryGrid(summaryRows, type, portalState, nameById);
 }
+
 
 /* =========================================================
 SUMMARY LOGIC (transaction_year-native)
