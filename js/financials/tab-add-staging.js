@@ -392,17 +392,9 @@ function renderStagingGrid(rows) {
     const div = document.createElement("div");
     div.className = "staging-row";
 
-    // ⭐ SAFE contact name extraction
-    const contactName =
-      row.contact && row.contact.search_name
-        ? row.contact.search_name
-        : "(none)";
-
-    // ⭐ SAFE referral name extraction
-    const referralName =
-      row.referral && row.referral.search_name
-        ? row.referral.search_name
-        : "(none)";
+    // ⭐ USE FLATTENED BACKEND FIELDS
+    const contactName = row.contact_name || "(none)";
+    const referralName = row.referral_name || "(none)";
 
     div.innerHTML = `
       <div class="cell contact">
