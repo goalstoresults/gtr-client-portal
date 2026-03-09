@@ -134,7 +134,7 @@ export async function loadTasksAdd({ portalState, container }) {
   `;
 
   /* =========================================================
-     4) Save Handler
+     4) Save Handler — FIXED FIELD NAME + FULL RESET
   ========================================================= */
   const form = content.querySelector("#addTaskForm");
 
@@ -146,7 +146,10 @@ export async function loadTasksAdd({ portalState, container }) {
       priority: form.querySelector("#priorityInput").value,
       area: form.querySelector("#areaInput").value,
       who: form.querySelector("#whoInput").value,
-      who_for: form.querySelector("#whoForInput").value,
+
+      // ⭐ FIXED FIELD NAME
+      who_is_this_for: form.querySelector("#whoForInput").value,
+
       due_date: form.querySelector("#dueDateInput").value || null,
       followup_date: form.querySelector("#followupDateInput").value || null,
       notes: form.querySelector("#notesInput").value.trim() || null,
@@ -168,7 +171,18 @@ export async function loadTasksAdd({ portalState, container }) {
     );
 
     alert("Task added.");
+
+    // ⭐ FULL RESET
     form.reset();
+
+    document.querySelector("#statusInput").selectedIndex = 0;
+    document.querySelector("#priorityInput").selectedIndex = 0;
+    document.querySelector("#areaInput").selectedIndex = 0;
+    document.querySelector("#whoInput").selectedIndex = 0;
+    document.querySelector("#whoForInput").selectedIndex = 0;
+
+    document.querySelector("#dueDateInput").value = "";
+    document.querySelector("#followupDateInput").value = "";
+    document.querySelector("#notesInput").value = "";
   });
 }
-
