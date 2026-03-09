@@ -62,17 +62,10 @@ export function loadTasksAdd({ portalState, container }) {
         </div>
       </div>
 
-      <!-- Who is this for + Project -->
-      <div class="two-col">
-        <div class="notes-row">
-          <label class="notes-label">Who is this for?</label>
-          <input id="taskWhoFor" class="form-control" />
-        </div>
-
-        <div class="notes-row">
-          <label class="notes-label">Project</label>
-          <input id="taskProject" class="form-control" />
-        </div>
+      <!-- Who is this for -->
+      <div class="notes-row">
+        <label class="notes-label">Who is this for?</label>
+        <input id="taskWhoFor" class="form-control" />
       </div>
 
       <!-- Due Date + Follow-up Date -->
@@ -115,11 +108,13 @@ export function loadTasksAdd({ portalState, container }) {
 
   container.querySelector("#btnAddTask").addEventListener("click", async () => {
     const payload = {
+      // NEVER user-entered — always from portalState
       project: portalState.project,
-      created_by_user_id: portalState.user_id,   // REQUIRED
+      created_by_user_id: portalState.user_id,
 
+      // Schema-aligned fields
       title: container.querySelector("#taskTitle").value.trim(),
-      status: container.querySelector("#taskStatus").value.trim(),
+      status: container.querySelector("#taskStatus").value.trim() || "todo",
       priority: parseInt(container.querySelector("#taskPriority").value.trim()) || 2,
 
       area: container.querySelector("#taskArea").value.trim(),
@@ -129,7 +124,6 @@ export function loadTasksAdd({ portalState, container }) {
       due_date: container.querySelector("#taskDueDate").value || null,
       followup_date: container.querySelector("#taskFollowUpDate").value || null,
 
-      project: container.querySelector("#taskProject").value.trim(),
       notes: container.querySelector("#taskNotes").value.trim()
     };
 
