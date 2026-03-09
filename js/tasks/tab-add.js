@@ -116,14 +116,19 @@ export function loadTasksAdd({ portalState, container }) {
   container.querySelector("#btnAddTask").addEventListener("click", async () => {
     const payload = {
       project: portalState.project,
+      created_by_user_id: portalState.user.id,   // REQUIRED
+
       title: container.querySelector("#taskTitle").value.trim(),
       status: container.querySelector("#taskStatus").value.trim(),
       priority: parseInt(container.querySelector("#taskPriority").value.trim()) || 2,
+
       area: container.querySelector("#taskArea").value.trim(),
       who: container.querySelector("#taskWho").value.trim(),
       who_is_this_for: container.querySelector("#taskWhoFor").value.trim(),
+
       due_date: container.querySelector("#taskDueDate").value || null,
       followup_date: container.querySelector("#taskFollowUpDate").value || null,
+
       project: container.querySelector("#taskProject").value.trim(),
       notes: container.querySelector("#taskNotes").value.trim()
     };
