@@ -40,12 +40,12 @@ export function loadTasksAdd({ portalState, container }) {
       <div class="two-col">
         <div class="notes-row">
           <label class="notes-label">Status</label>
-          <input id="taskStatus" class="form-control" placeholder="To-Do" />
+          <input id="taskStatus" class="form-control" placeholder="todo" />
         </div>
 
         <div class="notes-row">
           <label class="notes-label">Priority</label>
-          <input id="taskPriority" class="form-control" placeholder="P2" />
+          <input id="taskPriority" class="form-control" placeholder="2" />
         </div>
       </div>
 
@@ -53,25 +53,25 @@ export function loadTasksAdd({ portalState, container }) {
       <div class="two-col">
         <div class="notes-row">
           <label class="notes-label">Area</label>
-          <input id="taskArea" class="form-control" placeholder="Select" />
+          <input id="taskArea" class="form-control" />
         </div>
 
         <div class="notes-row">
           <label class="notes-label">Who</label>
-          <input id="taskWho" class="form-control" placeholder="Select" />
+          <input id="taskWho" class="form-control" />
         </div>
       </div>
 
-      <!-- Who For + Project/Client -->
+      <!-- Who is this for + Project -->
       <div class="two-col">
         <div class="notes-row">
           <label class="notes-label">Who is this for?</label>
-          <input id="taskWhoFor" class="form-control" placeholder="Select" />
+          <input id="taskWhoFor" class="form-control" />
         </div>
 
         <div class="notes-row">
-          <label class="notes-label">Project/Client</label>
-          <input id="taskProjectClient" class="form-control" />
+          <label class="notes-label">Project</label>
+          <input id="taskProject" class="form-control" />
         </div>
       </div>
 
@@ -94,11 +94,9 @@ export function loadTasksAdd({ portalState, container }) {
         <textarea id="taskNotes" class="form-control" placeholder="Optional details"></textarea>
       </div>
 
-      <!-- Buttons -->
-      <div style="margin-top:16px; display:flex; gap:12px;">
+      <!-- Primary Button Only -->
+      <div style="margin-top:16px;">
         <button id="btnAddTask" class="btn-primary">Add Task</button>
-        <button id="btnGoToList" class="btn-secondary">Lists</button>
-        <button id="btnBackToActive" class="btn-secondary">← Back to Active</button>
       </div>
 
       <div id="taskAddMessage" style="margin-top:12px;"></div>
@@ -120,13 +118,13 @@ export function loadTasksAdd({ portalState, container }) {
       project: portalState.project,
       title: container.querySelector("#taskTitle").value.trim(),
       status: container.querySelector("#taskStatus").value.trim(),
-      priority: container.querySelector("#taskPriority").value.trim(),
+      priority: parseInt(container.querySelector("#taskPriority").value.trim()) || 2,
       area: container.querySelector("#taskArea").value.trim(),
       who: container.querySelector("#taskWho").value.trim(),
-      who_for: container.querySelector("#taskWhoFor").value.trim(),
+      who_is_this_for: container.querySelector("#taskWhoFor").value.trim(),
       due_date: container.querySelector("#taskDueDate").value || null,
-      follow_up_date: container.querySelector("#taskFollowUpDate").value || null,
-      project_client: container.querySelector("#taskProjectClient").value.trim(),
+      followup_date: container.querySelector("#taskFollowUpDate").value || null,
+      project: container.querySelector("#taskProject").value.trim(),
       notes: container.querySelector("#taskNotes").value.trim()
     };
 
@@ -149,17 +147,5 @@ export function loadTasksAdd({ portalState, container }) {
       console.error(err);
       msg.innerHTML = `<p class="error">Failed to add task.</p>`;
     }
-  });
-
-  // Lists button
-  container.querySelector("#btnGoToList").addEventListener("click", () => {
-    const listBtn = document.querySelector('#tasks-subtabs button[data-subtab="list"]');
-    if (listBtn) listBtn.click();
-  });
-
-  // Back to Active button
-  container.querySelector("#btnBackToActive").addEventListener("click", () => {
-    const listBtn = document.querySelector('#tasks-subtabs button[data-subtab="list"]');
-    if (listBtn) listBtn.click();
   });
 }
