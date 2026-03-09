@@ -1,4 +1,4 @@
-// tab-list.js — Tasks List with Inline Expand/Edit
+// tab-list.js — Tasks List with Inline Expand/Edit + Dropdowns
 
 import { escapeHtml, formatDateOnly } from "../utilities.js";
 
@@ -17,6 +17,47 @@ export async function loadTasksList({ portalState, container }) {
   if (!portalState.project) {
     listEl.innerHTML = `<p>No project selected.</p>`;
     return;
+  }
+
+  /* ---------------------------------------------------------
+     Fetch lookups
+  --------------------------------------------------------- */
+  let lookups = [];
+  try {
+    const res = await fetch(
+      `https://tasks-manager.dennis-e64.workers.dev/lookups/list?project=${encodeURIComponent(
+        portalState.project
+      )}`,
+      { cache: "no-cache" }
+    );
+    const j = await res.json();
+    lookups = Array.isArray(j) ? j : [];
+  } catch {
+    lookups = [];
+  }
+
+  function getOptions(field) {
+    return lookups
+      .filter(r => r.field === field && r.active)
+      .sort((a, b) => a.sort_order - b.sort_order);
+  }
+
+  function buildOptions(field, currentValue) {
+    const opts = getOptions(field);
+    const cur = currentValue || "";
+    const optionsHtml = opts
+      .map(o => {
+        const val = o.value || "";
+        const selected = val === cur ? "selected" : "";
+        return `<option value="${escapeHtml(val)}" ${selected}>${escapeHtml(
+          val
+        )}</option>`;
+      })
+      .join("");
+    return `
+      <option value="">-- Select --</option>
+      ${optionsHtml}
+    `;
   }
 
   /* ---------------------------------------------------------
@@ -126,8 +167,14 @@ export async function loadTasksList({ portalState, container }) {
       .join("");
 
     const rowsHtml = tasks
-      .map(
-        t => `
+      .map(t => {
+        const statusOptions = buildOptions("status", t.status);
+        const priorityOptions = buildOptions("priority", t.priority?.toString());
+        const areaOptions = buildOptions("area", t.area);
+        const whoOptions = buildOptions("who", t.who);
+        const whoForOptions = buildOptions("who_is_this_for", t.who_is_this_for);
+
+        return `
         <tr class="task-row" data-id="${t.id}">
           <td class="expand-cell">
             <button class="expand-btn" data-id="${t.id}">▶</button>
@@ -152,26 +199,36 @@ export async function loadTasksList({ portalState, container }) {
                 </div>
                 <div style="flex:0 0 20%;">
                   <label>Status</label>
-                  <input class="edit-status" value="${escapeHtml(t.status || "")}" style="width:100%;">
+                  <select class="edit-status" style="width:100%;">
+                    ${statusOptions}
+                  </select>
                 </div>
                 <div style="flex:0 0 20%;">
                   <label>Priority</label>
-                  <input class="edit-priority" value="${escapeHtml(t.priority || "")}" style="width:100%;">
+                  <select class="edit-priority" style="width:100%;">
+                    ${priorityOptions}
+                  </select>
                 </div>
               </div>
 
               <div style="display:flex; gap:12px; margin-bottom:8px;">
                 <div style="flex:0 0 25%;">
                   <label>Area</label>
-                  <input class="edit-area" value="${escapeHtml(t.area || "")}" style="width:100%;">
+                  <select class="edit-area" style="width:100%;">
+                    ${areaOptions}
+                  </select>
                 </div>
                 <div style="flex:0 0 25%;">
                   <label>Assigned</label>
-                  <input class="edit-who" value="${escapeHtml(t.who || "")}" style="width:100%;">
+                  <select class="edit-who" style="width:100%;">
+                    ${whoOptions}
+                  </select>
                 </div>
                 <div style="flex:0 0 25%;">
                   <label>Who Is This For</label>
-                  <input class="edit-whoFor" value="${escapeHtml(t.who_is_this_for || "")}" style="width:100%;">
+                  <select class="edit-whoFor" style="width:100%;">
+                    ${whoForOptions}
+                  </select>
                 </div>
               </div>
 
@@ -188,7 +245,9 @@ export async function loadTasksList({ portalState, container }) {
 
               <div style="margin-bottom:8px;">
                 <label>Notes</label>
-                <textarea class="edit-notes" style="width:100%;">${escapeHtml(t.notes || "")}</textarea>
+                <textarea class="edit-notes" style="width:100%;">${escapeHtml(
+                  t.notes || ""
+                )}</textarea>
               </div>
 
               <div style="display:flex; gap:12px;">
@@ -199,8 +258,8 @@ export async function loadTasksList({ portalState, container }) {
             </div>
           </td>
         </tr>
-      `
-      )
+      `;
+      })
       .join("");
 
     listEl.innerHTML = `
@@ -253,18 +312,33 @@ export async function loadTasksList({ portalState, container }) {
         const id = btn.dataset.id;
         const row = document.getElementById(`expand-${id}`);
 
+        const titleVal = row.querySelector(".edit-title").value.trim();
+        if (!titleVal) {
+          alert("Title is required.");
+          return;
+        }
+
+        const statusVal = row.querySelector(".edit-status").value;
+        const priorityVal = row.querySelector(".edit-priority").value;
+        const areaVal = row.querySelector(".edit-area").value;
+        const whoVal = row.querySelector(".edit-who").value;
+        const whoForVal = row.querySelector(".edit-whoFor").value;
+        const dueVal = row.querySelector(".edit-due").value;
+        const followVal = row.querySelector(".edit-follow").value;
+        const notesVal = row.querySelector(".edit-notes").value.trim();
+
         const payload = {
           id,
           project: portalState.project,
-          title: row.querySelector(".edit-title").value.trim(),
-          status: row.querySelector(".edit-status").value.trim(),
-          priority: row.querySelector(".edit-priority").value.trim(),
-          area: row.querySelector(".edit-area").value.trim(),
-          who: row.querySelector(".edit-who").value.trim(),
-          who_is_this_for: row.querySelector(".edit-whoFor").value.trim(),
-          due_date: row.querySelector(".edit-due").value || null,
-          followup_date: row.querySelector(".edit-follow").value || null,
-          notes: row.querySelector(".edit-notes").value.trim()
+          title: titleVal,
+          status: statusVal,
+          priority: priorityVal ? parseInt(priorityVal, 10) : null,
+          area: areaVal || "",
+          who: whoVal || "",
+          who_is_this_for: whoForVal || "",
+          due_date: dueVal || null,
+          followup_date: followVal || null,
+          notes: notesVal || null
         };
 
         await fetch(
