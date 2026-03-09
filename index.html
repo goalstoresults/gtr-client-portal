@@ -214,6 +214,8 @@ async function attemptLogin() {
         portalState.userEmail = email;
         portalState.allowedTabs = result.allowed_tabs || [];
         portalState.deleteAllowed = result.delete_allowed === true;
+        portalState.user_id = result.staff_id;
+
 
         const friendly = result.first_name || "";
         welcomeHeader.textContent = `Welcome ${friendly}!`;
