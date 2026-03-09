@@ -97,15 +97,15 @@ export async function loadTasksAdd({ portalState, container }) {
 
       <!-- Row 2: Area, Assigned, Who Is This For -->
       <div style="display:flex; gap:12px;">
-        <div style="flex:1;">
+        <div style="flex:0 0 30%;">
           <label>Area</label>
           <select id="areaInput" style="width:100%;">${areaOptions}</select>
         </div>
-        <div style="flex:1;">
+        <div style="flex:0 0 25%;">
           <label>Assigned</label>
           <select id="whoInput" style="width:100%;">${whoOptions}</select>
         </div>
-        <div style="flex:1;">
+        <div style="flex:0 0 25%;">
           <label>Who Is This For</label>
           <select id="whoForInput" style="width:100%;">${whoForOptions}</select>
         </div>
@@ -113,11 +113,11 @@ export async function loadTasksAdd({ portalState, container }) {
 
       <!-- Row 3: Due Date, Follow-up Date -->
       <div style="display:flex; gap:12px;">
-        <div style="flex:1;">
+        <div style="flex:0 0 30%;">
           <label>Due Date</label>
           <input id="dueDateInput" type="date" style="width:100%;">
         </div>
-        <div style="flex:1;">
+        <div style="flex:0 0 30%;">
           <label>Follow-up Date</label>
           <input id="followupDateInput" type="date" style="width:100%;">
         </div>
