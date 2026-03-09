@@ -14,6 +14,13 @@ export async function loadTasksTab({ portalState, tabContent }) {
   const content = tabContent.querySelector("#tasksContent");
   const buttons = tabContent.querySelectorAll("#tasks-subtabs button");
 
+  // ⭐ NEW — Normalize role and hide Lookups tab if not admin
+  const role = (portalState.task_manager || "").trim().toLowerCase();
+  if (role !== "admin") {
+    const lookupsBtn = tabContent.querySelector('#tasks-subtabs button[data-subtab="lookups"]');
+    if (lookupsBtn) lookupsBtn.style.display = "none";
+  }
+
   // --- Subtab Router ---
   buttons.forEach(btn => {
     btn.addEventListener("click", async () => {
@@ -22,6 +29,16 @@ export async function loadTasksTab({ portalState, tabContent }) {
       btn.classList.add("active");
 
       const subtab = btn.dataset.subtab;
+
+      // ⭐ NEW — Block routing to Lookups if not admin
+      if (subtab === "lookups" && role !== "admin") {
+        content.innerHTML = `
+          <section class="card">
+            <p>You do not have permission to access Lookups.</p>
+          </section>
+        `;
+        return;
+      }
 
       switch (subtab) {
         case "list":
