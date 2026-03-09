@@ -1,15 +1,63 @@
-// js/tasks.js — Phase 1: full iframe, hard-coded cid
+// tasks.js
+
+import { loadTasksList } from "./tasks/tab-list.js";
+import { loadTasksAdd } from "./tasks/tab-add.js";
+import { loadTasksEdit } from "./tasks/tab-edit.js";
+import { loadTasksLookups } from "./tasks/tab-lookups.js";
+import { loadTasksOverview } from "./tasks/tab-overview.js";
 
 export async function loadTasksTab({ portalState, tabContent }) {
-  tabContent.innerHTML = `
-    <section class="card">
-      <h2>Tasks</h2>
+  // Load base HTML template
+  const res = await fetch("./components/tasks.html", { cache: "no-cache" });
+  tabContent.innerHTML = await res.text();
 
-      <iframe
-        id="tasksFrame"
-        src="https://gtr-task-manager.pages.dev/?cid=hezFHREjxhfwcOdxYOcc"
-        style="width:100%; height:80vh; border:1px solid #e5e7eb; border-radius:12px; background:#fff;">
-      </iframe>
-    </section>
-  `;
+  const content = tabContent.querySelector("#tasksContent");
+  const buttons = tabContent.querySelectorAll("#tasks-subtabs button");
+
+  // --- Subtab Router ---
+  buttons.forEach(btn => {
+    btn.addEventListener("click", async () => {
+      // Reset active state
+      buttons.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+
+      const subtab = btn.dataset.subtab;
+
+      switch (subtab) {
+        case "list":
+          await loadTasksList({ portalState, container: content });
+          break;
+
+        case "add":
+          await loadTasksAdd({ portalState, container: content });
+          break;
+
+        case "edit":
+          await loadTasksEdit({ portalState, container: content });
+          break;
+
+        case "lookups":
+          await loadTasksLookups({ portalState, container: content });
+          break;
+
+        case "overview":
+          await loadTasksOverview({ portalState, container: content });
+          break;
+
+        default:
+          content.innerHTML = `
+            <section class="card">
+              <p>Select a subtab to begin.</p>
+            </section>
+          `;
+      }
+    });
+  });
+
+  // ⭐ DEFAULT TO LIST VIEW
+  const defaultBtn = tabContent.querySelector('#tasks-subtabs button[data-subtab="list"]');
+  if (defaultBtn) {
+    defaultBtn.classList.add("active");
+    await loadTasksList({ portalState, container: content });
+  }
 }
