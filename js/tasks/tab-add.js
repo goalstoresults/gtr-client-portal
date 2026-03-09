@@ -1,150 +1,147 @@
-// tab-add.js
+// tab-add.js — Add Task
 
-/* =========================================================
-   BACKEND INSERT: Add Task
-========================================================= */
-export async function addTask(payload) {
-  const res = await fetch(
-    `https://tasks-manager.dennis-e64.workers.dev/tasks/add`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    }
-  );
+import { escapeHtml } from "../utilities.js";
 
-  const data = await res.json();
-
-  if (!res.ok) {
-    throw new Error(data.error || "Task insert failed");
+export async function loadTasksAdd({ portalState, container }) {
+  if (!portalState.project) {
+    container.innerHTML = `
+      <section class="card">
+        <p>No project selected.</p>
+      </section>
+    `;
+    return;
   }
 
-  return data;
-}
-
-/* =========================================================
-   RENDER: Add Task Form (2-column layout)
-========================================================= */
-export function loadTasksAdd({ portalState, container }) {
   container.innerHTML = `
     <section class="card">
       <h2>Add Task</h2>
-
-      <!-- Title (full width) -->
-      <div class="notes-row">
-        <label class="notes-label">Title</label>
-        <input id="taskTitle" class="form-control" />
-      </div>
-
-      <!-- Status + Priority -->
-      <div class="two-col">
-        <div class="notes-row">
-          <label class="notes-label">Status</label>
-          <input id="taskStatus" class="form-control" placeholder="todo" />
-        </div>
-
-        <div class="notes-row">
-          <label class="notes-label">Priority</label>
-          <input id="taskPriority" class="form-control" placeholder="2" />
-        </div>
-      </div>
-
-      <!-- Area + Who -->
-      <div class="two-col">
-        <div class="notes-row">
-          <label class="notes-label">Area</label>
-          <input id="taskArea" class="form-control" />
-        </div>
-
-        <div class="notes-row">
-          <label class="notes-label">Who</label>
-          <input id="taskWho" class="form-control" />
-        </div>
-      </div>
-
-      <!-- Who is this for -->
-      <div class="notes-row">
-        <label class="notes-label">Who is this for?</label>
-        <input id="taskWhoFor" class="form-control" />
-      </div>
-
-      <!-- Due Date + Follow-up Date -->
-      <div class="two-col">
-        <div class="notes-row">
-          <label class="notes-label">Due Date</label>
-          <input id="taskDueDate" class="form-control" type="date" />
-        </div>
-
-        <div class="notes-row">
-          <label class="notes-label">Follow-up Date</label>
-          <input id="taskFollowUpDate" class="form-control" type="date" />
-        </div>
-      </div>
-
-      <!-- Notes (full width) -->
-      <div class="notes-row">
-        <label class="notes-label">Notes</label>
-        <textarea id="taskNotes" class="form-control" placeholder="Optional details"></textarea>
-      </div>
-
-      <!-- Primary Button Only -->
-      <div style="margin-top:16px;">
-        <button id="btnAddTask" class="btn-primary">Add Task</button>
-      </div>
-
-      <div id="taskAddMessage" style="margin-top:12px;"></div>
+      <div id="taskAddContent">Loading…</div>
     </section>
-
-    <style>
-      .two-col {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 16px;
-      }
-    </style>
   `;
 
-  const msg = container.querySelector("#taskAddMessage");
+  const content = container.querySelector("#taskAddContent");
 
-  container.querySelector("#btnAddTask").addEventListener("click", async () => {
+  /* =========================================================
+     1) Fetch lookup values
+  ========================================================= */
+  let lookups = [];
+  try {
+    const res = await fetch(
+      `https://tasks-manager.dennis-e64.workers.dev/lookups/list?project=${encodeURIComponent(
+        portalState.project
+      )}`,
+      { cache: "no-cache" }
+    );
+    lookups = await res.json();
+    if (!Array.isArray(lookups)) lookups = [];
+  } catch (err) {
+    content.innerHTML = `<p>Error loading lookups.</p>`;
+    return;
+  }
+
+  /* =========================================================
+     2) Helper to get sorted active options for a field
+  ========================================================= */
+  function getOptions(field) {
+    return lookups
+      .filter(r => r.field === field && r.active)
+      .sort((a, b) => a.sort_order - b.sort_order);
+  }
+
+  /* =========================================================
+     3) Build dropdown HTML
+  ========================================================= */
+  const statusOptions = getOptions("status")
+    .map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.value)}</option>`)
+    .join("");
+
+  const priorityOptions = getOptions("priority")
+    .map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.value)}</option>`)
+    .join("");
+
+  const areaOptions = getOptions("area")
+    .map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.value)}</option>`)
+    .join("");
+
+  const whoOptions = getOptions("who")
+    .map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.value)}</option>`)
+    .join("");
+
+  const whoForOptions = getOptions("who_is_this_for")
+    .map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.value)}</option>`)
+    .join("");
+
+  /* =========================================================
+     4) Render Add Form
+  ========================================================= */
+  content.innerHTML = `
+    <form id="addTaskForm" class="form-grid">
+
+      <label>Title</label>
+      <input id="titleInput" placeholder="Task title">
+
+      <label>Description</label>
+      <textarea id="descriptionInput" placeholder="Task details"></textarea>
+
+      <label>Status</label>
+      <select id="statusInput">${statusOptions}</select>
+
+      <label>Priority</label>
+      <select id="priorityInput">${priorityOptions}</select>
+
+      <label>Area</label>
+      <select id="areaInput">${areaOptions}</select>
+
+      <label>Who</label>
+      <select id="whoInput">${whoOptions}</select>
+
+      <label>Who Is This For</label>
+      <select id="whoForInput">${whoForOptions}</select>
+
+      <label>Due Date</label>
+      <input id="dueDateInput" type="date">
+
+      <button id="saveTaskBtn" class="btn-primary" style="margin-top:16px;">Save Task</button>
+    </form>
+  `;
+
+  /* =========================================================
+     5) Save Handler
+  ========================================================= */
+  const form = content.querySelector("#addTaskForm");
+  const saveBtn = content.querySelector("#saveTaskBtn");
+
+  saveBtn.addEventListener("click", async e => {
+    e.preventDefault();
+
     const payload = {
-      // NEVER user-entered — always from portalState
       project: portalState.project,
-      created_by_user_id: portalState.user_id,
-
-      // Schema-aligned fields
-      title: container.querySelector("#taskTitle").value.trim(),
-      status: container.querySelector("#taskStatus").value.trim() || "todo",
-      priority: parseInt(container.querySelector("#taskPriority").value.trim()) || 2,
-
-      area: container.querySelector("#taskArea").value.trim(),
-      who: container.querySelector("#taskWho").value.trim(),
-      who_is_this_for: container.querySelector("#taskWhoFor").value.trim(),
-
-      due_date: container.querySelector("#taskDueDate").value || null,
-      followup_date: container.querySelector("#taskFollowUpDate").value || null,
-
-      notes: container.querySelector("#taskNotes").value.trim()
+      title: form.querySelector("#titleInput").value.trim(),
+      description: form.querySelector("#descriptionInput").value.trim(),
+      status: form.querySelector("#statusInput").value,
+      priority: form.querySelector("#priorityInput").value,
+      area: form.querySelector("#areaInput").value,
+      who: form.querySelector("#whoInput").value,
+      who_for: form.querySelector("#whoForInput").value,
+      due_date: form.querySelector("#dueDateInput").value || null,
+      created_at: new Date().toISOString()
     };
 
     if (!payload.title) {
-      msg.innerHTML = `<p class="error">Title is required.</p>`;
+      alert("Please enter a title.");
       return;
     }
 
-    msg.innerHTML = "Saving…";
+    await fetch(
+      "https://tasks-manager.dennis-e64.workers.dev/tasks/add",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }
+    );
 
-    try {
-      await addTask(payload);
-      msg.innerHTML = `<p class="success">Task added!</p>`;
-
-      // Auto-switch to List
-      const listBtn = document.querySelector('#tasks-subtabs button[data-subtab="list"]');
-      if (listBtn) listBtn.click();
-
-    } catch (err) {
-      console.error(err);
-      msg.innerHTML = `<p class="error">Failed to add task.</p>`;
-    }
+    alert("Task added.");
+    form.reset();
   });
 }
