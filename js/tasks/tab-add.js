@@ -1,4 +1,4 @@
-// tab-add.js — Add Task (3-per-row workspace layout)
+// tab-add.js — Add Task (3-per-row workspace layout, wide Title)
 
 import { escapeHtml } from "../utilities.js";
 
@@ -70,8 +70,8 @@ export async function loadTasksAdd({ portalState, container }) {
   const whoForOptions = buildOptions("who_is_this_for");
 
   /* =========================================================
-     3) Render Add Form — EXACT ROWS:
-        Row 1: Title, Status, Priority
+     3) Render Add Form
+        Row 1: Title (wide), Status, Priority
         Row 2: Area, Assigned, Who Is This For
         Row 3: Due Date, Follow-up Date
         Row 4: Notes (full width)
@@ -79,19 +79,19 @@ export async function loadTasksAdd({ portalState, container }) {
   content.innerHTML = `
     <form id="addTaskForm" class="workspace-form" style="display:flex; flex-direction:column; gap:12px;">
 
-      <!-- Row 1: Title, Status, Priority -->
+      <!-- Row 1: Title (wide), Status, Priority -->
       <div style="display:flex; gap:12px;">
-        <div style="flex:2;">
+        <div style="flex:0 0 60%;">
           <label>Title</label>
-          <input id="titleInput" placeholder="Task title">
+          <input id="titleInput" placeholder="Task title" style="width:100%;">
         </div>
-        <div style="flex:1;">
+        <div style="flex:0 0 20%;">
           <label>Status</label>
-          <select id="statusInput">${statusOptions}</select>
+          <select id="statusInput" style="width:100%;">${statusOptions}</select>
         </div>
-        <div style="flex:1;">
+        <div style="flex:0 0 20%;">
           <label>Priority</label>
-          <select id="priorityInput">${priorityOptions}</select>
+          <select id="priorityInput" style="width:100%;">${priorityOptions}</select>
         </div>
       </div>
 
@@ -99,15 +99,15 @@ export async function loadTasksAdd({ portalState, container }) {
       <div style="display:flex; gap:12px;">
         <div style="flex:1;">
           <label>Area</label>
-          <select id="areaInput">${areaOptions}</select>
+          <select id="areaInput" style="width:100%;">${areaOptions}</select>
         </div>
         <div style="flex:1;">
           <label>Assigned</label>
-          <select id="whoInput">${whoOptions}</select>
+          <select id="whoInput" style="width:100%;">${whoOptions}</select>
         </div>
         <div style="flex:1;">
           <label>Who Is This For</label>
-          <select id="whoForInput">${whoForOptions}</select>
+          <select id="whoForInput" style="width:100%;">${whoForOptions}</select>
         </div>
       </div>
 
@@ -115,11 +115,11 @@ export async function loadTasksAdd({ portalState, container }) {
       <div style="display:flex; gap:12px;">
         <div style="flex:1;">
           <label>Due Date</label>
-          <input id="dueDateInput" type="date">
+          <input id="dueDateInput" type="date" style="width:100%;">
         </div>
         <div style="flex:1;">
           <label>Follow-up Date</label>
-          <input id="followupDateInput" type="date">
+          <input id="followupDateInput" type="date" style="width:100%;">
         </div>
         <div style="flex:1;"></div>
       </div>
@@ -127,7 +127,7 @@ export async function loadTasksAdd({ portalState, container }) {
       <!-- Row 4: Notes (full width) -->
       <div style="display:flex; flex-direction:column;">
         <label>Notes</label>
-        <textarea id="notesInput" placeholder="Optional notes"></textarea>
+        <textarea id="notesInput" placeholder="Optional notes" style="width:100%;"></textarea>
       </div>
 
     </form>
@@ -171,3 +171,4 @@ export async function loadTasksAdd({ portalState, container }) {
     form.reset();
   });
 }
+
