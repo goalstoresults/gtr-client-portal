@@ -116,7 +116,7 @@ export function loadTasksAdd({ portalState, container }) {
   container.querySelector("#btnAddTask").addEventListener("click", async () => {
     const payload = {
       project: portalState.project,
-      created_by_user_id: portalState.user.id,   // REQUIRED
+      created_by_user_id: portalState.user_id,   // REQUIRED
 
       title: container.querySelector("#taskTitle").value.trim(),
       status: container.querySelector("#taskStatus").value.trim(),
