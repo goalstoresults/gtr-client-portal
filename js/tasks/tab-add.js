@@ -71,10 +71,6 @@ export async function loadTasksAdd({ portalState, container }) {
 
   /* =========================================================
      3) Render Add Form
-        Row 1: Title (wide), Status, Priority
-        Row 2: Area, Assigned, Who Is This For
-        Row 3: Due Date, Follow-up Date
-        Row 4: Notes (full width)
   ========================================================= */
   content.innerHTML = `
     <form id="addTaskForm" class="workspace-form" style="display:flex; flex-direction:column; gap:12px;">
@@ -82,7 +78,7 @@ export async function loadTasksAdd({ portalState, container }) {
       <!-- Row 1: Title (wide), Status, Priority -->
       <div style="display:flex; gap:12px;">
         <div style="flex:0 0 50%;">
-          <label>Title</label>
+          <label>Title1</label>
           <input id="titleInput" placeholder="Task title" style="width:100%;">
         </div>
         <div style="flex:0 0 20%;">
