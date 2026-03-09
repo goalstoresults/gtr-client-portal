@@ -463,4 +463,138 @@ export async function loadTasksList({ portalState, container }) {
 
     /* Delete */
     listEl.querySelectorAll(".delete-task").forEach(btn => {
-      btn.add
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id;
+
+        if (!confirm("Delete this task?")) return;
+
+        await fetch("https://tasks-manager.dennis-e64.workers.dev/tasks/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id })
+        });
+
+        tasks = computeDueIn(await fetchTasks());
+        filteredTasks = [...tasks];
+        renderTable();
+      });
+    });
+  }
+
+  /* ---------------------------------------------------------
+     FILTER PANEL TOGGLE
+  --------------------------------------------------------- */
+  container.querySelector("#filterToggle").addEventListener("click", () => {
+    filterPanel.style.display =
+      filterPanel.style.display === "none" ? "block" : "none";
+  });
+
+  /* ---------------------------------------------------------
+     SORT PANEL TOGGLE
+  --------------------------------------------------------- */
+  container.querySelector("#sortToggle").addEventListener("click", () => {
+    sortPanel.style.display =
+      sortPanel.style.display === "none" ? "block" : "none";
+  });
+
+  /* ---------------------------------------------------------
+     APPLY FILTERS
+  --------------------------------------------------------- */
+  filterPanel.querySelector("#applyFilters").addEventListener("click", () => {
+    applyFilters();
+    renderTable();
+  });
+
+  /* ---------------------------------------------------------
+     RESET FILTERS
+  --------------------------------------------------------- */
+  filterPanel.querySelector("#resetFilters").addEventListener("click", () => {
+    filterPanel.querySelectorAll("select").forEach(sel => (sel.selectedIndex = -1));
+    filterPanel.querySelector("#fDue").value = "all";
+    filterPanel.querySelector("#fFollowToday").checked = false;
+
+    filteredTasks = [...tasks];
+    renderTable();
+  });
+
+  /* ---------------------------------------------------------
+     APPLY SORT
+  --------------------------------------------------------- */
+  sortPanel.querySelector("#applySort").addEventListener("click", () => {
+    const fields = sortPanel.querySelectorAll(".sort-field");
+    const dirs = sortPanel.querySelectorAll(".sort-dir");
+
+    fields.forEach((f, i) => {
+      sortLevels[i].field = f.value;
+      sortLevels[i].dir = dirs[i].value;
+    });
+
+    renderTable();
+  });
+
+  /* ---------------------------------------------------------
+     RESET SORT
+  --------------------------------------------------------- */
+  sortPanel.querySelector("#resetSort").addEventListener("click", () => {
+    sortLevels = [
+      { field: "due_date", dir: "asc" },
+      { field: "", dir: "asc" },
+      { field: "", dir: "asc" },
+      { field: "", dir: "asc" }
+    ];
+    renderTable();
+  });
+
+  /* ---------------------------------------------------------
+     EXPORT CSV
+  --------------------------------------------------------- */
+  container.querySelector("#exportCsvBtn").addEventListener("click", () => {
+    if (!filteredTasks.length) {
+      alert("No tasks to export.");
+      return;
+    }
+
+    const headers = [
+      "id",
+      "title",
+      "who_is_this_for",
+      "who",
+      "area",
+      "priority",
+      "status",
+      "due_in",
+      "due_date",
+      "followup_date",
+      "project",
+      "notes"
+    ];
+
+    const csvRows = [
+      headers.join(","),
+      ...filteredTasks.map(t =>
+        headers
+          .map(h => {
+            const val = t[h] ?? "";
+            return `"${String(val).replace(/"/g, '""')}"`;
+          })
+          .join(",")
+      )
+    ];
+
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `tasks_export_${portalState.project}.csv`;
+    a.click();
+
+    URL.revokeObjectURL(url);
+  });
+
+  /* ---------------------------------------------------------
+     INITIAL RENDER
+  --------------------------------------------------------- */
+  renderTable();
+}
+
