@@ -130,13 +130,15 @@ export async function loadTasksAdd({ portalState, container }) {
   `;
 
   /* =========================================================
-     4) Save Handler — FIXED FIELD NAME + FULL RESET
+     4) Save Handler — FIXED FIELD NAME + FULL RESET + created_by_user_id
   ========================================================= */
   const form = content.querySelector("#addTaskForm");
 
   saveBtn.addEventListener("click", async () => {
     const payload = {
       project: portalState.project,
+      created_by_user_id: portalState.user_id,   // ⭐ REQUIRED BY BACKEND
+
       title: form.querySelector("#titleInput").value.trim(),
       status: form.querySelector("#statusInput").value,
       priority: form.querySelector("#priorityInput").value,
