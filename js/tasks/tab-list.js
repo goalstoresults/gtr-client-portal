@@ -41,9 +41,9 @@ export async function loadTasksList({ portalState, container }) {
   let currentSortDirection = "asc";
 
   const columns = [
-    { key: "description", label: "Title" },
-    { key: "contact_id", label: "For" },
-    { key: "assigned_to", label: "Who" },
+    { key: "title", label: "Title" },
+    { key: "who_is_this_for", label: "For" },
+    { key: "who", label: "Who" },
     { key: "status", label: "Status" },
     { key: "due_in", label: "Due In", numeric: true },
     { key: "due_date", label: "Due Date", isDate: true },
@@ -121,9 +121,9 @@ export async function loadTasksList({ portalState, container }) {
     const rowsHtml = tasks
       .map(t => `
         <tr>
-          <td>${escapeHtml(t.description || "")}</td>
-          <td>${escapeHtml(t.contact_id || "")}</td>
-          <td>${escapeHtml(t.assigned_to || "")}</td>
+          <td>${escapeHtml(t.title || "")}</td>
+          <td>${escapeHtml(t.who_is_this_for || "")}</td>
+          <td>${escapeHtml(t.who || "")}</td>
           <td>${escapeHtml(t.status || "")}</td>
           <td>${t.due_in === null ? "—" : t.due_in + "d"}</td>
           <td>${formatDateOnly(t.due_date)}</td>
