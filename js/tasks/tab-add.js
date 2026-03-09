@@ -23,66 +23,94 @@ export async function addTask(payload) {
 }
 
 /* =========================================================
-   RENDER: Add Task Form (text fields only for now)
+   RENDER: Add Task Form (2-column layout)
 ========================================================= */
 export function loadTasksAdd({ portalState, container }) {
   container.innerHTML = `
     <section class="card">
       <h2>Add Task</h2>
 
+      <!-- Title (full width) -->
       <div class="notes-row">
         <label class="notes-label">Title</label>
         <input id="taskTitle" class="form-control" />
       </div>
 
-      <div class="notes-row">
-        <label class="notes-label">Status</label>
-        <input id="taskStatus" class="form-control" placeholder="To-Do" />
+      <!-- Status + Priority -->
+      <div class="two-col">
+        <div class="notes-row">
+          <label class="notes-label">Status</label>
+          <input id="taskStatus" class="form-control" placeholder="To-Do" />
+        </div>
+
+        <div class="notes-row">
+          <label class="notes-label">Priority</label>
+          <input id="taskPriority" class="form-control" placeholder="P2" />
+        </div>
       </div>
 
-      <div class="notes-row">
-        <label class="notes-label">Priority</label>
-        <input id="taskPriority" class="form-control" placeholder="P2" />
+      <!-- Area + Who -->
+      <div class="two-col">
+        <div class="notes-row">
+          <label class="notes-label">Area</label>
+          <input id="taskArea" class="form-control" placeholder="Select" />
+        </div>
+
+        <div class="notes-row">
+          <label class="notes-label">Who</label>
+          <input id="taskWho" class="form-control" placeholder="Select" />
+        </div>
       </div>
 
-      <div class="notes-row">
-        <label class="notes-label">Area</label>
-        <input id="taskArea" class="form-control" placeholder="Select" />
+      <!-- Who For + Project/Client -->
+      <div class="two-col">
+        <div class="notes-row">
+          <label class="notes-label">Who is this for?</label>
+          <input id="taskWhoFor" class="form-control" placeholder="Select" />
+        </div>
+
+        <div class="notes-row">
+          <label class="notes-label">Project/Client</label>
+          <input id="taskProjectClient" class="form-control" />
+        </div>
       </div>
 
-      <div class="notes-row">
-        <label class="notes-label">Who</label>
-        <input id="taskWho" class="form-control" placeholder="Select" />
+      <!-- Due Date + Follow-up Date -->
+      <div class="two-col">
+        <div class="notes-row">
+          <label class="notes-label">Due Date</label>
+          <input id="taskDueDate" class="form-control" type="date" />
+        </div>
+
+        <div class="notes-row">
+          <label class="notes-label">Follow-up Date</label>
+          <input id="taskFollowUpDate" class="form-control" type="date" />
+        </div>
       </div>
 
-      <div class="notes-row">
-        <label class="notes-label">Who is this for?</label>
-        <input id="taskWhoFor" class="form-control" placeholder="Select" />
-      </div>
-
-      <div class="notes-row">
-        <label class="notes-label">Due Date</label>
-        <input id="taskDueDate" class="form-control" type="date" />
-      </div>
-
-      <div class="notes-row">
-        <label class="notes-label">Follow-up Date</label>
-        <input id="taskFollowUpDate" class="form-control" type="date" />
-      </div>
-
-      <div class="notes-row">
-        <label class="notes-label">Project/Client</label>
-        <input id="taskProjectClient" class="form-control" />
-      </div>
-
+      <!-- Notes (full width) -->
       <div class="notes-row">
         <label class="notes-label">Notes</label>
         <textarea id="taskNotes" class="form-control" placeholder="Optional details"></textarea>
       </div>
 
-      <button id="btnAddTask" class="btn-primary" style="margin-top:16px;">Add Task</button>
+      <!-- Buttons -->
+      <div style="margin-top:16px; display:flex; gap:12px;">
+        <button id="btnAddTask" class="btn-primary">Add Task</button>
+        <button id="btnGoToList" class="btn-secondary">Lists</button>
+        <button id="btnBackToActive" class="btn-secondary">← Back to Active</button>
+      </div>
+
       <div id="taskAddMessage" style="margin-top:12px;"></div>
     </section>
+
+    <style>
+      .two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+    </style>
   `;
 
   const msg = container.querySelector("#taskAddMessage");
@@ -121,5 +149,17 @@ export function loadTasksAdd({ portalState, container }) {
       console.error(err);
       msg.innerHTML = `<p class="error">Failed to add task.</p>`;
     }
+  });
+
+  // Lists button
+  container.querySelector("#btnGoToList").addEventListener("click", () => {
+    const listBtn = document.querySelector('#tasks-subtabs button[data-subtab="list"]');
+    if (listBtn) listBtn.click();
+  });
+
+  // Back to Active button
+  container.querySelector("#btnBackToActive").addEventListener("click", () => {
+    const listBtn = document.querySelector('#tasks-subtabs button[data-subtab="list"]');
+    if (listBtn) listBtn.click();
   });
 }
