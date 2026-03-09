@@ -1,13 +1,15 @@
-<!-- components/tasks.html -->
-<nav class="subtabs" id="tasks-subtabs">
-  <button data-subtab="list">List</button>
-  <button data-subtab="add">Add</button>
-  <button data-subtab="lookups">Lookups</button>
-  <button data-subtab="overview">Overview</button>
-</nav>
+<!-- Tasks partial -->
+<section class="card">
+  <h2>Tasks</h2>
 
-<div id="tasksContent">
-  <section class="card">
-    <p>Select a subtab to begin.</p>
-  </section>
-</div>
+  <!-- Add new task -->
+  <div class="row" style="gap:8px; margin-bottom:12px;">
+    <input id="newTaskText" placeholder="New task description" style="flex:1;" />
+    <button id="btnAddTask" class="primary">Add Task</button>
+  </div>
+
+  <!-- Task list -->
+  <div id="tasksList" class="card muted">
+    No tasks yet.
+  </div>
+</section>
