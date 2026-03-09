@@ -1,4 +1,4 @@
-// tab-add.js — Add Task
+// tab-add.js — Add Task (Workspace Style)
 
 import { escapeHtml } from "../utilities.js";
 
@@ -14,12 +14,16 @@ export async function loadTasksAdd({ portalState, container }) {
 
   container.innerHTML = `
     <section class="card">
-      <h2>Add Task</h2>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+        <h2 style="margin:0;">Add Task</h2>
+        <button id="saveTaskBtn" class="btn-primary">Save</button>
+      </div>
       <div id="taskAddContent">Loading…</div>
     </section>
   `;
 
   const content = container.querySelector("#taskAddContent");
+  const saveBtn = container.querySelector("#saveTaskBtn");
 
   /* =========================================================
      1) Fetch lookup values
@@ -51,57 +55,78 @@ export async function loadTasksAdd({ portalState, container }) {
   /* =========================================================
      3) Build dropdown HTML
   ========================================================= */
-  const statusOptions = getOptions("status")
-    .map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.value)}</option>`)
-    .join("");
+  function buildOptions(field) {
+    return getOptions(field)
+      .map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.value)}</option>`)
+      .join("");
+  }
 
-  const priorityOptions = getOptions("priority")
-    .map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.value)}</option>`)
-    .join("");
-
-  const areaOptions = getOptions("area")
-    .map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.value)}</option>`)
-    .join("");
-
-  const whoOptions = getOptions("who")
-    .map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.value)}</option>`)
-    .join("");
-
-  const whoForOptions = getOptions("who_is_this_for")
-    .map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.value)}</option>`)
-    .join("");
+  const statusOptions = buildOptions("status");
+  const priorityOptions = buildOptions("priority");
+  const areaOptions = buildOptions("area");
+  const whoOptions = buildOptions("who");
+  const whoForOptions = buildOptions("who_is_this_for");
 
   /* =========================================================
-     4) Render Add Form
+     4) Render Add Form (Workspace Style)
   ========================================================= */
   content.innerHTML = `
-    <form id="addTaskForm" class="form-grid">
+    <form id="addTaskForm" class="workspace-form">
 
-      <label>Title</label>
-      <input id="titleInput" placeholder="Task title">
+      <!-- Title -->
+      <div class="form-row full">
+        <label>Title</label>
+        <input id="titleInput" placeholder="Task title">
+      </div>
 
-      <label>Description</label>
-      <textarea id="descriptionInput" placeholder="Task details"></textarea>
+      <!-- Description -->
+      <div class="form-row full">
+        <label>Description</label>
+        <textarea id="descriptionInput" placeholder="Task details"></textarea>
+      </div>
 
-      <label>Status</label>
-      <select id="statusInput">${statusOptions}</select>
+      <!-- Status + Priority -->
+      <div class="form-row">
+        <div class="col">
+          <label>Status</label>
+          <select id="statusInput">${statusOptions}</select>
+        </div>
+        <div class="col">
+          <label>Priority</label>
+          <select id="priorityInput">${priorityOptions}</select>
+        </div>
+      </div>
 
-      <label>Priority</label>
-      <select id="priorityInput">${priorityOptions}</select>
+      <!-- Area + Who -->
+      <div class="form-row">
+        <div class="col">
+          <label>Area</label>
+          <select id="areaInput">${areaOptions}</select>
+        </div>
+        <div class="col">
+          <label>Who</label>
+          <select id="whoInput">${whoOptions}</select>
+        </div>
+      </div>
 
-      <label>Area</label>
-      <select id="areaInput">${areaOptions}</select>
+      <!-- Who Is This For + Due Date -->
+      <div class="form-row">
+        <div class="col">
+          <label>Who Is This For</label>
+          <select id="whoForInput">${whoForOptions}</select>
+        </div>
+        <div class="col">
+          <label>Due Date</label>
+          <input id="dueDateInput" type="date">
+        </div>
+      </div>
 
-      <label>Who</label>
-      <select id="whoInput">${whoOptions}</select>
+      <!-- Notes -->
+      <div class="form-row full">
+        <label>Notes</label>
+        <textarea id="notesInput" placeholder="Optional notes"></textarea>
+      </div>
 
-      <label>Who Is This For</label>
-      <select id="whoForInput">${whoForOptions}</select>
-
-      <label>Due Date</label>
-      <input id="dueDateInput" type="date">
-
-      <button id="saveTaskBtn" class="btn-primary" style="margin-top:16px;">Save Task</button>
     </form>
   `;
 
@@ -109,11 +134,8 @@ export async function loadTasksAdd({ portalState, container }) {
      5) Save Handler
   ========================================================= */
   const form = content.querySelector("#addTaskForm");
-  const saveBtn = content.querySelector("#saveTaskBtn");
 
-  saveBtn.addEventListener("click", async e => {
-    e.preventDefault();
-
+  saveBtn.addEventListener("click", async () => {
     const payload = {
       project: portalState.project,
       title: form.querySelector("#titleInput").value.trim(),
@@ -124,6 +146,7 @@ export async function loadTasksAdd({ portalState, container }) {
       who: form.querySelector("#whoInput").value,
       who_for: form.querySelector("#whoForInput").value,
       due_date: form.querySelector("#dueDateInput").value || null,
+      notes: form.querySelector("#notesInput").value.trim() || null,
       created_at: new Date().toISOString()
     };
 
