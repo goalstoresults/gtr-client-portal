@@ -1,4 +1,4 @@
-// tab-add.js — Add Task (Workspace Style)
+// tab-add.js — Add Task (3-per-row workspace layout)
 
 import { escapeHtml } from "../utilities.js";
 
@@ -52,12 +52,14 @@ export async function loadTasksAdd({ portalState, container }) {
       .sort((a, b) => a.sort_order - b.sort_order);
   }
 
-  /* =========================================================
-     3) Build dropdown HTML
-  ========================================================= */
   function buildOptions(field) {
     return getOptions(field)
-      .map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.value)}</option>`)
+      .map(
+        o =>
+          `<option value="${escapeHtml(o.value)}">${escapeHtml(
+            o.value
+          )}</option>`
+      )
       .join("");
   }
 
@@ -68,61 +70,62 @@ export async function loadTasksAdd({ portalState, container }) {
   const whoForOptions = buildOptions("who_is_this_for");
 
   /* =========================================================
-     4) Render Add Form (Workspace Style)
+     3) Render Add Form — EXACT ROWS:
+        Row 1: Title, Status, Priority
+        Row 2: Area, Assigned, Who Is This For
+        Row 3: Due Date, Follow-up Date
+        Row 4: Notes (full width)
   ========================================================= */
   content.innerHTML = `
-    <form id="addTaskForm" class="workspace-form">
+    <form id="addTaskForm" class="workspace-form" style="display:flex; flex-direction:column; gap:12px;">
 
-      <!-- Title -->
-      <div class="form-row full">
-        <label>Title</label>
-        <input id="titleInput" placeholder="Task title">
-      </div>
-
-      <!-- Description -->
-      <div class="form-row full">
-        <label>Description</label>
-        <textarea id="descriptionInput" placeholder="Task details"></textarea>
-      </div>
-
-      <!-- Status + Priority -->
-      <div class="form-row">
-        <div class="col">
+      <!-- Row 1: Title, Status, Priority -->
+      <div style="display:flex; gap:12px;">
+        <div style="flex:1;">
+          <label>Title</label>
+          <input id="titleInput" placeholder="Task title">
+        </div>
+        <div style="flex:1;">
           <label>Status</label>
           <select id="statusInput">${statusOptions}</select>
         </div>
-        <div class="col">
+        <div style="flex:1;">
           <label>Priority</label>
           <select id="priorityInput">${priorityOptions}</select>
         </div>
       </div>
 
-      <!-- Area + Who -->
-      <div class="form-row">
-        <div class="col">
+      <!-- Row 2: Area, Assigned, Who Is This For -->
+      <div style="display:flex; gap:12px;">
+        <div style="flex:1;">
           <label>Area</label>
           <select id="areaInput">${areaOptions}</select>
         </div>
-        <div class="col">
-          <label>Who</label>
+        <div style="flex:1;">
+          <label>Assigned</label>
           <select id="whoInput">${whoOptions}</select>
         </div>
-      </div>
-
-      <!-- Who Is This For + Due Date -->
-      <div class="form-row">
-        <div class="col">
+        <div style="flex:1;">
           <label>Who Is This For</label>
           <select id="whoForInput">${whoForOptions}</select>
         </div>
-        <div class="col">
+      </div>
+
+      <!-- Row 3: Due Date, Follow-up Date -->
+      <div style="display:flex; gap:12px;">
+        <div style="flex:1;">
           <label>Due Date</label>
           <input id="dueDateInput" type="date">
         </div>
+        <div style="flex:1;">
+          <label>Follow-up Date</label>
+          <input id="followupDateInput" type="date">
+        </div>
+        <div style="flex:1;"></div>
       </div>
 
-      <!-- Notes -->
-      <div class="form-row full">
+      <!-- Row 4: Notes (full width) -->
+      <div style="display:flex; flex-direction:column;">
         <label>Notes</label>
         <textarea id="notesInput" placeholder="Optional notes"></textarea>
       </div>
@@ -131,7 +134,7 @@ export async function loadTasksAdd({ portalState, container }) {
   `;
 
   /* =========================================================
-     5) Save Handler
+     4) Save Handler
   ========================================================= */
   const form = content.querySelector("#addTaskForm");
 
@@ -139,13 +142,13 @@ export async function loadTasksAdd({ portalState, container }) {
     const payload = {
       project: portalState.project,
       title: form.querySelector("#titleInput").value.trim(),
-      description: form.querySelector("#descriptionInput").value.trim(),
       status: form.querySelector("#statusInput").value,
       priority: form.querySelector("#priorityInput").value,
       area: form.querySelector("#areaInput").value,
       who: form.querySelector("#whoInput").value,
       who_for: form.querySelector("#whoForInput").value,
       due_date: form.querySelector("#dueDateInput").value || null,
+      followup_date: form.querySelector("#followupDateInput").value || null,
       notes: form.querySelector("#notesInput").value.trim() || null,
       created_at: new Date().toISOString()
     };
