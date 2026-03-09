@@ -215,7 +215,9 @@ async function attemptLogin() {
         portalState.allowedTabs = result.allowed_tabs || [];
         portalState.deleteAllowed = result.delete_allowed === true;
         portalState.user_id = result.staff_id;
-
+        
+        // ⭐ NEW — Normalize & store Task Manager role
+        portalState.task_manager = (result.task_manager || "").trim().toLowerCase();
 
         const friendly = result.first_name || "";
         welcomeHeader.textContent = `Welcome ${friendly}!`;
