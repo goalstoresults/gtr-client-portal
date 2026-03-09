@@ -53,11 +53,13 @@ export async function loadTasksLookups({ portalState, container }) {
   });
 
   /* =========================================================
-     3) Render groups
+     3) Render groups (⭐ SORT FIX APPLIED HERE)
   ========================================================= */
   content.innerHTML = Object.keys(grouped)
     .map(field => {
-      const items = grouped[field];
+
+      // ⭐ SORT ITEMS ASCENDING BY sort_order
+      const items = grouped[field].sort((a, b) => a.sort_order - b.sort_order);
 
       return `
         <section class="lookup-group card" style="margin-bottom:24px;">
@@ -261,3 +263,4 @@ export async function loadTasksLookups({ portalState, container }) {
     }
   });
 }
+
