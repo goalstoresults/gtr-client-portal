@@ -25,7 +25,7 @@ export async function loadTasksList({ portalState, container }) {
   let tasks = [];
   try {
     const res = await fetch(
-      `https://client-portal-api.dennis-e64.workers.dev/api/tasks?project=${encodeURIComponent(portalState.project)}`,
+      `https://tasks-manager.dennis-e64.workers.dev/tasks/list?project=${encodeURIComponent(portalState.project)}`,
       { cache: "no-cache" }
     );
     const j = await res.json();
