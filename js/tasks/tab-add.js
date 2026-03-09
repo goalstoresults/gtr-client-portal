@@ -83,11 +83,17 @@ export async function loadTasksAdd({ portalState, container }) {
         </div>
         <div style="flex:0 0 20%;">
           <label>Status</label>
-          <select id="statusInput" style="width:100%;">${statusOptions}</select>
+          <select id="statusInput" style="width:100%;">
+            <option value="">-- Select --</option>
+            ${statusOptions}
+          </select>
         </div>
         <div style="flex:0 0 20%;">
           <label>Priority</label>
-          <select id="priorityInput" style="width:100%;">${priorityOptions}</select>
+          <select id="priorityInput" style="width:100%;">
+            <option value="">-- Select --</option>
+            ${priorityOptions}
+          </select>
         </div>
       </div>
 
@@ -95,15 +101,24 @@ export async function loadTasksAdd({ portalState, container }) {
       <div style="display:flex; gap:12px;">
         <div style="flex:0 0 30%;">
           <label>Area</label>
-          <select id="areaInput" style="width:100%;">${areaOptions}</select>
+          <select id="areaInput" style="width:100%;">
+            <option value="">-- Select --</option>
+            ${areaOptions}
+          </select>
         </div>
         <div style="flex:0 0 25%;">
           <label>Assigned</label>
-          <select id="whoInput" style="width:100%;">${whoOptions}</select>
+          <select id="whoInput" style="width:100%;">
+            <option value="">-- Select --</option>
+            ${whoOptions}
+          </select>
         </div>
         <div style="flex:0 0 25%;">
           <label>Who Is This For</label>
-          <select id="whoForInput" style="width:100%;">${whoForOptions}</select>
+          <select id="whoForInput" style="width:100%;">
+            <option value="">-- Select --</option>
+            ${whoForOptions}
+          </select>
         </div>
       </div>
 
@@ -130,34 +145,48 @@ export async function loadTasksAdd({ portalState, container }) {
   `;
 
   /* =========================================================
-     4) Save Handler — FIXED FIELD NAME + FULL RESET + created_by_user_id
+     4) Save Handler — frontend validation + safe payload
   ========================================================= */
   const form = content.querySelector("#addTaskForm");
 
   saveBtn.addEventListener("click", async () => {
-    const payload = {
-      project: portalState.project,
-      created_by_user_id: portalState.user_id,   // ⭐ REQUIRED BY BACKEND
 
-      title: form.querySelector("#titleInput").value.trim(),
-      status: form.querySelector("#statusInput").value,
-      priority: form.querySelector("#priorityInput").value,
-      area: form.querySelector("#areaInput").value,
-      who: form.querySelector("#whoInput").value,
-
-      // ⭐ FIXED FIELD NAME
-      who_is_this_for: form.querySelector("#whoForInput").value,
-
-      due_date: form.querySelector("#dueDateInput").value || null,
-      followup_date: form.querySelector("#followupDateInput").value || null,
-      notes: form.querySelector("#notesInput").value.trim() || null,
-      created_at: new Date().toISOString()
-    };
-
-    if (!payload.title) {
+    // ⭐ FRONTEND VALIDATION
+    const titleVal = form.querySelector("#titleInput").value.trim();
+    if (!titleVal) {
       alert("Please enter a title.");
       return;
     }
+
+    // Grab values
+    const statusVal = form.querySelector("#statusInput").value;
+    const priorityVal = form.querySelector("#priorityInput").value;
+    const areaVal = form.querySelector("#areaInput").value;
+    const whoVal = form.querySelector("#whoInput").value;
+    const whoForVal = form.querySelector("#whoForInput").value;
+    const dueDateVal = form.querySelector("#dueDateInput").value;
+    const followupDateVal = form.querySelector("#followupDateInput").value;
+    const notesVal = form.querySelector("#notesInput").value.trim();
+
+    // ⭐ SAFE PAYLOAD (empty strings allowed)
+    const payload = {
+      project: portalState.project,
+      created_by_user_id: portalState.user_id,
+
+      title: titleVal,
+      status: statusVal,
+      priority: priorityVal ? parseInt(priorityVal, 10) : null,
+
+      area: areaVal || "",
+      who: whoVal || "",
+      who_is_this_for: whoForVal || "",
+
+      due_date: dueDateVal || null,
+      followup_date: followupDateVal || null,
+      notes: notesVal || null,
+
+      created_at: new Date().toISOString()
+    };
 
     await fetch(
       "https://tasks-manager.dennis-e64.workers.dev/tasks/add",
@@ -170,17 +199,7 @@ export async function loadTasksAdd({ portalState, container }) {
 
     alert("Task added.");
 
-    // ⭐ FULL RESET
+    // Reset form
     form.reset();
-
-    document.querySelector("#statusInput").selectedIndex = 0;
-    document.querySelector("#priorityInput").selectedIndex = 0;
-    document.querySelector("#areaInput").selectedIndex = 0;
-    document.querySelector("#whoInput").selectedIndex = 0;
-    document.querySelector("#whoForInput").selectedIndex = 0;
-
-    document.querySelector("#dueDateInput").value = "";
-    document.querySelector("#followupDateInput").value = "";
-    document.querySelector("#notesInput").value = "";
   });
 }
