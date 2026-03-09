@@ -81,7 +81,7 @@ export async function loadTasksAdd({ portalState, container }) {
 
       <!-- Row 1: Title (wide), Status, Priority -->
       <div style="display:flex; gap:12px;">
-        <div style="flex:0 0 60%;">
+        <div style="flex:0 0 50%;">
           <label>Title</label>
           <input id="titleInput" placeholder="Task title" style="width:100%;">
         </div>
