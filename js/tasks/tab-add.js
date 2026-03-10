@@ -175,7 +175,7 @@ export async function loadTasksAdd({ portalState, container }) {
 
       title: titleVal,
       status: statusVal,
-      priority: priorityVal ? Number(priorityVal) : null,
+      priority: priorityVal || null,
 
       area: areaVal || "",
       who: whoVal || "",
