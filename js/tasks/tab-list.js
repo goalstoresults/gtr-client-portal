@@ -131,13 +131,16 @@ function computeDueIn(arr) {
       return { ...t, due_in: null };
     }
 
-    const d = new Date(t.due_date);
-    const dueMid = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    // Force LOCAL date parsing (avoid UTC interpretation)
+    const [y, m, d] = t.due_date.split("-").map(Number);
+    const dueMid = new Date(y, m - 1, d); // local midnight
 
     const diffDays = Math.round((dueMid - todayMid) / 86400000);
+
     return { ...t, due_in: diffDays };
   });
 }
+
 
 tasks = computeDueIn(tasks);
 filteredTasks = [...tasks];
