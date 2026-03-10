@@ -470,7 +470,7 @@ function renderTable() {
         project: portalState.project,
         title: row.querySelector(".edit-title").value.trim(),
         status: row.querySelector(".edit-status").value,
-        priority: Number(row.querySelector(".edit-priority").value) || null,
+        priority: row.querySelector(".edit-priority").value || null,
         area: row.querySelector(".edit-area").value,
         who: row.querySelector(".edit-who").value,
         who_is_this_for: row.querySelector(".edit-whoFor").value,
