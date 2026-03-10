@@ -121,15 +121,21 @@ export async function loadTasksList({ portalState, container }) {
      Compute due_in
   --------------------------------------------------------- */
   function computeDueIn(arr) {
-    const now = new Date();
+    const today = new Date();
+    const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  
     return arr.map(t => {
-      let dueIn = null;
-      if (t.due_date) {
-        const d = new Date(t.due_date);
-        const diff = Math.floor((d - now) / (1000 * 60 * 60 * 24));
-        dueIn = diff;
+      if (!t.due_date) {
+        return { ...t, due_in: null };
       }
-      return { ...t, due_in: dueIn };
+  
+      const d = new Date(t.due_date);
+      const dueMid = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  
+      // Calendar‑day difference (includes weekends)
+      const diffDays = Math.round((dueMid - todayMid) / (1000 * 60 * 60 * 24));
+  
+      return { ...t, due_in: diffDays };
     });
   }
 
