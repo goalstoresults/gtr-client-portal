@@ -72,6 +72,23 @@ export async function loadTasksList({ portalState, container }) {
     `;
   }
 
+  function renderDueIn(dueIn) {
+  if (dueIn === null) {
+    return `<span style="color:#999;">⚪ —</span>`;
+  }
+
+  if (dueIn <= 2) {
+    return `<span style="color:#d00;">🔴 ${dueIn}d</span>`;
+  }
+
+  if (dueIn <= 5) {
+    return `<span style="color:#c9a000;">🟡 ${dueIn}d</span>`;
+  }
+
+  return `<span style="color:#0a0;">🟢 ${dueIn}d</span>`;
+}
+
+
   function buildMultiSelect(field) {
     const opts = getOptions(field);
     return opts
@@ -329,7 +346,7 @@ export async function loadTasksList({ portalState, container }) {
           <td>${escapeHtml(t.area || "")}</td>
           <td>${escapeHtml(t.priority || "")}</td>
           <td>${escapeHtml(t.status || "")}</td>
-          <td>${t.due_in === null ? "—" : t.due_in + "d"}</td>
+          <td>${renderDueIn(t.due_in)}</td>
           <td>${formatDateOnly(t.due_date)}</td>
           <td>${formatDateOnly(t.followup_date)}</td>
           <td>${escapeHtml(t.project || "")}</td>
