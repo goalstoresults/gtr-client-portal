@@ -3,621 +3,633 @@
 import { escapeHtml, formatDateOnly } from "../utilities.js";
 
 export async function loadTasksList({ portalState, container }) {
-  container.innerHTML = `
-    <section class="card">
-      <h3>Tasks — List</h3>
 
-      <div style="display:flex; gap:8px; margin-bottom:12px;">
-        <button id="filterToggle" class="btn-secondary">Filter</button>
-        <button id="sortToggle" class="btn-secondary">Sort</button>
-        <button id="exportCsvBtn" class="btn-secondary">Export CSV</button>
-      </div>
+container.innerHTML = `
+<section class="card">
+<h3>Tasks — List</h3>
 
-      <div id="filterPanel" style="display:none; padding:12px; background:#f7f7f7; border:1px solid #ddd; margin-bottom:12px;"></div>
-      <div id="sortPanel" style="display:none; padding:12px; background:#f7f7f7; border:1px solid #ddd; margin-bottom:12px;"></div>
+<div style="display:flex; gap:8px; margin-bottom:12px;">
+<button id="filterToggle" class="btn-secondary">Filter</button>
+<button id="sortToggle" class="btn-secondary">Sort</button>
+<button id="exportCsvBtn" class="btn-secondary">Export CSV</button>
+</div>
 
-      <div id="tasksListContent">
-        <p>Loading tasks...</p>
-      </div>
-    </section>
-  `;
+<div id="filterPanel" style="display:none; padding:12px; background:#f7f7f7; border:1px solid #ddd; margin-bottom:12px;"></div>
+<div id="sortPanel" style="display:none; padding:12px; background:#f7f7f7; border:1px solid #ddd; margin-bottom:12px;"></div>
 
-  const listEl = container.querySelector("#tasksListContent");
-  const filterPanel = container.querySelector("#filterPanel");
-  const sortPanel = container.querySelector("#sortPanel");
+<div id="tasksListContent">
+<p>Loading tasks...</p>
+</div>
 
-  if (!portalState.project) {
-    listEl.innerHTML = `<p>No project selected.</p>`;
-    return;
+</section>
+`;
+
+const listEl = container.querySelector("#tasksListContent");
+const filterPanel = container.querySelector("#filterPanel");
+const sortPanel = container.querySelector("#sortPanel");
+
+if (!portalState.project) {
+  listEl.innerHTML = `<p>No project selected.</p>`;
+  return;
+}
+
+/* ---------------------------------------------------------
+Fetch lookups
+--------------------------------------------------------- */
+
+let lookups = [];
+
+try {
+  const res = await fetch(
+    `https://tasks-manager.dennis-e64.workers.dev/lookups/list?project=${encodeURIComponent(
+      portalState.project
+    )}`,
+    { cache: "no-cache" }
+  );
+  const j = await res.json();
+  lookups = Array.isArray(j) ? j : [];
+} catch {
+  lookups = [];
+}
+
+function getOptions(field) {
+  return lookups
+    .filter(r => r.field === field && r.active)
+    .sort((a, b) => a.sort_order - b.sort_order);
+}
+
+function buildOptions(field, currentValue) {
+  const opts = getOptions(field);
+  const cur = currentValue || "";
+
+  const optionsHtml = opts
+    .map(o => {
+      const val = o.value || "";
+      const selected = val === cur ? "selected" : "";
+      return `<option value="${escapeHtml(val)}" ${selected}>${escapeHtml(val)}</option>`;
+    })
+    .join("");
+
+  return `
+<option value="">-- Select --</option>
+${optionsHtml}
+`;
+}
+
+function renderDueIn(dueIn) {
+  if (dueIn === null) {
+    return `<span style="color:#999;">⚪ —</span>`;
   }
+  if (dueIn <= 2) {
+    return `<span style="color:#d00;">🔴 ${dueIn}d</span>`;
+  }
+  if (dueIn <= 5) {
+    return `<span style="color:#c9a000;">🟡 ${dueIn}d</span>`;
+  }
+  return `<span style="color:#0a0;">🟢 ${dueIn}d</span>`;
+}
 
-  /* ---------------------------------------------------------
-     Fetch lookups
-  --------------------------------------------------------- */
-  let lookups = [];
+function buildMultiSelect(field) {
+  const opts = getOptions(field);
+  return opts
+    .map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.value)}</option>`)
+    .join("");
+}
+
+/* ---------------------------------------------------------
+Fetch tasks
+--------------------------------------------------------- */
+
+async function fetchTasks() {
   try {
     const res = await fetch(
-      `https://tasks-manager.dennis-e64.workers.dev/lookups/list?project=${encodeURIComponent(
+      `https://tasks-manager.dennis-e64.workers.dev/tasks/list?project=${encodeURIComponent(
         portalState.project
       )}`,
       { cache: "no-cache" }
     );
     const j = await res.json();
-    lookups = Array.isArray(j) ? j : [];
+    return Array.isArray(j) ? j : [];
   } catch {
-    lookups = [];
+    return [];
   }
-
-  function getOptions(field) {
-    return lookups
-      .filter(r => r.field === field && r.active)
-      .sort((a, b) => a.sort_order - b.sort_order);
-  }
-
-  function buildOptions(field, currentValue) {
-    const opts = getOptions(field);
-    const cur = currentValue || "";
-    const optionsHtml = opts
-      .map(o => {
-        const val = o.value || "";
-        const selected = val === cur ? "selected" : "";
-        return `<option value="${escapeHtml(val)}" ${selected}>${escapeHtml(
-          val
-        )}</option>`;
-      })
-      .join("");
-    return `
-      <option value="">-- Select --</option>
-      ${optionsHtml}
-    `;
-  }
-
-  function renderDueIn(dueIn) {
-  if (dueIn === null) {
-    return `<span style="color:#999;">⚪ —</span>`;
-  }
-
-  if (dueIn <= 2) {
-    return `<span style="color:#d00;">🔴 ${dueIn}d</span>`;
-  }
-
-  if (dueIn <= 5) {
-    return `<span style="color:#c9a000;">🟡 ${dueIn}d</span>`;
-  }
-
-  return `<span style="color:#0a0;">🟢 ${dueIn}d</span>`;
 }
 
+let tasks = await fetchTasks();
+let filteredTasks = [...tasks];
 
-  function buildMultiSelect(field) {
-    const opts = getOptions(field);
-    return opts
-      .map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.value)}</option>`)
-      .join("");
-  }
+/* ---------------------------------------------------------
+Compute due_in (timezone-proof)
+--------------------------------------------------------- */
 
-  /* ---------------------------------------------------------
-     Fetch tasks
-  --------------------------------------------------------- */
-  async function fetchTasks() {
-    try {
-      const res = await fetch(
-        `https://tasks-manager.dennis-e64.workers.dev/tasks/list?project=${encodeURIComponent(
-          portalState.project
-        )}`,
-        { cache: "no-cache" }
-      );
-      const j = await res.json();
-      return Array.isArray(j) ? j : [];
-    } catch {
-      return [];
+function computeDueIn(arr) {
+  const today = new Date();
+  const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  return arr.map(t => {
+    if (!t.due_date) {
+      return { ...t, due_in: null };
     }
-  }
 
-  let tasks = await fetchTasks();
-  let filteredTasks = [...tasks];
+    const d = new Date(t.due_date);
+    const dueMid = new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
-  /* ---------------------------------------------------------
-     Compute due_in
-  --------------------------------------------------------- */
-  function computeDueIn(arr) {
+    const diffDays = Math.round((dueMid - todayMid) / 86400000);
+    return { ...t, due_in: diffDays };
+  });
+}
+
+tasks = computeDueIn(tasks);
+filteredTasks = [...tasks];
+
+/* ---------------------------------------------------------
+Sorting state
+--------------------------------------------------------- */
+
+let sortLevels = [
+  { field: "due_date", dir: "asc" },
+  { field: "", dir: "asc" },
+  { field: "", dir: "asc" },
+  { field: "", dir: "asc" }
+];
+
+const sortableFields = [
+  "title",
+  "who",
+  "who_is_this_for",
+  "area",
+  "priority",
+  "status",
+  "due_in",
+  "due_date",
+  "followup_date"
+];
+
+/* ---------------------------------------------------------
+Apply filters (timezone-proof)
+--------------------------------------------------------- */
+
+function applyFilters() {
+  const statusSel = [...filterPanel.querySelector("#fStatus").selectedOptions].map(o => o.value);
+  const prioritySel = [...filterPanel.querySelector("#fPriority").selectedOptions].map(o => o.value);
+  const whoSel = [...filterPanel.querySelector("#fWho").selectedOptions].map(o => o.value);
+  const areaSel = [...filterPanel.querySelector("#fArea").selectedOptions].map(o => o.value);
+  const forSel = [...filterPanel.querySelector("#fFor").selectedOptions].map(o => o.value);
+  const dueFilter = filterPanel.querySelector("#fDue").value;
+  const followDueToday = filterPanel.querySelector("#fFollowToday").checked;
+
+  filteredTasks = tasks.filter(t => {
+    if (statusSel.length && !statusSel.includes(t.status)) return false;
+    if (prioritySel.length && !prioritySel.includes(String(t.priority))) return false;
+    if (whoSel.length && !whoSel.includes(t.who)) return false;
+    if (areaSel.length && !areaSel.includes(t.area)) return false;
+    if (forSel.length && !forSel.includes(t.who_is_this_for)) return false;
+
     const today = new Date();
     const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  
-    return arr.map(t => {
-      if (!t.due_date) {
-        return { ...t, due_in: null };
+
+    const due = t.due_date ? new Date(t.due_date) : null;
+    const dueMid = due ? new Date(due.getFullYear(), due.getMonth(), due.getDate()) : null;
+
+    if (dueFilter === "today" && (!dueMid || dueMid.getTime() !== todayMid.getTime())) return false;
+    if (dueFilter === "overdue" && (!dueMid || dueMid >= todayMid)) return false;
+    if (dueFilter === "7" && (!dueMid || dueMid > new Date(todayMid.getTime() + 7 * 86400000))) return false;
+    if (dueFilter === "30" && (!dueMid || dueMid > new Date(todayMid.getTime() + 30 * 86400000))) return false;
+
+    if (followDueToday) {
+      const f = t.followup_date ? new Date(t.followup_date) : null;
+      const fMid = f ? new Date(f.getFullYear(), f.getMonth(), f.getDate()) : null;
+      if (!fMid || fMid > todayMid) return false;
+    }
+
+    return true;
+  });
+}
+
+/* ---------------------------------------------------------
+Apply multi-sort
+--------------------------------------------------------- */
+
+function applySort() {
+  filteredTasks.sort((a, b) => {
+    for (const lvl of sortLevels) {
+      if (!lvl.field) continue;
+
+      let A = a[lvl.field];
+      let B = b[lvl.field];
+
+      if (lvl.field === "due_date" || lvl.field === "followup_date") {
+        A = A ? new Date(A) : new Date(0);
+        B = B ? new Date(B) : new Date(0);
+      } else if (lvl.field === "priority" || lvl.field === "due_in") {
+        A = Number(A) || 0;
+        B = Number(B) || 0;
+      } else {
+        A = (A || "").toString().toLowerCase();
+        B = (B || "").toString().toLowerCase();
       }
-  
-      const d = new Date(t.due_date);
-      const dueMid = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  
-      // Calendar‑day difference (includes weekends)
-      const diffDays = Math.round((dueMid - todayMid) / (1000 * 60 * 60 * 24));
-  
-      return { ...t, due_in: diffDays };
+
+      if (A < B) return lvl.dir === "asc" ? -1 : 1;
+      if (A > B) return lvl.dir === "asc" ? 1 : -1;
+    }
+    return 0;
+  });
+}
+
+/* ---------------------------------------------------------
+Render Filter Panel
+--------------------------------------------------------- */
+
+filterPanel.innerHTML = `
+<h4>Filters</h4>
+
+<div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+<div>
+<label>Status</label>
+<select id="fStatus" multiple size="4" style="width:150px;">
+${buildMultiSelect("status")}
+</select>
+</div>
+
+<div>
+<label>Priority</label>
+<select id="fPriority" multiple size="4" style="width:150px;">
+${buildMultiSelect("priority")}
+</select>
+</div>
+
+<div>
+<label>Who</label>
+<select id="fWho" multiple size="4" style="width:150px;">
+${buildMultiSelect("who")}
+</select>
+</div>
+
+<div>
+<label>Area</label>
+<select id="fArea" multiple size="4" style="width:150px;">
+${buildMultiSelect("area")}
+</select>
+</div>
+
+<div>
+<label>For</label>
+<select id="fFor" multiple size="4" style="width:150px;">
+${buildMultiSelect("who_is_this_for")}
+</select>
+</div>
+
+<div>
+<label>Due</label>
+<select id="fDue" style="width:150px;">
+<option value="all">All</option>
+<option value="today">Today</option>
+<option value="overdue">Overdue</option>
+<option value="7">Next 7 days</option>
+<option value="30">Next 30 days</option>
+</select>
+</div>
+
+<div>
+<label>Follow-up</label><br>
+<input type="checkbox" id="fFollowToday"> Due ≤ Today
+</div>
+</div>
+
+<button id="applyFilters" class="btn-primary">Apply Filters</button>
+<button id="resetFilters" class="btn-secondary">Reset</button>
+`;
+
+/* ---------------------------------------------------------
+Render Sort Panel
+--------------------------------------------------------- */
+
+function buildSortRow(idx) {
+  return `
+<div style="display:flex; gap:8px; margin-bottom:8px;">
+<select class="sort-field" data-idx="${idx}" style="width:180px;">
+<option value="">— none —</option>
+${sortableFields
+  .map(f => `<option value="${f}" ${sortLevels[idx].field === f ? "selected" : ""}>${f}</option>`)
+  .join("")}
+</select>
+
+<select class="sort-dir" data-idx="${idx}" style="width:120px;">
+<option value="asc" ${sortLevels[idx].dir === "asc" ? "selected" : ""}>A → Z / Oldest</option>
+<option value="desc" ${sortLevels[idx].dir === "desc" ? "selected" : ""}>Z → A / Newest</option>
+</select>
+</div>
+`;
+}
+
+sortPanel.innerHTML = `
+<h4>Sort</h4>
+${buildSortRow(0)}
+${buildSortRow(1)}
+${buildSortRow(2)}
+${buildSortRow(3)}
+<button id="applySort" class="btn-primary">Apply Sort</button>
+<button id="resetSort" class="btn-secondary">Reset</button>
+`;
+
+/* ---------------------------------------------------------
+Render Table
+--------------------------------------------------------- */
+
+function renderTable() {
+  applySort();
+
+  const rowsHtml = filteredTasks
+    .map(t => {
+      const statusOptions = buildOptions("status", t.status);
+      const priorityOptions = buildOptions("priority", t.priority?.toString());
+      const areaOptions = buildOptions("area", t.area);
+      const whoOptions = buildOptions("who", t.who);
+      const whoForOptions = buildOptions("who_is_this_for", t.who_is_this_for);
+
+      return `
+<tr class="task-row" data-id="${t.id}">
+<td><button class="expand-btn" data-id="${t.id}">▶</button></td>
+<td>${escapeHtml(t.title || "")}</td>
+<td>${escapeHtml(t.who_is_this_for || "")}</td>
+<td>${escapeHtml(t.who || "")}</td>
+<td>${escapeHtml(t.area || "")}</td>
+<td>${t.priority != null ? escapeHtml(String(t.priority)) : ""}</td>
+<td>${escapeHtml(t.status || "")}</td>
+<td>${renderDueIn(t.due_in)}</td>
+<td>${formatDateOnly(t.due_date)}</td>
+<td>${formatDateOnly(t.followup_date)}</td>
+</tr>
+
+<tr id="expand-${t.id}" style="display:none;">
+<td colspan="10">
+<div style="padding:12px; background:#f7f7f7; border:1px solid #ddd;">
+
+<div style="display:flex; gap:12px; margin-bottom:8px;">
+<div style="flex:1;">
+<label>Title</label>
+<input class="edit-title" value="${escapeHtml(t.title || "")}" style="width:100%;">
+</div>
+
+<div style="flex:0 0 20%;">
+<label>Status</label>
+<select class="edit-status" style="width:100%;">${statusOptions}</select>
+</div>
+
+<div style="flex:0 0 20%;">
+<label>Priority</label>
+<select class="edit-priority" style="width:100%;">${priorityOptions}</select>
+</div>
+</div>
+
+<div style="display:flex; gap:12px; margin-bottom:8px;">
+<div style="flex:0 0 25%;">
+<label>Area</label>
+<select class="edit-area" style="width:100%;">${areaOptions}</select>
+</div>
+
+<div style="flex:0 0 25%;">
+<label>Assigned</label>
+<select class="edit-who" style="width:100%;">${whoOptions}</select>
+</div>
+
+<div style="flex:0 0 25%;">
+<label>Who Is This For</label>
+<select class="edit-whoFor" style="width:100%;">${whoForOptions}</select>
+</div>
+</div>
+
+<div style="display:flex; gap:12px; margin-bottom:8px;">
+<div style="flex:0 0 25%;">
+<label>Due Date</label>
+<input type="date" class="edit-due" value="${t.due_date || ""}" style="width:100%;">
+</div>
+
+<div style="flex:0 0 25%;">
+<label>Follow-up</label>
+<input type="date" class="edit-follow" value="${t.followup_date || ""}" style="width:100%;">
+</div>
+</div>
+
+<div style="margin-bottom:8px;">
+<label>Notes</label>
+<textarea class="edit-notes" style="width:100%;">${escapeHtml(t.notes || "")}</textarea>
+</div>
+
+<div style="display:flex; gap:12px;">
+<button class="btn-primary save-edit" data-id="${t.id}">Save</button>
+<button class="btn-danger delete-task" data-id="${t.id}">Delete</button>
+</div>
+
+</div>
+</td>
+</tr>
+`;
+    })
+    .join("");
+
+  listEl.innerHTML = `
+<table class="notes-table">
+<thead>
+<tr>
+<th></th>
+<th>Title</th>
+<th>For</th>
+<th>Who</th>
+<th>Area</th>
+<th>Priority</th>
+<th>Status</th>
+<th>Due In</th>
+<th>Due</th>
+<th>Follow-up</th>
+</tr>
+</thead>
+<tbody>${rowsHtml}</tbody>
+</table>
+`;
+
+  /* Expand */
+  listEl.querySelectorAll(".expand-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      const row = document.getElementById(`expand-${id}`);
+      const open = row.style.display === "table-row";
+      row.style.display = open ? "none" : "table-row";
+      btn.textContent = open ? "▶" : "▼";
     });
-  }
+  });
 
-  tasks = computeDueIn(tasks);
+  /* Save Edit */
+  listEl.querySelectorAll(".save-edit").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
+      const row = document.getElementById(`expand-${id}`);
+
+      const payload = {
+        id,
+        project: portalState.project,
+        title: row.querySelector(".edit-title").value.trim(),
+        status: row.querySelector(".edit-status").value,
+        priority: Number(row.querySelector(".edit-priority").value) || null,
+        area: row.querySelector(".edit-area").value,
+        who: row.querySelector(".edit-who").value,
+        who_is_this_for: row.querySelector(".edit-whoFor").value,
+        due_date: row.querySelector(".edit-due").value || null,
+        followup_date: row.querySelector(".edit-follow").value || null,
+        notes: row.querySelector(".edit-notes").value.trim()
+      };
+
+      await fetch("https://tasks-manager.dennis-e64.workers.dev/tasks/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      tasks = computeDueIn(await fetchTasks());
+      filteredTasks = [...tasks];
+      renderTable();
+    });
+  });
+
+  /* Delete */
+  listEl.querySelectorAll(".delete-task").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
+      if (!confirm("Delete this task?")) return;
+
+      await fetch("https://tasks-manager.dennis-e64.workers.dev/tasks/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+
+      tasks = computeDueIn(await fetchTasks());
+      filteredTasks = [...tasks];
+      renderTable();
+    });
+  });
+}
+
+/* ---------------------------------------------------------
+FILTER PANEL TOGGLE
+--------------------------------------------------------- */
+
+container.querySelector("#filterToggle").addEventListener("click", () => {
+  filterPanel.style.display =
+    filterPanel.style.display === "none" ? "block" : "none";
+});
+
+/* ---------------------------------------------------------
+SORT PANEL TOGGLE
+--------------------------------------------------------- */
+
+container.querySelector("#sortToggle").addEventListener("click", () => {
+  sortPanel.style.display =
+    sortPanel.style.display === "none" ? "block" : "none";
+});
+
+/* ---------------------------------------------------------
+APPLY FILTERS
+--------------------------------------------------------- */
+
+filterPanel.querySelector("#applyFilters").addEventListener("click", () => {
+  applyFilters();
+  renderTable();
+});
+
+/* ---------------------------------------------------------
+RESET FILTERS
+--------------------------------------------------------- */
+
+filterPanel.querySelector("#resetFilters").addEventListener("click", () => {
+  filterPanel.querySelectorAll("select").forEach(sel => (sel.selectedIndex = -1));
+  filterPanel.querySelector("#fDue").value = "all";
+  filterPanel.querySelector("#fFollowToday").checked = false;
+
   filteredTasks = [...tasks];
+  renderTable();
+});
 
-  /* ---------------------------------------------------------
-     Sorting state
-  --------------------------------------------------------- */
-  let sortLevels = [
+/* ---------------------------------------------------------
+APPLY SORT
+--------------------------------------------------------- */
+
+sortPanel.querySelector("#applySort").addEventListener("click", () => {
+  const fields = sortPanel.querySelectorAll(".sort-field");
+  const dirs = sortPanel.querySelectorAll(".sort-dir");
+
+  fields.forEach((f, i) => {
+    sortLevels[i].field = f.value;
+    sortLevels[i].dir = dirs[i].value;
+  });
+
+  renderTable();
+});
+
+/* ---------------------------------------------------------
+RESET SORT
+--------------------------------------------------------- */
+
+sortPanel.querySelector("#resetSort").addEventListener("click", () => {
+  sortLevels = [
     { field: "due_date", dir: "asc" },
     { field: "", dir: "asc" },
     { field: "", dir: "asc" },
     { field: "", dir: "asc" }
   ];
 
-  const sortableFields = [
+  renderTable();
+});
+
+/* ---------------------------------------------------------
+EXPORT CSV
+--------------------------------------------------------- */
+
+container.querySelector("#exportCsvBtn").addEventListener("click", () => {
+  if (!filteredTasks.length) {
+    alert("No tasks to export.");
+    return;
+  }
+
+  const headers = [
+    "id",
     "title",
-    "who",
     "who_is_this_for",
+    "who",
     "area",
     "priority",
     "status",
     "due_in",
     "due_date",
-    "followup_date"
+    "followup_date",
+    "notes"
   ];
 
-  /* ---------------------------------------------------------
-     Apply filters
-  --------------------------------------------------------- */
-  function applyFilters() {
-    const statusSel = [...filterPanel.querySelector("#fStatus").selectedOptions].map(o => o.value);
-    const prioritySel = [...filterPanel.querySelector("#fPriority").selectedOptions].map(o => o.value);
-    const whoSel = [...filterPanel.querySelector("#fWho").selectedOptions].map(o => o.value);
-    const areaSel = [...filterPanel.querySelector("#fArea").selectedOptions].map(o => o.value);
-    const forSel = [...filterPanel.querySelector("#fFor").selectedOptions].map(o => o.value);
+  const csvRows = [
+    headers.join(","),
+    ...filteredTasks.map(t =>
+      headers
+        .map(h => {
+          const val = t[h] ?? "";
+          return `"${String(val).replace(/"/g, '""')}"`;
+        })
+        .join(",")
+    )
+  ];
 
-    const dueFilter = filterPanel.querySelector("#fDue").value;
-    const followDueToday = filterPanel.querySelector("#fFollowToday").checked;
+  const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `tasks_export_${portalState.project}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
 
-    filteredTasks = tasks.filter(t => {
-      if (statusSel.length && !statusSel.includes(t.status)) return false;
-      if (prioritySel.length && !prioritySel.includes(String(t.priority))) return false;
-      if (whoSel.length && !whoSel.includes(t.who)) return false;
-      if (areaSel.length && !areaSel.includes(t.area)) return false;
-      if (forSel.length && !forSel.includes(t.who_is_this_for)) return false;
+/* ---------------------------------------------------------
+INITIAL RENDER
+--------------------------------------------------------- */
 
-      if (dueFilter !== "all") {
-        const today = new Date();
-        const due = t.due_date ? new Date(t.due_date) : null;
+renderTable();
 
-        if (dueFilter === "today" && (!due || due.toDateString() !== today.toDateString())) return false;
-        if (dueFilter === "overdue" && (!due || due >= today)) return false;
-        if (dueFilter === "7" && (!due || due > new Date(today.getTime() + 7 * 86400000))) return false;
-        if (dueFilter === "30" && (!due || due > new Date(today.getTime() + 30 * 86400000))) return false;
-      }
-
-      if (followDueToday) {
-        const today = new Date();
-        const f = t.followup_date ? new Date(t.followup_date) : null;
-        if (!f || f > today) return false;
-      }
-
-      return true;
-    });
-  }
-
-  /* ---------------------------------------------------------
-     Apply multi-sort
-  --------------------------------------------------------- */
-  function applySort() {
-    filteredTasks.sort((a, b) => {
-      for (const lvl of sortLevels) {
-        if (!lvl.field) continue;
-
-        let A = a[lvl.field];
-        let B = b[lvl.field];
-
-        if (lvl.field === "due_date" || lvl.field === "followup_date") {
-          A = A ? new Date(A) : new Date(0);
-          B = B ? new Date(B) : new Date(0);
-        } else if (lvl.field === "priority" || lvl.field === "due_in") {
-          A = Number(A) || 0;
-          B = Number(B) || 0;
-        } else {
-          A = (A || "").toString().toLowerCase();
-          B = (B || "").toString().toLowerCase();
-        }
-
-        if (A < B) return lvl.dir === "asc" ? -1 : 1;
-        if (A > B) return lvl.dir === "asc" ? 1 : -1;
-      }
-      return 0;
-    });
-  }
-
-  /* ---------------------------------------------------------
-     Render Filter Panel
-  --------------------------------------------------------- */
-  filterPanel.innerHTML = `
-    <h4>Filters</h4>
-
-    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
-      <div>
-        <label>Status</label>
-        <select id="fStatus" multiple size="4" style="width:150px;">
-          ${buildMultiSelect("status")}
-        </select>
-      </div>
-
-      <div>
-        <label>Priority</label>
-        <select id="fPriority" multiple size="4" style="width:150px;">
-          ${buildMultiSelect("priority")}
-        </select>
-      </div>
-
-      <div>
-        <label>Who</label>
-        <select id="fWho" multiple size="4" style="width:150px;">
-          ${buildMultiSelect("who")}
-        </select>
-      </div>
-
-      <div>
-        <label>Area</label>
-        <select id="fArea" multiple size="4" style="width:150px;">
-          ${buildMultiSelect("area")}
-        </select>
-      </div>
-
-      <div>
-        <label>For</label>
-        <select id="fFor" multiple size="4" style="width:150px;">
-          ${buildMultiSelect("who_is_this_for")}
-        </select>
-      </div>
-
-      <div>
-        <label>Due</label>
-        <select id="fDue" style="width:150px;">
-          <option value="all">All</option>
-          <option value="today">Today</option>
-          <option value="overdue">Overdue</option>
-          <option value="7">Next 7 days</option>
-          <option value="30">Next 30 days</option>
-        </select>
-      </div>
-
-      <div>
-        <label>Follow-up</label><br>
-        <input type="checkbox" id="fFollowToday"> Due ≤ Today
-      </div>
-    </div>
-
-    <button id="applyFilters" class="btn-primary">Apply Filters</button>
-    <button id="resetFilters" class="btn-secondary">Reset</button>
-  `;
-
-  /* ---------------------------------------------------------
-     Render Sort Panel
-  --------------------------------------------------------- */
-  function buildSortRow(idx) {
-    return `
-      <div style="display:flex; gap:8px; margin-bottom:8px;">
-        <select class="sort-field" data-idx="${idx}" style="width:180px;">
-          <option value="">— none —</option>
-          ${sortableFields
-            .map(f => `<option value="${f}" ${sortLevels[idx].field === f ? "selected" : ""}>${f}</option>`)
-            .join("")}
-        </select>
-
-        <select class="sort-dir" data-idx="${idx}" style="width:120px;">
-          <option value="asc" ${sortLevels[idx].dir === "asc" ? "selected" : ""}>A → Z / Oldest</option>
-          <option value="desc" ${sortLevels[idx].dir === "desc" ? "selected" : ""}>Z → A / Newest</option>
-        </select>
-      </div>
-    `;
-  }
-
-  sortPanel.innerHTML = `
-    <h4>Sort</h4>
-
-    ${buildSortRow(0)}
-    ${buildSortRow(1)}
-    ${buildSortRow(2)}
-    ${buildSortRow(3)}
-
-    <button id="applySort" class="btn-primary">Apply Sort</button>
-    <button id="resetSort" class="btn-secondary">Reset</button>
-  `;
-
-  /* ---------------------------------------------------------
-     Render Table
-  --------------------------------------------------------- */
-  function renderTable() {
-    applySort();
-
-    const rowsHtml = filteredTasks
-      .map(t => {
-        const statusOptions = buildOptions("status", t.status);
-        const priorityOptions = buildOptions("priority", t.priority?.toString());
-        const areaOptions = buildOptions("area", t.area);
-        const whoOptions = buildOptions("who", t.who);
-        const whoForOptions = buildOptions("who_is_this_for", t.who_is_this_for);
-
-        return `
-        <tr class="task-row" data-id="${t.id}">
-          <td><button class="expand-btn" data-id="${t.id}">▶</button></td>
-          <td>${escapeHtml(t.title || "")}</td>
-          <td>${escapeHtml(t.who_is_this_for || "")}</td>
-          <td>${escapeHtml(t.who || "")}</td>
-          <td>${escapeHtml(t.area || "")}</td>
-          <td>${escapeHtml(t.priority || "")}</td>
-          <td>${escapeHtml(t.status || "")}</td>
-          <td>${renderDueIn(t.due_in)}</td>
-          <td>${formatDateOnly(t.due_date)}</td>
-          <td>${formatDateOnly(t.followup_date)}</td>
-          <td>${escapeHtml(t.project || "")}</td>
-        </tr>
-
-        <tr id="expand-${t.id}" style="display:none;">
-          <td colspan="11">
-            <div style="padding:12px; background:#f7f7f7; border:1px solid #ddd;">
-
-              <div style="display:flex; gap:12px; margin-bottom:8px;">
-                <div style="flex:1;">
-                  <label>Title</label>
-                  <input class="edit-title" value="${escapeHtml(t.title || "")}" style="width:100%;">
-                </div>
-                <div style="flex:0 0 20%;">
-                  <label>Status</label>
-                  <select class="edit-status" style="width:100%;">${statusOptions}</select>
-                </div>
-                <div style="flex:0 0 20%;">
-                  <label>Priority</label>
-                  <select class="edit-priority" style="width:100%;">${priorityOptions}</select>
-                </div>
-              </div>
-
-              <div style="display:flex; gap:12px; margin-bottom:8px;">
-                <div style="flex:0 0 25%;">
-                  <label>Area</label>
-                  <select class="edit-area" style="width:100%;">${areaOptions}</select>
-                </div>
-                <div style="flex:0 0 25%;">
-                  <label>Assigned</label>
-                  <select class="edit-who" style="width:100%;">${whoOptions}</select>
-                </div>
-                <div style="flex:0 0 25%;">
-                  <label>Who Is This For</label>
-                  <select class="edit-whoFor" style="width:100%;">${whoForOptions}</select>
-                </div>
-              </div>
-
-              <div style="display:flex; gap:12px; margin-bottom:8px;">
-                <div style="flex:0 0 25%;">
-                  <label>Due Date</label>
-                  <input type="date" class="edit-due" value="${t.due_date || ""}" style="width:100%;">
-                </div>
-                <div style="flex:0 0 25%;">
-                  <label>Follow-up</label>
-                  <input type="date" class="edit-follow" value="${t.followup_date || ""}" style="width:100%;">
-                </div>
-              </div>
-
-              <div style="margin-bottom:8px;">
-                <label>Notes</label>
-                <textarea class="edit-notes" style="width:100%;">${escapeHtml(t.notes || "")}</textarea>
-              </div>
-
-              <div style="display:flex; gap:12px;">
-                <button class="btn-primary save-edit" data-id="${t.id}">Save</button>
-                <button class="btn-danger delete-task" data-id="${t.id}">Delete</button>
-              </div>
-
-            </div>
-          </td>
-        </tr>
-      `;
-      })
-      .join("");
-
-    listEl.innerHTML = `
-      <table class="notes-table">
-        <thead>
-          <tr>
-            <th></th>
-            <th>Title</th>
-            <th>For</th>
-            <th>Who</th>
-            <th>Area</th>
-            <th>Priority</th>
-            <th>Status</th>
-            <th>Due In</th>
-            <th>Due</th>
-            <th>Follow-up</th>
-            <th>Project</th>
-          </tr>
-        </thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>
-    `;
-
-    /* Expand */
-    listEl.querySelectorAll(".expand-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const id = btn.dataset.id;
-        const row = document.getElementById(`expand-${id}`);
-        const open = row.style.display === "table-row";
-        row.style.display = open ? "none" : "table-row";
-        btn.textContent = open ? "▶" : "▼";
-      });
-    });
-
-    /* Save Edit */
-    listEl.querySelectorAll(".save-edit").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const id = btn.dataset.id;
-        const row = document.getElementById(`expand-${id}`);
-
-        const payload = {
-          id,
-          project: portalState.project,
-          title: row.querySelector(".edit-title").value.trim(),
-          status: row.querySelector(".edit-status").value,
-          priority: row.querySelector(".edit-priority").value,
-          area: row.querySelector(".edit-area").value,
-          who: row.querySelector(".edit-who").value,
-          who_is_this_for: row.querySelector(".edit-whoFor").value,
-          due_date: row.querySelector(".edit-due").value || null,
-          followup_date: row.querySelector(".edit-follow").value || null,
-          notes: row.querySelector(".edit-notes").value.trim()
-        };
-
-        await fetch("https://tasks-manager.dennis-e64.workers.dev/tasks/update", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-
-        tasks = computeDueIn(await fetchTasks());
-        filteredTasks = [...tasks];
-        renderTable();
-      });
-    });
-
-    /* Delete */
-    listEl.querySelectorAll(".delete-task").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const id = btn.dataset.id;
-
-        if (!confirm("Delete this task?")) return;
-
-        await fetch("https://tasks-manager.dennis-e64.workers.dev/tasks/delete", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id })
-        });
-
-        tasks = computeDueIn(await fetchTasks());
-        filteredTasks = [...tasks];
-        renderTable();
-      });
-    });
-  }
-
-  /* ---------------------------------------------------------
-     FILTER PANEL TOGGLE
-  --------------------------------------------------------- */
-  container.querySelector("#filterToggle").addEventListener("click", () => {
-    filterPanel.style.display =
-      filterPanel.style.display === "none" ? "block" : "none";
-  });
-
-  /* ---------------------------------------------------------
-     SORT PANEL TOGGLE
-  --------------------------------------------------------- */
-  container.querySelector("#sortToggle").addEventListener("click", () => {
-    sortPanel.style.display =
-      sortPanel.style.display === "none" ? "block" : "none";
-  });
-
-  /* ---------------------------------------------------------
-     APPLY FILTERS
-  --------------------------------------------------------- */
-  filterPanel.querySelector("#applyFilters").addEventListener("click", () => {
-    applyFilters();
-    renderTable();
-  });
-
-  /* ---------------------------------------------------------
-     RESET FILTERS
-  --------------------------------------------------------- */
-  filterPanel.querySelector("#resetFilters").addEventListener("click", () => {
-    filterPanel.querySelectorAll("select").forEach(sel => (sel.selectedIndex = -1));
-    filterPanel.querySelector("#fDue").value = "all";
-    filterPanel.querySelector("#fFollowToday").checked = false;
-
-    filteredTasks = [...tasks];
-    renderTable();
-  });
-
-  /* ---------------------------------------------------------
-     APPLY SORT
-  --------------------------------------------------------- */
-  sortPanel.querySelector("#applySort").addEventListener("click", () => {
-    const fields = sortPanel.querySelectorAll(".sort-field");
-    const dirs = sortPanel.querySelectorAll(".sort-dir");
-
-    fields.forEach((f, i) => {
-      sortLevels[i].field = f.value;
-      sortLevels[i].dir = dirs[i].value;
-    });
-
-    renderTable();
-  });
-
-  /* ---------------------------------------------------------
-     RESET SORT
-  --------------------------------------------------------- */
-  sortPanel.querySelector("#resetSort").addEventListener("click", () => {
-    sortLevels = [
-      { field: "due_date", dir: "asc" },
-      { field: "", dir: "asc" },
-      { field: "", dir: "asc" },
-      { field: "", dir: "asc" }
-    ];
-    renderTable();
-  });
-
-  /* ---------------------------------------------------------
-     EXPORT CSV
-  --------------------------------------------------------- */
-  container.querySelector("#exportCsvBtn").addEventListener("click", () => {
-    if (!filteredTasks.length) {
-      alert("No tasks to export.");
-      return;
-    }
-
-    const headers = [
-      "id",
-      "title",
-      "who_is_this_for",
-      "who",
-      "area",
-      "priority",
-      "status",
-      "due_in",
-      "due_date",
-      "followup_date",
-      "project",
-      "notes"
-    ];
-
-    const csvRows = [
-      headers.join(","),
-      ...filteredTasks.map(t =>
-        headers
-          .map(h => {
-            const val = t[h] ?? "";
-            return `"${String(val).replace(/"/g, '""')}"`;
-          })
-          .join(",")
-      )
-    ];
-
-    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `tasks_export_${portalState.project}.csv`;
-    a.click();
-
-    URL.revokeObjectURL(url);
-  });
-
-  /* ---------------------------------------------------------
-     INITIAL RENDER
-  --------------------------------------------------------- */
-  renderTable();
 }
-
