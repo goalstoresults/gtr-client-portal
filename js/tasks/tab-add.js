@@ -168,21 +168,21 @@ export async function loadTasksAdd({ portalState, container }) {
     const followupDateVal = form.querySelector("#followupDateInput").value;
     const notesVal = form.querySelector("#notesInput").value.trim();
 
-    // ⭐ SAFE PAYLOAD (empty strings allowed)
+    // ⭐ SAFE PAYLOAD (string dates, numeric priority)
     const payload = {
       project: portalState.project,
       created_by_user_id: portalState.user_id,
 
       title: titleVal,
       status: statusVal,
-      priority: priorityVal ? parseInt(priorityVal, 10) : null,
+      priority: priorityVal ? Number(priorityVal) : null,
 
       area: areaVal || "",
       who: whoVal || "",
       who_is_this_for: whoForVal || "",
 
-      due_date: dueDateVal || null,
-      followup_date: followupDateVal || null,
+      due_date: dueDateVal || null,          // <-- STRING, no UTC
+      followup_date: followupDateVal || null, // <-- STRING, no UTC
       notes: notesVal || null,
 
       created_at: new Date().toISOString()
