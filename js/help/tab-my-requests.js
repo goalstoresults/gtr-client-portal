@@ -118,3 +118,14 @@ export async function loadHelpMyRequests({ portalState, container }) {
   rowsEls.forEach((rowEl) => {
     rowEl.addEventListener("click", () => {
       const id = rowEl.getAttribute("data-id");
+            const detailRow = content.querySelector(`#details-${id}`);
+
+      if (detailRow.style.display === "none") {
+        detailRow.style.display = "table-row";
+      } else {
+        detailRow.style.display = "none";
+      }
+    });
+  });
+}
+
