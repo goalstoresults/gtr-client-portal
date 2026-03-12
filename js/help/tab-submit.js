@@ -150,5 +150,8 @@ export async function loadHelpSubmit({ portalState, container }) {
       }
     );
 
-    alert("Help request submitted.");
-    form.reset
+        alert("Help request submitted.");
+    form.reset();
+  });
+}
+
