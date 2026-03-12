@@ -5,7 +5,8 @@ import { renderContactList } from "./contacts/tab-list.js";
 import { renderContactDetails } from "./contacts/tab-details.js";
 import { renderContactRelationships } from "./contacts/tab-relationships.js";
 import { renderContactNotes } from "./contacts/tab-notes.js";
-import { renderContactServicesTab } from "./contacts/tab-services.js";   // ⭐ NEW IMPORT
+import { renderContactServicesTab } from "./contacts/tab-services.js";   
+import { renderContactTimeline } from "./contacts/tab-timeline.js";  // ⭐ NEW IMPORT
 
 
 export async function loadContactsTab({ portalState, tabContent }) {
@@ -114,6 +115,20 @@ export async function loadContactsTab({ portalState, tabContent }) {
             `;
           }
           break;
+
+        case "timeline":
+          if (portalState.selectedContactId) {
+            await renderContactTimeline(content, portalState, portalState.selectedContactId);
+          } else {
+            content.innerHTML = `
+              <section class="card">
+                <h2>Timeline</h2>
+                <p>Select a contact from the list to view their timeline.</p>
+              </section>
+            `;
+          }
+          break;
+          
 
         // ⭐ NEW SERVICES SUBTAB
         case "services":
