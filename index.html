@@ -3,103 +3,113 @@
 <head>
 <meta charset="UTF-8" />
 <title id="page-title"></title>
-
 <link rel="stylesheet" href="style.css" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="icon" type="image/png" href="./redumbrella_black.png" />
 
-<!-- ⭐ ADDING CHOICES.JS (GLOBAL, REQUIRED FOR FILTER TAB) -->
+<!-- Choices.js -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 
 <style>
 .logo-waiting {
-    display: block;
-    margin: 20px auto;
-    height: 80px;
+  display: block;
+  margin: 20px auto;
+  height: 80px;
 }
+
 .login-wrapper {
-    text-align: center;
-    margin-top: 20px;
+  text-align: center;
+  margin-top: 20px;
 }
+
 .login-wrapper label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: bold;
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
 }
+
 .login-wrapper input {
-    padding: 6px;
-    margin-bottom: 10px;
-    width: 260px;
+  padding: 6px;
+  margin-bottom: 10px;
+  width: 260px;
 }
+
 .login-wrapper button {
-    padding: 6px 12px;
-    margin-top: 10px;
+  padding: 6px 12px;
+  margin-top: 10px;
 }
+
 #errorBox {
-    color: red;
-    margin-top: 10px;
-    height: 18px;
+  color: red;
+  margin-top: 10px;
+  height: 18px;
 }
+
 header {
-    margin-top: 20px;
+  margin-top: 20px;
 }
+
 footer {
-    margin-top: 20px;
-    text-align: left;
-    color: #666;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    padding: 8px;
+  margin-top: 20px;
+  text-align: left;
+  color: #666;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  padding: 8px;
+}
+
+/* ⭐ GOLD HELP TAB */
+.nav-help {
+  color: #d4a017 !important;
+  font-weight: 600;
+}
+
+.nav-help.active {
+  border-bottom: 2px solid #d4a017 !important;
 }
 </style>
 </head>
 
 <body>
 
-<!-- ⭐ ONE SCREEN LOGIN FORM -->
+<!-- LOGIN -->
 <div id="loginForm" class="login-wrapper">
-    <img src="./RedUmbrellaPro Header2.png" alt="Red Umbrella Pro" class="logo-waiting" />
+  <img src="./RedUmbrellaPro Header2.png" alt="Red Umbrella Pro" class="logo-waiting" />
 
-    <div id="projectFieldBlock">
-        <label for="projectInput">Project:</label>
-        <input id="projectInput" type="text" placeholder="Project name" />
-    </div>
+  <div id="projectFieldBlock">
+    <label for="projectInput">Project:</label>
+    <input id="projectInput" type="text" placeholder="Project name" />
+  </div>
 
-    <label for="emailInput">Email:</label>
-    <input id="emailInput" type="email" placeholder="Email address" />
+  <label for="emailInput">Email:</label>
+  <input id="emailInput" type="email" placeholder="Email address" />
 
-    <button id="loginBtn">Login</button>
-    <div id="errorBox"></div>
+  <button id="loginBtn">Login</button>
+  <div id="errorBox"></div>
 </div>
 
-<!-- ⭐ PORTAL UI (HIDDEN UNTIL LOGIN SUCCESS) -->
+<!-- PORTAL UI -->
 <header id="portalHeader" style="display:none;">
-    <table style="border-collapse: collapse; margin-left: 20px;">
-        <tr>
-            <td rowspan="2" style="vertical-align: top; padding-right: 10px;">
-                <img src="./RedUmbrellaPro_black.png"
-                     alt="Portal Logo"
-                     style="height:32px; width:auto;" />
-            </td>
-            <td style="font-size: 26px; font-weight: 600;" id="welcomeHeader">
-                Welcome
-            </td>
-        </tr>
-        <tr>
-            <td style="font-size: 16px; opacity: 0.8;" id="subHeader">
-                Portal
-            </td>
-        </tr>
-    </table>
+  <table style="border-collapse: collapse; margin-left: 20px;">
+    <tr>
+      <td rowspan="2" style="vertical-align: top; padding-right: 10px;">
+        <img src="./RedUmbrellaPro_black.png" alt="Portal Logo" style="height:32px; width:auto;" />
+      </td>
+      <td style="font-size: 26px; font-weight: 600;" id="welcomeHeader">Welcome</td>
+    </tr>
+    <tr>
+      <td style="font-size: 16px; opacity: 0.8;" id="subHeader">Portal</td>
+    </tr>
+  </table>
 </header>
 
 <nav id="tabs" style="display:none;"></nav>
 <div id="tab-content"></div>
 
 <footer id="portalFooter" style="display:none;">
-    <small style="display:block; opacity:0.7;">Portal Version: 2.0.0</small>
+  <small style="display:block; opacity:0.7;">Portal Version: 2.0.0</small>
 </footer>
 
 <script type="module">
@@ -119,15 +129,18 @@ import { loadECCampaignsTab } from "./js/ecampaigns.js";
 import { loadPipelineTab } from "./js/pipeline.js";
 import { loadFilterTab } from "./js/filter.js";
 
+/* ⭐ NEW — HELP TAB */
+import { loadHelpTab } from "./js/help.js";
+
 /* ============================================================
 PORTAL STATE
 ============================================================ */
 const portalState = {
-    project: "",
-    userEmail: "",
-    staffName: "",
-    allowedTabs: [],
-    deleteAllowed: false
+  project: "",
+  userEmail: "",
+  staffName: "",
+  allowedTabs: [],
+  deleteAllowed: false
 };
 window.portalState = portalState;
 
@@ -145,199 +158,212 @@ const pageTitle = document.getElementById("page-title");
 const tabs = document.getElementById("tabs");
 const tabContent = document.getElementById("tab-content");
 
+/* ============================================================
+TAB MAP (⭐ HELP ADDED AS #13)
+============================================================ */
 const tabMap = {
-    "1": { label: "Contacts", loader: loadContactsTab },
-    "2": { label: "Financials", loader: loadFinancialsTab },
-    "3": { label: "Notes", loader: loadNotesTab },
-    "4": { label: "Tasks", loader: loadTasksTab },
-    "5": { label: "Lookups", loader: loadLookupsTab },
-    "6": { label: "E-Campaigns", loader: loadECCampaignsTab },
-    "7": { label: "Groups", loader: loadGroupsTab },
-    "8": { label: "Setup", loader: loadSetupTab },
-    "9": { label: "Operations", loader: loadOperationsTab },
-    "10": { label: "Emails", loader: loadEmailsTab },
-    "11": { label: "Pipeline", loader: loadPipelineTab },
-    "12": { label: "Filter", loader: loadFilterTab }
+  "1": { label: "Contacts", loader: loadContactsTab },
+  "2": { label: "Financials", loader: loadFinancialsTab },
+  "3": { label: "Notes", loader: loadNotesTab },
+  "4": { label: "Tasks", loader: loadTasksTab },
+  "5": { label: "Lookups", loader: loadLookupsTab },
+  "6": { label: "E-Campaigns", loader: loadECCampaignsTab },
+  "7": { label: "Groups", loader: loadGroupsTab },
+  "8": { label: "Setup", loader: loadSetupTab },
+  "9": { label: "Operations", loader: loadOperationsTab },
+  "10": { label: "Emails", loader: loadEmailsTab },
+  "11": { label: "Pipeline", loader: loadPipelineTab },
+  "12": { label: "Filter", loader: loadFilterTab },
+
+  /* ⭐ NEW HELP TAB */
+  "13": { label: "Help", loader: loadHelpTab }
 };
 
 /* ============================================================
 LOGIN HANDLER
 ============================================================ */
 async function attemptLogin() {
-    errorBox.textContent = "";
+  errorBox.textContent = "";
 
-    const project = projectInput.value.trim();
-    const email = emailInput.value.trim();
+  const project = projectInput.value.trim();
+  const email = emailInput.value.trim();
 
-    if (!project) {
-        errorBox.textContent = "Please enter a project.";
-        return;
+  if (!project) {
+    errorBox.textContent = "Please enter a project.";
+    return;
+  }
+  if (!email) {
+    errorBox.textContent = "Please enter an email.";
+    return;
+  }
+
+  try {
+    const res = await fetch(
+      "https://client-portal-api.dennis-e64.workers.dev/api/check_staff",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project, email })
+      }
+    );
+
+    const result = await res.json();
+
+    await fetch(
+      "https://client-portal-api.dennis-e64.workers.dev/api/log_portal_login",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project,
+          email,
+          status: result.valid ? "success" : "invalid",
+          reason: result.valid ? null : "Email not found for project",
+          userAgent: navigator.userAgent
+        })
+      }
+    );
+
+    if (!result.valid) {
+      errorBox.textContent = "Invalid email for this project.";
+      return;
     }
-    if (!email) {
-        errorBox.textContent = "Please enter an email.";
-        return;
-    }
 
-    try {
-        const res = await fetch(
-            "https://client-portal-api.dennis-e64.workers.dev/api/check_staff",
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ project, email })
-            }
-        );
+    portalState.project = project;
+    portalState.userEmail = email;
+    portalState.allowedTabs = result.allowed_tabs || [];
+    portalState.deleteAllowed = result.delete_allowed === true;
+    portalState.user_id = result.staff_id;
 
-        const result = await res.json();
+    portalState.task_manager = (result.task_manager || "").trim().toLowerCase();
 
-        await fetch(
-            "https://client-portal-api.dennis-e64.workers.dev/api/log_portal_login",
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    project,
-                    email,
-                    status: result.valid ? "success" : "invalid",
-                    reason: result.valid ? null : "Email not found for project",
-                    userAgent: navigator.userAgent
-                })
-            }
-        );
+    const friendly = result.first_name || "";
+    welcomeHeader.textContent = `Welcome ${friendly}!`;
 
-        if (!result.valid) {
-            errorBox.textContent = "Invalid email for this project.";
-            return;
-        }
+    loginForm.style.display = "none";
+    portalHeader.style.display = "block";
+    portalFooter.style.display = "block";
+    tabs.style.display = "block";
 
-        portalState.project = project;
-        portalState.userEmail = email;
-        portalState.allowedTabs = result.allowed_tabs || [];
-        portalState.deleteAllowed = result.delete_allowed === true;
-        portalState.user_id = result.staff_id;
-        
-        // ⭐ NEW — Normalize & store Task Manager role
-        portalState.task_manager = (result.task_manager || "").trim().toLowerCase();
-
-        const friendly = result.first_name || "";
-        welcomeHeader.textContent = `Welcome ${friendly}!`;
-
-        loginForm.style.display = "none";
-        portalHeader.style.display = "block";
-        portalFooter.style.display = "block";
-        tabs.style.display = "block";
-
-        loadPortalConfig(project);
-    } catch (err) {
-        errorBox.textContent = "Server error. Try again.";
-    }
+    loadPortalConfig(project);
+  } catch (err) {
+    errorBox.textContent = "Server error. Try again.";
+  }
 }
 
 loginBtn.addEventListener("click", attemptLogin);
-
 loginForm.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-        e.preventDefault();
-        loginBtn.click();
-    }
+  if (e.key === "Enter") {
+    e.preventDefault();
+    loginBtn.click();
+  }
 });
 
 /* ============================================================
 LOAD PROJECT CONFIG
 ============================================================ */
 async function loadPortalConfig(projectName) {
-    try {
-        const res = await fetch(
-            "https://client-portal-api.dennis-e64.workers.dev/api/projects_config",
-            { cache: "no-cache" }
-        );
+  try {
+    const res = await fetch(
+      "https://client-portal-api.dennis-e64.workers.dev/api/projects_config",
+      { cache: "no-cache" }
+    );
 
-        const projects = await res.json();
+    const projects = await res.json();
 
-        const match = projects.find(
-            p => String(p.project).toLowerCase() === projectName.toLowerCase()
-        );
+    const match = projects.find(
+      p => String(p.project).toLowerCase() === projectName.toLowerCase()
+    );
 
-        if (!match) {
-            tabContent.innerHTML =
-                `<section class="card"><p>Invalid project specified.</p></section>`;
-            return;
-        }
-
-        subHeader.textContent = match.display_name || "";
-        pageTitle.textContent = match.display_name || "";
-
-        const projectTabs = normalizeTabs(match.enabled_tabs);
-        const staffTabs = portalState.allowedTabs || [];
-        const finalTabs = projectTabs.filter(t => staffTabs.includes(t));
-
-        renderTabs(finalTabs);
-    } catch (err) {
-        tabContent.innerHTML =
-            `<section class="card"><p>Error loading project config.</p></section>`;
+    if (!match) {
+      tabContent.innerHTML =
+        `<section class="card"><p>Invalid project specified.</p></section>`;
+      return;
     }
+
+    subHeader.textContent = match.display_name || "";
+    pageTitle.textContent = match.display_name || "";
+
+    const projectTabs = normalizeTabs(match.enabled_tabs);
+    const staffTabs = portalState.allowedTabs || [];
+
+    const finalTabs = projectTabs.filter(t => staffTabs.includes(t));
+
+    renderTabs(finalTabs);
+  } catch (err) {
+    tabContent.innerHTML =
+      `<section class="card"><p>Error loading project config.</p></section>`;
+  }
 }
 
 /* ============================================================
 SUPPORT FUNCTIONS
 ============================================================ */
 function normalizeTabs(raw) {
-    if (Array.isArray(raw)) return raw;
-    if (typeof raw === "string") {
-        try { return JSON.parse(raw); }
-        catch { return []; }
-    }
-    return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === "string") {
+    try { return JSON.parse(raw); }
+    catch { return []; }
+  }
+  return [];
 }
 
 function renderTabs(enabledTabs) {
-    tabs.innerHTML = enabledTabs
-        .map(tabId =>
-            tabMap[tabId]
-                ? `<button data-tab="${tabId}">${tabMap[tabId].label}</button>`
-                : ""
-        )
-        .join("");
+  tabs.innerHTML = enabledTabs
+    .map(tabId => {
+      if (!tabMap[tabId]) return "";
 
-    tabs.querySelectorAll("button[data-tab]").forEach(btn => {
-        btn.addEventListener("click", () => loadTab(btn.dataset.tab));
-    });
+      const isHelp = tabMap[tabId].label === "Help";
+
+      return `
+        <button 
+          data-tab="${tabId}" 
+          class="${isHelp ? "nav-help" : ""}"
+        >
+          ${tabMap[tabId].label}
+        </button>
+      `;
+    })
+    .join("");
+
+  tabs.querySelectorAll("button[data-tab]").forEach(btn => {
+    btn.addEventListener("click", () => loadTab(btn.dataset.tab));
+  });
 }
 
 async function loadTab(tabId) {
-    document.querySelectorAll("#tabs button")
-        .forEach(btn => btn.classList.remove("active"));
+  document.querySelectorAll("#tabs button")
+    .forEach(btn => btn.classList.remove("active"));
 
-    document.querySelector(`#tabs button[data-tab="${tabId}"]`)
-        ?.classList.add("active");
+  const activeBtn = document.querySelector(`#tabs button[data-tab="${tabId}"]`);
+  if (activeBtn) activeBtn.classList.add("active");
 
-    const contextBar = document.getElementById("contact-context-bar");
-    portalState.selectedContactName = null;
+  const contextBar = document.getElementById("contact-context-bar");
+  portalState.selectedContactName = null;
 
-    if (contextBar) {
-        contextBar.textContent = "";
-        contextBar.style.display = "none";
-    }
+  if (contextBar) {
+    contextBar.textContent = "";
+    contextBar.style.display = "none";
+  }
 
-    const tab = tabMap[tabId];
-
-    if (tab && typeof tab.loader === "function") {
-        tabContent.innerHTML = "";
-        await tab.loader({ portalState, tabContent });
-    }
+  const tab = tabMap[tabId];
+  if (tab && typeof tab.loader === "function") {
+    tabContent.innerHTML = "";
+    await tab.loader({ portalState, tabContent });
+  }
 }
 
 /* ============================================================
 INITIALIZE — HANDLE ?project PARAM
 ============================================================ */
 window.addEventListener("DOMContentLoaded", () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const projectParam = urlParams.get("project");
+  const urlParams = new URLSearchParams(window.location.search);
+  const projectParam = urlParams.get("project");
 
-    if (projectParam) {
-        projectInput.value = projectParam;
-        projectFieldBlock.style.display = "none";
-    }
+  if (projectParam) {
+    projectInput.value = projectParam;
+    projectFieldBlock.style.display = "none";
+  }
 });
 </script>
 
