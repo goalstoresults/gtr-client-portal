@@ -133,6 +133,16 @@ nav#notes-subtabs button.disabled {
   cursor: not-allowed;
 }
 
+.nav-help {
+  color: #d4a017 !important; /* your muted gold */
+  font-weight: 600;
+}
+
+.nav-help.active {
+  border-bottom: 2px solid #d4a017;
+}
+
+
 /* Cards */
 .card {
   background: #fff;
