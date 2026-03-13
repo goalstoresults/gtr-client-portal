@@ -139,7 +139,8 @@ nav#notes-subtabs button.disabled {
 }
 
 .nav-help.active {
-  border-bottom: 2px solid #d4a017;
+  color: #ffffff !important;
+  border-bottom: 2px solid #d4a017 !important;
 }
 
 
