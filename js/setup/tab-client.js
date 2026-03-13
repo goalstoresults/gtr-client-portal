@@ -105,7 +105,8 @@ export async function renderClientSetup(container, portalState) {
       { tab_id: "9", description: "Operations" },
       { tab_id: "11", description: "Pipeline" },
       { tab_id: "12", description: "Filter" },
-      { tab_id: "13", description: "Help" }
+      { tab_id: "13", description: "Setup" },      
+      { tab_id: "14", description: "Help" }
     ];
 
     // Render client details + tab config
