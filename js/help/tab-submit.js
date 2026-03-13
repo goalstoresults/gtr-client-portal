@@ -38,7 +38,7 @@ export async function loadHelpSubmit({ portalState, container }) {
       <!-- Row 1: Module, Issue Type, Severity -->
       <div style="display:flex; gap:12px;">
         <div style="flex:0 0 30%;">
-          <label>Module</label>
+          <label>Top Menu Tab Is:</label>
           <select id="moduleInput" style="width:100%;">
             <option value="">-- Select --</option>
             <option value="contacts">Contacts</option>
@@ -47,7 +47,6 @@ export async function loadHelpSubmit({ portalState, container }) {
             <option value="pipelines">Pipelines</option>
             <option value="financials">Financials</option>
             <option value="operations">Operations</option>
-            <option value="setup">Setup</option>
             <option value="other">Other</option>
           </select>
         </div>
@@ -58,7 +57,6 @@ export async function loadHelpSubmit({ portalState, container }) {
             <option value="">-- Select --</option>
             <option value="bug">Bug</option>
             <option value="confusion">Confusion</option>
-            <option value="feature_request">Feature Request</option>
             <option value="data_issue">Data Issue</option>
             <option value="permission_issue">Permission Issue</option>
           </select>
