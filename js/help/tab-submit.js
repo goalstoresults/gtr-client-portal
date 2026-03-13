@@ -165,8 +165,8 @@ export async function loadHelpSubmit({ portalState, container }) {
           method: "POST",
           headers: {
             "Content-Type": file.type,
-            "apikey": "YOUR_SUPABASE_ANON_KEY_HERE",
-            "Authorization": `Bearer YOUR_SUPABASE_ANON_KEY_HERE`
+            "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3emxid3F6b3NvcmV5bmRlbm9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTkyODIsImV4cCI6MjA2ODc3NTI4Mn0.6yZV9E0RcNaHqEfEmaBZH15RC02_FkxwiGMyuX0THdM",
+            "Authorization": `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3emxid3F6b3NvcmV5bmRlbm9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTkyODIsImV4cCI6MjA2ODc3NTI4Mn0.6yZV9E0RcNaHqEfEmaBZH15RC02_FkxwiGMyuX0THdM`
           },
           body: file
         }
