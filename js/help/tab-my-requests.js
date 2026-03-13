@@ -75,30 +75,33 @@ export async function loadHelpMyRequests({ portalState, container }) {
 
           <!-- Hidden detail row -->
           <tr id="details-${escapeHtml(r.id)}" style="display:none; background:#fafafa;">
-            <td colspan="5" style="padding:12px;">
-              <strong>Description:</strong><br>
-              ${escapeHtml(r.description)}<br><br>
+            <td colspan="5" style="padding:12px; border-top:1px solid #ddd;">
+              
+              <div style="margin-bottom:8px;">
+                <strong>Description:</strong><br>
+                ${escapeHtml(r.description || "")}
+              </div>
 
               ${
                 r.steps_to_reproduce
-                  ? `<strong>Steps to Reproduce:</strong><br>${escapeHtml(
-                      r.steps_to_reproduce
-                    )}<br><br>`
+                  ? `
+              <div style="margin-bottom:8px;">
+                <strong>Steps to Reproduce:</strong><br>
+                ${escapeHtml(r.steps_to_reproduce)}
+              </div>`
                   : ""
               }
 
-              ${
-                r.screenshot_url
-                  ? `<strong>Screenshot:</strong><br>
-                     <a href="${escapeHtml(
-                       r.screenshot_url
-                     )}" target="_blank">View Screenshot</a><br><br>`
-                  : ""
-              }
+              <div style="margin-bottom:8px;">
+                <strong>Severity:</strong> ${escapeHtml(r.severity)}
+              </div>
 
-              <strong>Last Updated:</strong> ${new Date(
-                r.updated_at
-              ).toLocaleString()}
+              <div>
+                <strong>Last Updated:</strong> ${new Date(
+                  r.updated_at
+                ).toLocaleString()}
+              </div>
+
             </td>
           </tr>
         `
@@ -118,7 +121,7 @@ export async function loadHelpMyRequests({ portalState, container }) {
   rowsEls.forEach((rowEl) => {
     rowEl.addEventListener("click", () => {
       const id = rowEl.getAttribute("data-id");
-            const detailRow = content.querySelector(`#details-${id}`);
+      const detailRow = content.querySelector(`#details-${id}`);
 
       if (detailRow.style.display === "none") {
         detailRow.style.display = "table-row";
@@ -128,4 +131,3 @@ export async function loadHelpMyRequests({ portalState, container }) {
     });
   });
 }
-
