@@ -116,13 +116,16 @@ export async function loadHelpSubmit({ portalState, container }) {
       return;
     }
 
-    // Build payload
+    // FIXED: Use staffName + userEmail instead of first_name/last_name/email
+    const safeName = portalState.staffName || "User";
+
     const payload = {
       user_id: portalState.user_id,
       project: portalState.project,
-      first_name: portalState.first_name,
-      last_name: portalState.last_name,
-      email: portalState.email,
+
+      first_name: safeName,
+      last_name: safeName,
+      email: portalState.userEmail,
 
       module: moduleVal,
       issue_type: issueTypeVal,
@@ -132,7 +135,6 @@ export async function loadHelpSubmit({ portalState, container }) {
       steps_to_reproduce: stepsVal || null
     };
 
-    // Submit to backend Worker
     const res = await fetch(
       "https://help-center-worker.dennis-e64.workers.dev/help/submit",
       {
