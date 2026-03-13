@@ -245,9 +245,6 @@ async function attemptLogin() {
     const friendly = result.first_name || result.staff_name || "";
     welcomeHeader.textContent = `Welcome ${friendly}!`;
 
-    const friendly = result.first_name || "";
-    welcomeHeader.textContent = `Welcome ${friendly}!`;
-
     loginForm.style.display = "none";
     portalHeader.style.display = "block";
     portalFooter.style.display = "block";
