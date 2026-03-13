@@ -116,15 +116,14 @@ export async function loadHelpSubmit({ portalState, container }) {
       return;
     }
 
-    // FIXED: Use staffName + userEmail instead of first_name/last_name/email
-    const safeName = portalState.staffName || "User";
 
     const payload = {
       user_id: portalState.user_id,
       project: portalState.project,
 
-      first_name: safeName,
-      last_name: safeName,
+      first_name: portalState.firstName || null,
+      last_name: portalState.lastName || null,
+
       email: portalState.userEmail,
 
       module: moduleVal,
