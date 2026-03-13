@@ -93,108 +93,10 @@ export async function loadHelpSubmit({ portalState, container }) {
         <input id="screenshotInput" placeholder="Paste screenshot URL" style="width:100%;">
       </div>
 
-      <!-- Row 5: Screenshot Upload -->
-      <div style="display:flex; flex-direction:column;">
-        <label>Upload Screenshot (optional)</label>
-
-        <input 
-          type="file" 
-          id="screenshot_file" 
-          accept="image/png, image/jpeg, image/jpg, image/webp"
-          style="margin-top:6px;"
-        />
-
-        <!-- Preview container -->
-        <div id="screenshot_preview" style="margin-top:10px; display:none;">
-          <img 
-            id="screenshot_thumb" 
-            src="" 
-            alt="Screenshot Preview" 
-            style="max-width:200px; border:1px solid #ccc; border-radius:4px;"
-          />
-          <button 
-            type="button" 
-            id="remove_screenshot_btn" 
-            style="display:block; margin-top:6px;"
-          >
-            Remove
-          </button>
-        </div>
-      </div>
-
     </form>
   `;
 
   const form = content.querySelector("#helpForm");
-
-  const fileInput = form.querySelector("#screenshot_file");
-  const previewBox = form.querySelector("#screenshot_preview");
-  const thumb = form.querySelector("#screenshot_thumb");
-  const removeBtn = form.querySelector("#remove_screenshot_btn");
-  const screenshotUrlInput = form.querySelector("#screenshotInput");
-
-  /* =========================================================
-     Preview + Upload Logic
-  ========================================================== */
-  fileInput.addEventListener("change", async () => {
-    const file = fileInput.files[0];
-    if (!file) {
-      previewBox.style.display = "none";
-      thumb.src = "";
-      screenshotUrlInput.value = "";
-      return;
-    }
-
-    // Preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      thumb.src = e.target.result;
-      previewBox.style.display = "block";
-    };
-    reader.readAsDataURL(file);
-
-    // Upload to Supabase Storage
-    try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${crypto.randomUUID()}.${fileExt}`;
-      const storagePath = `${portalState.project}/${portalState.user_id}/${fileName}`;
-
-      const uploadRes = await fetch(
-        "https://cwzlbwqzosoreyndenok.supabase.co/storage/v1/object/help_screenshots/" + encodeURIComponent(storagePath),
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": file.type,
-            "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3emxid3F6b3NvcmV5bmRlbm9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTkyODIsImV4cCI6MjA2ODc3NTI4Mn0.6yZV9E0RcNaHqEfEmaBZH15RC02_FkxwiGMyuX0THdM",
-            "Authorization": `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3emxid3F6b3NvcmV5bmRlbm9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTkyODIsImV4cCI6MjA2ODc3NTI4Mn0.6yZV9E0RcNaHqEfEmaBZH15RC02_FkxwiGMyuX0THdM`
-          },
-          body: file
-        }
-      );
-
-      if (!uploadRes.ok) {
-        console.error("Upload failed", await uploadRes.text());
-        alert("Screenshot upload failed.");
-        return;
-      }
-
-      const publicUrl =
-        "https://cwzlbwqzosoreyndenok.supabase.co/storage/v1/object/public/help_screenshots/" +
-        encodeURIComponent(storagePath);
-
-      screenshotUrlInput.value = publicUrl;
-    } catch (err) {
-      console.error("Upload error", err);
-      alert("Screenshot upload failed.");
-    }
-  });
-
-  removeBtn.addEventListener("click", () => {
-    fileInput.value = "";
-    thumb.src = "";
-    previewBox.style.display = "none";
-    screenshotUrlInput.value = "";
-  });
 
   /* =========================================================
      3) Submit Handler
@@ -205,8 +107,9 @@ export async function loadHelpSubmit({ portalState, container }) {
     const severityVal = form.querySelector("#severityInput").value;
     const descriptionVal = form.querySelector("#descriptionInput").value.trim();
     const stepsVal = form.querySelector("#stepsInput").value.trim();
-    const screenshotVal = screenshotUrlInput.value.trim();
+    const screenshotVal = form.querySelector("#screenshotInput").value.trim();
 
+    // Validation
     if (!moduleVal) {
       alert("Please select a module.");
       return;
@@ -220,6 +123,7 @@ export async function loadHelpSubmit({ portalState, container }) {
       return;
     }
 
+    // Build payload
     const payload = {
       user_id: portalState.user_id,
       project: portalState.project,
@@ -236,6 +140,7 @@ export async function loadHelpSubmit({ portalState, container }) {
       screenshot_url: screenshotVal || null
     };
 
+    // Submit to backend Worker
     await fetch(
       "https://help-center-worker.dennis-e64.workers.dev/help/submit",
       {
@@ -247,11 +152,5 @@ export async function loadHelpSubmit({ portalState, container }) {
 
     alert("Help request submitted.");
     form.reset();
-
-    fileInput.value = "";
-    thumb.src = "";
-    previewBox.style.display = "none";
-    screenshotUrlInput.value = "";
   });
 }
-
