@@ -93,6 +93,35 @@ export async function loadHelpSubmit({ portalState, container }) {
         <input id="screenshotInput" placeholder="Paste screenshot URL" style="width:100%;">
       </div>
 
+      <!-- ⭐ NEW: Row 5 — Screenshot Upload -->
+      <div style="display:flex; flex-direction:column;">
+        <label>Upload Screenshot (optional)</label>
+
+        <input 
+          type="file" 
+          id="screenshot_file" 
+          accept="image/png, image/jpeg, image/jpg, image/webp"
+          style="margin-top:6px;"
+        />
+
+        <!-- Preview container -->
+        <div id="screenshot_preview" style="margin-top:10px; display:none;">
+          <img 
+            id="screenshot_thumb" 
+            src="" 
+            alt="Screenshot Preview" 
+            style="max-width:200px; border:1px solid #ccc; border-radius:4px;"
+          />
+          <button 
+            type="button" 
+            id="remove_screenshot_btn" 
+            style="display:block; margin-top:6px;"
+          >
+            Remove
+          </button>
+        </div>
+      </div>
+
     </form>
   `;
 
@@ -150,7 +179,7 @@ export async function loadHelpSubmit({ portalState, container }) {
       }
     );
 
-        alert("Help request submitted.");
+    alert("Help request submitted.");
     form.reset();
   });
 }
