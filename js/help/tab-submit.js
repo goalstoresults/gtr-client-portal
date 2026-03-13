@@ -93,7 +93,7 @@ export async function loadHelpSubmit({ portalState, container }) {
         <input id="screenshotInput" placeholder="Paste screenshot URL" style="width:100%;">
       </div>
 
-      <!-- ⭐ NEW: Row 5 — Screenshot Upload -->
+      <!-- Row 5: Screenshot Upload -->
       <div style="display:flex; flex-direction:column;">
         <label>Upload Screenshot (optional)</label>
 
@@ -127,36 +127,73 @@ export async function loadHelpSubmit({ portalState, container }) {
 
   const form = content.querySelector("#helpForm");
 
-  /* =========================================================
-     ⭐ STEP 2 — Preview Logic
-  ========================================================== */
   const fileInput = form.querySelector("#screenshot_file");
   const previewBox = form.querySelector("#screenshot_preview");
   const thumb = form.querySelector("#screenshot_thumb");
   const removeBtn = form.querySelector("#remove_screenshot_btn");
+  const screenshotUrlInput = form.querySelector("#screenshotInput");
 
-  // When user selects a file → show preview
-  fileInput.addEventListener("change", () => {
+  /* =========================================================
+     Preview + Upload Logic
+  ========================================================== */
+  fileInput.addEventListener("change", async () => {
     const file = fileInput.files[0];
     if (!file) {
       previewBox.style.display = "none";
       thumb.src = "";
+      screenshotUrlInput.value = "";
       return;
     }
 
+    // Preview
     const reader = new FileReader();
     reader.onload = (e) => {
       thumb.src = e.target.result;
       previewBox.style.display = "block";
     };
     reader.readAsDataURL(file);
+
+    // Upload to Supabase Storage
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${crypto.randomUUID()}.${fileExt}`;
+      const storagePath = `${portalState.project}/${portalState.user_id}/${fileName}`;
+
+      const uploadRes = await fetch(
+        "https://cwzlbwqzosoreyndenok.supabase.co/storage/v1/object/help_screenshots/" + encodeURIComponent(storagePath),
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": file.type,
+            "apikey": "YOUR_SUPABASE_ANON_KEY_HERE",
+            "Authorization": `Bearer YOUR_SUPABASE_ANON_KEY_HERE`
+          },
+          body: file
+        }
+      );
+
+      if (!uploadRes.ok) {
+        console.error("Upload failed", await uploadRes.text());
+        alert("Screenshot upload failed.");
+        return;
+      }
+
+      const publicUrl =
+        "https://cwzlbwqzosoreyndenok.supabase.co/storage/v1/object/public/help_screenshots/" +
+        encodeURIComponent(storagePath);
+
+      screenshotUrlInput.value = publicUrl;
+    } catch (err) {
+      console.error("Upload error", err);
+      alert("Screenshot upload failed.");
+    }
   });
 
-  // Remove screenshot
   removeBtn.addEventListener("click", () => {
     fileInput.value = "";
     thumb.src = "";
     previewBox.style.display = "none";
+    screenshotUrlInput.value = "";
   });
 
   /* =========================================================
@@ -168,9 +205,8 @@ export async function loadHelpSubmit({ portalState, container }) {
     const severityVal = form.querySelector("#severityInput").value;
     const descriptionVal = form.querySelector("#descriptionInput").value.trim();
     const stepsVal = form.querySelector("#stepsInput").value.trim();
-    const screenshotVal = form.querySelector("#screenshotInput").value.trim();
+    const screenshotVal = screenshotUrlInput.value.trim();
 
-    // ⭐ Validation
     if (!moduleVal) {
       alert("Please select a module.");
       return;
@@ -184,7 +220,6 @@ export async function loadHelpSubmit({ portalState, container }) {
       return;
     }
 
-    // ⭐ Build payload
     const payload = {
       user_id: portalState.user_id,
       project: portalState.project,
@@ -201,7 +236,6 @@ export async function loadHelpSubmit({ portalState, container }) {
       screenshot_url: screenshotVal || null
     };
 
-    // ⭐ Submit to backend Worker
     await fetch(
       "https://help-center-worker.dennis-e64.workers.dev/help/submit",
       {
@@ -214,9 +248,9 @@ export async function loadHelpSubmit({ portalState, container }) {
     alert("Help request submitted.");
     form.reset();
 
-    // Reset preview
     fileInput.value = "";
     thumb.src = "";
     previewBox.style.display = "none";
+    screenshotUrlInput.value = "";
   });
 }
