@@ -228,16 +228,22 @@ async function attemptLogin() {
       errorBox.textContent = "Invalid email for this project.";
       return;
     }
-
     portalState.project = project;
     portalState.userEmail = email;
     portalState.allowedTabs = result.allowed_tabs || [];
     portalState.deleteAllowed = result.delete_allowed === true;
     portalState.user_id = result.staff_id;
     portalState.full_admin = result.full_admin === true;
-
-
     portalState.task_manager = (result.task_manager || "").trim().toLowerCase();
+    
+    // ⭐ FIX: map names correctly
+    portalState.staffName = result.staff_name || "";
+    portalState.firstName = result.first_name || "";
+    portalState.lastName = result.last_name || "";
+    
+    // UI welcome header
+    const friendly = result.first_name || result.staff_name || "";
+    welcomeHeader.textContent = `Welcome ${friendly}!`;
 
     const friendly = result.first_name || "";
     welcomeHeader.textContent = `Welcome ${friendly}!`;
