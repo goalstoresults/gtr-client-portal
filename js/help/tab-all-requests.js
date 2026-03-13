@@ -37,17 +37,18 @@ export async function loadHelpAllRequests({ portalState, container }) {
   const projectFilter = container.querySelector("#projectFilter");
 
   /* =========================================================
-     2) Load project list for dropdown (admin only)
+     2) Load project list from Help Worker (admin only)
   ========================================================== */
   if (portalState.full_admin) {
     try {
       const res = await fetch(
-        `${portalState.api_base}/projects/list`,
+        "https://help-center-worker.dennis-e64.workers.dev/help/projects",
         { cache: "no-cache" }
       );
       const projects = await res.json();
 
       projects.forEach((p) => {
+        if (!p.project) return;
         const opt = document.createElement("option");
         opt.value = p.project;
         opt.textContent = p.project;
@@ -59,14 +60,91 @@ export async function loadHelpAllRequests({ portalState, container }) {
   }
 
   /* =========================================================
-     3) Fetch + Render Function
+     3) Helpers for dropdowns (match Submit tab)
+  ========================================================== */
+  function buildModuleOptions(current) {
+    const modules = [
+      "contacts",
+      "notes",
+      "tasks",
+      "pipelines",
+      "financials",
+      "operations",
+      "setup",
+      "other"
+    ];
+    const cur = (current || "").toLowerCase();
+    return modules
+      .map(
+        (m) =>
+          `<option value="${m}" ${
+            cur === m ? "selected" : ""
+          }>${m}</option>`
+      )
+      .join("");
+  }
+
+  function buildIssueTypeOptions(current) {
+    const issues = [
+      "bug",
+      "confusion",
+      "feature_request",
+      "data_issue",
+      "permission_issue"
+    ];
+    const cur = (current || "").toLowerCase();
+    return issues
+      .map(
+        (i) =>
+          `<option value="${i}" ${
+            cur === i ? "selected" : ""
+          }>${i}</option>`
+      )
+      .join("");
+  }
+
+  function buildSeverityOptions(current) {
+    const severities = ["low", "medium", "high", "blocking"];
+    const cur = (current || "").toLowerCase();
+    return severities
+      .map(
+        (s) =>
+          `<option value="${s}" ${
+            cur === s ? "selected" : ""
+          }>${s}</option>`
+      )
+      .join("");
+  }
+
+  function buildStatusOptions(current) {
+    const statuses = [
+      "new",
+      "in_review",
+      "in_progress",
+      "waiting_on_user",
+      "resolved"
+    ];
+    const cur = (current || "").toLowerCase();
+    return statuses
+      .map(
+        (s) =>
+          `<option value="${s}" ${
+            cur === s ? "selected" : ""
+          }>${s}</option>`
+      )
+      .join("");
+  }
+
+  /* =========================================================
+     4) Fetch + Render Function
   ========================================================== */
   async function loadTable() {
     const selectedProject = projectFilter.value;
 
     let endpoint = "";
     if (selectedProject === "all") {
-      endpoint = "https://help-center-worker.dennis-e64.workers.dev/help/all-projects";
+      endpoint =
+        "https://help-center-worker.dennis-e64.workers.dev/help/all-projects";
     } else {
       endpoint = `https://help-center-worker.dennis-e64.workers.dev/help/all?project=${encodeURIComponent(
         selectedProject
@@ -89,7 +167,7 @@ export async function loadHelpAllRequests({ portalState, container }) {
     }
 
     /* =========================================================
-       4) Render table — NOTES TABLE STYLE WITH ARROW
+       5) Render table — NOTES TABLE STYLE WITH ARROW
     ========================================================== */
     const tableHtml = `
       <table class="notes-table" style="width:100%; border-collapse:collapse;">
@@ -110,7 +188,9 @@ export async function loadHelpAllRequests({ portalState, container }) {
             .map(
               (r) => `
             <tr class="help-row" data-id="${escapeHtml(r.id)}">
-              <td><button class="expand-btn" data-id="${escapeHtml(r.id)}">▶</button></td>
+              <td><button class="expand-btn" data-id="${escapeHtml(
+                r.id
+              )}">▶</button></td>
               <td>${escapeHtml(r.first_name)} ${escapeHtml(r.last_name)}</td>
               <td>${escapeHtml(r.project)}</td>
               <td>${escapeHtml(r.module)}</td>
@@ -128,21 +208,21 @@ export async function loadHelpAllRequests({ portalState, container }) {
                   <!-- Description -->
                   <div style="margin-bottom:12px;">
                     <label><strong>Description</strong></label><br>
-                    <textarea class="descInput" data-id="${escapeHtml(
-                      r.id
-                    )}" style="width:100%; height:80px;">${escapeHtml(
-                r.description || ""
-              )}</textarea>
+                    <textarea
+                      class="descInput"
+                      data-id="${escapeHtml(r.id)}"
+                      style="width:100%; height:80px;"
+                    >${escapeHtml(r.description || "")}</textarea>
                   </div>
 
                   <!-- Steps -->
                   <div style="margin-bottom:12px;">
                     <label><strong>Steps to Reproduce</strong></label><br>
-                    <textarea class="stepsInput" data-id="${escapeHtml(
-                      r.id
-                    )}" style="width:100%; height:80px;">${escapeHtml(
-                r.steps_to_reproduce || ""
-              )}</textarea>
+                    <textarea
+                      class="stepsInput"
+                      data-id="${escapeHtml(r.id)}"
+                      style="width:100%; height:80px;"
+                    >${escapeHtml(r.steps_to_reproduce || "")}</textarea>
                   </div>
 
                   <!-- Module / Issue / Severity / Status -->
@@ -150,74 +230,88 @@ export async function loadHelpAllRequests({ portalState, container }) {
 
                     <div style="flex:1;">
                       <label>Module</label><br>
-                      <input class="moduleInput" data-id="${escapeHtml(
-                        r.id
-                      )}" value="${escapeHtml(r.module)}" style="width:100%;">
+                      <select
+                        class="moduleInput"
+                        data-id="${escapeHtml(r.id)}"
+                        style="width:100%;"
+                      >
+                        ${buildModuleOptions(r.module)}
+                      </select>
                     </div>
 
                     <div style="flex:1;">
                       <label>Issue Type</label><br>
-                      <input class="issueInput" data-id="${escapeHtml(
-                        r.id
-                      )}" value="${escapeHtml(r.issue_type)}" style="width:100%;">
+                      <select
+                        class="issueInput"
+                        data-id="${escapeHtml(r.id)}"
+                        style="width:100%;"
+                      >
+                        ${buildIssueTypeOptions(r.issue_type)}
+                      </select>
                     </div>
 
                     <div style="flex:1;">
                       <label>Severity</label><br>
-                      <select class="severityInput" data-id="${escapeHtml(
-                        r.id
-                      )}" style="width:100%;">
-                        <option value="low" ${
-                          r.severity === "low" ? "selected" : ""
-                        }>Low</option>
-                        <option value="medium" ${
-                          r.severity === "medium" ? "selected" : ""
-                        }>Medium</option>
-                        <option value="high" ${
-                          r.severity === "high" ? "selected" : ""
-                        }>High</option>
-                        <option value="blocking" ${
-                          r.severity === "blocking" ? "selected" : ""
-                        }>Blocking</option>
+                      <select
+                        class="severityInput"
+                        data-id="${escapeHtml(r.id)}"
+                        style="width:100%;"
+                      >
+                        ${buildSeverityOptions(r.severity)}
                       </select>
                     </div>
 
                     <div style="flex:1;">
                       <label>Status</label><br>
-                      <select class="statusInput" data-id="${escapeHtml(
-                        r.id
-                      )}" style="width:100%;">
-                        <option value="new" ${
-                          r.status === "new" ? "selected" : ""
-                        }>New</option>
-                        <option value="in_review" ${
-                          r.status === "in_review" ? "selected" : ""
-                        }>In Review</option>
-                        <option value="in_progress" ${
-                          r.status === "in_progress" ? "selected" : ""
-                        }>In Progress</option>
-                        <option value="waiting_on_user" ${
-                          r.status === "waiting_on_user" ? "selected" : ""
-                        }>Waiting on User</option>
-                        <option value="resolved" ${
-                          r.status === "resolved" ? "selected" : ""
-                        }>Resolved</option>
+                      <select
+                        class="statusInput"
+                        data-id="${escapeHtml(r.id)}"
+                        style="width:100%;"
+                      >
+                        ${buildStatusOptions(r.status)}
                       </select>
                     </div>
 
                   </div>
 
+                  <!-- Submitted By -->
+                  <div style="margin-bottom:8px; font-size:0.9em; color:#555;">
+                    <strong>Submitted By:</strong>
+                    ${escapeHtml(r.first_name)} ${escapeHtml(
+                r.last_name
+              )} (${escapeHtml(r.email)})
+                  </div>
+
+                  <!-- Screenshot (view only) -->
+                  ${
+                    r.screenshot_url
+                      ? `
+                  <div style="margin-bottom:8px;">
+                    <strong>Screenshot:</strong>
+                    <a href="${escapeHtml(
+                      r.screenshot_url
+                    )}" target="_blank">View Screenshot</a>
+                  </div>`
+                      : ""
+                  }
+
                   <!-- Save + Delete -->
                   <div style="display:flex; gap:16px; margin-top:12px;">
-                    <button class="saveAdminBtn btn-primary" data-id="${escapeHtml(
-                      r.id
-                    )}">Save Changes</button>
+                    <button
+                      class="saveAdminBtn btn-primary"
+                      data-id="${escapeHtml(r.id)}"
+                    >
+                      Save Changes
+                    </button>
 
                     ${
                       portalState.full_admin
-                        ? `<button class="deleteAdminBtn btn-danger" data-id="${escapeHtml(
-                            r.id
-                          )}">Delete</button>`
+                        ? `<button
+                             class="deleteAdminBtn btn-danger"
+                             data-id="${escapeHtml(r.id)}"
+                           >
+                             Delete
+                           </button>`
                         : ""
                     }
                   </div>
@@ -235,7 +329,7 @@ export async function loadHelpAllRequests({ portalState, container }) {
     content.innerHTML = tableHtml;
 
     /* =========================================================
-       5) Expand/Collapse Logic — MATCH TASK LIST
+       6) Expand/Collapse Logic — MATCH TASK LIST
     ========================================================== */
     content.querySelectorAll(".expand-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -249,7 +343,7 @@ export async function loadHelpAllRequests({ portalState, container }) {
     });
 
     /* =========================================================
-       6) Save Admin Changes (FULL EDIT PANEL)
+       7) Save Admin Changes (FULL EDIT PANEL)
     ========================================================== */
     content.querySelectorAll(".saveAdminBtn").forEach((btn) => {
       btn.addEventListener("click", async () => {
@@ -265,11 +359,11 @@ export async function loadHelpAllRequests({ portalState, container }) {
 
         const moduleVal = content.querySelector(
           `.moduleInput[data-id="${id}"]`
-        ).value.trim();
+        ).value;
 
         const issueVal = content.querySelector(
           `.issueInput[data-id="${id}"]`
-        ).value.trim();
+        ).value;
 
         const severityVal = content.querySelector(
           `.severityInput[data-id="${id}"]`
@@ -302,7 +396,7 @@ export async function loadHelpAllRequests({ portalState, container }) {
     });
 
     /* =========================================================
-       7) Delete Request (Admin Only)
+       8) Delete Request (Admin Only)
     ========================================================== */
     content.querySelectorAll(".deleteAdminBtn").forEach((btn) => {
       btn.addEventListener("click", async () => {
@@ -326,7 +420,7 @@ export async function loadHelpAllRequests({ portalState, container }) {
   }
 
   /* =========================================================
-     8) Load table initially + on filter change
+     9) Load table initially + on filter change
   ========================================================== */
   await loadTable();
 
