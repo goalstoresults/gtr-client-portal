@@ -16,7 +16,8 @@ export async function loadHelpTab({ portalState, tabContent }) {
      Normalize role — determine if user is admin
   ========================================================== */
   const role = (portalState.role || "").trim().toLowerCase();
-  const isAdmin = role === "admin" || portalState.is_admin === true;
+  const isAdmin = portalState.full_admin === true;
+
 
   // Hide "All Requests" tab if not admin
   if (!isAdmin) {
