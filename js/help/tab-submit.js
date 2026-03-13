@@ -30,7 +30,7 @@ export async function loadHelpSubmit({ portalState, container }) {
   const submitBtn = container.querySelector("#submitHelpBtn");
 
   /* =========================================================
-     2) Build form (no lookups needed)
+     2) Build form
   ========================================================== */
   content.innerHTML = `
     <form id="helpForm" class="workspace-form" style="display:flex; flex-direction:column; gap:12px;">
@@ -128,6 +128,38 @@ export async function loadHelpSubmit({ portalState, container }) {
   const form = content.querySelector("#helpForm");
 
   /* =========================================================
+     ⭐ STEP 2 — Preview Logic
+  ========================================================== */
+  const fileInput = form.querySelector("#screenshot_file");
+  const previewBox = form.querySelector("#screenshot_preview");
+  const thumb = form.querySelector("#screenshot_thumb");
+  const removeBtn = form.querySelector("#remove_screenshot_btn");
+
+  // When user selects a file → show preview
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files[0];
+    if (!file) {
+      previewBox.style.display = "none";
+      thumb.src = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      thumb.src = e.target.result;
+      previewBox.style.display = "block";
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Remove screenshot
+  removeBtn.addEventListener("click", () => {
+    fileInput.value = "";
+    thumb.src = "";
+    previewBox.style.display = "none";
+  });
+
+  /* =========================================================
      3) Submit Handler
   ========================================================== */
   submitBtn.addEventListener("click", async () => {
@@ -181,6 +213,10 @@ export async function loadHelpSubmit({ portalState, container }) {
 
     alert("Help request submitted.");
     form.reset();
+
+    // Reset preview
+    fileInput.value = "";
+    thumb.src = "";
+    previewBox.style.display = "none";
   });
 }
-
