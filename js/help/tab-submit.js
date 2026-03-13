@@ -254,3 +254,4 @@ export async function loadHelpSubmit({ portalState, container }) {
     screenshotUrlInput.value = "";
   });
 }
+
