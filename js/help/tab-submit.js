@@ -87,12 +87,6 @@ export async function loadHelpSubmit({ portalState, container }) {
         <textarea id="stepsInput" placeholder="If possible, list the steps…" style="width:100%; height:100px;"></textarea>
       </div>
 
-      <!-- Row 4: Screenshot URL -->
-      <div style="display:flex; flex-direction:column;">
-        <label>Screenshot URL (optional)</label>
-        <input id="screenshotInput" placeholder="Paste screenshot URL" style="width:100%;">
-      </div>
-
     </form>
   `;
 
@@ -107,7 +101,6 @@ export async function loadHelpSubmit({ portalState, container }) {
     const severityVal = form.querySelector("#severityInput").value;
     const descriptionVal = form.querySelector("#descriptionInput").value.trim();
     const stepsVal = form.querySelector("#stepsInput").value.trim();
-    const screenshotVal = form.querySelector("#screenshotInput").value.trim();
 
     // Validation
     if (!moduleVal) {
@@ -136,12 +129,11 @@ export async function loadHelpSubmit({ portalState, container }) {
       severity: severityVal,
 
       description: descriptionVal,
-      steps_to_reproduce: stepsVal || null,
-      screenshot_url: screenshotVal || null
+      steps_to_reproduce: stepsVal || null
     };
 
     // Submit to backend Worker
-    await fetch(
+    const res = await fetch(
       "https://help-center-worker.dennis-e64.workers.dev/help/submit",
       {
         method: "POST",
@@ -149,6 +141,11 @@ export async function loadHelpSubmit({ portalState, container }) {
         body: JSON.stringify(payload)
       }
     );
+
+    if (!res.ok) {
+      alert("Help request failed to submit.");
+      return;
+    }
 
     alert("Help request submitted.");
     form.reset();
