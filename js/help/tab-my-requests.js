@@ -48,24 +48,26 @@ export async function loadHelpMyRequests({ portalState, container }) {
   }
 
   /* =========================================================
-     3) Render table
+     3) Render table — NOTES TABLE STYLE WITH ARROW
   ========================================================== */
   const tableHtml = `
-    <table class="data-table" style="width:100%; border-collapse:collapse;">
+    <table class="notes-table" style="width:100%; border-collapse:collapse;">
       <thead>
         <tr>
-          <th style="text-align:left;">Module</th>
-          <th style="text-align:left;">Issue Type</th>
-          <th style="text-align:left;">Severity</th>
-          <th style="text-align:left;">Status</th>
-          <th style="text-align:left;">Created</th>
+          <th></th>
+          <th>Module</th>
+          <th>Issue Type</th>
+          <th>Severity</th>
+          <th>Status</th>
+          <th>Created</th>
         </tr>
       </thead>
       <tbody>
         ${rows
           .map(
             (r) => `
-          <tr class="help-row" data-id="${escapeHtml(r.id)}" style="cursor:pointer;">
+          <tr class="help-row" data-id="${escapeHtml(r.id)}">
+            <td><button class="expand-btn" data-id="${escapeHtml(r.id)}">▶</button></td>
             <td>${escapeHtml(r.module)}</td>
             <td>${escapeHtml(r.issue_type)}</td>
             <td>${escapeHtml(r.severity)}</td>
@@ -73,35 +75,37 @@ export async function loadHelpMyRequests({ portalState, container }) {
             <td>${new Date(r.created_at).toLocaleString()}</td>
           </tr>
 
-          <!-- Hidden detail row -->
-          <tr id="details-${escapeHtml(r.id)}" style="display:none; background:#fafafa;">
-            <td colspan="5" style="padding:12px; border-top:1px solid #ddd;">
-              
-              <div style="margin-bottom:8px;">
-                <strong>Description:</strong><br>
-                ${escapeHtml(r.description || "")}
+          <!-- Expand row -->
+          <tr id="details-${escapeHtml(r.id)}" style="display:none;">
+            <td colspan="6">
+              <div style="padding:12px; background:#f7f7f7; border:1px solid #ddd;">
+
+                <div style="margin-bottom:8px;">
+                  <strong>Description:</strong><br>
+                  ${escapeHtml(r.description || "")}
+                </div>
+
+                ${
+                  r.steps_to_reproduce
+                    ? `
+                <div style="margin-bottom:8px;">
+                  <strong>Steps to Reproduce:</strong><br>
+                  ${escapeHtml(r.steps_to_reproduce)}
+                </div>`
+                    : ""
+                }
+
+                <div style="margin-bottom:8px;">
+                  <strong>Severity:</strong> ${escapeHtml(r.severity)}
+                </div>
+
+                <div>
+                  <strong>Last Updated:</strong> ${new Date(
+                    r.updated_at
+                  ).toLocaleString()}
+                </div>
+
               </div>
-
-              ${
-                r.steps_to_reproduce
-                  ? `
-              <div style="margin-bottom:8px;">
-                <strong>Steps to Reproduce:</strong><br>
-                ${escapeHtml(r.steps_to_reproduce)}
-              </div>`
-                  : ""
-              }
-
-              <div style="margin-bottom:8px;">
-                <strong>Severity:</strong> ${escapeHtml(r.severity)}
-              </div>
-
-              <div>
-                <strong>Last Updated:</strong> ${new Date(
-                  r.updated_at
-                ).toLocaleString()}
-              </div>
-
             </td>
           </tr>
         `
@@ -114,20 +118,16 @@ export async function loadHelpMyRequests({ portalState, container }) {
   content.innerHTML = tableHtml;
 
   /* =========================================================
-     4) Expand/Collapse Logic
+     4) Expand/Collapse Logic — MATCH TASK LIST
   ========================================================== */
-  const rowsEls = content.querySelectorAll(".help-row");
-
-  rowsEls.forEach((rowEl) => {
-    rowEl.addEventListener("click", () => {
-      const id = rowEl.getAttribute("data-id");
+  content.querySelectorAll(".expand-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
       const detailRow = content.querySelector(`#details-${id}`);
+      const isOpen = detailRow.style.display === "table-row";
 
-      if (detailRow.style.display === "none") {
-        detailRow.style.display = "table-row";
-      } else {
-        detailRow.style.display = "none";
-      }
+      detailRow.style.display = isOpen ? "none" : "table-row";
+      btn.textContent = isOpen ? "▶" : "▼";
     });
   });
 }
