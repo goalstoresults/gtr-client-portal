@@ -43,28 +43,25 @@ export async function loadTasksAdd({ portalState, container }) {
     return;
   }
 
-  /* =========================================================
-     1b) Fetch project staff (real users)
-     WHERE project = portalState.project
-  ========================================================= */
-  let projectStaff = [];
-  try {
-    const res = await fetch(
-      `${portalState.supabaseUrl}/rest/v1/projects_staff?project=eq.${encodeURIComponent(
-        portalState.project
-      )}&select=id,first_name,last_name,staff_name,staff_email`,
-      {
-        headers: {
-          apikey: portalState.supabaseAnonKey,
-          Authorization: `Bearer ${portalState.supabaseAnonKey}`
-        }
-      }
-    );
-    projectStaff = await res.json();
-    if (!Array.isArray(projectStaff)) projectStaff = [];
-  } catch (err) {
-    console.error("Error loading project staff", err);
-  }
+/* =========================================================
+   Fetch project staff (real users)
+   WHERE project = portalState.project
+========================================================= */
+let projectStaff = [];
+try {
+  const res = await fetch(
+    `https://tasks-manager.dennis-e64.workers.dev/projects/staff?project=${encodeURIComponent(
+      portalState.project
+    )}`,
+    { cache: "no-cache" }
+  );
+
+  projectStaff = await res.json();
+  if (!Array.isArray(projectStaff)) projectStaff = [];
+} catch (err) {
+  console.error("Error loading project staff", err);
+}
+
 
   /* =========================================================
      Helper: Resolve staff display name
