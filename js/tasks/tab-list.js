@@ -48,6 +48,19 @@ try {
   lookups = [];
 }
 
+// ⭐ Make lookups available to tab-edit.js
+portalState.lookups = {
+  status: getOptions("status"),
+  priority: getOptions("priority"),
+  area: getOptions("area"),
+  who_is_this_for: getOptions("who_is_this_for")
+};
+
+// ⭐ Make staff available to tab-edit.js
+portalState.projectStaff = projectStaff;
+  
+
+  
 function getOptions(field) {
   return lookups
     .filter(r => r.field === field && r.active)
