@@ -45,19 +45,36 @@ export async function loadTasksAdd({ portalState, container }) {
 
   /* =========================================================
      1b) Fetch project staff (real users)
+     WHERE project = portalState.project
   ========================================================= */
   let projectStaff = [];
   try {
     const res = await fetch(
-      `https://tasks-manager.dennis-e64.workers.dev/projects/staff?project=${encodeURIComponent(
+      `${portalState.supabaseUrl}/rest/v1/projects_staff?project=eq.${encodeURIComponent(
         portalState.project
-      )}`,
-      { cache: "no-cache" }
+      )}&select=id,first_name,last_name,staff_name,staff_email`,
+      {
+        headers: {
+          apikey: portalState.supabaseAnonKey,
+          Authorization: `Bearer ${portalState.supabaseAnonKey}`
+        }
+      }
     );
     projectStaff = await res.json();
     if (!Array.isArray(projectStaff)) projectStaff = [];
   } catch (err) {
     console.error("Error loading project staff", err);
+  }
+
+  /* =========================================================
+     Helper: Resolve staff display name
+  ========================================================= */
+  function getStaffDisplayName(row) {
+    if (row.first_name || row.last_name) {
+      return `${row.first_name || ""} ${row.last_name || ""}`.trim();
+    }
+    if (row.staff_name) return row.staff_name;
+    return row.staff_email;
   }
 
   /* =========================================================
@@ -86,15 +103,16 @@ export async function loadTasksAdd({ portalState, container }) {
   const whoForOptions = buildOptions("who_is_this_for");
 
   /* =========================================================
-     Build Assigned dropdown (users + Client + Other)
+     Build Assigned dropdown (Users + Client + Other)
   ========================================================= */
   function buildAssignedOptions() {
     let html = "";
 
     // 1. Project staff users
     for (const u of projectStaff) {
-      html += `<option value="user:${escapeHtml(u.user_id)}">${escapeHtml(
-        u.name
+      const name = getStaffDisplayName(u);
+      html += `<option value="user:${escapeHtml(u.id)}">${escapeHtml(
+        name
       )}</option>`;
     }
 
@@ -226,40 +244,3 @@ export async function loadTasksAdd({ portalState, container }) {
     }
 
     // ⭐ SAFE PAYLOAD
-    const payload = {
-      project: portalState.project,
-      created_by_user_id: portalState.user_id,
-
-      title: titleVal,
-      status: statusVal,
-      priority: priorityVal || null,
-
-      area: areaVal || "",
-      who, // only "Other" or ""
-      who_is_this_for: whoForVal || "",
-
-      assigned_to_user_id,
-      assigned_to_contact_id,
-
-      due_date: dueDateVal || null,
-      followup_date: followupDateVal || null,
-      notes: notesVal || null,
-
-      created_at: new Date().toISOString()
-    };
-
-    await fetch(
-      "https://tasks-manager.dennis-e64.workers.dev/tasks/add",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      }
-    );
-
-    alert("Task added.");
-
-    // Reset form
-    form.reset();
-  });
-}
