@@ -175,6 +175,15 @@ function buildMultiSelect(field) {
   let tasks = await fetchTasks();
   let filteredTasks = [...tasks];
 
+  // Allow edit panel to refresh the list after save
+  portalState.refreshTasks = async () => {
+    tasks = await fetchTasks();
+    tasks = computeDueIn(tasks);
+    filteredTasks = [...tasks];
+    renderTable();
+  };
+
+
   /* ---------------------------------------------------------
      Compute due_in (timezone-proof)
   --------------------------------------------------------- */
