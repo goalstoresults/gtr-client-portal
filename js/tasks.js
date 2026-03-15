@@ -2,7 +2,6 @@
 
 import { loadTasksList } from "./tasks/tab-list.js";
 import { loadTasksAdd } from "./tasks/tab-add.js";
-import { loadTasksEdit } from "./tasks/tab-edit.js";
 import { loadTasksLookups } from "./tasks/tab-lookups.js";
 import { loadTasksOverview } from "./tasks/tab-overview.js";
 
@@ -47,10 +46,6 @@ export async function loadTasksTab({ portalState, tabContent }) {
 
         case "add":
           await loadTasksAdd({ portalState, container: content });
-          break;
-
-        case "edit":
-          await loadTasksEdit({ portalState, container: content });
           break;
 
         case "lookups":
