@@ -120,6 +120,14 @@ export async function loadTasksList({ portalState, container }) {
     return "";
   }
 
+function buildMultiSelect(field) {
+  const opts = getOptions(field);
+  return opts
+    .map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.value)}</option>`)
+    .join("");
+}
+
+  
   /* ---------------------------------------------------------
      Build Assigned To filter options
   --------------------------------------------------------- */
