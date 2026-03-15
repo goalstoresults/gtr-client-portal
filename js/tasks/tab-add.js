@@ -44,6 +44,23 @@ export async function loadTasksAdd({ portalState, container }) {
   }
 
   /* =========================================================
+     1b) Fetch project staff (real users)
+  ========================================================= */
+  let projectStaff = [];
+  try {
+    const res = await fetch(
+      `https://tasks-manager.dennis-e64.workers.dev/projects/staff?project=${encodeURIComponent(
+        portalState.project
+      )}`,
+      { cache: "no-cache" }
+    );
+    projectStaff = await res.json();
+    if (!Array.isArray(projectStaff)) projectStaff = [];
+  } catch (err) {
+    console.error("Error loading project staff", err);
+  }
+
+  /* =========================================================
      2) Helper to get sorted active options for a field
   ========================================================= */
   function getOptions(field) {
@@ -66,8 +83,35 @@ export async function loadTasksAdd({ portalState, container }) {
   const statusOptions = buildOptions("status");
   const priorityOptions = buildOptions("priority");
   const areaOptions = buildOptions("area");
-  const whoOptions = buildOptions("who");
   const whoForOptions = buildOptions("who_is_this_for");
+
+  /* =========================================================
+     Build Assigned dropdown (users + Client + Other)
+  ========================================================= */
+  function buildAssignedOptions() {
+    let html = "";
+
+    // 1. Project staff users
+    for (const u of projectStaff) {
+      html += `<option value="user:${escapeHtml(u.user_id)}">${escapeHtml(
+        u.name
+      )}</option>`;
+    }
+
+    // 2. Client (contact)
+    if (portalState.project_contact_id) {
+      html += `<option value="contact:${escapeHtml(
+        portalState.project_contact_id
+      )}">Client</option>`;
+    }
+
+    // 3. Other
+    html += `<option value="other">Other</option>`;
+
+    return html;
+  }
+
+  const assignedOptions = buildAssignedOptions();
 
   /* =========================================================
      3) Render Add Form
@@ -108,9 +152,9 @@ export async function loadTasksAdd({ portalState, container }) {
         </div>
         <div style="flex:0 0 25%;">
           <label>Assigned</label>
-          <select id="whoInput" style="width:100%;">
+          <select id="assignedInput" style="width:100%;">
             <option value="">-- Select --</option>
-            ${whoOptions}
+            ${assignedOptions}
           </select>
         </div>
         <div style="flex:0 0 25%;">
@@ -162,13 +206,26 @@ export async function loadTasksAdd({ portalState, container }) {
     const statusVal = form.querySelector("#statusInput").value;
     const priorityVal = form.querySelector("#priorityInput").value;
     const areaVal = form.querySelector("#areaInput").value;
-    const whoVal = form.querySelector("#whoInput").value;
+    const assignedVal = form.querySelector("#assignedInput").value;
     const whoForVal = form.querySelector("#whoForInput").value;
     const dueDateVal = form.querySelector("#dueDateInput").value;
     const followupDateVal = form.querySelector("#followupDateInput").value;
     const notesVal = form.querySelector("#notesInput").value.trim();
 
-    // ⭐ SAFE PAYLOAD (string dates, numeric priority)
+    // ⭐ Interpret Assigned selection
+    let assigned_to_user_id = null;
+    let assigned_to_contact_id = null;
+    let who = "";
+
+    if (assignedVal.startsWith("user:")) {
+      assigned_to_user_id = assignedVal.replace("user:", "");
+    } else if (assignedVal.startsWith("contact:")) {
+      assigned_to_contact_id = assignedVal.replace("contact:", "");
+    } else if (assignedVal === "other") {
+      who = "Other";
+    }
+
+    // ⭐ SAFE PAYLOAD
     const payload = {
       project: portalState.project,
       created_by_user_id: portalState.user_id,
@@ -178,11 +235,14 @@ export async function loadTasksAdd({ portalState, container }) {
       priority: priorityVal || null,
 
       area: areaVal || "",
-      who: whoVal || "",
+      who, // only "Other" or ""
       who_is_this_for: whoForVal || "",
 
-      due_date: dueDateVal || null,          // <-- STRING, no UTC
-      followup_date: followupDateVal || null, // <-- STRING, no UTC
+      assigned_to_user_id,
+      assigned_to_contact_id,
+
+      due_date: dueDateVal || null,
+      followup_date: followupDateVal || null,
       notes: notesVal || null,
 
       created_at: new Date().toISOString()
