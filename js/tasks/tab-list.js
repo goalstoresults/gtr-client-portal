@@ -460,50 +460,50 @@ export async function loadTasksList({ portalState, container }) {
     renderTable();
   });
 
-  /* ---------------------------------------------------------
-     EXPORT CSV
-  --------------------------------------------------------- */
-  container.querySelector("#exportCsvBtn").addEventListener("click", () => {
-    if (!filteredTasks.length) {
-      alert("No tasks to export.");
-      return;
-    }
+/* ---------------------------------------------------------
+   EXPORT CSV
+--------------------------------------------------------- */
+container.querySelector("#exportCsvBtn").addEventListener("click", () => {
+  if (!filteredTasks.length) {
+    alert("No tasks to export.");
+    return;
+  }
 
-    const headers = [
-      "id",
-      "title",
-      "who_is_this_for",
-      "who",
-      "area",
-      "priority",
-      "status",
-      "due_in",
-      "due_date",
-      "followup_date",
-      "notes"
-    ];
+  const headers = [
+    "id",
+    "title",
+    "who_is_this_for",
+    "who",
+    "area",
+    "priority",
+    "status",
+    "due_in",
+    "due_date",
+    "followup_date",
+    "notes"
+  ];
 
-    const csvRows = [
-      headers.join(","),
-      ...filteredTasks.map(t =>
-        headers
-          .map(h => {
-            const val = t[h] ?? "";
-            return `"${String(val).replace(/"/g, '""')}"`;
-          })
-          })
-          .join(",")
-      )
-    ];
+  const csvRows = [
+    headers.join(","),
+    ...filteredTasks.map(t =>
+      headers
+        .map(h => {
+          const val = t[h] ?? "";
+          return `"${String(val).replace(/"/g, '""')}"`;
+        })
+        .join(",")
+    )
+  ];
 
-    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `tasks_export_${portalState.project}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  });
+  const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `tasks_export_${portalState.project}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
 
   /* ---------------------------------------------------------
      INITIAL RENDER
