@@ -244,3 +244,40 @@ export async function loadTasksAdd({ portalState, container }) {
     }
 
     // ⭐ SAFE PAYLOAD
+    const payload = {
+      project: portalState.project,
+      created_by_user_id: portalState.user_id,
+
+      title: titleVal,
+      status: statusVal,
+      priority: priorityVal || null,
+
+      area: areaVal || "",
+      who, // only "Other" or ""
+      who_is_this_for: whoForVal || "",
+
+      assigned_to_user_id,
+      assigned_to_contact_id,
+
+      due_date: dueDateVal || null,
+      followup_date: followupDateVal || null,
+      notes: notesVal || null,
+
+      created_at: new Date().toISOString()
+    };
+
+    await fetch(
+      "https://tasks-manager.dennis-e64.workers.dev/tasks/add",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }
+    );
+
+    alert("Task added.");
+
+    // Reset form
+    form.reset();
+  });
+}
