@@ -48,6 +48,12 @@ try {
   lookups = [];
 }
 
+function getOptions(field) {
+  return lookups
+    .filter(r => r.field === field && r.active)
+    .sort((a, b) => a.sort_order - b.sort_order);
+}
+
 // ⭐ Make lookups available to tab-edit.js
 portalState.lookups = {
   status: getOptions("status"),
@@ -55,17 +61,6 @@ portalState.lookups = {
   area: getOptions("area"),
   who_is_this_for: getOptions("who_is_this_for")
 };
-
-// ⭐ Make staff available to tab-edit.js
-portalState.projectStaff = projectStaff;
-  
-
-  
-function getOptions(field) {
-  return lookups
-    .filter(r => r.field === field && r.active)
-    .sort((a, b) => a.sort_order - b.sort_order);
-}
 
 function buildMultiSelect(field) {
   const opts = getOptions(field);
@@ -95,6 +90,9 @@ try {
 } catch {
   projectStaff = [];
 }
+
+// ⭐ Make staff available to tab-edit.js
+portalState.projectStaff = projectStaff;
 
 function resolveAssigned(t) {
   if (t.assigned_to_user_id) {
@@ -154,7 +152,7 @@ let tasks = await fetchTasks();
 let filteredTasks = [...tasks];
 
 /* ---------------------------------------------------------
-   refreshTasks (critical)
+   refreshTasks
 --------------------------------------------------------- */
 portalState.refreshTasks = async () => {
   tasks = await fetchTasks();
