@@ -215,17 +215,19 @@ function buildMultiSelect(field) {
     { field: "", dir: "asc" }
   ];
 
-  const sortableFields = [
-    "title",
-    "assigned_to",
-    "who_is_this_for",
-    "area",
-    "priority",
-    "status",
-    "due_in",
-    "due_date",
-    "followup_date"
-  ];
+const sortableFields = [
+  "title",
+  "assigned_to",
+  "who_is_this_for",
+  "area",
+  "priority",
+  "status",
+  "due_in",
+  "due_date",
+  "followup_date",
+  "created_at"
+];
+
 
   /* ---------------------------------------------------------
      Apply filters
