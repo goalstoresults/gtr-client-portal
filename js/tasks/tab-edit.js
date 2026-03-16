@@ -94,7 +94,10 @@ export function renderTaskEdit({ task, portalState, container }) {
       <!-- Notes -->
       <div style="display:flex; flex-direction:column;">
         <label>Notes</label>
-        <textarea id="eNotes" style="width:100%;">${escapeHtml(task?.notes || "")}</textarea>
+        <textarea 
+          id="eNotes" 
+          style="width:100%; height:160px;"
+        >${escapeHtml(task?.notes || "")}</textarea>
       </div>
 
       <div style="display:flex; gap:12px;">
