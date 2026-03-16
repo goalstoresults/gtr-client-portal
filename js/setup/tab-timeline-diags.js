@@ -1,9 +1,6 @@
-/* ============================================================
-   Timeline Diagnostics — Full Frontend Module
-   Mirrors Contact Diagnostics structure and behavior
-============================================================ */
+// /js/setup/tab-timeline-diags.js
 
-const TD_BASE_URL = "https://timeline-diagnostics.dennis-e64.workers.dev";
+const TD_BASE_URL = "https://timeline-module.dennis-e64.workers.dev";
 
 let TD_CACHE = [];
 
@@ -32,7 +29,6 @@ export async function renderTimelineDiagnostics(setupContent, portalState) {
 
       <div style="margin-bottom: 15px; display:flex; gap:10px; align-items:center;">
         <button id="td-refresh" class="btn btn-primary">Refresh</button>
-        <button id="td-bulk-sync" class="btn btn-success">Bulk Sync</button>
         <button id="td-export" class="btn btn-secondary">Export Selected</button>
         <button id="td-clear-all" class="btn btn-secondary">Clear All</button>
 
@@ -42,10 +38,16 @@ export async function renderTimelineDiagnostics(setupContent, portalState) {
 
         <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
           <label style="font-weight:bold;">Filter:</label>
-          <select id="td-filter" class="form-select" style="width:220px;">
-            <option value="missing_summary">Missing Summary</option>
-            <option value="missing_metadata">Missing Metadata</option>
-            <option value="all">All Events</option>
+          <select id="td-filter" class="form-select" style="width:260px;">
+            <option value="contact_created">Contact Created</option>
+            <option value="contact_updated">Contact Updated</option>
+            <option value="relationship_added">Relationships</option>
+            <option value="note_added">Notes</option>
+            <option value="payment_added">Payments</option>
+            <option value="email_logged">Emails</option>
+            <option value="ghl_contact_synced">GHL Contact Sync</option>
+            <option value="ghl_note_added">GHL Notes</option>
+            <option value="errors">Errors Only</option>
           </select>
         </div>
       </div>
@@ -98,7 +100,7 @@ export async function renderTimelineDiagnostics(setupContent, portalState) {
         </tbody>
       </table>
     </section>
-  `;
+  ”
 
   document.getElementById("td-refresh").onclick = () =>
     loadTimeline(project, portalState);
@@ -106,17 +108,18 @@ export async function renderTimelineDiagnostics(setupContent, portalState) {
   document.getElementById("td-select-all").onclick = toggleSelectAllTD;
   document.getElementById("td-clear-all").onclick = clearAllTD;
   document.getElementById("td-export").onclick = exportSelectedTD;
-  document.getElementById("td-bulk-sync").onclick = () => bulkSyncTD(project);
 
   document.getElementById("td-filter").onchange = () =>
     loadTimeline(project, portalState);
 
+  // Force a filter (first option) and load
+  const filterSelect = document.getElementById("td-filter");
+  if (filterSelect && !filterSelect.value) {
+    filterSelect.value = "contact_created";
+  }
+
   loadTimeline(project, portalState);
 }
-
-/* ============================================================
-   LOAD TIMELINE EVENTS
-============================================================ */
 
 async function loadTimeline(project, portalState) {
   const tbody = document.getElementById("td-body");
@@ -125,31 +128,43 @@ async function loadTimeline(project, portalState) {
   tbody.innerHTML = `<tr><td colspan="6">Loading...</td></tr>`;
 
   try {
-    const filterSelect = document.getElementById("td-filter");
-    const filter = filterSelect ? filterSelect.value || "missing_summary" : "missing_summary";
-
+    // Pull ALL events for the project from timeline-module
     const res = await fetch(
-      `${TD_BASE_URL}/timeline_diag/list?project=${project}&filter=${filter}`
+      `${TD_BASE_URL}/timeline/project?project_id=${encodeURIComponent(project)}`
     );
 
     const data = await res.json();
-    TD_CACHE = Array.isArray(data.events) ? data.events : [];
+    const events = Array.isArray(data) ? data : data.events || [];
 
+    TD_CACHE = events;
     renderRowsTD(portalState);
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="6">Error loading timeline events.</td></tr>`;
   }
 }
 
-/* ============================================================
-   RENDER ROWS
-============================================================ */
-
 function renderRowsTD(portalState) {
   const tbody = document.getElementById("td-body");
   if (!tbody) return;
 
-  let rows = sortRowsTD([...TD_CACHE], portalState);
+  const filterSelect = document.getElementById("td-filter");
+  const filter = filterSelect ? filterSelect.value : "contact_created";
+
+  let rows = [...TD_CACHE];
+
+  if (filter === "errors") {
+    rows = rows.filter(e =>
+      !e.contact_id ||
+      !e.event_type ||
+      !e.event_timestamp ||
+      e.project == null ||
+      e.summary == null
+    );
+  } else {
+    rows = rows.filter(e => e.event_type === filter);
+  }
+
+  rows = sortRowsTD(rows, portalState);
 
   if (rows.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6">No matching events.</td></tr>`;
@@ -174,8 +189,7 @@ function renderRowsTD(portalState) {
           <td>${summary}</td>
 
           <td style="text-align:center;">
-            <button class="btn btn-secondary" onclick="tdPreview('${e.id}', '${e.project}')">Preview</button>
-            <button class="btn btn-success" onclick="tdSync('${e.id}', '${e.project}')">Sync</button>
+            <button class="btn btn-secondary" onclick="tdPreview('${e.id}')">Preview</button>
           </td>
         </tr>
       `;
@@ -193,10 +207,6 @@ function renderRowsTD(portalState) {
   updateSortArrowsTD(portalState);
   updateSelectedCountTD();
 }
-
-/* ============================================================
-   SORTING
-============================================================ */
 
 function sortRowsTD(rows, portalState) {
   const { column, direction } = portalState.timelineDiagSort;
@@ -243,40 +253,14 @@ function updateSortArrowsTD(portalState) {
   });
 }
 
-/* ============================================================
-   PREVIEW + SYNC
-============================================================ */
-
-window.tdPreview = async function (eventId, project) {
-  const res = await fetch(`${TD_BASE_URL}/timeline_diag/preview`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ project, event_id: eventId })
-  });
-
-  const data = await res.json();
-  alert(JSON.stringify(data.payload, null, 2));
+window.tdPreview = function (eventId) {
+  const event = TD_CACHE.find(e => e.id === eventId);
+  if (!event) {
+    alert("Event not found in cache.");
+    return;
+  }
+  alert(JSON.stringify(event, null, 2));
 };
-
-window.tdSync = async function (eventId, project) {
-  const res = await fetch(`${TD_BASE_URL}/timeline_diag/sync`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ project, event_id: eventId })
-  });
-
-  const data = await res.json();
-  alert("Sync complete:\n" + JSON.stringify(data, null, 2));
-
-  const portalState = window.portalState || {};
-  const effectiveProject = portalState.setup_project_id || project;
-
-  loadTimeline(effectiveProject, portalState);
-};
-
-/* ============================================================
-   SELECTION + EXPORT
-============================================================ */
 
 function toggleSelectAllTD() {
   const checked = document.getElementById("td-select-all").checked;
@@ -295,8 +279,10 @@ function updateSelectedCountTD() {
   const selected = document.querySelectorAll(".td-row:checked").length;
   const total = TD_CACHE.length;
 
-  document.getElementById("td-selected-count").innerText =
-    `Total: ${total} Selected: ${selected}`;
+  const el = document.getElementById("td-selected-count");
+  if (el) {
+    el.innerText = `Total: ${total} Selected: ${selected}`;
+  }
 }
 
 function exportSelectedTD() {
@@ -343,37 +329,8 @@ function exportSelectedTD() {
 
   const a = document.createElement("a");
   a.href = url;
-  a.download = "selected_timeline_events.csv";
+  a.download = "timeline_events_diagnostics.csv";
   a.click();
 
   URL.revokeObjectURL(url);
-}
-
-/* ============================================================
-   BULK SYNC
-============================================================ */
-
-async function bulkSyncTD(project) {
-  const ids = [...document.querySelectorAll(".td-row:checked")].map((cb) =>
-    cb.closest("tr").dataset.id
-  );
-
-  if (ids.length === 0) {
-    alert("No events selected.");
-    return;
-  }
-
-  const res = await fetch(`${TD_BASE_URL}/timeline_diag/bulk_sync`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ project, event_ids: ids })
-  });
-
-  const data = await res.json();
-  alert("Bulk sync complete:\n" + JSON.stringify(data, null, 2));
-
-  const portalState = window.portalState || {};
-  const effectiveProject = portalState.setup_project_id || project;
-
-  loadTimeline(effectiveProject, portalState);
 }
