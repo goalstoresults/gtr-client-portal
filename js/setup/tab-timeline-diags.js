@@ -1,5 +1,5 @@
 // /js/setup/tab-timeline-diags.js
-// Timeline Diagnostics — tied directly to timeline-module Worker
+// Timeline Diagnostics (Round 1) — NEW UI + NEW BACKEND
 
 const TD_BASE_URL = "https://timeline-module.dennis-e64.workers.dev";
 
@@ -17,9 +17,10 @@ export async function renderTimelineDiagnostics(setupContent, portalState) {
     return;
   }
 
+  // Sorting state
   if (!portalState.timelineDiagSort) {
     portalState.timelineDiagSort = {
-      column: "event_timestamp",
+      column: "timestamp",
       direction: "desc"
     };
   }
@@ -28,31 +29,30 @@ export async function renderTimelineDiagnostics(setupContent, portalState) {
     <section class="card">
       <h2>Timeline Diagnostics</h2>
 
+      <!-- TOP CONTROLS -->
       <div style="margin-bottom: 15px; display:flex; gap:10px; align-items:center;">
-        <button id="td-refresh" class="btn btn-primary">Refresh</button>
-        <button id="td-export" class="btn btn-secondary">Export Selected</button>
-        <button id="td-clear-all" class="btn btn-secondary">Clear All</button>
+        
+        <!-- MODE DROPDOWN -->
+        <label style="font-weight:bold;">Mode:</label>
+        <select id="td-mode" class="form-select" style="width:260px;">
+          <option value="">Select...</option>
+          <option value="contact-created">Contact Created</option>
+          <option value="contact-updated">Contact Updated</option>
+          <option value="relationships">Relationships</option>
+          <option value="notes-created">Notes Created</option>
+          <option value="notes-updated">Notes Updated</option>
+          <option value="payments">Payments</option>
+        </select>
 
-        <span id="td-selected-count" style="font-weight:bold; margin-left:10px;">
+        <!-- RETRIEVE BUTTON -->
+        <button id="td-retrieve" class="btn btn-primary">Retrieve</button>
+
+        <span id="td-selected-count" style="font-weight:bold; margin-left:auto;">
           Total: 0 Selected: 0
         </span>
-
-        <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
-          <label style="font-weight:bold;">Filter:</label>
-          <select id="td-filter" class="form-select" style="width:260px;">
-            <option value="contact_created">Contact Created</option>
-            <option value="contact_updated">Contact Updated</option>
-            <option value="relationship_added">Relationships</option>
-            <option value="note_added">Notes</option>
-            <option value="payment_added">Payments</option>
-            <option value="email_logged">Emails</option>
-            <option value="ghl_contact_synced">GHL Contact Sync</option>
-            <option value="ghl_note_added">GHL Notes</option>
-            <option value="errors">Errors Only</option>
-          </select>
-        </div>
       </div>
 
+      <!-- GRID -->
       <table class="notes-table" style="width:100%;">
         <thead>
           <tr>
@@ -60,75 +60,85 @@ export async function renderTimelineDiagnostics(setupContent, portalState) {
               <input type="checkbox" id="td-select-all">
             </th>
 
-            <th class="td-sortable" data-field="event_timestamp">
+            <th class="td-sortable" data-field="id">
+              ID
+              <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+                <span class="sort-up">△</span>
+                <span class="sort-down">▽</span>
+              </span>
+            </th>
+
+            <th class="td-sortable" data-field="contact_name">
+              Contact Name
+              <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+                <span class="sort-up">△</span>
+                <span class="sort-down">▽</span>
+              </span>
+            </th>
+
+            <th class="td-sortable" data-field="timestamp">
               Timestamp
               <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
                 <span class="sort-up">△</span>
                 <span class="sort-down">▽</span>
               </span>
             </th>
-
-            <th class="td-sortable" data-field="event_type">
-              Event Type
-              <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-                <span class="sort-up">△</span>
-                <span class="sort-down">▽</span>
-              </span>
-            </th>
-
-            <th class="td-sortable" data-field="contact_id">
-              Contact ID
-              <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-                <span class="sort-up">△</span>
-                <span class="sort-down">▽</span>
-              </span>
-            </th>
-
-            <th class="td-sortable" data-field="summary">
-              Summary
-              <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-                <span class="sort-up">△</span>
-                <span class="sort-down">▽</span>
-              </span>
-            </th>
-
-            <th style="width:180px; text-align:center;">Actions</th>
           </tr>
         </thead>
 
         <tbody id="td-body">
-          <tr><td colspan="6">Loading...</td></tr>
+          <tr><td colspan="4">Awaiting selection...</td></tr>
         </tbody>
       </table>
+
+      <!-- BOTTOM BUTTONS -->
+      <div style="margin-top:15px; display:flex; gap:10px;">
+        <button id="td-clear-all" class="btn btn-secondary">Clear All</button>
+        <button id="td-create-timeline" class="btn btn-primary" disabled>Create Timeline</button>
+      </div>
+
     </section>
   `;
 
-  document.getElementById("td-refresh").onclick = () =>
-    loadTimeline(project, portalState);
+  // Wire up events
+  document.getElementById("td-retrieve").onclick = () =>
+    retrieveDiagnostics(project, portalState);
 
   document.getElementById("td-select-all").onclick = toggleSelectAllTD;
   document.getElementById("td-clear-all").onclick = clearAllTD;
-  document.getElementById("td-export").onclick = exportSelectedTD;
 
-  document.getElementById("td-filter").onchange = () =>
-    loadTimeline(project, portalState);
-
-  loadTimeline(project, portalState);
+  // Create Timeline button (POST comes in Round 2)
+  document.getElementById("td-create-timeline").onclick = () => {
+    alert("Create Timeline Events will be implemented in Round 2.");
+  };
 }
 
 /* ============================================================
-   LOAD TIMELINE EVENTS (pull all, filter client-side)
+   RETRIEVE DATA FROM BACKEND
 ============================================================ */
-
-async function loadTimeline(project, portalState) {
+async function retrieveDiagnostics(project, portalState) {
+  const mode = document.getElementById("td-mode").value;
   const tbody = document.getElementById("td-body");
-  if (!tbody) return;
 
-  tbody.innerHTML = `<tr><td colspan="6">Loading...</td></tr>`;
+  if (!mode) {
+    tbody.innerHTML = `<tr><td colspan="4">Please select a mode.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = `<tr><td colspan="4">Loading...</td></tr>`;
+
+  const endpoint = {
+    "contact-created": "/diag/contact-created",
+    "contact-updated": "/diag/contact-updated",
+    "relationships": "/diag/relationships",
+    "notes-created": "/diag/notes-created",
+    "notes-updated": "/diag/notes-updated",
+    "payments": "/diag/payments"
+  }[mode];
 
   try {
     const res = await fetch(
-      `${TD_BASE_URL}/timeline/project?project_id=${encodeURIComponent(project)}`
+      `${TD_BASE_URL}${endpoint}?project=${encodeURIComponent(project)}`
     );
 
     const data = await res.json();
@@ -136,62 +146,36 @@ async function loadTimeline(project, portalState) {
 
     renderRowsTD(portalState);
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6">Error loading timeline events.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4">Error loading diagnostics.</td></tr>`;
   }
 }
 
 /* ============================================================
-   RENDER ROWS
+   RENDER GRID
 ============================================================ */
-
 function renderRowsTD(portalState) {
   const tbody = document.getElementById("td-body");
   if (!tbody) return;
 
-  const filterEl = document.getElementById("td-filter");
-  const filter = filterEl ? filterEl.value : "contact_created";
-
   let rows = [...TD_CACHE];
-
-  if (filter === "errors") {
-    rows = rows.filter(e =>
-      !e.contact_id ||
-      !e.event_type ||
-      !e.event_timestamp ||
-      !e.project ||
-      e.summary == null
-    );
-  } else {
-    rows = rows.filter(e => e.event_type === filter);
-  }
-
   rows = sortRowsTD(rows, portalState);
 
   if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6">No matching events.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4">No matching records.</td></tr>`;
     updateSelectedCountTD();
     return;
   }
 
   tbody.innerHTML = rows
     .map((e) => {
-      const ts = e.event_timestamp || "";
-      const summary = e.summary || `<span style="color:red;font-weight:bold;">None</span>`;
-
       return `
         <tr data-id="${e.id}">
           <td style="text-align:center;">
             <input type="checkbox" class="td-row">
           </td>
-
-          <td>${ts}</td>
-          <td>${e.event_type || ""}</td>
-          <td>${e.contact_id || ""}</td>
-          <td>${summary}</td>
-
-          <td style="text-align:center;">
-            <button class="btn btn-secondary" onclick="tdPreview('${e.id}')">Preview</button>
-          </td>
+          <td>${e.id || ""}</td>
+          <td>${e.contact_name || ""}</td>
+          <td>${e.timestamp || ""}</td>
         </tr>
       `;
     })
@@ -212,7 +196,6 @@ function renderRowsTD(portalState) {
 /* ============================================================
    SORTING
 ============================================================ */
-
 function sortRowsTD(rows, portalState) {
   const { column, direction } = portalState.timelineDiagSort;
 
@@ -259,22 +242,8 @@ function updateSortArrowsTD(portalState) {
 }
 
 /* ============================================================
-   PREVIEW
+   SELECTION
 ============================================================ */
-
-window.tdPreview = function (eventId) {
-  const event = TD_CACHE.find(e => e.id === eventId);
-  if (!event) {
-    alert("Event not found.");
-    return;
-  }
-  alert(JSON.stringify(event, null, 2));
-};
-
-/* ============================================================
-   SELECTION + EXPORT
-============================================================ */
-
 function toggleSelectAllTD() {
   const checked = document.getElementById("td-select-all").checked;
   document.querySelectorAll(".td-row").forEach((cb) => (cb.checked = checked));
@@ -293,57 +262,8 @@ function updateSelectedCountTD() {
   const total = TD_CACHE.length;
 
   const el = document.getElementById("td-selected-count");
-  if (el) {
-    el.innerText = `Total: ${total} Selected: ${selected}`;
-  }
-}
+  if (el) el.innerText = `Total: ${total} Selected: ${selected}`;
 
-function exportSelectedTD() {
-  const selected = [...document.querySelectorAll(".td-row:checked")].map((cb) => {
-    const tr = cb.closest("tr");
-    const id = tr.dataset.id;
-    const event = TD_CACHE.find((e) => e.id === id);
-
-    return {
-      id: event.id,
-      contact_id: event.contact_id,
-      event_type: event.event_type,
-      event_timestamp: event.event_timestamp,
-      summary: event.summary || "",
-      project: event.project
-    };
-  });
-
-  if (selected.length === 0) {
-    alert("No rows selected.");
-    return;
-  }
-
-  const headers = [
-    "id",
-    "contact_id",
-    "event_type",
-    "event_timestamp",
-    "summary",
-    "project"
-  ];
-
-  let csv = headers.join(",") + "\n";
-
-  selected.forEach((row) => {
-    csv +=
-      headers
-        .map((h) => (row[h] || "").toString().replace(/,/g, ""))
-        .join(",") + "\n";
-  });
-
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "timeline_events_diagnostics.csv";
-  a.click();
-
-  URL.revokeObjectURL(url);
+  const btn = document.getElementById("td-create-timeline");
+  if (btn) btn.disabled = selected === 0;
 }
