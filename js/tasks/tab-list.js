@@ -7,20 +7,25 @@ export async function loadTasksList({ portalState, container }) {
 
 container.innerHTML = `
 <section class="card">
-<h3>Tasks — List</h3>
+  <h3>Tasks — List</h3>
 
-<div style="display:flex; gap:8px; margin-bottom:12px;">
-  <button id="filterToggle" class="btn-secondary">Filter</button>
-  <button id="sortToggle" class="btn-secondary">Sort</button>
-  <button id="exportCsvBtn" class="btn-secondary">Export CSV</button>
-</div>
+  <div style="display:flex; gap:12px; margin-bottom:12px; align-items:center;">
+    <button id="filterToggle" class="btn-secondary">Filter</button>
+    <button id="sortToggle" class="btn-secondary">Sort</button>
+    <button id="exportCsvBtn" class="btn-secondary">Export CSV</button>
 
-<div id="filterPanel" style="display:none; padding:12px; background:#f7f7f7; border:1px solid #ddd; margin-bottom:12px;"></div>
-<div id="sortPanel" style="display:none; padding:12px; background:#f7f7f7; border:1px solid #ddd; margin-bottom:12px;"></div>
+    <label style="display:flex; align-items:center; gap:6px; margin-left:20px;">
+      <input type="checkbox" id="showMine" checked>
+      Show Only My Assigned Tasks
+    </label>
+  </div>
 
-<div id="tasksListContent">
-  <p>Loading tasks...</p>
-</div>
+  <div id="filterPanel" style="display:none; padding:12px; background:#f7f7f7; border:1px solid #ddd; margin-bottom:12px;"></div>
+  <div id="sortPanel" style="display:none; padding:12px; background:#f7f7f7; border:1px solid #ddd; margin-bottom:12px;"></div>
+
+  <div id="tasksListContent">
+    <p>Loading tasks...</p>
+  </div>
 </section>
 `;
 
@@ -32,11 +37,12 @@ if (!portalState.project) {
   listEl.innerHTML = `<p>No project selected.</p>`;
   return;
 }
-
 /* ---------------------------------------------------------
    Fetch lookups
 --------------------------------------------------------- */
+
 let lookups = [];
+
 try {
   const res = await fetch(
     `https://tasks-manager.dennis-e64.workers.dev/lookups/list?project=${encodeURIComponent(portalState.project)}`,
@@ -79,7 +85,9 @@ function renderDueIn(dueIn) {
 /* ---------------------------------------------------------
    Fetch project staff
 --------------------------------------------------------- */
+
 let projectStaff = [];
+
 try {
   const res = await fetch(
     `https://tasks-manager.dennis-e64.workers.dev/projects/staff?project=${encodeURIComponent(portalState.project)}`,
@@ -115,6 +123,7 @@ function resolveAssigned(t) {
 /* ---------------------------------------------------------
    Assigned To filter options
 --------------------------------------------------------- */
+
 function buildAssignedFilterOptions() {
   let html = `<option value="">-- All --</option>`;
 
@@ -135,6 +144,7 @@ function buildAssignedFilterOptions() {
 /* ---------------------------------------------------------
    Fetch tasks
 --------------------------------------------------------- */
+
 async function fetchTasks() {
   try {
     const res = await fetch(
@@ -154,16 +164,19 @@ let filteredTasks = [...tasks];
 /* ---------------------------------------------------------
    refreshTasks
 --------------------------------------------------------- */
+
 portalState.refreshTasks = async () => {
   tasks = await fetchTasks();
   tasks = computeDueIn(tasks);
   filteredTasks = [...tasks];
+  applyShowMineFilter();   // ⭐ NEW — auto-apply checkbox filter
   renderTable();
 };
 
 /* ---------------------------------------------------------
    Compute due_in
 --------------------------------------------------------- */
+
 function computeDueIn(arr) {
   const today = new Date();
   const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -181,10 +194,10 @@ function computeDueIn(arr) {
 
 tasks = computeDueIn(tasks);
 filteredTasks = [...tasks];
-
 /* ---------------------------------------------------------
    Sorting
 --------------------------------------------------------- */
+
 let sortLevels = [
   { field: "due_date", dir: "asc" },
   { field: "", dir: "asc" },
@@ -244,10 +257,12 @@ function applySort() {
 /* ---------------------------------------------------------
    Filter Panel
 --------------------------------------------------------- */
+
 filterPanel.innerHTML = `
 <h4>Filters</h4>
 
 <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+
   <div>
     <label>Status</label>
     <select id="fStatus" multiple size="4" style="width:150px;">
@@ -298,6 +313,7 @@ filterPanel.innerHTML = `
     <label>Follow-up</label><br>
     <input type="checkbox" id="fFollowToday"> Due ≤ Today
   </div>
+
 </div>
 
 <button id="applyFilters" class="btn-primary">Apply Filters</button>
@@ -307,6 +323,7 @@ filterPanel.innerHTML = `
 /* ---------------------------------------------------------
    Apply Filters
 --------------------------------------------------------- */
+
 function applyFilters() {
   const statusSel = [...filterPanel.querySelector("#fStatus").selectedOptions].map(o => o.value);
   const prioritySel = [...filterPanel.querySelector("#fPriority").selectedOptions].map(o => o.value);
@@ -354,10 +371,10 @@ function applyFilters() {
     return true;
   });
 }
-
 /* ---------------------------------------------------------
    Sort Panel
 --------------------------------------------------------- */
+
 function buildSortRow(idx) {
   return `
   <div style="display:flex; gap:8px; margin-bottom:8px;">
@@ -374,8 +391,12 @@ function buildSortRow(idx) {
     </select>
 
     <select class="sort-dir" data-idx="${idx}" style="width:120px;">
-      <option value="asc" ${sortLevels[idx].dir === "asc" ? "selected" : ""}>A → Z / Oldest</option>
-      <option value="desc" ${sortLevels[idx].dir === "desc" ? "selected" : ""}>Z → A / Newest</option>
+      <option value="asc" ${sortLevels[idx].dir === "asc" ? "selected" : ""}>
+        A → Z / Oldest
+      </option>
+      <option value="desc" ${sortLevels[idx].dir === "desc" ? "selected" : ""}>
+        Z → A / Newest
+      </option>
     </select>
   </div>
   `;
@@ -394,57 +415,58 @@ ${buildSortRow(3)}
 /* ---------------------------------------------------------
    Render Table
 --------------------------------------------------------- */
+
 function renderTable() {
   applySort();
 
   const rowsHtml = filteredTasks
     .map(t => {
       return `
-<tr class="task-row" data-id="${t.id}">
-  <td><button class="expand-btn" data-id="${t.id}">▶</button></td>
-  <td>${escapeHtml(t.title || "")}</td>
-  <td>${escapeHtml(t.who_is_this_for || "")}</td>
-  <td>${escapeHtml(resolveAssigned(t))}</td>
-  <td>${escapeHtml(t.area || "")}</td>
-  <td>${t.priority != null ? escapeHtml(String(t.priority)) : ""}</td>
-  <td>${escapeHtml(t.status || "")}</td>
-  <td>${renderDueIn(t.due_in)}</td>
-  <td>${formatDateOnly(t.due_date)}</td>
-  <td>${formatDateOnly(t.followup_date)}</td>
-  <td>${formatDateOnly(t.created_at)}</td>
-</tr>
+      <tr class="task-row" data-id="${t.id}">
+        <td><button class="expand-btn" data-id="${t.id}">▶</button></td>
+        <td>${escapeHtml(t.title || "")}</td>
+        <td>${escapeHtml(t.who_is_this_for || "")}</td>
+        <td>${escapeHtml(resolveAssigned(t))}</td>
+        <td>${escapeHtml(t.area || "")}</td>
+        <td>${t.priority != null ? escapeHtml(String(t.priority)) : ""}</td>
+        <td>${escapeHtml(t.status || "")}</td>
+        <td>${renderDueIn(t.due_in)}</td>
+        <td>${formatDateOnly(t.due_date)}</td>
+        <td>${formatDateOnly(t.followup_date)}</td>
+        <td>${formatDateOnly(t.created_at)}</td>
+      </tr>
 
-<tr id="expand-${t.id}" style="display:none;">
-  <td colspan="11">
-    <div style="padding:12px; background:#f7f7f7; border:1px solid #ddd;">
-      <div id="edit-${t.id}"></div>
-    </div>
-  </td>
-</tr>
-`;
+      <tr id="expand-${t.id}" style="display:none;">
+        <td colspan="11">
+          <div style="padding:12px; background:#f7f7f7; border:1px solid #ddd;">
+            <div id="edit-${t.id}"></div>
+          </div>
+        </td>
+      </tr>
+      `;
     })
     .join("");
 
   listEl.innerHTML = `
-<table class="notes-table">
-<thead>
-<tr>
-  <th></th>
-  <th>Title</th>
-  <th>For</th>
-  <th>Assigned To</th>
-  <th>Area</th>
-  <th>Priority</th>
-  <th>Status</th>
-  <th>Due In</th>
-  <th>Due</th>
-  <th>Follow-up</th>
-  <th>Created</th>
-</tr>
-</thead>
-<tbody>${rowsHtml}</tbody>
-</table>
-`;
+  <table class="notes-table">
+    <thead>
+      <tr>
+        <th></th>
+        <th>Title</th>
+        <th>For</th>
+        <th>Assigned To</th>
+        <th>Area</th>
+        <th>Priority</th>
+        <th>Status</th>
+        <th>Due In</th>
+        <th>Due</th>
+        <th>Follow-up</th>
+        <th>Created</th>
+      </tr>
+    </thead>
+    <tbody>${rowsHtml}</tbody>
+  </table>
+  `;
 
   listEl.querySelectorAll(".expand-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -469,6 +491,7 @@ function renderTable() {
 /* ---------------------------------------------------------
    Toggles
 --------------------------------------------------------- */
+
 container.querySelector("#filterToggle").addEventListener("click", () => {
   filterPanel.style.display =
     filterPanel.style.display === "none" ? "block" : "none";
@@ -482,8 +505,10 @@ container.querySelector("#sortToggle").addEventListener("click", () => {
 /* ---------------------------------------------------------
    Filter Buttons
 --------------------------------------------------------- */
+
 filterPanel.querySelector("#applyFilters").addEventListener("click", () => {
   applyFilters();
+  applyShowMineFilter();   // ⭐ NEW — checkbox filter layered on top
   renderTable();
 });
 
@@ -493,12 +518,14 @@ filterPanel.querySelector("#resetFilters").addEventListener("click", () => {
   filterPanel.querySelector("#fFollowToday").checked = false;
 
   filteredTasks = [...tasks];
+  applyShowMineFilter();   // ⭐ NEW — still respect checkbox
   renderTable();
 });
 
 /* ---------------------------------------------------------
    Sort Buttons
 --------------------------------------------------------- */
+
 sortPanel.querySelector("#applySort").addEventListener("click", () => {
   const fields = sortPanel.querySelectorAll(".sort-field");
   const dirs = sortPanel.querySelectorAll(".sort-dir");
@@ -518,12 +545,13 @@ sortPanel.querySelector("#resetSort").addEventListener("click", () => {
     { field: "", dir: "asc" },
     { field: "", dir: "asc" }
   ];
+
   renderTable();
 });
-
 /* ---------------------------------------------------------
    EXPORT CSV
 --------------------------------------------------------- */
+
 container.querySelector("#exportCsvBtn").addEventListener("click", () => {
   if (!filteredTasks.length) {
     alert("No tasks to export.");
@@ -571,16 +599,42 @@ container.querySelector("#exportCsvBtn").addEventListener("click", () => {
 
   const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
+
   const a = document.createElement("a");
   a.href = url;
   a.download = `tasks_export_${portalState.project}.csv`;
   a.click();
+
   URL.revokeObjectURL(url);
+});
+
+/* ---------------------------------------------------------
+   ⭐ NEW — Show Only My Assigned Tasks
+--------------------------------------------------------- */
+
+function applyShowMineFilter() {
+  const showMine = container.querySelector("#showMine").checked;
+  if (!showMine) return;
+
+  const myId = portalState.user_id;
+
+  filteredTasks = filteredTasks.filter(t => {
+    return t.assigned_to_user_id === myId;
+  });
+}
+
+container.querySelector("#showMine").addEventListener("change", () => {
+  filteredTasks = [...tasks];
+  applyFilters();        // apply normal filters
+  applyShowMineFilter(); // then apply checkbox filter
+  renderTable();
 });
 
 /* ---------------------------------------------------------
    INITIAL RENDER
 --------------------------------------------------------- */
+
+applyShowMineFilter();  // ⭐ default ON
 renderTable();
 
 }
