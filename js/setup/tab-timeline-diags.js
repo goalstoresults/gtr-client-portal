@@ -1,4 +1,5 @@
 // /js/setup/tab-timeline-diags.js
+// Timeline Diagnostics — tied directly to timeline-module Worker
 
 const TD_BASE_URL = "https://timeline-module.dennis-e64.workers.dev";
 
@@ -100,7 +101,7 @@ export async function renderTimelineDiagnostics(setupContent, portalState) {
         </tbody>
       </table>
     </section>
-  ”
+  `;
 
   document.getElementById("td-refresh").onclick = () =>
     loadTimeline(project, portalState);
@@ -112,14 +113,12 @@ export async function renderTimelineDiagnostics(setupContent, portalState) {
   document.getElementById("td-filter").onchange = () =>
     loadTimeline(project, portalState);
 
-  // Force a filter (first option) and load
-  const filterSelect = document.getElementById("td-filter");
-  if (filterSelect && !filterSelect.value) {
-    filterSelect.value = "contact_created";
-  }
-
   loadTimeline(project, portalState);
 }
+
+/* ============================================================
+   LOAD TIMELINE EVENTS (pull all, filter client-side)
+============================================================ */
 
 async function loadTimeline(project, portalState) {
   const tbody = document.getElementById("td-body");
@@ -128,27 +127,29 @@ async function loadTimeline(project, portalState) {
   tbody.innerHTML = `<tr><td colspan="6">Loading...</td></tr>`;
 
   try {
-    // Pull ALL events for the project from timeline-module
     const res = await fetch(
       `${TD_BASE_URL}/timeline/project?project_id=${encodeURIComponent(project)}`
     );
 
     const data = await res.json();
-    const events = Array.isArray(data) ? data : data.events || [];
+    TD_CACHE = Array.isArray(data) ? data : [];
 
-    TD_CACHE = events;
     renderRowsTD(portalState);
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="6">Error loading timeline events.</td></tr>`;
   }
 }
 
+/* ============================================================
+   RENDER ROWS
+============================================================ */
+
 function renderRowsTD(portalState) {
   const tbody = document.getElementById("td-body");
   if (!tbody) return;
 
-  const filterSelect = document.getElementById("td-filter");
-  const filter = filterSelect ? filterSelect.value : "contact_created";
+  const filterEl = document.getElementById("td-filter");
+  const filter = filterEl ? filterEl.value : "contact_created";
 
   let rows = [...TD_CACHE];
 
@@ -157,7 +158,7 @@ function renderRowsTD(portalState) {
       !e.contact_id ||
       !e.event_type ||
       !e.event_timestamp ||
-      e.project == null ||
+      !e.project ||
       e.summary == null
     );
   } else {
@@ -208,6 +209,10 @@ function renderRowsTD(portalState) {
   updateSelectedCountTD();
 }
 
+/* ============================================================
+   SORTING
+============================================================ */
+
 function sortRowsTD(rows, portalState) {
   const { column, direction } = portalState.timelineDiagSort;
 
@@ -253,14 +258,22 @@ function updateSortArrowsTD(portalState) {
   });
 }
 
+/* ============================================================
+   PREVIEW
+============================================================ */
+
 window.tdPreview = function (eventId) {
   const event = TD_CACHE.find(e => e.id === eventId);
   if (!event) {
-    alert("Event not found in cache.");
+    alert("Event not found.");
     return;
   }
   alert(JSON.stringify(event, null, 2));
 };
+
+/* ============================================================
+   SELECTION + EXPORT
+============================================================ */
 
 function toggleSelectAllTD() {
   const checked = document.getElementById("td-select-all").checked;
