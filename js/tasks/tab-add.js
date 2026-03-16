@@ -197,7 +197,7 @@ try {
       <!-- Row 4: Notes (full width) -->
       <div style="display:flex; flex-direction:column;">
         <label>Notes</label>
-        <textarea id="notesInput" placeholder="Optional notes" style="width:100%;"></textarea>
+        <textarea id="notesInput" placeholder="Optional notes" style="width:100%; height:160px;"></textarea>
       </div>
 
     </form>
