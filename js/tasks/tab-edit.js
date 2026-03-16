@@ -24,15 +24,23 @@ export function renderTaskEdit({ task, portalState, container }) {
 
   const assignedOptions = [
     ...(portalState.projectStaff || []).map(u => {
-      const name = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.staff_name || u.staff_email;
+      const name =
+        [u.first_name, u.last_name].filter(Boolean).join(" ") ||
+        u.staff_name ||
+        u.staff_email;
+
       const selected = task?.assigned_to_user_id === u.id ? "selected" : "";
       return `<option value="user:${escapeHtml(u.id)}" ${selected}>${escapeHtml(name)}</option>`;
     }),
+
     portalState.project_contact_id
       ? `<option value="contact:${escapeHtml(portalState.project_contact_id)}" ${
-          task?.assigned_to_contact_id === portalState.project_contact_id ? "selected" : ""
+          task?.assigned_to_contact_id === portalState.project_contact_id
+            ? "selected"
+            : ""
         }>Client</option>`
       : "",
+
     `<option value="other" ${task?.who === "Other" ? "selected" : ""}>Other</option>`
   ].join("");
 
@@ -100,8 +108,16 @@ export function renderTaskEdit({ task, portalState, container }) {
         >${escapeHtml(task?.notes || "")}</textarea>
       </div>
 
+      <!-- Buttons -->
       <div style="display:flex; gap:12px;">
         <button type="button" id="eSave" class="btn-primary">${isEdit ? "Save" : "Add"}</button>
+
+        ${
+          isEdit
+            ? `<button type="button" id="eDelete" class="btn-danger">Delete</button>`
+            : ""
+        }
+
         <button type="button" id="eCancel" class="btn-secondary">Cancel</button>
       </div>
 
@@ -171,6 +187,36 @@ export function renderTaskEdit({ task, portalState, container }) {
       if (row) row.style.display = "none";
     }
   });
+
+  // DELETE HANDLER
+  if (isEdit) {
+    container.querySelector("#eDelete").addEventListener("click", async () => {
+      if (!confirm("Delete this task?")) return;
+
+      const res = await fetch(
+        "https://tasks-manager.dennis-e64.workers.dev/tasks/delete",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: task.id })
+        }
+      );
+
+      if (!res.ok) {
+        alert("Error deleting task.");
+        return;
+      }
+
+      alert("Task deleted.");
+
+      if (portalState.refreshTasks) {
+        await portalState.refreshTasks();
+      }
+
+      const row = document.getElementById(`expand-${task.id}`);
+      if (row) row.style.display = "none";
+    });
+  }
 
   // CANCEL HANDLER
   container.querySelector("#eCancel").addEventListener("click", () => {
