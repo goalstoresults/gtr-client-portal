@@ -107,10 +107,9 @@ export async function renderTimelineDiagnostics(setupContent, portalState) {
   document.getElementById("td-select-all").onclick = toggleSelectAllTD;
   document.getElementById("td-clear-all").onclick = clearAllTD;
 
-  // Create Timeline button (POST comes in Round 2)
-  document.getElementById("td-create-timeline").onclick = () => {
-    alert("Create Timeline Events will be implemented in Round 2.");
-  };
+  // Create Timeline button
+  document.getElementById("td-create-timeline").onclick = () =>
+    createTimelineEvents(project);
 }
 
 /* ============================================================
@@ -267,3 +266,71 @@ function updateSelectedCountTD() {
   const btn = document.getElementById("td-create-timeline");
   if (btn) btn.disabled = selected === 0;
 }
+
+/* ============================================================
+   CREATE TIMELINE EVENTS (Round 1: Contact Created Only)
+============================================================ */
+async function createTimelineEvents(project) {
+  const mode = document.getElementById("td-mode").value;
+
+  if (!mode) {
+    alert("Please select a mode first.");
+    return;
+  }
+
+  if (mode !== "contact-created") {
+    alert("Create Timeline is currently only enabled for Contact Created.");
+    return;
+  }
+
+  const checkboxes = Array.from(document.querySelectorAll(".td-row:checked"));
+
+  if (checkboxes.length === 0) {
+    alert("Please select at least one row.");
+    return;
+  }
+
+  const ids = checkboxes
+    .map((cb) => cb.closest("tr")?.getAttribute("data-id"))
+    .filter(Boolean);
+
+  if (ids.length === 0) {
+    alert("No valid IDs found.");
+    return;
+  }
+
+  const btn = document.getElementById("td-create-timeline");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = "Creating...";
+  }
+
+  try {
+    const results = [];
+
+    for (const id of ids) {
+      const payload = { contact_id: id, project };
+
+      const res = await fetch(`${TD_BASE_URL}/timeline/contact-created`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      results.push({ id, status: res.status, data });
+    }
+
+    console.log("Timeline create results:", results);
+    alert(`Created timeline events for ${results.length} contact(s).`);
+  } catch (err) {
+    console.error("Error creating timeline events:", err);
+    alert("Error creating timeline events. Check console for details.");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = "Create Timeline";
+    }
+  }
+}
+
