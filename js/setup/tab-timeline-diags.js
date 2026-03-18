@@ -269,18 +269,13 @@ function updateSelectedCountTD() {
 }
 
 /* ============================================================
-   CREATE TIMELINE EVENTS (Round 1: Contact Created Only)
+   CREATE TIMELINE EVENTS (Multi‑Mode)
 ============================================================ */
 async function createTimelineEvents(project) {
   const mode = document.getElementById("td-mode").value;
 
   if (!mode) {
     alert("Please select a mode first.");
-    return;
-  }
-
-  if (mode !== "contact-created") {
-    alert("Create Timeline is currently only enabled for Contact Created.");
     return;
   }
 
@@ -311,8 +306,54 @@ async function createTimelineEvents(project) {
 
     for (const id of ids) {
       const payload = { contact_id: id, project };
+      let endpoint = null;
 
-      const res = await fetch(`${TD_BASE_URL}/timeline/contact-created`, {
+      /* ============================
+         MODE ROUTING
+      ============================ */
+
+      if (mode === "contact-created") {
+        endpoint = "/timeline/contact-created";
+      }
+
+      else if (mode === "contact-updated") {
+        endpoint = "/timeline/contact-updated";
+      }
+
+      else if (mode === "relationships") {
+        // TODO: implement later
+        console.warn("Relationships mode not implemented yet.");
+        continue;
+      }
+
+      else if (mode === "notes-created") {
+        // TODO: implement later
+        console.warn("Notes Created mode not implemented yet.");
+        continue;
+      }
+
+      else if (mode === "notes-updated") {
+        // TODO: implement later
+        console.warn("Notes Updated mode not implemented yet.");
+        continue;
+      }
+
+      else if (mode === "payments") {
+        // TODO: implement later
+        console.warn("Payments mode not implemented yet.");
+        continue;
+      }
+
+      else {
+        alert("Unknown mode selected.");
+        return;
+      }
+
+      /* ============================
+         EXECUTE POST
+      ============================ */
+
+      const res = await fetch(`${TD_BASE_URL}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -323,7 +364,8 @@ async function createTimelineEvents(project) {
     }
 
     console.log("Timeline create results:", results);
-    alert(`Created timeline events for ${results.length} contact(s).`);
+    alert(`Created timeline events for ${results.length} record(s).`);
+
   } catch (err) {
     console.error("Error creating timeline events:", err);
     alert("Error creating timeline events. Check console for details.");
@@ -333,5 +375,7 @@ async function createTimelineEvents(project) {
       btn.innerText = "Create Timeline";
     }
   }
+}
+
 }
 
