@@ -377,5 +377,4 @@ async function createTimelineEvents(project) {
   }
 }
 
-}
 
