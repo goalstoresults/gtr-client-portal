@@ -1,7 +1,8 @@
 // /js/setup/tab-timeline-diags.js
 // Timeline Diagnostics (Round 1) — NEW UI + NEW BACKEND
 
-const TD_BASE_URL = "https://timeline-module-gets.dennis-e64.workers.dev";
+const TD_BASE_URL_GETS = "https://timeline-module-gets.dennis-e64.workers.dev";
+const TD_BASE_URL = "https://timeline-module.dennis-e64.workers.dev";
 
 let TD_CACHE = [];
 
@@ -137,7 +138,7 @@ async function retrieveDiagnostics(project, portalState) {
 
   try {
     const res = await fetch(
-      `${TD_BASE_URL}${endpoint}?project=${encodeURIComponent(project)}`
+      `${TD_BASE_URL_GETS}${endpoint}?project=${encodeURIComponent(project)}`
     );
 
     const data = await res.json();
