@@ -1,7 +1,7 @@
 // /js/setup/tab-timeline-diags.js
 // Timeline Diagnostics (Round 1) — NEW UI + NEW BACKEND
 
-const TD_BASE_URL = "https://timeline-module.dennis-e64.workers.dev";
+const TD_BASE_URL = "https://timeline-module-gets.dennis-e64.workers.dev";
 
 let TD_CACHE = [];
 
