@@ -269,7 +269,7 @@ function updateSelectedCountTD() {
 }
 
 /* ============================================================
-   CREATE TIMELINE EVENTS (Multi‑Mode)
+   CREATE TIMELINE EVENTS (Full Tree Logic)
 ============================================================ */
 async function createTimelineEvents(project) {
   const mode = document.getElementById("td-mode").value;
@@ -305,19 +305,21 @@ async function createTimelineEvents(project) {
     const results = [];
 
     for (const id of ids) {
-      const payload = { contact_id: id, project };
       let endpoint = null;
+      let payload = { project };
 
       /* ============================
-         MODE ROUTING
+         MODE ROUTING (FULL TREE)
       ============================ */
 
       if (mode === "contact-created") {
         endpoint = "/timeline/contact-created";
+        payload.contact_id = id;
       }
 
       else if (mode === "contact-updated") {
         endpoint = "/timeline/contact-updated";
+        payload.contact_id = id;
       }
 
       else if (mode === "relationships") {
@@ -376,5 +378,3 @@ async function createTimelineEvents(project) {
     }
   }
 }
-
-
