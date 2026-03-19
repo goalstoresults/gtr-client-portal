@@ -130,13 +130,18 @@ async function retrieveDiagnostics(project, portalState) {
   tbody.innerHTML = `<tr><td colspan="4">Loading...</td></tr>`;
 
   const endpoint = {
-    "contact-created": "/diag/contact-created",
-    "contact-updated": "/diag/contact-updated",
-    "relationships": "/diag/relationships",
-    "notes-created": "/diag/notes-created",
-    "notes-updated": "/diag/notes-updated",
-    "payments": "/diag/payments"
-  }[mode];
+  "contact-created": "/diag/contact-created",
+  "contact-updated": "/diag/contact-updated",
+
+  "relationships": "/diag/relationship-created",
+  "relationships-updated": "/diag/relationship-updated",
+
+  "notes-created": "/diag/note-created",
+  "notes-updated": "/diag/note-updated",
+
+  "payments": "/diag/payment-created",
+  "payments-updated": "/diag/payment-updated"
+}[mode];
 
   try {
     const res = await fetch(
