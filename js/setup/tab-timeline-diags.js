@@ -40,9 +40,11 @@ export async function renderTimelineDiagnostics(setupContent, portalState) {
           <option value="contact-created">Contact Created</option>
           <option value="contact-updated">Contact Updated</option>
           <option value="relationships">Relationships</option>
+          <option value="relationships-updated">Relationship Updated</option>
           <option value="notes-created">Notes Created</option>
           <option value="notes-updated">Notes Updated</option>
           <option value="payments">Payments</option>
+          <option value="payments-updated">Payment Updated</option>
         </select>
 
         <!-- RETRIEVE BUTTON -->
@@ -308,48 +310,54 @@ async function createTimelineEvents(project) {
       let endpoint = null;
       let payload = { project };
 
-      /* ============================
-         MODE ROUTING (FULL TREE)
-      ============================ */
+ /* ============================
+   MODE ROUTING (FULL TREE)
+============================ */
 
-      if (mode === "contact-created") {
-        endpoint = "/timeline/contact-created";
-        payload.contact_id = id;
-      }
+if (mode === "contact-created") {
+  endpoint = "/timeline/contact-created";
+  payload.contact_id = id;
+}
 
-      else if (mode === "contact-updated") {
-        endpoint = "/timeline/contact-updated";
-        payload.contact_id = id;
-      }
+else if (mode === "contact-updated") {
+  endpoint = "/timeline/contact-updated";
+  payload.contact_id = id;
+}
 
-      else if (mode === "relationships") {
-        // TODO: implement later
-        console.warn("Relationships mode not implemented yet.");
-        continue;
-      }
+else if (mode === "relationships") {
+  endpoint = "/timeline/relationship-created";
+  payload.relationship_id = id;
+}
 
-      else if (mode === "notes-created") {
-        // TODO: implement later
-        console.warn("Notes Created mode not implemented yet.");
-        continue;
-      }
+else if (mode === "relationships-updated") {
+  endpoint = "/timeline/relationship-updated";
+  payload.relationship_id = id;
+}
 
-      else if (mode === "notes-updated") {
-        // TODO: implement later
-        console.warn("Notes Updated mode not implemented yet.");
-        continue;
-      }
+else if (mode === "notes-created") {
+  endpoint = "/timeline/note-created";
+  payload.note_id = id;
+}
 
-      else if (mode === "payments") {
-        // TODO: implement later
-        console.warn("Payments mode not implemented yet.");
-        continue;
-      }
+else if (mode === "notes-updated") {
+  endpoint = "/timeline/note-updated";
+  payload.note_id = id;
+}
 
-      else {
-        alert("Unknown mode selected.");
-        return;
-      }
+else if (mode === "payments") {
+  endpoint = "/timeline/payment-created";
+  payload.revenue_id = id;
+}
+
+else if (mode === "payments-updated") {
+  endpoint = "/timeline/payment-updated";
+  payload.revenue_id = id;
+}
+
+else {
+  alert("Unknown mode selected.");
+  return;
+}
 
       /* ============================
          EXECUTE POST
