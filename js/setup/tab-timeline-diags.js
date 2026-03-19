@@ -133,13 +133,13 @@ async function retrieveDiagnostics(project, portalState) {
   "contact-created": "/diag/contact-created",
   "contact-updated": "/diag/contact-updated",
 
-  "relationships": "/diag/relationships-created",
+  "relationships-created": "/diag/relationships-created",
   "relationships-updated": "/diag/relationships-updated",
 
   "notes-created": "/diag/notes-created",
   "notes-updated": "/diag/notes-updated",
 
-  "payments": "/diag/payments-created",
+  "payments-created": "/diag/payments-created",
   "payments-updated": "/diag/payments-updated"
 }[mode];
 
@@ -329,7 +329,7 @@ else if (mode === "contact-updated") {
   payload.contact_id = id;
 }
 
-else if (mode === "relationships") {
+else if (mode === "relationships-created") {
   endpoint = "/timeline/relationship-created";
   payload.relationship_id = id;
 }
@@ -349,7 +349,7 @@ else if (mode === "notes-updated") {
   payload.note_id = id;
 }
 
-else if (mode === "payments") {
+else if (mode === "payments-created") {
   endpoint = "/timeline/payment-created";
   payload.revenue_id = id;
 }
