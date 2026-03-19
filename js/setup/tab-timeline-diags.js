@@ -39,11 +39,11 @@ export async function renderTimelineDiagnostics(setupContent, portalState) {
           <option value="">Select...</option>
           <option value="contact-created">Contact Created</option>
           <option value="contact-updated">Contact Updated</option>
-          <option value="relationships">Relationships</option>
+          <option value="relationships-created">Relationships</option>
           <option value="relationships-updated">Relationship Updated</option>
           <option value="notes-created">Notes Created</option>
           <option value="notes-updated">Notes Updated</option>
-          <option value="payments">Payments</option>
+          <option value="payments-created">Payments</option>
           <option value="payments-updated">Payment Updated</option>
         </select>
 
