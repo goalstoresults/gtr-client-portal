@@ -136,10 +136,10 @@ async function retrieveDiagnostics(project, portalState) {
   "relationships": "/diag/relationship-created",
   "relationships-updated": "/diag/relationship-updated",
 
-  "notes-created": "/diag/note-created",
-  "notes-updated": "/diag/note-updated",
+  "notes-created": "/diag/notes-created",
+  "notes-updated": "/diag/notes-updated",
 
-  "payments": "/diag/payment-created",
+  "payments": "/diag/payments-created",
   "payments-updated": "/diag/payment-updated"
 }[mode];
 
