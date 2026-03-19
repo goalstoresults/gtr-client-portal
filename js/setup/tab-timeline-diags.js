@@ -131,14 +131,14 @@ async function retrieveDiagnostics(project, portalState) {
 
 
   const endpoint = {
-  "contact-created": "/diag/contact-created",
-  "contact-updated": "/diag/contact-updated",
+  "contact-created": "/contact-created",
+  "contact-updated": "/contact-updated",
 
-  "relationships": "/diag/relationship-created",
-  "relationships-updated": "/diag/relationship-updated",
+  "relationships": "/relationship-created",
+  "relationships-updated": "/relationship-updated",
 
-  "notes-created": "/diag/note-created",
-  "notes-updated": "/diag/note-updated",
+  "notes-created": "/note-created",
+  "notes-updated": "/note-updated",
 
   "payments": "/diag/payment-created",
   "payments-updated": "/diag/payment-updated"
