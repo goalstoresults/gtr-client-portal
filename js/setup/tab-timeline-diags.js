@@ -140,8 +140,8 @@ async function retrieveDiagnostics(project, portalState) {
   "notes-created": "/note-created",
   "notes-updated": "/note-updated",
 
-  "payments": "/diag/payment-created",
-  "payments-updated": "/diag/payment-updated"
+  "payments": "/payment-created",
+  "payments-updated": "/payment-updated"
 }[mode];
 
 
