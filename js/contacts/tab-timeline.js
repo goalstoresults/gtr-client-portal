@@ -1,5 +1,6 @@
 // js/contacts/tab-timeline.js
 // Contact Timeline Tab — uses event_timestamp as canonical date
+// Now supports deep-linking into Notes via portalState.notesFilterDate + notesFilterSubject
 
 import { escapeHtml, formatDateTime } from "../utilities.js";
 
@@ -161,7 +162,7 @@ export async function renderContactTimeline(container, portalState, contactId) {
             <td>${formatDateTime(ev.event_timestamp)}</td>
             <td>${escapeHtml(section)}</td>
             <td>${escapeHtml(ev.summary || "")}</td>
-            <td><button class="btn-primary btn-details" data-type="${ev.event_type}" data-id="${ev.event_source_id}">Details</button></td>
+            <td><button class="btn-primary btn-details" data-type="${ev.event_type}" data-id="${ev.event_source_id}" data-summary="${escapeHtml(ev.summary || "")}" data-date="${ev.event_timestamp}">Details</button></td>
           </tr>
         `;
       }).join("");
@@ -210,21 +211,54 @@ export async function renderContactTimeline(container, portalState, contactId) {
       });
 
       /* -------------------------------------------------------
-         DETAILS BUTTON ROUTING
+         DETAILS BUTTON ROUTING (NOW WITH NOTES FILTER PASSING)
       ------------------------------------------------------- */
       tableDiv.querySelectorAll(".btn-details").forEach(btn => {
         btn.addEventListener("click", () => {
           const eventType = btn.dataset.type;
 
+          /* -----------------------------
+             NOTES: pass filters to portalState
+          ------------------------------*/
+          if (eventType.startsWith("note_")) {
+            const rawDate = btn.dataset.date;
+            const summary = btn.dataset.summary || "";
+
+            // Set filters for Notes tab
+            portalState.notesFilterDate = rawDate ? rawDate.split("T")[0] : null;
+            portalState.notesFilterSubject = summary || null;
+
+            // Switch to Notes tab
+            const notesBtn = document.querySelector('#contacts-subtabs button[data-subtab="notes"]');
+            if (notesBtn) notesBtn.click();
+            return;
+          }
+
+          /* -----------------------------
+             CONTACTS
+          ------------------------------*/
           if (eventType.startsWith("contact_")) {
-            document.querySelector('#contacts-subtabs button[data-subtab="details"]').click();
-          } else if (eventType.startsWith("note_")) {
-            document.querySelector('#contacts-subtabs button[data-subtab="notes"]').click();
-          } else if (eventType.startsWith("relationship_")) {
-            document.querySelector('#contacts-subtabs button[data-subtab="relationships"]').click();
-          } else if (eventType.startsWith("payment_")) {
+            const btnTab = document.querySelector('#contacts-subtabs button[data-subtab="details"]');
+            if (btnTab) btnTab.click();
+            return;
+          }
+
+          /* -----------------------------
+             RELATIONSHIPS
+          ------------------------------*/
+          if (eventType.startsWith("relationship_")) {
+            const btnTab = document.querySelector('#contacts-subtabs button[data-subtab="relationships"]');
+            if (btnTab) btnTab.click();
+            return;
+          }
+
+          /* -----------------------------
+             FINANCIALS
+          ------------------------------*/
+          if (eventType.startsWith("payment_")) {
             const btnTab = document.querySelector('#contacts-subtabs button[data-subtab="financials"]');
             if (btnTab) btnTab.click();
+            return;
           }
         });
       });
