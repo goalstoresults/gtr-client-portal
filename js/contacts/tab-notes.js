@@ -1,5 +1,5 @@
 // js/contacts/tab-notes.js
-// Modularized Contact Notes Tab
+// Contact Notes Tab — now with Date + Subject filters + Timeline deep linking
 
 import { escapeHtml, formatDateTime } from "../utilities.js";
 
@@ -17,13 +17,45 @@ export async function renderContactNotes(container, portalState, contactId) {
     return;
   }
 
+  /* -------------------------------------------------------
+     FETCH NOTES
+  ------------------------------------------------------- */
   const url = `https://contacts-module.dennis-e64.workers.dev/notes_history?project=${portalState.project}&contact_id=${contactId}`;
   const res = await fetch(url, { cache: "no-cache" });
   let notes = await res.json();
   if (!Array.isArray(notes)) notes = [];
 
   /* -------------------------------------------------------
-     RENDER NOTES TABLE + ADD BUTTON
+     APPLY FILTERS FROM portalState (Timeline deep link)
+  ------------------------------------------------------- */
+  const filterDate = portalState.notesFilterDate || "";
+  const filterSubject = portalState.notesFilterSubject || "";
+
+  function applyFilters(list) {
+    let filtered = [...list];
+
+    if (filterDate) {
+      const cutoff = new Date(filterDate);
+      filtered = filtered.filter(n => {
+        if (!n.note_date) return false;
+        return new Date(n.note_date) >= cutoff;
+      });
+    }
+
+    if (filterSubject) {
+      const term = filterSubject.toLowerCase();
+      filtered = filtered.filter(n =>
+        (n.subject || "").toLowerCase().includes(term)
+      );
+    }
+
+    return filtered;
+  }
+
+  const filteredNotes = applyFilters(notes);
+
+  /* -------------------------------------------------------
+     RENDER FILTER BAR + NOTES TABLE
   ------------------------------------------------------- */
   container.innerHTML = `
     <section class="card">
@@ -31,6 +63,26 @@ export async function renderContactNotes(container, portalState, contactId) {
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <h2>Notes</h2>
         <button id="contactAddNoteBtn" class="btn-primary">+ Add Note</button>
+      </div>
+
+      <!-- FILTER BAR -->
+      <div style="display:flex; align-items:flex-start; gap:20px; flex-wrap:wrap; margin:12px 0;">
+
+        <label style="display:flex; flex-direction:column;">
+          <span>Date ≥</span>
+          <input type="date" id="notesFilterDate" value="${filterDate}" style="min-width:160px;">
+        </label>
+
+        <label style="display:flex; flex-direction:column;">
+          <span>Subject Contains</span>
+          <input type="text" id="notesFilterSubject" value="${escapeHtml(filterSubject)}" style="min-width:240px;">
+        </label>
+
+      </div>
+
+      <div style="display:flex; gap:10px; margin-bottom:12px;">
+        <button id="btnApplyNotesFilter" class="secondary">Apply Filter</button>
+        <button id="btnClearNotesFilter" class="secondary">Clear Filter</button>
       </div>
 
       <table class="notes-table">
@@ -44,8 +96,8 @@ export async function renderContactNotes(container, portalState, contactId) {
         </thead>
         <tbody id="notesRows">
           ${
-            notes.length > 0
-              ? notes.map((n, idx) => `
+            filteredNotes.length > 0
+              ? filteredNotes.map((n, idx) => `
                   <tr>
                     <td>${n.note_date ? formatDateTime(n.note_date) : ""}</td>
                     <td>${escapeHtml(n.subject || "")}</td>
@@ -64,32 +116,25 @@ export async function renderContactNotes(container, portalState, contactId) {
                       <div><strong>Needs Review:</strong> ${n.needs_review ? "Yes" : "No"}</div>
 
                       <div style="margin-top:8px;"><strong>Raw Text:</strong></div>
-${
-  /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(n.raw_text)
-    ? `
-        <div class="html-note-block">
-          ${n.raw_text}
-        </div>
-      `
-    : `
-        <div class="raw-text-block">
-          ${n.raw_text}
-        </div>
-      `
-}
+                      ${
+                        /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(n.raw_text)
+                          ? `<div class="html-note-block">${n.raw_text}</div>`
+                          : `<div class="raw-text-block">${n.raw_text}</div>`
+                      }
 
                       <button class="btn-primary btn-review-note" data-id="${n.id}" style="margin-top:8px; margin-right:8px;">
                         Review Note
                       </button>
-                      ${portalState.deleteAllowed
-                       ? `<button class="btn-danger btn-delete-note" data-id="${n.id}" style="margin-top:8px;">
-                        Delete Note
-                      </button>`
-                       : ``}
+
+                      ${
+                        portalState.deleteAllowed
+                          ? `<button class="btn-danger btn-delete-note" data-id="${n.id}" style="margin-top:8px;">Delete Note</button>`
+                          : ``
+                      }
                     </td>
                   </tr>
                 `).join("")
-              : `<tr><td colspan="4">(no notes yet)</td></tr>`
+              : `<tr><td colspan="4">(no notes found)</td></tr>`
           }
         </tbody>
       </table>
@@ -97,7 +142,22 @@ ${
   `;
 
   /* -------------------------------------------------------
-     ADD NOTE BUTTON HANDLER
+     FILTER BUTTON HANDLERS
+  ------------------------------------------------------- */
+  document.getElementById("btnApplyNotesFilter").addEventListener("click", () => {
+    portalState.notesFilterDate = document.getElementById("notesFilterDate").value || null;
+    portalState.notesFilterSubject = document.getElementById("notesFilterSubject").value.trim() || null;
+    renderContactNotes(container, portalState, contactId);
+  });
+
+  document.getElementById("btnClearNotesFilter").addEventListener("click", () => {
+    portalState.notesFilterDate = null;
+    portalState.notesFilterSubject = null;
+    renderContactNotes(container, portalState, contactId);
+  });
+
+  /* -------------------------------------------------------
+     ADD NOTE BUTTON
   ------------------------------------------------------- */
   document.getElementById("contactAddNoteBtn")
     ?.addEventListener("click", () =>
@@ -105,7 +165,7 @@ ${
     );
 
   /* -------------------------------------------------------
-     EXPAND / COLLAPSE HANDLERS
+     EXPAND / COLLAPSE
   ------------------------------------------------------- */
   container.querySelectorAll(".btn-expand").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -119,7 +179,7 @@ ${
   });
 
   /* -------------------------------------------------------
-     DELETE NOTE HANDLERS
+     DELETE NOTE
   ------------------------------------------------------- */
   container.querySelectorAll(".btn-delete-note").forEach(btn => {
     btn.addEventListener("click", async () => {
@@ -127,20 +187,17 @@ ${
 
       const noteId = btn.dataset.id;
 
-       await fetch(
-           `https://notes-history-module.dennis-e64.workers.dev/note_history?id=${noteId}&project=${portalState.project}`,
-           {
-             method: "DELETE"
-           }
-         );
-
+      await fetch(
+        `https://notes-history-module.dennis-e64.workers.dev/note_history?id=${noteId}&project=${portalState.project}`,
+        { method: "DELETE" }
+      );
 
       await renderContactNotes(container, portalState, contactId);
     });
   });
 
   /* -------------------------------------------------------
-     REVIEW NOTE HANDLER — JUMP TO NOTES → REVIEW
+     REVIEW NOTE — Jump to Notes → Review
   ------------------------------------------------------- */
   container.querySelectorAll(".btn-review-note").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -203,7 +260,7 @@ function showContactAddNoteForm(container, portalState, contactId) {
 }
 
 /* -------------------------------------------------------
-   SAVE NOTE (same logic as Notes → Add)
+   SAVE NOTE
 ------------------------------------------------------- */
 async function saveContactNote(portalState, contactId, container) {
   const noteDate = document.getElementById("noteDate").value;
