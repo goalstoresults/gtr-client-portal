@@ -3,11 +3,11 @@
 
 import { escapeHtml, formatDateTime } from "../utilities.js";
 
-/* -------------------------------------------------------
-   MAIN ENTRY: Render Contact Timeline
-------------------------------------------------------- */
 export async function renderContactTimeline(container, portalState, contactId) {
   try {
+    /* -------------------------------------------------------
+       RENDER FILTER BAR + TABLE SHELL
+    ------------------------------------------------------- */
     container.innerHTML = `
       <section class="card">
         <h2>Timeline for ${escapeHtml(portalState.selectedContactName || "")}</h2>
@@ -15,13 +15,11 @@ export async function renderContactTimeline(container, portalState, contactId) {
         <!-- ROW 1: FILTERS -->
         <div style="display:flex; align-items:flex-start; gap:20px; flex-wrap:wrap; margin-bottom:6px;">
 
-          <!-- DATE FILTER -->
           <label style="display:flex; flex-direction:column;">
             <span>Date ≥</span>
             <input type="date" id="timelineDateFilter" style="min-width:160px;">
           </label>
 
-          <!-- SECTION FILTER -->
           <label style="display:flex; flex-direction:column;">
             <span>Section</span>
             <select id="timelineSectionFilter" class="form-control" style="min-width:160px;">
@@ -43,7 +41,7 @@ export async function renderContactTimeline(container, portalState, contactId) {
 
         <div id="timelineTable">(loading…)</div>
       </section>
-    ";
+    `;
 
     const tableDiv      = container.querySelector("#timelineTable");
     const dateInput     = document.getElementById("timelineDateFilter");
@@ -133,7 +131,7 @@ export async function renderContactTimeline(container, portalState, contactId) {
         return currentSortDirection === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
       });
 
-      // Headers with arrows (like list tab)
+      // Headers with arrows
       const headerDefs = [
         { field: "event_timestamp", label: "Date" },
         { field: "section",        label: "Section" },
@@ -217,19 +215,14 @@ export async function renderContactTimeline(container, portalState, contactId) {
       tableDiv.querySelectorAll(".btn-details").forEach(btn => {
         btn.addEventListener("click", () => {
           const eventType = btn.dataset.type;
-          // const sourceId = btn.dataset.id; // available if you later want deep-linking
 
-          if (eventType && eventType.startsWith("contact_")) {
-            const btnTab = document.querySelector('#contacts-subtabs button[data-subtab="details"]');
-            if (btnTab) btnTab.click();
-          } else if (eventType && eventType.startsWith("note_")) {
-            const btnTab = document.querySelector('#contacts-subtabs button[data-subtab="notes"]');
-            if (btnTab) btnTab.click();
-          } else if (eventType && eventType.startsWith("relationship_")) {
-            const btnTab = document.querySelector('#contacts-subtabs button[data-subtab="relationships"]');
-            if (btnTab) btnTab.click();
-          } else if (eventType && eventType.startsWith("payment_")) {
-            // Financial tab coming soon
+          if (eventType.startsWith("contact_")) {
+            document.querySelector('#contacts-subtabs button[data-subtab="details"]').click();
+          } else if (eventType.startsWith("note_")) {
+            document.querySelector('#contacts-subtabs button[data-subtab="notes"]').click();
+          } else if (eventType.startsWith("relationship_")) {
+            document.querySelector('#contacts-subtabs button[data-subtab="relationships"]').click();
+          } else if (eventType.startsWith("payment_")) {
             const btnTab = document.querySelector('#contacts-subtabs button[data-subtab="financials"]');
             if (btnTab) btnTab.click();
           }
@@ -262,3 +255,4 @@ export async function renderContactTimeline(container, portalState, contactId) {
     console.error("[Timeline] Error in renderContactTimeline:", err);
   }
 }
+
