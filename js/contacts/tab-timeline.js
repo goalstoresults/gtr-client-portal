@@ -1,6 +1,5 @@
 // js/contacts/tab-timeline.js
-// Contact Timeline Tab — Full Production Version
-// Matches styling + patterns of tab-list.js
+// Contact Timeline Tab — uses event_timestamp as canonical date
 
 import { escapeHtml, formatDateTime } from "../utilities.js";
 
@@ -13,12 +12,12 @@ export async function renderContactTimeline(container, portalState, contactId) {
       <section class="card">
         <h2>Timeline for ${escapeHtml(portalState.selectedContactName || "")}</h2>
 
-        <!-- FILTER BAR -->
+        <!-- ROW 1: FILTERS -->
         <div style="display:flex; align-items:flex-start; gap:20px; flex-wrap:wrap; margin-bottom:6px;">
 
           <!-- DATE FILTER -->
           <label style="display:flex; flex-direction:column;">
-            <span>Date >=</span>
+            <span>Date ≥</span>
             <input type="date" id="timelineDateFilter" style="min-width:160px;">
           </label>
 
@@ -36,7 +35,7 @@ export async function renderContactTimeline(container, portalState, contactId) {
 
         </div>
 
-        <!-- BUTTONS -->
+        <!-- ROW 2: BUTTONS -->
         <div style="display:flex; gap:10px; margin-bottom:12px;">
           <button id="btnApplyTimelineFilter" class="secondary">Apply Filter</button>
           <button id="btnClearTimelineFilter" class="secondary">Clear Filter</button>
@@ -44,10 +43,10 @@ export async function renderContactTimeline(container, portalState, contactId) {
 
         <div id="timelineTable">(loading…)</div>
       </section>
-    `;
+    ";
 
-    const tableDiv = container.querySelector("#timelineTable");
-    const dateInput = document.getElementById("timelineDateFilter");
+    const tableDiv      = container.querySelector("#timelineTable");
+    const dateInput     = document.getElementById("timelineDateFilter");
     const sectionSelect = document.getElementById("timelineSectionFilter");
 
     /* -------------------------------------------------------
@@ -68,7 +67,6 @@ export async function renderContactTimeline(container, portalState, contactId) {
 
       const res = await fetch(url, { cache: "no-cache" });
       const data = await res.json();
-
       events = Array.isArray(data) ? data : [];
     }
 
@@ -76,6 +74,7 @@ export async function renderContactTimeline(container, portalState, contactId) {
        MAP event_type → Section
     ------------------------------------------------------- */
     function mapSection(eventType) {
+      if (!eventType) return "Other";
       if (eventType.startsWith("contact_")) return "Contacts";
       if (eventType.startsWith("note_")) return "Notes";
       if (eventType.startsWith("relationship_")) return "Relationships";
@@ -89,11 +88,14 @@ export async function renderContactTimeline(container, portalState, contactId) {
     function applyFilter() {
       let filtered = [...events];
 
-      // Date filter
+      // Date >= event_timestamp
       const dateVal = dateInput.value;
       if (dateVal) {
         const cutoff = new Date(dateVal);
-        filtered = filtered.filter(ev => new Date(ev.event_timestamp) >= cutoff);
+        filtered = filtered.filter(ev => {
+          const ts = ev.event_timestamp ? new Date(ev.event_timestamp) : null;
+          return ts && ts >= cutoff;
+        });
       }
 
       // Section filter
@@ -110,26 +112,52 @@ export async function renderContactTimeline(container, portalState, contactId) {
     ------------------------------------------------------- */
     function renderTable() {
       const filtered = applyFilter();
-
       const sorted = [...filtered];
 
       sorted.sort((a, b) => {
         if (currentSortField === "event_timestamp") {
-          const da = new Date(a.event_timestamp);
-          const db = new Date(b.event_timestamp);
+          const da = a.event_timestamp ? new Date(a.event_timestamp) : new Date(0);
+          const db = b.event_timestamp ? new Date(b.event_timestamp) : new Date(0);
           return currentSortDirection === "asc" ? da - db : db - da;
         }
 
-        const valA = (a[currentSortField] || "").toLowerCase();
-        const valB = (b[currentSortField] || "").toLowerCase();
-        return currentSortDirection === "asc"
-          ? valA.localeCompare(valB)
-          : valB.localeCompare(valA);
+        if (currentSortField === "section") {
+          const sa = mapSection(a.event_type).toLowerCase();
+          const sb = mapSection(b.event_type).toLowerCase();
+          return currentSortDirection === "asc" ? sa.localeCompare(sb) : sb.localeCompare(sa);
+        }
+
+        // summary
+        const va = (a.summary || "").toLowerCase();
+        const vb = (b.summary || "").toLowerCase();
+        return currentSortDirection === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
       });
+
+      // Headers with arrows (like list tab)
+      const headerDefs = [
+        { field: "event_timestamp", label: "Date" },
+        { field: "section",        label: "Section" },
+        { field: "summary",        label: "Summary" }
+      ];
+
+      const headers = headerDefs.map(h => {
+        const isSorted = currentSortField === h.field;
+        const upArrow   = isSorted && currentSortDirection === "asc"  ? "▲" : "△";
+        const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+
+        return `
+          <th class="sortable" data-field="${h.field}">
+            ${escapeHtml(h.label)}
+            <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+              <span class="sort-up">${upArrow}</span>
+              <span class="sort-down">${downArrow}</span>
+            </span>
+          </th>
+        `;
+      }).join("");
 
       const rows = sorted.map(ev => {
         const section = mapSection(ev.event_type);
-
         return `
           <tr>
             <td>${formatDateTime(ev.event_timestamp)}</td>
@@ -155,9 +183,7 @@ export async function renderContactTimeline(container, portalState, contactId) {
         <table class="notes-table">
           <thead>
             <tr>
-              <th class="sortable" data-field="event_timestamp">Date</th>
-              <th class="sortable" data-field="section">Section</th>
-              <th class="sortable" data-field="summary">Summary</th>
+              ${headers}
               <th>Action</th>
             </tr>
           </thead>
@@ -189,19 +215,23 @@ export async function renderContactTimeline(container, portalState, contactId) {
          DETAILS BUTTON ROUTING
       ------------------------------------------------------- */
       tableDiv.querySelectorAll(".btn-details").forEach(btn => {
-        btn.addEventListener("click", async () => {
+        btn.addEventListener("click", () => {
           const eventType = btn.dataset.type;
-          const sourceId = btn.dataset.id;
+          // const sourceId = btn.dataset.id; // available if you later want deep-linking
 
-          // ROUTING LOGIC
-          if (eventType.startsWith("contact_")) {
-            document.querySelector('#contacts-subtabs button[data-subtab="details"]').click();
-          } else if (eventType.startsWith("note_")) {
-            document.querySelector('#contacts-subtabs button[data-subtab="notes"]').click();
-          } else if (eventType.startsWith("relationship_")) {
-            document.querySelector('#contacts-subtabs button[data-subtab="relationships"]').click();
-          } else if (eventType.startsWith("payment_")) {
-            alert("Financials tab coming soon!");
+          if (eventType && eventType.startsWith("contact_")) {
+            const btnTab = document.querySelector('#contacts-subtabs button[data-subtab="details"]');
+            if (btnTab) btnTab.click();
+          } else if (eventType && eventType.startsWith("note_")) {
+            const btnTab = document.querySelector('#contacts-subtabs button[data-subtab="notes"]');
+            if (btnTab) btnTab.click();
+          } else if (eventType && eventType.startsWith("relationship_")) {
+            const btnTab = document.querySelector('#contacts-subtabs button[data-subtab="relationships"]');
+            if (btnTab) btnTab.click();
+          } else if (eventType && eventType.startsWith("payment_")) {
+            // Financial tab coming soon
+            const btnTab = document.querySelector('#contacts-subtabs button[data-subtab="financials"]');
+            if (btnTab) btnTab.click();
           }
         });
       });
@@ -212,7 +242,7 @@ export async function renderContactTimeline(container, portalState, contactId) {
     ------------------------------------------------------- */
     document.getElementById("btnApplyTimelineFilter").addEventListener("click", renderTable);
 
-    document.getElementById("btnClearTimelineFilter").addEventListener("click", async () => {
+    document.getElementById("btnClearTimelineFilter").addEventListener("click", () => {
       dateInput.value = "";
       sectionSelect.value = "";
       renderTable();
