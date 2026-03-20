@@ -235,6 +235,9 @@ async function attemptLogin() {
     portalState.user_id = result.staff_id;
     portalState.full_admin = result.full_admin === true;
     portalState.task_manager = (result.task_manager || "").trim().toLowerCase();
+    portalState.notesFilterDate = null;
+    portalState.notesFilterSubject = null;
+
     
     // ⭐ FIX: map names correctly
     portalState.staffName = result.staff_name || "";
