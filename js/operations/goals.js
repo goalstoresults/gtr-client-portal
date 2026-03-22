@@ -292,13 +292,21 @@ function attachAutosaveHandlers(portalState, year) {
 
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const indicators = [
-    { key: "outreach_past_clients", label: "Outreach to Clients (Current/Past)" },
-    { key: "outreach_networks", label: "Outreach to Networks" },
-    { key: "outreach_referrals", label: "Outreach to Referral Partners" },
-    { key: "new_leads", label: "New Leads" },
-    { key: "discovery_calls", label: "Discovery Calls" },
-    { key: "sales_calls", label: "Sales Calls" }
-  ];
+  { key: "outreach_past_clients", label: "Outreach to Clients (Current/Past)" },
+  { key: "outreach_networks", label: "Outreach to Networks" },
+  { key: "outreach_referrals", label: "Outreach to Referral Partners" },
+  { key: "new_leads", label: "New Leads" },
+  { key: "discovery_calls", label: "Discovery Calls" },
+  { key: "sales_calls", label: "Sales Calls" },
+
+  // NEW INDICATORS
+  { key: "new_clients_closed", label: "New Clients Closed" },
+  { key: "revenue_added", label: "Revenue Added" },
+  { key: "newsletter_sends", label: "Newsletter / Email Sends" },
+  { key: "newsletter_clicks", label: "Newsletter Clicks" },
+  { key: "social_posts", label: "Social Media Posts" },
+  { key: "social_reach", label: "Social Media Reach" }
+];
 
 function renderLeadIndicatorsGrid(goals, year) {
 
