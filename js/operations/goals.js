@@ -291,7 +291,7 @@ function attachAutosaveHandlers(portalState, year) {
   ------------------------------------------------------------ */
 
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const indicators = [
+const indicators = [
   // Outreach
   { section: "Outreach", key: "outreach_past_clients", label: "Outreach to Clients (Current/Past)" },
   { section: "Outreach", key: "outreach_networks", label: "Outreach to Networks" },
@@ -301,10 +301,7 @@ function attachAutosaveHandlers(portalState, year) {
   { section: "Funnel", key: "new_leads", label: "New Leads" },
   { section: "Funnel", key: "discovery_calls", label: "Discovery Calls" },
   { section: "Funnel", key: "sales_calls", label: "Sales Calls" },
-
-  // Revenue
-  { section: "Revenue", key: "new_clients_closed", label: "New Clients Closed" },
-  { section: "Revenue", key: "revenue_added", label: "Revenue Added" },
+  { section: "Funnel", key: "new_clients_closed", label: "New Clients Closed" },
 
   // Content
   { section: "Content", key: "newsletter_sends", label: "Newsletter / Email Sends" },
@@ -315,19 +312,7 @@ function attachAutosaveHandlers(portalState, year) {
 
 function renderLeadIndicatorsGrid(goals, year) {
 
-  // 1. Compute monthly totals
-  const monthlyTotals = months.map((_, idx) => {
-    const month = idx + 1;
-
-    return indicators.reduce((sum, ind) => {
-      const sid = `${portalState.project}-${year}-${month}-indicators`;
-      const row = goals.find(g => g.month === month && g.service_id === sid);
-      const value = Number(row?.[ind.key] ?? 0);
-      return sum + value;
-    }, 0);
-  });
-
-  // 2. Header row (months)
+  // 1. Header row (months)
   const header = `
     <tr>
       <th>Indicator</th>
@@ -335,15 +320,7 @@ function renderLeadIndicatorsGrid(goals, year) {
     </tr>
   `;
 
-  // 3. Totals row (gold background)
-  const totalsRow = `
-    <tr style="background:#f7e7c3; font-weight:bold;">
-      <td style="text-align:left;">TOTAL</td>
-      ${monthlyTotals.map(t => `<td class="amount">${t}</td>`).join("")}
-    </tr>
-  `;
-
-  // 4. Data rows WITH SECTION HEADERS
+  // 2. Data rows WITH SECTION HEADERS
   let lastSection = null;
 
   const body = indicators.map(ind => {
@@ -394,20 +371,20 @@ function renderLeadIndicatorsGrid(goals, year) {
     `;
   }).join("");
 
-  // 5. Render
+  // 3. Render
   leadsGrid.innerHTML = `
     <h3>Lead Indicators (Goals)</h3>
     <div class="goals-scroll-container">
       <table class="notes-table goals-table">
         <thead>
           ${header}
-          ${totalsRow}
         </thead>
         <tbody>${body}</tbody>
       </table>
     </div>
   `;
 }
+
 
   /* ------------------------------------------------------------
      GRID RENDERING — CLIENT GOALS (WITH TOTALS AT TOP)
