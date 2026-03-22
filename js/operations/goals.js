@@ -292,20 +292,25 @@ function attachAutosaveHandlers(portalState, year) {
 
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const indicators = [
-  { key: "outreach_past_clients", label: "Outreach to Clients (Current/Past)" },
-  { key: "outreach_networks", label: "Outreach to Networks" },
-  { key: "outreach_referrals", label: "Outreach to Referral Partners" },
-  { key: "new_leads", label: "New Leads" },
-  { key: "discovery_calls", label: "Discovery Calls" },
-  { key: "sales_calls", label: "Sales Calls" },
+  // Outreach
+  { section: "Outreach", key: "outreach_past_clients", label: "Outreach to Clients (Current/Past)" },
+  { section: "Outreach", key: "outreach_networks", label: "Outreach to Networks" },
+  { section: "Outreach", key: "outreach_referrals", label: "Outreach to Referral Partners" },
 
-  // NEW INDICATORS
-  { key: "new_clients_closed", label: "New Clients Closed" },
-  { key: "revenue_added", label: "Revenue Added" },
-  { key: "newsletter_sends", label: "Newsletter / Email Sends" },
-  { key: "newsletter_clicks", label: "Newsletter Clicks" },
-  { key: "social_posts", label: "Social Media Posts" },
-  { key: "social_reach", label: "Social Media Reach" }
+  // Funnel
+  { section: "Funnel", key: "new_leads", label: "New Leads" },
+  { section: "Funnel", key: "discovery_calls", label: "Discovery Calls" },
+  { section: "Funnel", key: "sales_calls", label: "Sales Calls" },
+
+  // Revenue
+  { section: "Revenue", key: "new_clients_closed", label: "New Clients Closed" },
+  { section: "Revenue", key: "revenue_added", label: "Revenue Added" },
+
+  // Content
+  { section: "Content", key: "newsletter_sends", label: "Newsletter / Email Sends" },
+  { section: "Content", key: "newsletter_clicks", label: "Newsletter Clicks" },
+  { section: "Content", key: "social_posts", label: "Social Media Posts" },
+  { section: "Content", key: "social_reach", label: "Social Media Reach" }
 ];
 
 function renderLeadIndicatorsGrid(goals, year) {
@@ -338,8 +343,30 @@ function renderLeadIndicatorsGrid(goals, year) {
     </tr>
   `;
 
-  // 4. Data rows
+  // 4. Data rows WITH SECTION HEADERS
+  let lastSection = null;
+
   const body = indicators.map(ind => {
+    let sectionHeader = "";
+
+    // Insert section header when section changes
+    if (ind.section !== lastSection) {
+      sectionHeader = `
+        <tr class="section-row">
+          <td colspan="${months.length + 1}" style="
+            background:#eef3f7;
+            font-weight:bold;
+            text-transform:uppercase;
+            padding:6px 10px;
+          ">
+            ${escapeHtml(ind.section)}
+          </td>
+        </tr>
+      `;
+      lastSection = ind.section;
+    }
+
+    // Build month cells
     const cells = months.map((_, idx) => {
       const month = idx + 1;
 
@@ -358,7 +385,13 @@ function renderLeadIndicatorsGrid(goals, year) {
       `;
     }).join("");
 
-    return `<tr><td>${escapeHtml(ind.label)}</td>${cells}</tr>`;
+    return `
+      ${sectionHeader}
+      <tr>
+        <td>${escapeHtml(ind.label)}</td>
+        ${cells}
+      </tr>
+    `;
   }).join("");
 
   // 5. Render
