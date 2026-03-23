@@ -1,5 +1,4 @@
 // /notes/tab-review.js
-
 // Handles: Note review, metadata editing, client assignment, deletion, relationships navigation
 
 import { escapeHtml, formatDateTime, getEasternDateOnly } from "../utilities.js";
@@ -63,19 +62,26 @@ export async function renderReview(container, portalState, noteId) {
 
   <div class="row" style="gap:12px; margin-bottom:12px;">
     <h2 style="margin:0;">Notes Review: ${escapeHtml(note.subject || "(no subject)")}</h2>
+
     <button id="btnSetClient" class="btn-secondary btn-edit">Set Contact</button>
-    ${portalState.deleteAllowed ? `<button id="btnDeleteNote" class="btn-danger btn-delete">Delete</button>` : ``}
+
+    ${
+      portalState.deleteAllowed
+        ? `<button id="btnDeleteNote" class="btn-danger btn-delete">Delete</button>`
+        : ``
+    }
+
+    <!-- ⭐ NEW BUTTON -->
+    <button id="btnCheckRouting" class="btn-secondary">Check Contact Relationship</button>
   </div>
 
   <!-- ⭐ UPDATED: Unified Search Box -->
   <section id="setClientForm" class="card" style="display:none; margin-bottom:16px;">
     <h3>Attach Contact to Note</h3>
-
     <div class="row" style="gap:12px; margin-bottom:12px;">
       <input id="filter-any" placeholder="Search name, business, or email" style="flex:1;" />
       <button id="btnFindClient" class="btn-primary">Find</button>
     </div>
-
     <div id="clientSearchResults" class="muted">Enter criteria and click Find.</div>
   </section>
 
@@ -285,7 +291,6 @@ export async function renderReview(container, portalState, noteId) {
     const relBtn = document.getElementById("btnRelationships");
     if (relBtn) {
       relBtn.addEventListener("click", () => {
-        // ⭐ FIX: Ensure Relationships tab knows which note to load
         portalState.selectedNoteId = note.id;
 
         document.querySelectorAll("#notes-subtabs button").forEach(b =>
@@ -334,6 +339,46 @@ export async function renderReview(container, portalState, noteId) {
     }
 
     // ------------------------------------------------------------
+    // ⭐⭐ NEW: CHECK CONTACT RELATIONSHIP BUTTON ⭐⭐
+    // ------------------------------------------------------------
+    const checkBtn = document.getElementById("btnCheckRouting");
+    if (checkBtn) {
+      checkBtn.addEventListener("click", async () => {
+        try {
+          const payload = {
+            note_id: note.id,
+            project: portalState.project
+          };
+
+          const res = await fetch(
+            "https://notes-relationship-module.dennis-e64.workers.dev/route-one",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+            }
+          );
+
+          const data = await res.json().catch(() => null);
+
+          if (!res.ok) {
+            alert(`❌ Routing failed: ${data?.error || "Unknown error"}`);
+            return;
+          }
+
+          alert(`Routing Result: ${data.result?.status || "unknown"}`);
+
+          // Refresh the screen to show updated contact
+          await renderReview(container, portalState, note.id);
+
+        } catch (err) {
+          alert("Error calling routing worker: " + err.message);
+          console.error(err);
+        }
+      });
+    }
+
+    // ------------------------------------------------------------
     // ⭐⭐ FIND CLIENT — UNIFIED SEARCH BOX ⭐⭐
     // ------------------------------------------------------------
     document.getElementById("btnFindClient").addEventListener("click", async () => {
@@ -350,20 +395,21 @@ export async function renderReview(container, portalState, noteId) {
       const encoded = encodeURIComponent(`*${term}*`);
 
       const url = `
-        https://client-portal-api.dennis-e64.workers.dev/api/contacts?
-        project=${portalState.project}&
-        or=(
-          first_name.ilike.${encoded},
-          last_name.ilike.${encoded},
-          business_name.ilike.${encoded},
-          search_name.ilike.${encoded},
-          email.ilike.${encoded}
-        )
-        &select=contact_id,first_name,last_name,email,contact_type
-      `.replace(/\s+/g, "");
+https://client-portal-api.dennis-e64.workers.dev/api/contacts?
+project=${portalState.project}&
+or=(
+  first_name.ilike.${encoded},
+  last_name.ilike.${encoded},
+  business_name.ilike.${encoded},
+  search_name.ilike.${encoded},
+  email.ilike.${encoded}
+)
+&select=contact_id,first_name,last_name,email,contact_type
+`.replace(/\s+/g, "");
 
       try {
         const res = await fetch(url);
+
         if (!res.ok) {
           const msg = await res.text().catch(() => "");
           resultsDiv.textContent = `❌ Search failed (${res.status}). ${msg}`;
@@ -380,16 +426,16 @@ export async function renderReview(container, portalState, noteId) {
         resultsDiv.innerHTML = contacts
           .map(
             c => `
-          <div class="contact-result"
-            data-id="${c.contact_id}"
-            data-name="${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}"
-            data-type="${escapeHtml(c.contact_type || "")}"
-            data-email="${escapeHtml(c.email || "")}">
-            <strong>${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}</strong>
-            (${escapeHtml(c.contact_type || "No type")})<br/>
-            <small>${escapeHtml(c.email || "No email")}</small>
-          </div>
-        `
+<div class="contact-result"
+  data-id="${c.contact_id}"
+  data-name="${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}"
+  data-type="${escapeHtml(c.contact_type || "")}"
+  data-email="${escapeHtml(c.email || "")}">
+  <strong>${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}</strong>
+  (${escapeHtml(c.contact_type || "No type")})<br/>
+  <small>${escapeHtml(c.email || "No email")}</small>
+</div>
+`
           )
           .join("");
 
@@ -462,6 +508,7 @@ async function attachClientToNote(contactId, contactName, contactType, contactEm
     if (container) {
       await renderReview(container, portalState, portalState.selectedNoteId);
     }
+
   } catch (err) {
     alert("Error attaching client: " + err.message);
     console.error(err);
