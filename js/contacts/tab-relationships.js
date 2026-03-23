@@ -1,12 +1,15 @@
 // js/contacts/tab-relationships.js
+
 // Modularized Relationships Tab
 
 import { escapeHtml, formatDateTime } from "../utilities.js";
 
 /* -------------------------------------------------------
-   MAIN ENTRY: Render Relationships Tab
+MAIN ENTRY: Render Relationships Tab
 ------------------------------------------------------- */
+
 export async function renderContactRelationships(container, portalState, contactId) {
+
   if (!portalState.project || !contactId) {
     container.innerHTML = `
       <section class="card">
@@ -66,9 +69,11 @@ export async function renderContactRelationships(container, portalState, contact
 }
 
 /* -------------------------------------------------------
-   SOURCE GRID (Editable)
+SOURCE GRID (Editable)
 ------------------------------------------------------- */
+
 async function renderContactRelationshipsSource(container, portalState, contactId) {
+
   const url = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${portalState.project}&source_contact_id=${contactId}`;
   const res = await fetch(url, { cache: "no-cache" });
   let rows = await res.json();
@@ -81,35 +86,44 @@ async function renderContactRelationshipsSource(container, portalState, contactI
           <th>Type</th>
           <th>Role</th>
           <th>Related Contact</th>
+          <th>Contact Type</th>
           <th>Financial Referral</th>
           <th>Created</th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody>
-        ${rows.length > 0
-          ? rows.map(r => `
-              <tr>
-                <td>${escapeHtml(r.relationship_type || "")}</td>
-                <td>${escapeHtml(r.relationship_role || "")}</td>
-                <td>${escapeHtml(r.related_contact_name || r.related_contact_id || "")}</td>
-                <td>${r.financial_referral ? "✅" : ""}</td>
-                <td>${formatDateTime(r.created_at)}</td>
-                <td>
-                  <button 
-                    class="btn-secondary btn-edit" 
-                    data-id="${r.id}"
-                    data-related-name="${escapeHtml(r.related_contact_name || "")}"
-                  >
-                    Edit
-                  </button>
-                  ${portalState.deleteAllowed
-                    ? `<button class="btn-danger btn-delete" data-id="${r.id}">Delete</button>`
-                    : ``}
-                </td>
-              </tr>
-            `).join("")
-          : `<tr><td colspan="6">(no relationships)</td></tr>`
+        ${
+          rows.length > 0
+            ? rows
+                .map(
+                  r => `
+          <tr>
+            <td>${escapeHtml(r.relationship_type || "")}</td>
+            <td>${escapeHtml(r.relationship_role || "")}</td>
+            <td>${escapeHtml(r.related_contact_name || r.related_contact_id || "")}</td>
+            <td>${escapeHtml(r.related_contact_type || "")}</td>
+            <td>${r.financial_referral ? "✅" : ""}</td>
+            <td>${formatDateTime(r.created_at)}</td>
+            <td>
+              <button
+                class="btn-secondary btn-edit"
+                data-id="${r.id}"
+                data-related-name="${escapeHtml(r.related_contact_name || "")}"
+              >
+                Edit
+              </button>
+              ${
+                portalState.deleteAllowed
+                  ? `<button class="btn-danger btn-delete" data-id="${r.id}">Delete</button>`
+                  : ``
+              }
+            </td>
+          </tr>
+        `
+                )
+                .join("")
+            : `<tr><td colspan="7">(no relationships)</td></tr>`
         }
       </tbody>
     </table>
@@ -132,19 +146,23 @@ async function renderContactRelationshipsSource(container, portalState, contactI
   container.querySelectorAll(".btn-delete").forEach(btn => {
     btn.addEventListener("click", async () => {
       if (!confirm("Delete this relationship?")) return;
+
       await fetch(
         `https://contacts-module.dennis-e64.workers.dev/contact_relationships/${btn.dataset.id}?project=${portalState.project}`,
         { method: "DELETE" }
       );
+
       await renderContactRelationshipsSource(container, portalState, contactId);
     });
   });
 }
 
 /* -------------------------------------------------------
-   RELATED GRID (Read‑Only)
+RELATED GRID (Read‑Only)
 ------------------------------------------------------- */
+
 async function renderContactRelationshipsRelated(container, portalState, contactId) {
+
   const url = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${portalState.project}&related_contact_id=${contactId}`;
   const res = await fetch(url, { cache: "no-cache" });
   let rows = await res.json();
@@ -159,24 +177,31 @@ async function renderContactRelationshipsRelated(container, portalState, contact
           <th>Type</th>
           <th>Role</th>
           <th>Source Contact</th>
+          <th>Contact Type</th>
           <th>Financial Referral</th>
           <th>Created</th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody>
-        ${rows.length > 0
-          ? rows.map(r => `
-              <tr>
-                <td>${escapeHtml(r.relationship_type || "")}</td>
-                <td>${escapeHtml(r.relationship_role || "")}</td>
-                <td>${escapeHtml(r.source_contact_name || r.source_contact_id || "")}</td>
-                <td>${r.financial_referral ? "✅" : ""}</td>
-                <td>${formatDateTime(r.created_at)}</td>
-                <td style="color:#999;">—</td>
-              </tr>
-            `).join("")
-          : `<tr><td colspan="6">(no relationships)</td></tr>`
+        ${
+          rows.length > 0
+            ? rows
+                .map(
+                  r => `
+          <tr>
+            <td>${escapeHtml(r.relationship_type || "")}</td>
+            <td>${escapeHtml(r.relationship_role || "")}</td>
+            <td>${escapeHtml(r.source_contact_name || r.source_contact_id || "")}</td>
+            <td>${escapeHtml(r.source_contact_type || "")}</td>
+            <td>${r.financial_referral ? "✅" : ""}</td>
+            <td>${formatDateTime(r.created_at)}</td>
+            <td style="color:#999;">—</td>
+          </tr>
+        `
+                )
+                .join("")
+            : `<tr><td colspan="7">(no relationships)</td></tr>`
         }
       </tbody>
     </table>
@@ -184,9 +209,11 @@ async function renderContactRelationshipsRelated(container, portalState, contact
 }
 
 /* -------------------------------------------------------
-   REFERRAL SUMMARY
+REFERRAL SUMMARY
 ------------------------------------------------------- */
+
 async function renderContactRelationshipsReferralSummary(container, portalState, contactId) {
+
   const base = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${portalState.project}`;
 
   const [asSourceRes, asRelatedRes] = await Promise.all([
@@ -217,6 +244,7 @@ async function renderContactRelationshipsReferralSummary(container, portalState,
     const referredTo = sourceName;
 
     let direction;
+
     if (String(contactId) === String(sourceId)) direction = "Inbound";
     else if (String(contactId) === String(relatedId)) direction = "Outbound";
     else continue;
@@ -257,17 +285,22 @@ async function renderContactRelationshipsReferralSummary(container, portalState,
         </tr>
       </thead>
       <tbody>
-        ${combined.length > 0
-          ? combined.map(r => `
-              <tr>
-                <td>${escapeHtml(r.direction)}</td>
-                <td>${escapeHtml(r.referredBy)}</td>
-                <td>${escapeHtml(r.referredTo)}</td>
-                <td>${r.financial ? "✅" : ""}</td>
-                <td>${formatDateTime(r.created)}</td>
-              </tr>
-            `).join("")
-          : `<tr><td colspan="5">(no referrals)</td></tr>`
+        ${
+          combined.length > 0
+            ? combined
+                .map(
+                  r => `
+          <tr>
+            <td>${escapeHtml(r.direction)}</td>
+            <td>${escapeHtml(r.referredBy)}</td>
+            <td>${escapeHtml(r.referredTo)}</td>
+            <td>${r.financial ? "✅" : ""}</td>
+            <td>${formatDateTime(r.created)}</td>
+          </tr>
+        `
+                )
+                .join("")
+            : `<tr><td colspan="5">(no referrals)</td></tr>`
         }
       </tbody>
     </table>
@@ -275,16 +308,20 @@ async function renderContactRelationshipsReferralSummary(container, portalState,
 }
 
 /* -------------------------------------------------------
-   RELATIONSHIP FORM (Add/Edit)
+RELATIONSHIP FORM (Add/Edit)
 ------------------------------------------------------- */
+
 export async function openRelationshipForm(container, portalState, { mode, contactId, relationshipId, relatedName }) {
+
   const projectId = portalState.project;
+
   if (!projectId) {
     container.innerHTML = `<section class="card"><p>Missing project.</p></section>`;
     return;
   }
 
   let relationship = null;
+
   if (mode === "edit" && relationshipId) {
     const res = await fetch(
       `https://contacts-module.dennis-e64.workers.dev/contact_relationships/${relationshipId}?project=${encodeURIComponent(projectId)}`,
@@ -298,14 +335,16 @@ export async function openRelationshipForm(container, portalState, { mode, conta
     `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${encodeURIComponent(projectId)}&limit=500`,
     { cache: "no-cache" }
   );
+
   const contacts = await contactsRes.json().catch(() => []);
+
   const contactMap = {};
   (Array.isArray(contacts) ? contacts : []).forEach(c => {
     const name = c.contact_name || `${c.first_name || ""} ${c.last_name || ""}`.trim();
     if (c.contact_id) contactMap[c.contact_id] = name || c.contact_id;
   });
 
-  const sourceId  = relationship?.source_contact_id  || contactId || "";
+  const sourceId = relationship?.source_contact_id || contactId || "";
   const relatedId = relationship?.related_contact_id || "";
 
   const sourceName = contactMap[sourceId] || sourceId || "(unknown)";
@@ -318,7 +357,9 @@ export async function openRelationshipForm(container, portalState, { mode, conta
   container.innerHTML = `
     <section class="card">
       <h3>${mode === "edit" ? "Edit Relationship" : "Add Relationship"}</h3>
+
       <form id="relationshipForm">
+
         <div class="row" style="gap:12px; align-items:center;">
           <label style="min-width:160px;">Source contact</label>
           <input type="hidden" name="source_contact_id" value="${escapeHtml(sourceId)}">
@@ -360,17 +401,21 @@ export async function openRelationshipForm(container, portalState, { mode, conta
           <button type="submit" class="btn-primary">${mode === "edit" ? "Save changes" : "Add relationship"}</button>
           <button type="button" class="btn-secondary" id="btnCancel">Cancel</button>
         </div>
+
       </form>
 
       <section id="relatedPicker" class="card" style="display:none; margin-top:16px;">
         <h4>Find related contact</h4>
+
         <div class="row" style="gap:8px; margin-bottom:8px;">
           <input id="rel-first" placeholder="First name">
           <input id="rel-last" placeholder="Last name">
           <button id="btnFindRel" class="primary">Find</button>
         </div>
+
         <div id="relResults" class="muted">(enter a name and click Find)</div>
       </section>
+
     </section>
   `;
 
@@ -427,33 +472,45 @@ export async function openRelationshipForm(container, portalState, { mode, conta
   // Find related contact
   document.getElementById("btnFindRel")?.addEventListener("click", async () => {
     const first = document.getElementById("rel-first").value.trim();
-    const last  = document.getElementById("rel-last").value.trim();
+    const last = document.getElementById("rel-last").value.trim();
 
-    if (!first && !last) { alert("Enter at least a first or last name."); return; }
+    if (!first && !last) {
+      alert("Enter at least a first or last name.");
+      return;
+    }
 
     const filters = [`project.eq.${projectId}`];
     if (first) filters.push(`first_name.ilike.${first}*`);
-    if (last)  filters.push(`last_name.ilike.${last}*`);
+    if (last) filters.push(`last_name.ilike.${last}*`);
 
     const query = filters.length > 1 ? `and=(${filters.join(",")})` : filters[0];
+
     const url = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?${query}&select=contact_id,first_name,last_name,email,contact_type`;
 
     try {
       const resp = await fetch(url);
       const rows = await resp.json();
+
       const relResults = document.getElementById("relResults");
 
-      relResults.innerHTML = Array.isArray(rows) && rows.length > 0
-        ? rows.map(r => {
-            const fullName = `${r.first_name || ""} ${r.last_name || ""}`.trim();
-            return `
-              <div class="contact-result" data-id="${escapeHtml(r.contact_id)}" data-name="${escapeHtml(fullName)}" data-email="${escapeHtml(r.email || "")}">
-                <strong>${escapeHtml(fullName)}</strong><br/>
-                <small>${escapeHtml(r.email || "")}</small>
-              </div>
-            `;
-            }).join("")
-        : "<div class='muted'>No contacts found.</div>";
+      relResults.innerHTML =
+        Array.isArray(rows) && rows.length > 0
+          ? rows
+              .map(r => {
+                const fullName = `${r.first_name || ""} ${r.last_name || ""}`.trim();
+                return `
+                  <div class="contact-result"
+                       data-id="${escapeHtml(r.contact_id)}"
+                       data-name="${escapeHtml(fullName)}"
+                       data-email="${escapeHtml(r.email || "")}">
+                    <strong>${escapeHtml(fullName)}</strong><br/>
+                    <small>${escapeHtml(r.email || "")}</small><br/>
+                    <small>Type: ${escapeHtml(r.contact_type || "")}</small>
+                  </div>
+                `;
+              })
+              .join("")
+          : "<div class='muted'>No contacts found.</div>";
 
       // Click handler for selecting a related contact
       relResults.querySelectorAll(".contact-result").forEach(el => {
@@ -462,14 +519,15 @@ export async function openRelationshipForm(container, portalState, { mode, conta
           const name = el.dataset.name;
 
           const hidden = document.querySelector('input[name="related_contact_id"]');
-          const label  = document.querySelector('input[name="related_contact_id"] + span');
+          const label = document.querySelector('input[name="related_contact_id"] + span');
 
           if (hidden) hidden.value = id || "";
-          if (label)  label.textContent = name || "(unknown)";
+          if (label) label.textContent = name || "(unknown)";
 
           alert("✅ Related contact selected.");
         });
       });
+
     } catch (err) {
       alert("Network error searching contacts.");
       console.error(err);
@@ -479,6 +537,7 @@ export async function openRelationshipForm(container, portalState, { mode, conta
   // Submit handler
   document.getElementById("relationshipForm")?.addEventListener("submit", async e => {
     e.preventDefault();
+
     const form = e.currentTarget;
     const fd = new FormData(form);
 
@@ -493,13 +552,20 @@ export async function openRelationshipForm(container, portalState, { mode, conta
       ...(mode === "add" ? { created_at: new Date().toISOString() } : {})
     };
 
-    if (!payload.source_contact_id) { alert("Missing source contact."); return; }
-    if (!payload.related_contact_id) { alert("Missing related contact."); return; }
+    if (!payload.source_contact_id) {
+      alert("Missing source contact.");
+      return;
+    }
+    if (!payload.related_contact_id) {
+      alert("Missing related contact.");
+      return;
+    }
 
     try {
-      const url = mode === "edit"
-        ? `https://contacts-module.dennis-e64.workers.dev/contact_relationships/${relationshipId}?project=${encodeURIComponent(projectId)}`
-        : `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${encodeURIComponent(projectId)}`;
+      const url =
+        mode === "edit"
+          ? `https://contacts-module.dennis-e64.workers.dev/contact_relationships/${relationshipId}?project=${encodeURIComponent(projectId)}`
+          : `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${encodeURIComponent(projectId)}`;
 
       const res = await fetch(url, {
         method: mode === "edit" ? "PATCH" : "POST",
@@ -508,20 +574,25 @@ export async function openRelationshipForm(container, portalState, { mode, conta
       });
 
       const text = await res.text();
+
       if (!res.ok) {
         alert(`❌ Save failed: ${text}`);
         return;
       }
 
       alert("✅ Relationship saved.");
+
       container.innerHTML = "";
       await renderContactRelationships(container, portalState, contactId);
       container.scrollIntoView({ behavior: "smooth", block: "start" });
+
     } catch (err) {
       alert("Error saving relationship: " + err.message);
       console.error(err);
     }
   });
-} // <-- THIS closes openRelationshipForm()
+
+} // <-- closes openRelationshipForm()
 
 // End of module
+       
