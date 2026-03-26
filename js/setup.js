@@ -1,6 +1,6 @@
 // js/setup.js
-// v3.2 — Modular Setup Loader 
-// (Client, Contact Add, Contact List, Lookups, Staff, Contact Diagnostics, Timeline Diagnostics)
+// v3.3 — Modular Setup Loader 
+// (Client, Contact Add, Contact List, Lookups, Staff, Contact Diagnostics, Timeline Diagnostics, Notes Diagnostics)
 
 import { renderClientSetup } from "./setup/tab-client.js";
 import { renderContactAddSetup } from "./setup/tab-contact-add.js";
@@ -8,7 +8,8 @@ import { renderContactListSetup } from "./setup/tab-contact-list.js";
 import { renderLookupsSetup } from "./setup/tab-lookups.js";
 import { renderStaffSetup } from "./setup/tab-staff.js";
 import { renderContactDiagnostics } from "./setup/tab-contact-diagnostics.js";
-import { renderTimelineDiagnostics } from "./setup/tab-timeline-diags.js";   // ✅ NEW
+import { renderTimelineDiagnostics } from "./setup/tab-timeline-diags.js";
+import { renderNotesDiagnostics } from "./setup/tab-notes-diagnostics.js";   // ✅ NEW
 
 export async function loadSetupTab({ portalState, tabContent }) {
   // Load base HTML template
@@ -67,8 +68,12 @@ export async function loadSetupTab({ portalState, tabContent }) {
           await renderContactDiagnostics(setupContent, portalState);
           break;
 
-        case "timeline-diagnostics":                                // ✅ NEW
+        case "timeline-diagnostics":
           await renderTimelineDiagnostics(setupContent, portalState);
+          break;
+
+        case "notes-diagnostics":                                  // ✅ NEW
+          await renderNotesDiagnostics(setupContent, portalState);
           break;
 
         default:
