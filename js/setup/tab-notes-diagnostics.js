@@ -1,6 +1,7 @@
 // /js/setup/tab-notes-diagnostics.js
 
-const ND_BASE_URL = "https://relationship-processor.dennis-e64.workers.dev";
+const ND_BASE_URL = "https://notes-relationship-module.dennis-e64.workers.dev";
+
 
 let ND_CACHE = [];
 
