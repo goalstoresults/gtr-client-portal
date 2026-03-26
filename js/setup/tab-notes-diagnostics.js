@@ -2,7 +2,6 @@
 
 const ND_BASE_URL = "https://notes-relationship-module.dennis-e64.workers.dev";
 
-
 let ND_CACHE = [];
 
 export async function renderNotesDiagnostics(setupContent, portalState) {
@@ -142,6 +141,7 @@ async function loadNotes(project, portalState) {
 
     renderRows(portalState);
   } catch (err) {
+    console.error("Error loading notes:", err);
     tbody.innerHTML = `<tr><td colspan="7">Error loading notes.</td></tr>`;
   }
 }
@@ -280,7 +280,7 @@ async function previewSelected(project) {
   const ids = getSelectedIds();
 
   if (ids.length !== 1) {
-    alert("Select exactly one note to preview.");
+    console.warn("Select exactly one note to preview.");
     return;
   }
 
@@ -295,7 +295,7 @@ async function previewSelected(project) {
 
   const data = await res.json();
 
-  alert(JSON.stringify(data.payload, null, 2));
+  console.log("Preview Selected:", data.payload);
 }
 
 /* ============================================================
@@ -306,7 +306,7 @@ async function bulkFixTo(project) {
   const ids = getSelectedIds();
 
   if (ids.length === 0) {
-    alert("No notes selected.");
+    console.warn("No notes selected.");
     return;
   }
 
@@ -320,7 +320,7 @@ async function bulkFixTo(project) {
 
   const data = await res.json();
 
-  alert("Fix From/To complete:\n" + JSON.stringify(data, null, 2));
+  console.log("Fix From/To result:", data);
 
   const portalState = window.portalState || {};
   const effectiveProject = portalState.setup_project_id || project;
@@ -336,7 +336,7 @@ async function bulkFixRelationship(project) {
   const ids = getSelectedIds();
 
   if (ids.length === 0) {
-    alert("No notes selected.");
+    console.warn("No notes selected.");
     return;
   }
 
@@ -354,7 +354,7 @@ async function bulkFixRelationship(project) {
     results.push({ id, result: data });
   }
 
-  alert("Relationship routing complete:\n" + JSON.stringify(results, null, 2));
+  console.log("Fix Relationship result:", results);
 
   const portalState = window.portalState || {};
   const effectiveProject = portalState.setup_project_id || project;
