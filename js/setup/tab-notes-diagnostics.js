@@ -103,23 +103,36 @@ export async function renderNotesDiagnostics(setupContent, portalState) {
     </section>
   `;
 
-  document.getElementById("nd-refresh").onclick = () =>
-    loadNotes(project, portalState);
+document.getElementById("nd-refresh").onclick = () => {
+    const ps = window.portalState || {};
+    loadNotes(ps.setup_project_id, ps);
+};
 
-  document.getElementById("nd-select-all").onclick = toggleSelectAll;
+document.getElementById("nd-select-all").onclick = toggleSelectAll;
 
-  document.getElementById("nd-clear-all").onclick = clearAll;
+document.getElementById("nd-clear-all").onclick = () => {
+    clearAll();
+    const ps = window.portalState || {};
+    loadNotes(ps.setup_project_id, ps);
+};
 
-  document.getElementById("nd-fix-to").onclick = () =>
-    bulkFixTo(project);
+document.getElementById("nd-fix-to").onclick = () => {
+    const ps = window.portalState || {};
+    bulkFixTo(ps.setup_project_id);
+};
 
-  document.getElementById("nd-fix-rel").onclick = () =>
-    bulkFixRelationship(project);
+document.getElementById("nd-fix-rel").onclick = () => {
+    const ps = window.portalState || {};
+    bulkFixRelationship(ps.setup_project_id);
+};
 
-  document.getElementById("nd-preview").onclick = () =>
-    previewSelected(project);
+document.getElementById("nd-preview").onclick = () => {
+    const ps = window.portalState || {};
+    previewSelected(ps.setup_project_id);
+};
 
-  loadNotes(project, portalState);
+// Initial load
+loadNotes(project, portalState);
 }
 
 /* ============================================================
