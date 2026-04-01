@@ -70,6 +70,14 @@ export async function renderNotesDiagnostics(setupContent, portalState) {
               </span>
             </th>
 
+            <th class="nd-sortable" data-field="from_name">
+                FROM Name
+                <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+                    <span class="sort-up">△</span>
+                    <span class="sort-down">▽</span>
+                </span>
+            </th>
+
             <th class="nd-sortable" data-field="subject">
               Subject
               <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
@@ -185,6 +193,7 @@ function renderRows(portalState) {
           <td>${n.id}</td>
           <td>${n.contact_email || ""}</td>
           <td>${n.from_email || ""}</td>
+          <td>${n.from_name || ""}</td>
           <td>${n.subject || ""}</td>
           <td>${n.created_at || ""}</td>
           <td>${n.reason || ""}</td>
