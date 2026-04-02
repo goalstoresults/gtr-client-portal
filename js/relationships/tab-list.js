@@ -1,5 +1,5 @@
 // /js/relationships/tab-list.js
-// Relationships — List View (REAL VERSION)
+// Relationships — List View (FULL VERSION with sorting)
 
 export async function renderRelList(container, portalState) {
   const project = portalState.project;
@@ -40,6 +40,40 @@ export async function renderRelList(container, portalState) {
   const resultsDiv = document.getElementById("rel-results");
 
   // ------------------------------------------------------------
+  // SORTING STATE
+  // ------------------------------------------------------------
+  let currentSortField = "full_name";
+  let currentSortDirection = "asc";
+
+  function sortRows(rows) {
+    const sorted = [...rows];
+
+    sorted.sort((a, b) => {
+      const field = currentSortField;
+
+      let valA = a[field];
+      let valB = b[field];
+
+      // Numeric sort for relationship_count
+      if (field === "relationship_count") {
+        valA = Number(valA) || 0;
+        valB = Number(valB) || 0;
+        return currentSortDirection === "asc" ? valA - valB : valB - valA;
+      }
+
+      // String sort for everything else
+      valA = (valA || "").toString().toLowerCase();
+      valB = (valB || "").toString().toLowerCase();
+
+      return currentSortDirection === "asc"
+        ? valA.localeCompare(valB)
+        : valB.localeCompare(valA);
+    });
+
+    return sorted;
+  }
+
+  // ------------------------------------------------------------
   // LOAD LIST FUNCTION
   // ------------------------------------------------------------
   async function loadList() {
@@ -68,23 +102,41 @@ export async function renderRelList(container, portalState) {
         return;
       }
 
+      const sortedRows = sortRows(rows);
+
       // Build table
       let html = `
         <div class="goals-scroll-container">
           <table class="notes-table goals-table" style="margin-top:12px;">
             <thead>
               <tr>
-                <th>Full Name</th>
-                <th>Email</th>
-                <th>Contact Type</th>
-                <th>Relationships</th>
+                <th class="sortable" data-field="full_name">
+                  Full Name
+                  <span class="sort-arrow">${currentSortField === "full_name" ? (currentSortDirection === "asc" ? "▲" : "▼") : ""}</span>
+                </th>
+
+                <th class="sortable" data-field="email">
+                  Email
+                  <span class="sort-arrow">${currentSortField === "email" ? (currentSortDirection === "asc" ? "▲" : "▼") : ""}</span>
+                </th>
+
+                <th class="sortable" data-field="contact_type">
+                  Contact Type
+                  <span class="sort-arrow">${currentSortField === "contact_type" ? (currentSortDirection === "asc" ? "▲" : "▼") : ""}</span>
+                </th>
+
+                <th class="sortable" data-field="relationship_count">
+                  Relationships
+                  <span class="sort-arrow">${currentSortField === "relationship_count" ? (currentSortDirection === "asc" ? "▲" : "▼") : ""}</span>
+                </th>
+
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
       `;
 
-      rows.forEach(row => {
+      sortedRows.forEach(row => {
         const fullName = row.full_name || row.search_name || "Unknown";
         const email = row.email || "";
         const type = row.contact_type || "";
@@ -113,7 +165,27 @@ export async function renderRelList(container, portalState) {
 
       resultsDiv.innerHTML = html;
 
-      // Wire up Select buttons (placeholder for now)
+      // ------------------------------------------------------------
+      // SORTING CLICK HANDLERS
+      // ------------------------------------------------------------
+      document.querySelectorAll("th.sortable").forEach(th => {
+        th.addEventListener("click", () => {
+          const field = th.dataset.field;
+
+          if (currentSortField === field) {
+            currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+          } else {
+            currentSortField = field;
+            currentSortDirection = "asc";
+          }
+
+          loadList(); // reload + re-sort
+        });
+      });
+
+      // ------------------------------------------------------------
+      // SELECT BUTTONS
+      // ------------------------------------------------------------
       document.querySelectorAll(".rel-select-btn").forEach(btn => {
         btn.addEventListener("click", () => {
           const id = btn.dataset.id;
