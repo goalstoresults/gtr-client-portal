@@ -5,6 +5,7 @@
 import { escapeHtml, formatDateOnly } from "../utilities.js";
 
 export async function renderRunFilter(container, portalState) {
+
   // ------------------------------------------------------------
   // Initialize sort state (NEW)
   // ------------------------------------------------------------
@@ -17,6 +18,7 @@ export async function renderRunFilter(container, portalState) {
 
   container.innerHTML = `
 <section class="card two-col">
+
   <!-- LEFT PANEL -->
   <div class="left-panel">
     <h3>Filter Criteria</h3>
@@ -94,6 +96,7 @@ export async function renderRunFilter(container, portalState) {
       <tbody id="flt-results-body"></tbody>
     </table>
   </div>
+
 </section>
 `;
 
@@ -122,12 +125,14 @@ export async function renderRunFilter(container, portalState) {
   // Load Lookups
   // ------------------------------------------------------------
   const LOOKUP_URL = "https://filter-module.dennis-e64.workers.dev/lookups";
+
   let NEIGHBORHOODS = [];
   let SQFT = [];
 
   try {
     const res = await fetch(LOOKUP_URL);
     const data = await res.json();
+
     NEIGHBORHOODS = data.neighborhoods || [];
     SQFT = data.square_footage || [];
 
@@ -225,6 +230,7 @@ export async function renderRunFilter(container, portalState) {
     const includeHot = document.getElementById("flt-hot").checked;
     const includeCustomers = document.getElementById("flt-customers").checked;
     const applyNoEmail = document.getElementById("flt-apply-noemail").checked;
+
     let days = parseInt(document.getElementById("flt-noemail-days").value, 10);
     if (!Number.isFinite(days) || days <= 0) days = 30;
 
@@ -248,6 +254,7 @@ export async function renderRunFilter(container, portalState) {
       if (!data.success) throw new Error(data.error || "Unknown error");
 
       const results = data.results || [];
+
       if (!results.length) {
         msg.textContent = "No matching records found.";
         return;
@@ -256,9 +263,8 @@ export async function renderRunFilter(container, portalState) {
       msg.textContent = "";
       table.style.display = "";
       total.textContent = `Total Rows: ${results.length}`;
-      window.currentContactIds = [];
 
-      // Track contact IDs for commit + CSV
+      window.currentContactIds = [];
       results.forEach(c => {
         if (c.contact_id) window.currentContactIds.push(String(c.contact_id));
       });
@@ -267,6 +273,7 @@ export async function renderRunFilter(container, portalState) {
       // AUTO-SAVE COMMIT (NEW)
       // ------------------------------------------------------------
       const autoSave = document.getElementById("flt-autosave").checked;
+
       if (autoSave) {
         try {
           await fetch("https://filter-module.dennis-e64.workers.dev/commit-run", {
@@ -277,7 +284,8 @@ export async function renderRunFilter(container, portalState) {
               neighborhoods,
               square_footage: sqft,
               contact_ids: window.currentContactIds,
-              result_count: results.length
+              result_count: results.length,
+              results   // <-- REQUIRED FIX
             })
           });
         } catch (err) {
@@ -290,6 +298,7 @@ export async function renderRunFilter(container, portalState) {
       // ------------------------------------------------------------
       function sortResults() {
         const { column, direction } = portalState.filterSort;
+
         results.sort((a, b) => {
           let A = a[column];
           let B = b[column];
@@ -327,6 +336,7 @@ export async function renderRunFilter(container, portalState) {
             const isSorted = portalState.filterSort.column === col.key;
             const up = isSorted && portalState.filterSort.direction === "asc" ? "▲" : "△";
             const down = isSorted && portalState.filterSort.direction === "desc" ? "▼" : "▽";
+
             return `
 <th class="sortable" data-field="${col.key}">
   ${col.label}
@@ -366,10 +376,10 @@ export async function renderRunFilter(container, portalState) {
           })
           .join("");
 
-        // Sorting events
         document.querySelectorAll("th.sortable").forEach(th => {
           th.addEventListener("click", () => {
             const field = th.dataset.field;
+
             if (portalState.filterSort.column === field) {
               portalState.filterSort.direction =
                 portalState.filterSort.direction === "asc" ? "desc" : "asc";
@@ -377,13 +387,14 @@ export async function renderRunFilter(container, portalState) {
               portalState.filterSort.column = field;
               portalState.filterSort.direction = "asc";
             }
+
             renderResultsTable();
           });
         });
       }
 
-      // Initial render
       renderResultsTable();
+
     } catch (err) {
       msg.textContent = "Error fetching data: " + err.message;
     }
@@ -395,10 +406,11 @@ export async function renderRunFilter(container, portalState) {
   document.getElementById("flt-savecsv").onclick = async () => {
     const table = document.getElementById("flt-results");
     const rows = Array.from(document.querySelectorAll("#flt-results-body tr"));
+
     if (!rows.length) return alert("No data to save");
 
-    // CSV export only — no DB writes
     const trs = Array.from(table.querySelectorAll("tr"));
+
     const csv = trs
       .map(tr =>
         Array.from(tr.querySelectorAll("th,td"))
@@ -409,12 +421,16 @@ export async function renderRunFilter(container, portalState) {
 
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
+
     const a = document.createElement("a");
     a.href = url;
     a.download = "jw_contacts.csv";
+
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+
     URL.revokeObjectURL(url);
   };
 }
+
