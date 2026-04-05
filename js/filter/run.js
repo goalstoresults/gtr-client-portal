@@ -1,10 +1,10 @@
 // /js/filter/run.js
+
 // Run Filter — Phase 1 parity with cleaner UI + Choices.js
 
 import { escapeHtml, formatDateOnly } from "../utilities.js";
 
 export async function renderRunFilter(container, portalState) {
-
   // ------------------------------------------------------------
   // Initialize sort state (NEW)
   // ------------------------------------------------------------
@@ -17,14 +17,12 @@ export async function renderRunFilter(container, portalState) {
 
   container.innerHTML = `
 <section class="card two-col">
-
   <!-- LEFT PANEL -->
   <div class="left-panel">
     <h3>Filter Criteria</h3>
 
     <label>Neighborhoods</label>
     <select id="flt-neighborhoods" multiple></select>
-
     <div class="btn-row">
       <button id="flt-nh-selectall" class="secondary">Select All</button>
       <button id="flt-nh-clear" class="secondary">Clear</button>
@@ -32,7 +30,6 @@ export async function renderRunFilter(container, portalState) {
 
     <label>Square Footage</label>
     <select id="flt-sqft" multiple></select>
-
     <div class="btn-row">
       <button id="flt-sqft-selectall" class="secondary">Select All</button>
       <button id="flt-sqft-clear" class="secondary">Clear</button>
@@ -43,6 +40,11 @@ export async function renderRunFilter(container, portalState) {
 
     <label>Filename</label>
     <input id="flt-filename" type="text" placeholder="e.g. Bryant Park — Q4 Outreach" style="width:100%;" />
+
+    <div class="inline" style="margin-top:12px;">
+      <input type="checkbox" id="flt-autosave" checked />
+      <label for="flt-autosave">Save Data Automatically</label>
+    </div>
 
     <label>No emails recently</label>
     <div class="inline">
@@ -68,7 +70,6 @@ export async function renderRunFilter(container, portalState) {
   <!-- RIGHT PANEL -->
   <div class="right-panel">
     <h3>Results</h3>
-
     <div id="flt-message" class="mini-label"></div>
     <div id="flt-total" style="font-weight:bold; margin-top:8px;"></div>
 
@@ -93,7 +94,6 @@ export async function renderRunFilter(container, portalState) {
       <tbody id="flt-results-body"></tbody>
     </table>
   </div>
-
 </section>
 `;
 
@@ -122,14 +122,12 @@ export async function renderRunFilter(container, portalState) {
   // Load Lookups
   // ------------------------------------------------------------
   const LOOKUP_URL = "https://filter-module.dennis-e64.workers.dev/lookups";
-
   let NEIGHBORHOODS = [];
   let SQFT = [];
 
   try {
     const res = await fetch(LOOKUP_URL);
     const data = await res.json();
-
     NEIGHBORHOODS = data.neighborhoods || [];
     SQFT = data.square_footage || [];
 
@@ -190,6 +188,7 @@ export async function renderRunFilter(container, portalState) {
     document.getElementById("flt-results").style.display = "none";
     document.getElementById("flt-results-body").innerHTML = "";
     document.getElementById("flt-total").textContent = "";
+    window.currentContactIds = [];
   };
 
   // ------------------------------------------------------------
@@ -205,6 +204,7 @@ export async function renderRunFilter(container, portalState) {
     table.style.display = "none";
     body.innerHTML = "";
     total.textContent = "";
+    window.currentContactIds = [];
 
     const neighborhoods = nhSelect.getValue(true);
     const sqft = sqftSelect.getValue(true);
@@ -225,7 +225,6 @@ export async function renderRunFilter(container, portalState) {
     const includeHot = document.getElementById("flt-hot").checked;
     const includeCustomers = document.getElementById("flt-customers").checked;
     const applyNoEmail = document.getElementById("flt-apply-noemail").checked;
-
     let days = parseInt(document.getElementById("flt-noemail-days").value, 10);
     if (!Number.isFinite(days) || days <= 0) days = 30;
 
@@ -249,7 +248,6 @@ export async function renderRunFilter(container, portalState) {
       if (!data.success) throw new Error(data.error || "Unknown error");
 
       const results = data.results || [];
-
       if (!results.length) {
         msg.textContent = "No matching records found.";
         return;
@@ -258,16 +256,40 @@ export async function renderRunFilter(container, portalState) {
       msg.textContent = "";
       table.style.display = "";
       total.textContent = `Total Rows: ${results.length}`;
-
       window.currentContactIds = [];
+
+      // Track contact IDs for commit + CSV
+      results.forEach(c => {
+        if (c.contact_id) window.currentContactIds.push(String(c.contact_id));
+      });
+
+      // ------------------------------------------------------------
+      // AUTO-SAVE COMMIT (NEW)
+      // ------------------------------------------------------------
+      const autoSave = document.getElementById("flt-autosave").checked;
+      if (autoSave) {
+        try {
+          await fetch("https://filter-module.dennis-e64.workers.dev/commit-run", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              user_label: runBy,
+              neighborhoods,
+              square_footage: sqft,
+              contact_ids: window.currentContactIds,
+              result_count: results.length
+            })
+          });
+        } catch (err) {
+          console.error("Auto-save failed:", err);
+        }
+      }
 
       // ------------------------------------------------------------
       // SORTING SYSTEM (NEW)
       // ------------------------------------------------------------
-
       function sortResults() {
         const { column, direction } = portalState.filterSort;
-
         results.sort((a, b) => {
           let A = a[column];
           let B = b[column];
@@ -305,16 +327,15 @@ export async function renderRunFilter(container, portalState) {
             const isSorted = portalState.filterSort.column === col.key;
             const up = isSorted && portalState.filterSort.direction === "asc" ? "▲" : "△";
             const down = isSorted && portalState.filterSort.direction === "desc" ? "▼" : "▽";
-
             return `
-              <th class="sortable" data-field="${col.key}">
-                ${col.label}
-                <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-                  <span>${up}</span>
-                  <span>${down}</span>
-                </span>
-              </th>
-            `;
+<th class="sortable" data-field="${col.key}">
+  ${col.label}
+  <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+    <span>${up}</span>
+    <span>${down}</span>
+  </span>
+</th>
+`;
           })
           .join("");
 
@@ -323,21 +344,25 @@ export async function renderRunFilter(container, portalState) {
         body.innerHTML = results
           .map(c => {
             const name = [c.first_name, c.last_name].filter(Boolean).join(" ");
-            const nh = Array.isArray(c.neighborhood) ? c.neighborhood.join(", ") : (c.neighborhood || "");
-            const sq = Array.isArray(c.square_footage) ? c.square_footage.join(", ") : (c.square_footage || "");
+            const nh = Array.isArray(c.neighborhood)
+              ? c.neighborhood.join(", ")
+              : (c.neighborhood || "");
+            const sq = Array.isArray(c.square_footage)
+              ? c.square_footage.join(", ")
+              : (c.square_footage || "");
 
             return `
-              <tr>
-                <td>${escapeHtml(c.email || "")}</td>
-                <td>${escapeHtml(name)}</td>
-                <td>${escapeHtml(nh)}</td>
-                <td>${escapeHtml(sq)}</td>
-                <td>${escapeHtml(c.lead_level || "")}</td>
-                <td>${escapeHtml(c.type || "")}</td>
-                <td>${formatDateOnly(c.last_email_date)}</td>
-                <td>${formatDateOnly(c.last_reply_date)}</td>
-              </tr>
-            `;
+<tr>
+  <td>${escapeHtml(c.email || "")}</td>
+  <td>${escapeHtml(name)}</td>
+  <td>${escapeHtml(nh)}</td>
+  <td>${escapeHtml(sq)}</td>
+  <td>${escapeHtml(c.lead_level || "")}</td>
+  <td>${escapeHtml(c.type || "")}</td>
+  <td>${formatDateOnly(c.last_email_date)}</td>
+  <td>${formatDateOnly(c.last_reply_date)}</td>
+</tr>
+`;
           })
           .join("");
 
@@ -345,7 +370,6 @@ export async function renderRunFilter(container, portalState) {
         document.querySelectorAll("th.sortable").forEach(th => {
           th.addEventListener("click", () => {
             const field = th.dataset.field;
-
             if (portalState.filterSort.column === field) {
               portalState.filterSort.direction =
                 portalState.filterSort.direction === "asc" ? "desc" : "asc";
@@ -353,7 +377,6 @@ export async function renderRunFilter(container, portalState) {
               portalState.filterSort.column = field;
               portalState.filterSort.direction = "asc";
             }
-
             renderResultsTable();
           });
         });
@@ -361,61 +384,21 @@ export async function renderRunFilter(container, portalState) {
 
       // Initial render
       renderResultsTable();
-
-      // Track contact IDs for CSV + mark emailed
-      results.forEach(c => {
-        if (c.contact_id) window.currentContactIds.push(String(c.contact_id));
-      });
-
     } catch (err) {
       msg.textContent = "Error fetching data: " + err.message;
     }
   };
 
   // ------------------------------------------------------------
-  // Save CSV + Log Run + Mark Emailed
+  // Save CSV (PURE EXPORT ONLY)
   // ------------------------------------------------------------
   document.getElementById("flt-savecsv").onclick = async () => {
     const table = document.getElementById("flt-results");
     const rows = Array.from(document.querySelectorAll("#flt-results-body tr"));
-
     if (!rows.length) return alert("No data to save");
 
-    const runBy = runBySelect.getValue(true);
-    if (!runBy) return alert("Please select who ran this.");
-
-    const neighborhoods = nhSelect.getValue(true);
-    const sqft = sqftSelect.getValue(true);
-
-    // Log run
-    try {
-      await fetch("https://filter-module.dennis-e64.workers.dev/log-run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_label: runBy,
-          filter_name: "",
-          neighborhoods,
-          square_footage: sqft,
-          result_count: rows.length
-        })
-      });
-    } catch (_) {}
-
-    // Mark emailed
-    try {
-      if (window.currentContactIds?.length) {
-        await fetch("https://filter-module.dennis-e64.workers.dev/mark-emailed", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contact_ids: window.currentContactIds })
-        });
-      }
-    } catch (_) {}
-
-    // CSV export
+    // CSV export only — no DB writes
     const trs = Array.from(table.querySelectorAll("tr"));
-
     const csv = trs
       .map(tr =>
         Array.from(tr.querySelectorAll("th,td"))
@@ -426,14 +409,12 @@ export async function renderRunFilter(container, portalState) {
 
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-
     const a = document.createElement("a");
     a.href = url;
     a.download = "jw_contacts.csv";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-
     URL.revokeObjectURL(url);
   };
 }
