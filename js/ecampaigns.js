@@ -1,7 +1,7 @@
 // /ecampaigns.js
 // E‑Campaigns module controller — loads HTML, initializes subtabs, routes to subtab modules
 
-//import { renderECOverview } from "./ecampaigns/tab-overview.js";
+// import { renderECOverview } from "./ecampaigns/tab-overview.js";   // ⬅️ COMMENTED OUT
 import { renderECCampaigns } from "./ecampaigns/tab-campaigns.js";
 import { renderECTopContacts } from "./ecampaigns/tab-top-contacts.js";
 import { renderECSegmentation } from "./ecampaigns/tab-segmentation.js";
@@ -63,8 +63,8 @@ function initECCampaigns(portalState) {
     return;
   }
 
-  // Default
-  loadECSubtab("overview", portalState);
+  // ⭐ DEFAULT SUBTAB (Overview removed → Campaigns is now default)
+  loadECSubtab("campaigns", portalState);
 }
 
 // ------------------------------------------------------------
@@ -104,7 +104,7 @@ async function loadECSubtab(subtab, portalState) {
     ?.classList.add("active");
 
   // Route to subtab modules
-  if (subtab === "overview") return renderECOverview(container, portalState);
+  // if (subtab === "overview") return renderECOverview(container, portalState);   // ⬅️ COMMENTED OUT
   if (subtab === "campaigns") return renderECCampaigns(container, portalState);
   if (subtab === "top-contacts") return renderECTopContacts(container, portalState);
   if (subtab === "segmentation") return renderECSegmentation(container, portalState);
