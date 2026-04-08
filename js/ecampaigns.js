@@ -1,7 +1,7 @@
 // /ecampaigns.js
 // E‑Campaigns module controller — loads HTML, initializes subtabs, routes to subtab modules
 
-import { renderECOverview } from "./ecampaigns/tab-overview.js";
+//import { renderECOverview } from "./ecampaigns/tab-overview.js";
 import { renderECCampaigns } from "./ecampaigns/tab-campaigns.js";
 import { renderECTopContacts } from "./ecampaigns/tab-top-contacts.js";
 import { renderECSegmentation } from "./ecampaigns/tab-segmentation.js";
