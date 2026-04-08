@@ -172,107 +172,123 @@ export async function renderLookupsSetup(tabContent, portalState) {
       });
     });
 
-    /* -------------------------
-       CLONE GROUP
-    ------------------------- */
-    const cloneBtn = tabContent.querySelector("#btnCloneLookups");
-    cloneBtn.addEventListener("click", async () => {
-      const formDiv = tabContent.querySelector("#cloneForm");
-      formDiv.style.display = formDiv.style.display === "none" ? "block" : "none";
+/* -------------------------
+   CLONE GROUP
+------------------------- */
+const cloneBtn = tabContent.querySelector("#btnCloneLookups");
 
-      if (formDiv.innerHTML !== "") return;
+cloneBtn.addEventListener("click", async () => {
+  const formDiv = tabContent.querySelector("#cloneForm");
+  formDiv.style.display = formDiv.style.display === "none" ? "block" : "none";
 
-      const resConfig = await fetch(
-        "https://lookups-module.dennis-e64.workers.dev/api/projects_config",
-        { cache: "no-cache" }
+  if (formDiv.innerHTML !== "") return;
+
+  const resConfig = await fetch(
+    "https://lookups-module.dennis-e64.workers.dev/api/projects_config",
+    { cache: "no-cache" }
+  );
+  const configRows = await resConfig.json();
+
+  formDiv.innerHTML = `
+    <label>Select Project to Clone From:</label>
+    <select id="cloneProjectSelect"><option value="">-- choose --</option></select>
+    <br/>
+
+    <label>Select a Group:</label>
+    <select id="cloneGroupSelect"><option value="">-- choose --</option></select>
+    <br/>
+
+    <button id="btnDoClone" class="btn-primary">Clone</button>
+  `;
+
+  const projectSelect = formDiv.querySelector("#cloneProjectSelect");
+
+  // ✅ Allow SAME PROJECT to appear in dropdown
+  configRows.forEach(row => {
+    const opt = document.createElement("option");
+    opt.value = row.project;
+    opt.textContent =
+      row.project === portalState.setup_project_id
+        ? `${row.display_name} (current)`
+        : row.display_name;
+
+    projectSelect.appendChild(opt);
+  });
+
+  // Load groups when project changes
+  projectSelect.addEventListener("change", async () => {
+    const sourceProject = projectSelect.value;
+    const groupSelect = formDiv.querySelector("#cloneGroupSelect");
+
+    groupSelect.innerHTML = `<option value="">-- choose --</option>`;
+    if (!sourceProject) return;
+
+    const resSource = await fetch(
+      `https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${sourceProject}`,
+      { cache: "no-cache" }
+    );
+    const sourceData = await resSource.json();
+
+    if (sourceData.status === "ok" && Array.isArray(sourceData.lookups)) {
+      const groups = [...new Set(sourceData.lookups.map(l => l.lookup_type))];
+      groups.forEach(g => {
+        const opt = document.createElement("option");
+        opt.value = g;
+        opt.textContent = g;
+        groupSelect.appendChild(opt);
+      });
+    }
+  });
+
+  // Perform clone
+  formDiv.querySelector("#btnDoClone").addEventListener("click", async () => {
+    const sourceProject = projectSelect.value;
+    const group = formDiv.querySelector("#cloneGroupSelect").value;
+
+    if (!sourceProject || !group) return;
+
+    // ❌ Prevent cloning a group into itself
+    if (
+      sourceProject === portalState.setup_project_id &&
+      group === group // same name
+    ) {
+      alert("Cannot clone a group into itself. Choose a different target group.");
+      return;
+    }
+
+    const resSource = await fetch(
+      `https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${sourceProject}`,
+      { cache: "no-cache" }
+    );
+    const sourceData = await resSource.json();
+
+    if (sourceData.status === "ok" && Array.isArray(sourceData.lookups)) {
+      const payload = sourceData.lookups
+        .filter(l => l.lookup_type === group)
+        .map(l => ({
+          lookup_type: l.lookup_type,
+          value: l.value,
+          sort_order: l.sort_order,
+          is_active: l.is_active,
+          project: portalState.setup_project_id,
+          created_at: new Date().toISOString()
+        }));
+
+      await fetch(
+        "https://lookups-module.dennis-e64.workers.dev/lookups/addValue",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }
       );
-      const configRows = await resConfig.json();
 
-      formDiv.innerHTML = `
-        <label>Select Another Project:</label>
-        <select id="cloneProjectSelect"><option value="">-- choose --</option></select>
-        <br/>
+      alert(`Group "${group}" cloned from ${sourceProject}.`);
+      renderLookupsSetup(tabContent, portalState);
+    }
+  });
+});
 
-        <label>Select a Group:</label>
-        <select id="cloneGroupSelect"><option value="">-- choose --</option></select>
-        <br/>
-
-        <button id="btnDoClone" class="btn-primary">Clone</button>
-      `;
-
-      const projectSelect = formDiv.querySelector("#cloneProjectSelect");
-
-      configRows.forEach(row => {
-        if (row.project !== portalState.setup_project_id) {
-          const opt = document.createElement("option");
-          opt.value = row.project;
-          opt.textContent = row.display_name;
-          projectSelect.appendChild(opt);
-        }
-      });
-
-      projectSelect.addEventListener("change", async () => {
-        const sourceProject = projectSelect.value;
-        const groupSelect = formDiv.querySelector("#cloneGroupSelect");
-
-        groupSelect.innerHTML = `<option value="">-- choose --</option>`;
-        if (!sourceProject) return;
-
-        const resSource = await fetch(
-          `https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${sourceProject}`,
-          { cache: "no-cache" }
-        );
-        const sourceData = await resSource.json();
-
-        if (sourceData.status === "ok" && Array.isArray(sourceData.lookups)) {
-          const groups = [...new Set(sourceData.lookups.map(l => l.lookup_type))];
-          groups.forEach(g => {
-            const opt = document.createElement("option");
-            opt.value = g;
-            opt.textContent = g;
-            groupSelect.appendChild(opt);
-          });
-        }
-      });
-
-      formDiv.querySelector("#btnDoClone").addEventListener("click", async () => {
-        const sourceProject = projectSelect.value;
-        const group = formDiv.querySelector("#cloneGroupSelect").value;
-
-        if (!sourceProject || !group) return;
-
-        const resSource = await fetch(
-          `https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${sourceProject}`,
-          { cache: "no-cache" }
-        );
-        const sourceData = await resSource.json();
-
-        if (sourceData.status === "ok" && Array.isArray(sourceData.lookups)) {
-          const payload = sourceData.lookups
-            .filter(l => l.lookup_type === group)
-            .map(l => ({
-              lookup_type: l.lookup_type,
-              value: l.value,
-              sort_order: l.sort_order,
-              is_active: l.is_active,
-              project: portalState.setup_project_id,
-              created_at: new Date().toISOString()
-            }));
-
-          await fetch(
-            "https://lookups-module.dennis-e64.workers.dev/lookups/addValue",
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload)
-            }
-          );
-
-          alert(`Group "${group}" cloned from ${sourceProject}.`);
-          renderLookupsSetup(tabContent, portalState);
-        }
-      });
-    });
 
     /* -------------------------
        SAVE / DELETE / ADD VALUE
