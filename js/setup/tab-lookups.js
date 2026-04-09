@@ -248,13 +248,13 @@ cloneBtn.addEventListener("click", async () => {
     if (!sourceProject || !group) return;
 
     // ❌ Prevent cloning a group into itself
-    if (
-      sourceProject === portalState.setup_project_id &&
-      group === group // same name
-    ) {
-      alert("Cannot clone a group into itself. Choose a different target group.");
-      return;
-    }
+    // if (
+    //  sourceProject === portalState.setup_project_id &&
+    //  group === group // same name
+    // ) {
+    //  alert("Cannot clone a group into itself. Choose a different target group.");
+    //  return;
+    // }
 
     const resSource = await fetch(
       `https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${sourceProject}`,
