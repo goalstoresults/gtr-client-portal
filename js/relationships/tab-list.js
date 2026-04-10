@@ -71,6 +71,23 @@ export async function renderRelList(container, portalState) {
     }
 
     /* -------------------------------------------------------
+       NOTES-STYLE SORT ARROWS (MATCHES tab-history.js)
+    ------------------------------------------------------- */
+    function arrowsFor(field) {
+      const isSorted = currentSortField === field;
+
+      const up = isSorted && currentSortDirection === "asc" ? "▲" : "△";
+      const down = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+
+      return `
+        <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+          <span class="sort-up">${up}</span>
+          <span class="sort-down">${down}</span>
+        </span>
+      `;
+    }
+
+    /* -------------------------------------------------------
        RENDER TABLE (IDENTICAL STRUCTURE TO CONTACTS)
     ------------------------------------------------------- */
     function renderSortedTable() {
@@ -81,21 +98,22 @@ export async function renderRelList(container, portalState) {
 
       const sorted = sortRows();
 
-      const arrow = (field) =>
-        currentSortField === field
-          ? currentSortDirection === "asc"
-            ? "▲"
-            : "▼"
-          : "";
-
       tableDiv.innerHTML = `
         <table class="notes-table">
           <thead>
             <tr>
-              <th class="sortable" data-field="full_name">Full Name ${arrow("full_name")}</th>
-              <th class="sortable" data-field="email">Email ${arrow("email")}</th>
-              <th class="sortable" data-field="contact_type">Type ${arrow("contact_type")}</th>
-              <th class="sortable" data-field="relationship_count">Relationships ${arrow("relationship_count")}</th>
+              <th class="sortable" data-field="full_name">
+                Full Name ${arrowsFor("full_name")}
+              </th>
+              <th class="sortable" data-field="email">
+                Email ${arrowsFor("email")}
+              </th>
+              <th class="sortable" data-field="contact_type">
+                Type ${arrowsFor("contact_type")}
+              </th>
+              <th class="sortable" data-field="relationship_count">
+                Relationships ${arrowsFor("relationship_count")}
+              </th>
               <th>Action</th>
             </tr>
           </thead>
