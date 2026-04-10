@@ -14,13 +14,15 @@ export async function renderRelList(container, portalState) {
           <label style="font-weight:bold;">Contact Type:</label>
           <select id="rel-contactType" class="form-control" style="min-width:160px;">
             <option value="">ALL</option>
-            <option value="client">Client</option>
-            <option value="vendor">Vendor</option>
-            <option value="attorney">Attorney</option>
-            <option value="spouse">Spouse</option>
+            <option value="Client">Client</option>
+            <option value="Client Vendor">Client Vendor</option>
+            <option value="NYFO Vendor">NYFO Vendor</option>
+            <option value="Lead">Lead</option>
             <option value="child">Child</option>
-            <option value="lead">Lead</option>
-            <option value="new_contact">New Contact</option>
+            <option value="Family">Family</option>
+            <option value="New Contact">New Contact</option>
+            <option value="Other">Other</option>
+            <option value="Unknown">Unknown</option>
           </select>
 
           <button id="rel-applyFilter" class="secondary">Apply Filter</button>
