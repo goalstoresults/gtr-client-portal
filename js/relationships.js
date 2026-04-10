@@ -3,7 +3,7 @@
 
 import { renderRelList } from "./relationships/tab-list.js";
 import { renderRelDetails } from "./relationships/tab-details.js";
-import { renderRelSettings } from "./relationships/tab-settings.js";
+import { renderRelOverview } from "./relationships/tab-overview.js";
 
 export async function loadRelationshipsTab({ portalState, tabContent }) {
   // Load base HTML template
@@ -34,8 +34,8 @@ export async function loadRelationshipsTab({ portalState, tabContent }) {
         return;
       }
 
-      if (subtab === "settings") {
-        await renderRelSettings(content, portalState);
+      if (subtab === "overview") {
+        await renderRelOverview(content, portalState);
         return;
       }
 
@@ -58,4 +58,3 @@ export async function loadRelationshipsTab({ portalState, tabContent }) {
 
   await renderRelList(content, portalState);
 }
-
