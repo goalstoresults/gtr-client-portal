@@ -48,10 +48,14 @@ export async function loadRelationshipsTab({ portalState, tabContent }) {
     });
   });
 
-  // Default view
-  content.innerHTML = `
-    <section class="card">
-      <p>Select a subtab to begin.</p>
-    </section>
-  `;
+  // ------------------------------------------------------------
+  // DEFAULT VIEW = AUTO‑LOAD LIST SUBTAB
+  // ------------------------------------------------------------
+  buttons.forEach(b => b.classList.remove("active"));
+
+  const listBtn = tabContent.querySelector('#relationships-subtabs button[data-subtab="list"]');
+  if (listBtn) listBtn.classList.add("active");
+
+  await renderRelList(content, portalState);
 }
+
