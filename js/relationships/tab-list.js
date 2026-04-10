@@ -1,6 +1,8 @@
 // /js/relationships/tab-list.js
 // Relationships — List View (EXACT Contacts-style architecture)
 
+import { renderRelDetails } from "./tab-details.js";
+
 export async function renderRelList(container, portalState) {
   try {
     /* -------------------------------------------------------
@@ -44,7 +46,7 @@ export async function renderRelList(container, portalState) {
     let rows = []; // in-memory dataset
 
     /* -------------------------------------------------------
-       SORTING ENGINE (IDENTICAL TO CONTACTS)
+       SORTING ENGINE
     ------------------------------------------------------- */
     function sortRows() {
       const sorted = [...rows];
@@ -71,7 +73,7 @@ export async function renderRelList(container, portalState) {
     }
 
     /* -------------------------------------------------------
-       NOTES-STYLE SORT ARROWS (MATCHES tab-history.js)
+       NOTES-STYLE SORT ARROWS
     ------------------------------------------------------- */
     function arrowsFor(field) {
       const isSorted = currentSortField === field;
@@ -88,7 +90,7 @@ export async function renderRelList(container, portalState) {
     }
 
     /* -------------------------------------------------------
-       RENDER TABLE (IDENTICAL STRUCTURE TO CONTACTS)
+       RENDER TABLE
     ------------------------------------------------------- */
     function renderSortedTable() {
       if (!rows.length) {
@@ -154,16 +156,40 @@ export async function renderRelList(container, portalState) {
       });
 
       /* -------------------------------------------------------
-         SELECT BUTTONS
+         SELECT BUTTON HANDLER (FIXED)
       ------------------------------------------------------- */
       tableDiv.querySelectorAll(".rel-select-btn").forEach((btn) => {
-        btn.addEventListener("click", () => {
+        btn.addEventListener("click", async () => {
           const id = btn.dataset.id;
-          tableDiv.innerHTML = `
-            <section class="card">
-              <p>Details view coming soon for contact: <strong>${id}</strong></p>
-            </section>
-          `;
+
+          // Save selected contact ID
+          portalState.selectedContactId = id;
+
+          // Fetch contact details to get the display name
+          const res = await fetch(
+            `https://contacts-module.dennis-e64.workers.dev/contacts/details/${id}`,
+            { cache: "no-cache" }
+          );
+          const data = await res.json();
+          const contact = Array.isArray(data) ? data[0] : data;
+
+          portalState.selectedContactName =
+            contact.search_name ||
+            `${contact.first_name || ""} ${contact.last_name || ""}`.trim();
+
+          // Switch to Details subtab
+          document
+            .querySelectorAll("#relationships-subtabs button")
+            .forEach((b) => b.classList.remove("active"));
+
+          const detailsBtn = document.querySelector(
+            '#relationships-subtabs button[data-subtab="details"]'
+          );
+          if (detailsBtn) detailsBtn.classList.add("active");
+
+          // Render the Details tab
+          const content = document.getElementById("relationshipsContent");
+          await renderRelDetails(content, portalState);
         });
       });
     }
