@@ -1,5 +1,5 @@
 // /js/relationships/tab-list.js
-// Relationships — List View (EXACT Contacts-style architecture)
+// Relationships — List View with inline edit/delete for data cleanup
 
 import { renderRelDetails } from "./tab-details.js";
 
@@ -121,13 +121,38 @@ export async function renderRelList(container, portalState) {
             ${sorted
               .map(
                 (r) => `
-              <tr>
+              <tr data-id="${r.contact_id}">
                 <td>${r.full_name}</td>
                 <td>${r.email || ""}</td>
                 <td>${r.contact_type || ""}</td>
                 <td>${r.relationship_count || 0}</td>
-                <td><button class="btn-primary rel-select-btn" data-id="${r.contact_id}">Select</button></td>
-              </tr>`
+                <td>
+                  <button class="btn-primary rel-select-btn" data-id="${r.contact_id}">Select</button>
+                  <button class="btn-secondary rel-edit-btn" data-id="${r.contact_id}">Edit</button>
+                </td>
+              </tr>
+              <tr class="inline-editor" id="editor-${r.contact_id}" style="display:none;">
+                <td colspan="5" style="background:#fafafa; border-top:1px solid #ddd;">
+                  <label style="font-weight:bold;">Contact Type</label>
+                  <select class="edit-contact-type form-control" data-id="${r.contact_id}">
+                    <option value="Client">Client</option>
+                    <option value="Client Vendor">Client Vendor</option>
+                    <option value="NYFO Vendor">NYFO Vendor</option>
+                    <option value="Lead">Lead</option>
+                    <option value="child">Child</option>
+                    <option value="Family">Family</option>
+                    <option value="New Contact">New Contact</option>
+                    <option value="Other">Other</option>
+                    <option value="Unknown">Unknown</option>
+                  </select>
+
+                  <div style="margin-top:12px; display:flex; gap:12px;">
+                    <button class="btn-primary save-contact-type" data-id="${r.contact_id}">Save</button>
+                    <button class="btn-danger delete-contact" data-id="${r.contact_id}">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            `
               )
               .join("")}
           </tbody>
@@ -154,16 +179,14 @@ export async function renderRelList(container, portalState) {
       });
 
       /* -------------------------------------------------------
-         SELECT BUTTON HANDLER (CORRECTED)
+         SELECT BUTTON HANDLER
       ------------------------------------------------------- */
       tableDiv.querySelectorAll(".rel-select-btn").forEach((btn) => {
         btn.addEventListener("click", async () => {
           const id = btn.dataset.id;
 
-          // Save selected contact ID
           portalState.selectedContactId = id;
 
-          // Fetch contact name
           const res = await fetch(
             `https://contacts-module.dennis-e64.workers.dev/contacts/details/${id}`,
             { cache: "no-cache" }
@@ -175,7 +198,6 @@ export async function renderRelList(container, portalState) {
             contact.search_name ||
             `${contact.first_name || ""} ${contact.last_name || ""}`.trim();
 
-          // Switch to Details subtab
           document
             .querySelectorAll("#relationships-subtabs button")
             .forEach((b) => b.classList.remove("active"));
@@ -185,9 +207,62 @@ export async function renderRelList(container, portalState) {
           );
           if (detailsBtn) detailsBtn.classList.add("active");
 
-          // Render Details tab
           const content = document.getElementById("relationshipsContent");
           await renderRelDetails(content, portalState);
+        });
+      });
+
+      /* -------------------------------------------------------
+         EDIT BUTTON HANDLER
+      ------------------------------------------------------- */
+      tableDiv.querySelectorAll(".rel-edit-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.id;
+          const editor = document.getElementById(`editor-${id}`);
+          editor.style.display =
+            editor.style.display === "none" ? "table-row" : "none";
+        });
+      });
+
+      /* -------------------------------------------------------
+         SAVE CONTACT TYPE
+      ------------------------------------------------------- */
+      tableDiv.querySelectorAll(".save-contact-type").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const id = btn.dataset.id;
+          const select = document.querySelector(
+            `.edit-contact-type[data-id="${id}"]`
+          );
+          const newType = select.value;
+
+          await fetch(
+            `https://contacts-module.dennis-e64.workers.dev/contacts/update/${id}`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ contact_type: newType }),
+            }
+          );
+
+          await loadList();
+        });
+      });
+
+      /* -------------------------------------------------------
+         DELETE CONTACT
+      ------------------------------------------------------- */
+      tableDiv.querySelectorAll(".delete-contact").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const id = btn.dataset.id;
+
+          if (!confirm("Are you sure you want to delete this contact?")) return;
+
+          await fetch(
+            `https://contacts-module.dennis-e64.workers.dev/contacts/delete/${id}`,
+            { method: "DELETE" }
+          );
+
+          await loadList();
         });
       });
     }
