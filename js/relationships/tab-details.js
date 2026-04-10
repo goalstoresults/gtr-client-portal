@@ -14,23 +14,20 @@ export async function renderRelDetails(container, portalState) {
       return;
     }
 
-    // -------------------------------------------------------
-    // FETCH RELATIONSHIPS FOR THIS CONTACT
-    // -------------------------------------------------------
-    const url = new URL(
-      "https://relationships-topview.dennis-e64.workers.dev/relationships/details"
-    );
-    url.searchParams.set("project", portalState.project);
-    url.searchParams.set("contact_id", contactId);
+    /* -------------------------------------------------------
+       FETCH RELATIONSHIPS FOR THIS CONTACT
+       (Correct URL format: /relationships/details/:id)
+    ------------------------------------------------------- */
+    const url = `https://relationships-topview.dennis-e64.workers.dev/relationships/details/${contactId}?project=${portalState.project}`;
 
-    const res = await fetch(url.toString(), { cache: "no-cache" });
+    const res = await fetch(url, { cache: "no-cache" });
     const data = await res.json();
 
     const rels = Array.isArray(data) ? data : [];
 
-    // -------------------------------------------------------
-    // UPDATE CONTEXT BAR
-    // -------------------------------------------------------
+    /* -------------------------------------------------------
+       UPDATE CONTEXT BAR
+    ------------------------------------------------------- */
     const contextBar = document.getElementById("contact-context-bar");
     if (contextBar) {
       contextBar.textContent = portalState.selectedContactName
@@ -38,20 +35,18 @@ export async function renderRelDetails(container, portalState) {
         : "Contact Details";
     }
 
-    // -------------------------------------------------------
-    // RENDER TABLE
-    // -------------------------------------------------------
+    /* -------------------------------------------------------
+       BUILD TABLE ROWS
+    ------------------------------------------------------- */
     const rowsHtml = rels
       .map((r) => {
         const direction =
-          r.source_contact_id === contactId
-            ? "→"
-            : "←";
+          r.source_contact_id === contactId ? "→" : "←";
 
         const relatedName =
           r.source_contact_id === contactId
-            ? r.related_contact_name
-            : r.source_contact_name;
+            ? r.related_contact?.search_name
+            : r.source_contact?.search_name;
 
         const relatedId =
           r.source_contact_id === contactId
@@ -63,7 +58,7 @@ export async function renderRelDetails(container, portalState) {
             <td>${relatedName || "(unknown)"}</td>
             <td>${r.relationship_type || ""}</td>
             <td style="text-align:center;">${direction}</td>
-            <td>${r.notes || ""}</td>
+            <td>${r.relationship_role || ""}</td>
             <td>
               <button class="btn-primary rel-jump" data-id="${relatedId}">
                 View
@@ -74,6 +69,9 @@ export async function renderRelDetails(container, portalState) {
       })
       .join("");
 
+    /* -------------------------------------------------------
+       RENDER DETAILS TABLE
+    ------------------------------------------------------- */
     container.innerHTML = `
       <section class="card">
         <h3>Relationships for ${portalState.selectedContactName || ""}</h3>
@@ -84,7 +82,7 @@ export async function renderRelDetails(container, portalState) {
               <th>Related Contact</th>
               <th>Type</th>
               <th>Dir</th>
-              <th>Notes</th>
+              <th>Role</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -98,9 +96,9 @@ export async function renderRelDetails(container, portalState) {
       </section>
     `;
 
-    // -------------------------------------------------------
-    // CLICK HANDLER: JUMP TO ANOTHER CONTACT'S DETAILS
-    // -------------------------------------------------------
+    /* -------------------------------------------------------
+       CLICK HANDLER: JUMP TO ANOTHER CONTACT'S DETAILS
+    ------------------------------------------------------- */
     container.querySelectorAll(".rel-jump").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const newId = btn.dataset.id;
@@ -141,3 +139,4 @@ export async function renderRelDetails(container, portalState) {
     `;
   }
 }
+
