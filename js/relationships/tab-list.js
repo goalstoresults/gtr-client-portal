@@ -39,11 +39,11 @@ export async function renderRelList(container, portalState) {
     const typeSelect = document.getElementById("rel-contactType");
 
     /* -------------------------------------------------------
-       INTERNAL STATE (MATCHES CONTACTS TAB)
+       INTERNAL STATE
     ------------------------------------------------------- */
     let currentSortField = "full_name";
     let currentSortDirection = "asc";
-    let rows = []; // in-memory dataset
+    let rows = [];
 
     /* -------------------------------------------------------
        SORTING ENGINE
@@ -54,14 +54,12 @@ export async function renderRelList(container, portalState) {
       sorted.sort((a, b) => {
         const field = currentSortField;
 
-        // numeric sort
         if (field === "relationship_count") {
           const A = Number(a[field] || 0);
           const B = Number(b[field] || 0);
           return currentSortDirection === "asc" ? A - B : B - A;
         }
 
-        // string sort
         const A = (a[field] || "").toLowerCase();
         const B = (b[field] || "").toLowerCase();
         return currentSortDirection === "asc"
@@ -73,7 +71,7 @@ export async function renderRelList(container, portalState) {
     }
 
     /* -------------------------------------------------------
-       NOTES-STYLE SORT ARROWS
+       SORT ARROWS
     ------------------------------------------------------- */
     function arrowsFor(field) {
       const isSorted = currentSortField === field;
@@ -156,7 +154,7 @@ export async function renderRelList(container, portalState) {
       });
 
       /* -------------------------------------------------------
-         SELECT BUTTON HANDLER (FIXED)
+         SELECT BUTTON HANDLER (CORRECTED)
       ------------------------------------------------------- */
       tableDiv.querySelectorAll(".rel-select-btn").forEach((btn) => {
         btn.addEventListener("click", async () => {
@@ -165,7 +163,7 @@ export async function renderRelList(container, portalState) {
           // Save selected contact ID
           portalState.selectedContactId = id;
 
-          // Fetch contact details to get the display name
+          // Fetch contact name
           const res = await fetch(
             `https://contacts-module.dennis-e64.workers.dev/contacts/details/${id}`,
             { cache: "no-cache" }
@@ -187,7 +185,7 @@ export async function renderRelList(container, portalState) {
           );
           if (detailsBtn) detailsBtn.classList.add("active");
 
-          // Render the Details tab
+          // Render Details tab
           const content = document.getElementById("relationshipsContent");
           await renderRelDetails(content, portalState);
         });
