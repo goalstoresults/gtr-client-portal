@@ -1,10 +1,21 @@
 // /js/relationships/tab-list.js
-// Relationships — List View with inline edit/delete for data cleanup
+// Relationships — List View with inline edit/delete + persistent filter/sort state + row count
 
 import { renderRelDetails } from "./tab-details.js";
 
 export async function renderRelList(container, portalState) {
   try {
+    /* -------------------------------------------------------
+       INITIALIZE PERSISTENT STATE
+    ------------------------------------------------------- */
+    if (!portalState.relationshipsListState) {
+      portalState.relationshipsListState = {
+        contact_type: "",
+        sortField: "full_name",
+        sortDirection: "asc"
+      };
+    }
+
     /* -------------------------------------------------------
        RENDER FILTER BAR + TABLE SHELL
     ------------------------------------------------------- */
@@ -31,18 +42,24 @@ export async function renderRelList(container, portalState) {
           <button id="rel-clearFilter" class="secondary">Clear</button>
         </div>
 
+        <p id="relRowCount" class="muted"></p>
+
         <div id="relTable">(apply filter to load)</div>
       </section>
     `;
 
     const tableDiv = container.querySelector("#relTable");
+    const rowCountDiv = container.querySelector("#relRowCount");
     const typeSelect = document.getElementById("rel-contactType");
 
     /* -------------------------------------------------------
-       INTERNAL STATE
+       LOAD SAVED FILTER STATE
     ------------------------------------------------------- */
-    let currentSortField = "full_name";
-    let currentSortDirection = "asc";
+    typeSelect.value = portalState.relationshipsListState.contact_type || "";
+
+    let currentSortField = portalState.relationshipsListState.sortField;
+    let currentSortDirection = portalState.relationshipsListState.sortDirection;
+
     let rows = [];
 
     /* -------------------------------------------------------
@@ -64,7 +81,7 @@ export async function renderRelList(container, portalState) {
         const B = (b[field] || "").toLowerCase();
         return currentSortDirection === "asc"
           ? A.localeCompare(B)
-          : B.localelocaleCompare(A);
+          : B.localeCompare(A);
       });
 
       return sorted;
@@ -91,6 +108,8 @@ export async function renderRelList(container, portalState) {
        RENDER TABLE
     ------------------------------------------------------- */
     function renderSortedTable() {
+      rowCountDiv.textContent = `Showing ${rows.length} relationships`;
+
       if (!rows.length) {
         tableDiv.innerHTML = `<p class="muted">(no results)</p>`;
         return;
@@ -173,6 +192,10 @@ export async function renderRelList(container, portalState) {
             currentSortField = field;
             currentSortDirection = "asc";
           }
+
+          // SAVE SORT STATE
+          portalState.relationshipsListState.sortField = currentSortField;
+          portalState.relationshipsListState.sortDirection = currentSortDirection;
 
           renderSortedTable();
         });
@@ -274,6 +297,7 @@ export async function renderRelList(container, portalState) {
     ------------------------------------------------------- */
     async function loadList() {
       tableDiv.innerHTML = `<p class="muted">Loading…</p>`;
+      rowCountDiv.textContent = "";
 
       const url = new URL(
         "https://relationships-topview.dennis-e64.workers.dev/relationships/list"
@@ -293,15 +317,30 @@ export async function renderRelList(container, portalState) {
     /* -------------------------------------------------------
        BUTTON HANDLERS
     ------------------------------------------------------- */
-    document
-      .getElementById("rel-applyFilter")
-      .addEventListener("click", loadList);
+    document.getElementById("rel-applyFilter").addEventListener("click", () => {
+      portalState.relationshipsListState.contact_type = typeSelect.value.trim();
+      loadList();
+    });
 
     document.getElementById("rel-clearFilter").addEventListener("click", () => {
+      portalState.relationshipsListState = {
+        contact_type: "",
+        sortField: "full_name",
+        sortDirection: "asc"
+      };
+
       typeSelect.value = "";
       rows = [];
+      rowCountDiv.textContent = "";
       tableDiv.innerHTML = `<p class="muted">Apply a filter to load results.</p>`;
     });
+
+    /* -------------------------------------------------------
+       AUTO-LOAD IF FILTER EXISTS
+    ------------------------------------------------------- */
+    if (portalState.relationshipsListState.contact_type) {
+      loadList();
+    }
   } catch (err) {
     container.innerHTML = `
       <h4>Relationships</h4>
@@ -309,4 +348,3 @@ export async function renderRelList(container, portalState) {
     `;
   }
 }
-
