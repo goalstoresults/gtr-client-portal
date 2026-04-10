@@ -59,6 +59,16 @@ export async function renderContactList(container, portalState) {
     const searchInput  = document.getElementById("unifiedSearch");
     const searchLabel  = document.getElementById("searchLabel");
 
+// Pressing ENTER in the search box triggers Apply Filter
+searchInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    document.getElementById("btnApplyContactsFilter").click();
+  }
+});
+     
+     
+
     /* -------------------------------------------------------
        LOAD CONTACT TYPES
     ------------------------------------------------------- */
