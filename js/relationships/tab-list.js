@@ -64,7 +64,7 @@ export async function renderRelList(container, portalState) {
         const B = (b[field] || "").toLowerCase();
         return currentSortDirection === "asc"
           ? A.localeCompare(B)
-          : B.localeCompare(A);
+          : B.localelocaleCompare(A);
       });
 
       return sorted;
@@ -236,11 +236,13 @@ export async function renderRelList(container, portalState) {
           const newType = select.value;
 
           await fetch(
-            `https://contacts-module.dennis-e64.workers.dev/contacts/update/${id}`,
+            `https://contacts-module.dennis-e64.workers.dev/contacts/edit/${id}`,
             {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ contact_type: newType }),
+              body: JSON.stringify({
+                contact_type: newType
+              })
             }
           );
 
@@ -258,7 +260,7 @@ export async function renderRelList(container, portalState) {
           if (!confirm("Are you sure you want to delete this contact?")) return;
 
           await fetch(
-            `https://contacts-module.dennis-e64.workers.dev/contacts/delete/${id}`,
+            `https://contacts-module.dennis-e64.workers.dev/contacts/delete/${id}?project=${portalState.project}`,
             { method: "DELETE" }
           );
 
@@ -307,3 +309,4 @@ export async function renderRelList(container, portalState) {
     `;
   }
 }
+
