@@ -101,10 +101,15 @@ Contact map (unchanged)
 function buildContactMap(contacts) {
   const map = {};
   contacts.forEach(c => {
-    const name =
-      c.contact_name ||
-      `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
-      c.contact_id;
+const name =
+  c.search_name ||
+  c.contact_name ||
+  `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
+  c.business_name ||
+  c.email ||
+  c.contact_id ||
+  "(unknown)";
+
 
     map[c.contact_id] = {
       id: c.contact_id,
@@ -566,7 +571,7 @@ contacts.forEach(c => {
     const label = buildSectionLabel(key);
 
     // Clients drilldown
-    if (key.startsWith("totalClients") || key.startsWith("totalClientsWith")) {
+    if (key.startsWith("totalClients") {
       renderClientsDrilldown(container, label, displayRows, portalState);
     }
     // Relationships drilldown
