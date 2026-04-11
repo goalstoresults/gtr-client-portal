@@ -1,5 +1,6 @@
 // /js/relationships/tab-overview.js
-// Relationships → Overview (30,000-foot relationship map)
+
+// Relationships → Overview (table-based analytics dashboard)
 
 import { escapeHtml } from "../utilities.js";
 
@@ -21,168 +22,32 @@ export async function renderRelOverview(container, portalState) {
         <h2>Relationship Overview</h2>
       </div>
 
-      <!-- Filters -->
-      <div id="relOverviewFilters" class="row" style="gap:8px; margin-bottom:12px; flex-wrap:wrap;">
-        <div>
-          <label style="font-size:0.85em; color:#555;">Contact type</label><br>
-          <select id="ovFilterContactType" class="form-control" style="min-width:160px;">
-            <option value="">(All)</option>
-          </select>
-        </div>
+      <!-- Stats -->
+      <section id="relOverviewStats" style="margin-bottom:16px; font-size:0.9em; color:#444;">
+        <div class="muted">Loading stats…</div>
+      </section>
 
-        <div>
-          <label style="font-size:0.85em; color:#555;">Relationship type</label><br>
-          <select id="ovFilterRelType" class="form-control" style="min-width:160px;">
-            <option value="">(All)</option>
-          </select>
-        </div>
-
-        <div>
-          <label style="font-size:0.85em; color:#555;">Direction</label><br>
-          <select id="ovFilterDirection" class="form-control" style="min-width:140px;">
-            <option value="">Inbound + Outbound</option>
-            <option value="outbound">Outbound only</option>
-            <option value="inbound">Inbound only</option>
-          </select>
-        </div>
-
-        <div>
-          <label style="font-size:0.85em; color:#555;">Search contact</label><br>
-          <input id="ovSearchContact" class="form-control" placeholder="Name contains..." style="min-width:200px;">
-        </div>
-
-        <div style="align-self:flex-end;">
-          <button id="ovApplyFilters" class="btn-secondary">Apply</button>
-        </div>
-      </div>
-
-      <!-- Graph host -->
-      <div id="relOverviewGraph"
-           style="width:100%; height:480px; border:1px solid #ddd; border-radius:4px; background:#fafafa;"></div>
-
-      <!-- Optional stats (easy to remove if you don't like it) -->
-      <section id="relOverviewStats" style="margin-top:16px; font-size:0.9em; color:#444;">
-        <h3 style="margin-bottom:8px;">Network Summary</h3>
-        <div id="relOverviewStatsContent" class="muted">Loading summary…</div>
+      <!-- Drilldown -->
+      <section id="relOverviewDrilldown" style="margin-top:8px; font-size:0.9em; color:#444;">
+        <div class="muted">Click any count to see the underlying rows.</div>
       </section>
     </section>
   `;
 
-  const graphContainer = container.querySelector("#relOverviewGraph");
-  const statsContainer = container.querySelector("#relOverviewStatsContent");
-
-  const filterContactType = container.querySelector("#ovFilterContactType");
-  const filterRelType = container.querySelector("#ovFilterRelType");
-  const filterDirection = container.querySelector("#ovFilterDirection");
-  const searchInput = container.querySelector("#ovSearchContact");
-  const applyBtn = container.querySelector("#ovApplyFilters");
+  const statsContainer = container.querySelector("#relOverviewStats");
+  const drilldownContainer = container.querySelector("#relOverviewDrilldown");
 
   // Load data
   const { contacts, relationships } = await loadOverviewData(project);
 
-  // Build lookup maps
-  const contactMap = {};
-  contacts.forEach(c => {
-    const name =
-      c.contact_name ||
-      `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
-      c.contact_id;
-    contactMap[c.contact_id] = {
-      id: c.contact_id,
-      name,
-      type: c.contact_type || "Unknown"
-    };
-  });
+  // Build contact map for quick lookup
+  const contactMap = buildContactMap(contacts);
 
-  // Populate filters
-  populateContactTypeFilter(filterContactType, contacts);
-  populateRelTypeFilter(filterRelType, relationships);
+  // Build stats model + datasets for drilldown
+  const { statsRows, datasets } = buildStatsModel(contacts, relationships);
 
-  // Prepare vis-network datasets
-  let { nodes, edges } = buildGraphDatasets(contacts, relationships, contactMap);
-
-  // Create network (requires vis-network loaded globally)
-  // e.g. <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-  let network = null;
-  if (window.vis && window.vis.Network) {
-    const data = { nodes, edges };
-    const options = {
-      physics: {
-        stabilization: true,
-        barnesHut: {
-          gravitationalConstant: -3000,
-          springLength: 120,
-          springConstant: 0.04
-        }
-      },
-      nodes: {
-        shape: "dot",
-        font: { size: 12 }
-      },
-      edges: {
-        arrows: { to: { enabled: false } },
-        color: { color: "#cccccc" },
-        smooth: false
-      },
-      interaction: {
-        hover: true,
-        tooltipDelay: 150
-      }
-    };
-
-    network = new window.vis.Network(graphContainer, data, options);
-
-    // Click → jump to Details tab
-    network.on("click", params => {
-      if (!params.nodes || !params.nodes.length) return;
-      const nodeId = params.nodes[0];
-      const contact = contactMap[nodeId];
-      if (!contact) return;
-
-      portalState.selectedContactId = contact.id;
-      portalState.selectedContactName = contact.name;
-
-      // If you have a tab switcher, call it here.
-      // For now, we just log.
-      console.log("Clicked contact node:", contact);
-    });
-  } else {
-    graphContainer.innerHTML = `
-      <div style="padding:16px; color:#a00;">
-        vis-network library not found.  
-        Include it in your HTML to enable the relationship graph.
-      </div>
-    `;
-  }
-
-  // Initial stats
-  updateStats(statsContainer, contacts, relationships);
-
-  // Filters apply
-  applyBtn.addEventListener("click", () => {
-    const typeFilter = filterContactType.value;
-    const relTypeFilter = filterRelType.value;
-    const directionFilter = filterDirection.value;
-    const searchTerm = (searchInput.value || "").trim().toLowerCase();
-
-    const { nodes: newNodes, edges: newEdges } = buildGraphDatasets(
-      contacts,
-      relationships,
-      contactMap,
-      { typeFilter, relTypeFilter, directionFilter, searchTerm }
-    );
-
-    if (network) {
-      network.setData({ nodes: newNodes, edges: newEdges });
-    }
-
-    updateStats(statsContainer, contacts, relationships, {
-      typeFilter,
-      relTypeFilter,
-      directionFilter,
-      searchTerm
-    });
-  });
+  // Render stats table
+  renderStatsTable(statsContainer, statsRows, datasets, drilldownContainer, contactMap, portalState);
 }
 
 /* -------------------------------------------------------
@@ -193,7 +58,6 @@ async function loadOverviewData(projectId) {
   const contactsUrl = `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${encodeURIComponent(
     projectId
   )}&limit=1000`;
-
   const relUrl = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${encodeURIComponent(
     projectId
   )}`;
@@ -213,247 +77,411 @@ async function loadOverviewData(projectId) {
 }
 
 /* -------------------------------------------------------
-Filters population
+Helpers: contact map
 ------------------------------------------------------- */
 
-function populateContactTypeFilter(selectEl, contacts) {
-  const types = new Set();
+function buildContactMap(contacts) {
+  const map = {};
   contacts.forEach(c => {
-    if (c.contact_type) types.add(c.contact_type);
-  });
-
-  Array.from(types)
-    .sort((a, b) => a.localeCompare(b))
-    .forEach(t => {
-      const opt = document.createElement("option");
-      opt.value = t;
-      opt.textContent = t;
-      selectEl.appendChild(opt);
-    });
-}
-
-function populateRelTypeFilter(selectEl, relationships) {
-  const types = new Set();
-  relationships.forEach(r => {
-    if (r.relationship_type) types.add(r.relationship_type);
-  });
-
-  Array.from(types)
-    .sort((a, b) => a.localeCompare(b))
-    .forEach(t => {
-      const opt = document.createElement("option");
-      opt.value = t;
-      opt.textContent = t;
-      selectEl.appendChild(opt);
-    });
-}
-
-/* -------------------------------------------------------
-Graph dataset builder
-------------------------------------------------------- */
-
-function buildGraphDatasets(
-  contacts,
-  relationships,
-  contactMap,
-  filters = {}
-) {
-  const {
-    typeFilter = "",
-    relTypeFilter = "",
-    directionFilter = "",
-    searchTerm = ""
-  } = filters;
-
-  const nodes = new window.vis.DataSet();
-  const edges = new window.vis.DataSet();
-
-  // Precompute relationship counts per contact for node sizing
-  const relCounts = {};
-  relationships.forEach(r => {
-    const s = r.source_contact_id;
-    const t = r.related_contact_id;
-    if (!s || !t) return;
-    relCounts[s] = (relCounts[s] || 0) + 1;
-    relCounts[t] = (relCounts[t] || 0) + 1;
-  });
-
-  // Filtered contacts
-  const allowedContacts = new Set();
-
-  contacts.forEach(c => {
-    const id = c.contact_id;
-    if (!id) return;
-
-    const type = c.contact_type || "Unknown";
     const name =
       c.contact_name ||
       `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
-      id;
-
-    if (typeFilter && type !== typeFilter) return;
-    if (searchTerm && !name.toLowerCase().includes(searchTerm)) return;
-
-    allowedContacts.add(id);
-
-    const size = 10 + (relCounts[id] || 0) * 2;
-    const color = colorForContactType(type);
-
-    nodes.add({
-      id,
-      label: name,
-      title: `${escapeHtml(name)}<br/><small>${escapeHtml(type)}</small>`,
-      value: relCounts[id] || 0,
-      color,
-      size
-    });
+      c.contact_id;
+    map[c.contact_id] = {
+      id: c.contact_id,
+      name,
+      type: c.contact_type || "Unknown",
+      email: c.email || c.primary_email || ""
+    };
   });
+  return map;
+}
 
-  // Filtered relationships
+/* -------------------------------------------------------
+Stats model builder
+------------------------------------------------------- */
+
+function buildStatsModel(contacts, relationships) {
+  const totalRelationships = relationships.length;
+  const clients = contacts.filter(c => (c.contact_type || "") === "Client");
+  const totalClients = clients.length;
+
+  // Relationship types
+  const typeCounts = {};
   relationships.forEach(r => {
-    const s = r.source_contact_id;
-    const t = r.related_contact_id;
-    if (!s || !t) return;
-
-    if (!allowedContacts.has(s) || !allowedContacts.has(t)) return;
-
-    const relType = r.relationship_type || "";
-    if (relTypeFilter && relType !== relTypeFilter) return;
-
-    // Direction filter: from perspective of "graph"? We'll treat:
-    // outbound = edges where source has more relationships than target (rough heuristic)
-    if (directionFilter === "outbound" || directionFilter === "inbound") {
-      const sCount = relCounts[s] || 0;
-      const tCount = relCounts[t] || 0;
-      const isOutbound = sCount >= tCount;
-      if (directionFilter === "outbound" && !isOutbound) return;
-      if (directionFilter === "inbound" && isOutbound) return;
+    const t = r.relationship_type || "Unknown";
+    if (!typeCounts[t]) {
+      typeCounts[t] = { count: 0, rows: [] };
     }
-
-    edges.add({
-      id: r.id,
-      from: s,
-      to: t,
-      title: escapeHtml(relType || "Relationship"),
-      color: colorForRelationshipType(relType)
-    });
+    typeCounts[t].count += 1;
+    typeCounts[t].rows.push(r);
   });
 
-  return { nodes, edges };
+  // Relationship roles (assuming field name relationship_role)
+  const roleCounts = {};
+  relationships.forEach(r => {
+    const role = r.relationship_role || "Unknown";
+    if (!roleCounts[role]) {
+      roleCounts[role] = { count: 0, rows: [] };
+    }
+    roleCounts[role].count += 1;
+    roleCounts[role].rows.push(r);
+  });
+
+  const statsRows = [];
+  const datasets = {};
+
+  // Total relationships
+  statsRows.push({
+    category: "Total Relationships",
+    key: "totalRelationships",
+    count: totalRelationships,
+    percent: "",
+    group: "Totals"
+  });
+  datasets["totalRelationships"] = {
+    label: "All Relationships",
+    type: "relationships",
+    rows: relationships
+  };
+
+  // Total clients
+  statsRows.push({
+    category: "Total Clients",
+    key: "totalClients",
+    count: totalClients,
+    percent: "",
+    group: "Totals"
+  });
+  datasets["totalClients"] = {
+    label: "Client Contacts",
+    type: "clients",
+    rows: clients
+  };
+
+  // Relationship types
+  Object.keys(typeCounts)
+    .sort((a, b) => a.localeCompare(b))
+    .forEach(type => {
+      const { count, rows } = typeCounts[type];
+      const pct =
+        totalRelationships > 0
+          ? ((count / totalRelationships) * 100).toFixed(1) + "%"
+          : "";
+      const key = `type:${type}`;
+      statsRows.push({
+        category: `Relationship Type: ${type}`,
+        key,
+        count,
+        percent: pct,
+        group: "Types"
+      });
+      datasets[key] = {
+        label: `Relationships of type "${type}"`,
+        type: "relationships",
+        rows
+      };
+    });
+
+  // Relationship roles
+  Object.keys(roleCounts)
+    .sort((a, b) => a.localeCompare(b))
+    .forEach(role => {
+      const { count, rows } = roleCounts[role];
+      const pct =
+        totalRelationships > 0
+          ? ((count / totalRelationships) * 100).toFixed(1) + "%"
+          : "";
+      const key = `role:${role}`;
+      statsRows.push({
+        category: `Relationship Role: ${role}`,
+        key,
+        count,
+        percent: pct,
+        group: "Roles"
+      });
+      datasets[key] = {
+        label: `Relationships with role "${role}"`,
+        type: "relationships",
+        rows
+      };
+    });
+
+  return { statsRows, datasets };
 }
 
 /* -------------------------------------------------------
-Color helpers
+Stats table rendering
 ------------------------------------------------------- */
 
-function colorForContactType(type) {
-  const t = (type || "").toLowerCase();
-  if (t.includes("client")) return "#2b8a3e";
-  if (t.includes("vendor")) return "#1c7ed6";
-  if (t.includes("family")) return "#e67700";
-  if (t.includes("staff") || t.includes("team")) return "#7048e8";
-  return "#868e96";
-}
-
-function colorForRelationshipType(relType) {
-  const t = (relType || "").toLowerCase();
-  if (t.includes("referral")) return "#e03131";
-  if (t.includes("family")) return "#e67700";
-  if (t.includes("client") || t.includes("vendor")) return "#1c7ed6";
-  return "#adb5bd";
-}
-
-/* -------------------------------------------------------
-Stats (optional, easy to remove)
-------------------------------------------------------- */
-
-function updateStats(
+function renderStatsTable(
   container,
-  contacts,
-  relationships,
-  filters = {}
+  statsRows,
+  datasets,
+  drilldownContainer,
+  contactMap,
+  portalState
 ) {
-  const {
-    typeFilter = "",
-    relTypeFilter = "",
-    directionFilter = "",
-    searchTerm = ""
-  } = filters;
-
-  let filteredContacts = contacts;
-  let filteredRelationships = relationships;
-
-  if (typeFilter) {
-    filteredContacts = filteredContacts.filter(
-      c => (c.contact_type || "") === typeFilter
-    );
-  }
-
-  if (searchTerm) {
-    const term = searchTerm.toLowerCase();
-    filteredContacts = filteredContacts.filter(c => {
-      const name =
-        c.contact_name ||
-        `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
-        c.contact_id;
-      return name.toLowerCase().includes(term);
-    });
-  }
-
-  const allowedIds = new Set(filteredContacts.map(c => c.contact_id));
-
-  filteredRelationships = filteredRelationships.filter(r => {
-    if (!allowedIds.has(r.source_contact_id) || !allowedIds.has(r.related_contact_id)) {
-      return false;
-    }
-    if (relTypeFilter && (r.relationship_type || "") !== relTypeFilter) {
-      return false;
-    }
-    return true;
-  });
-
-  const totalContacts = filteredContacts.length;
-  const totalRelationships = filteredRelationships.length;
-
-  // Simple hub calc
-  const counts = {};
-  filteredRelationships.forEach(r => {
-    counts[r.source_contact_id] = (counts[r.source_contact_id] || 0) + 1;
-    counts[r.related_contact_id] = (counts[r.related_contact_id] || 0) + 1;
-  });
-
-  const hubs = Object.entries(counts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
-
-  if (!totalContacts && !totalRelationships) {
-    container.innerHTML = `<span class="muted">No data matches the current filters.</span>`;
+  if (!statsRows.length) {
+    container.innerHTML = `<span class="muted">No relationship data available.</span>`;
     return;
   }
 
-  container.innerHTML = `
-    <div style="display:flex; flex-wrap:wrap; gap:16px;">
-      <div>
-        <strong>Total contacts:</strong> ${totalContacts}<br>
-        <strong>Total relationships:</strong> ${totalRelationships}
+  // Group rows by group label
+  const groups = {};
+  statsRows.forEach(row => {
+    if (!groups[row.group]) groups[row.group] = [];
+    groups[row.group].push(row);
+  });
+
+  let html = "";
+
+  Object.keys(groups)
+    .sort((a, b) => a.localeCompare(b))
+    .forEach(groupName => {
+      const rows = groups[groupName];
+
+      html += `
+        <h3 style="margin:8px 0 4px 0; font-size:1em;">${escapeHtml(
+          groupName
+        )}</h3>
+        <table class="table table-sm" style="width:100%; margin-bottom:8px;">
+          <thead>
+            <tr>
+              <th style="width:60%;">Category</th>
+              <th style="width:20%; text-align:right;">Count</th>
+              <th style="width:20%; text-align:right;">% of total relationships</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      rows.forEach(row => {
+        html += `
+          <tr>
+            <td>${escapeHtml(row.category)}</td>
+            <td style="text-align:right;">
+              <a href="#" 
+                 class="rel-stat-count" 
+                 data-stat-key="${escapeHtml(row.key)}"
+                 style="text-decoration:none;">
+                ${row.count}
+              </a>
+            </td>
+            <td style="text-align:right;">${row.percent || ""}</td>
+          </tr>
+        `;
+      });
+
+      html += `
+          </tbody>
+        </table>
+      `;
+    });
+
+  container.innerHTML = html;
+
+  // Attach click handlers
+  const links = container.querySelectorAll(".rel-stat-count");
+  links.forEach(link => {
+    link.addEventListener("click", evt => {
+      evt.preventDefault();
+      const key = link.getAttribute("data-stat-key");
+      const dataset = datasets[key];
+      if (!dataset) return;
+      renderDrilldownTable(
+        drilldownContainer,
+        dataset,
+        contactMap,
+        portalState
+      );
+    });
+  });
+}
+
+/* -------------------------------------------------------
+Drilldown table rendering
+------------------------------------------------------- */
+
+function renderDrilldownTable(container, dataset, contactMap, portalState) {
+  const { label, type, rows } = dataset;
+
+  if (!rows || !rows.length) {
+    container.innerHTML = `
+      <div style="margin-top:8px;">
+        <strong>${escapeHtml(label)}</strong><br>
+        <span class="muted">No rows found for this selection.</span>
       </div>
-      <div>
-        <strong>Top hubs:</strong><br>
-        ${
-          hubs.length
-            ? hubs
-                .map(([id, count]) => {
-                  const c = contacts.find(x => x.contact_id === id);
-                  const name =
-                    c?.contact_name ||
-                    `${c?.first_name || ""} ${c?.last_name || ""}`.trim() ||
-                    id;
-                  return `${escapeHtml(name)} (${count})`;
-                })
-                .join("<br>")
-            : "<span class='muted'>(none)</span>"
-        }
+    `;
+    return;
+  }
+
+  if (type === "clients") {
+    container.innerHTML = renderClientsTableHtml(label, rows);
+    attachClientRowHandlers(container, rows, portalState);
+  } else {
+    container.innerHTML = renderRelationshipsTableHtml(
+      label,
+      rows,
+      contactMap
+    );
+    attachRelationshipRowHandlers(container, rows, contactMap, portalState);
+  }
+}
+
+/* -------------------------------------------------------
+Clients drilldown
+------------------------------------------------------- */
+
+function renderClientsTableHtml(label, clients) {
+  let html = `
+    <div style="margin-top:8px;">
+      <strong>${escapeHtml(label)}</strong>
+      <div style="margin-top:4px; max-height:360px; overflow:auto;">
+        <table class="table table-sm" style="width:100%;">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Type</th>
+              <th>Email</th>
+            </tr>
+          </thead>
+          <tbody>
+  `;
+
+  clients.forEach(c => {
+    const name =
+      c.contact_name ||
+      `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
+      c.contact_id;
+    const email = c.email || c.primary_email || "";
+    const type = c.contact_type || "Unknown";
+
+    html += `
+      <tr class="drill-client-row" data-contact-id="${escapeHtml(
+        c.contact_id
+      )}">
+        <td>${escapeHtml(name)}</td>
+        <td>${escapeHtml(type)}</td>
+        <td>${escapeHtml(email)}</td>
+      </tr>
+    `;
+  });
+
+  html += `
+          </tbody>
+        </table>
       </div>
     </div>
   `;
+
+  return html;
 }
+
+function attachClientRowHandlers(container, clients, portalState) {
+  const rows = container.querySelectorAll(".drill-client-row");
+  rows.forEach(row => {
+    row.addEventListener("click", () => {
+      const contactId = row.getAttribute("data-contact-id");
+      const contact = clients.find(c => c.contact_id === contactId);
+      if (!contact) return;
+
+      const name =
+        contact.contact_name ||
+        `${contact.first_name || ""} ${contact.last_name || ""}`.trim() ||
+        contact.contact_id;
+
+      portalState.selectedContactId = contact.contact_id;
+      portalState.selectedContactName = name;
+
+      // If you have a tab switcher, call it here.
+      console.log("Selected client from overview:", {
+        id: contact.contact_id,
+        name
+      });
+    });
+  });
+}
+
+/* -------------------------------------------------------
+Relationships drilldown
+------------------------------------------------------- */
+
+function renderRelationshipsTableHtml(label, relationships, contactMap) {
+  let html = `
+    <div style="margin-top:8px;">
+      <strong>${escapeHtml(label)}</strong>
+      <div style="margin-top:4px; max-height:360px; overflow:auto;">
+        <table class="table table-sm" style="width:100%;">
+          <thead>
+            <tr>
+              <th>Source</th>
+              <th>Target</th>
+              <th>Type</th>
+              <th>Role</th>
+            </tr>
+          </thead>
+          <tbody>
+  `;
+
+  relationships.forEach(r => {
+    const s = contactMap[r.source_contact_id];
+    const t = contactMap[r.related_contact_id];
+
+    const sName = s ? s.name : r.source_contact_id || "(unknown)";
+    const tName = t ? t.name : r.related_contact_id || "(unknown)";
+
+    const relType = r.relationship_type || "";
+    const role = r.relationship_role || "";
+
+    html += `
+      <tr class="drill-rel-row" data-source-id="${escapeHtml(
+        r.source_contact_id || ""
+      )}">
+        <td>${escapeHtml(sName)}</td>
+        <td>${escapeHtml(tName)}</td>
+        <td>${escapeHtml(relType)}</td>
+        <td>${escapeHtml(role)}</td>
+      </tr>
+    `;
+  });
+
+  html += `
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  return html;
+}
+
+function attachRelationshipRowHandlers(
+  container,
+  relationships,
+  contactMap,
+  portalState
+) {
+  const rows = container.querySelectorAll(".drill-rel-row");
+  rows.forEach((row, index) => {
+    row.addEventListener("click", () => {
+      const rel = relationships[index];
+      if (!rel) return;
+
+      const sourceId = rel.source_contact_id;
+      const source = contactMap[sourceId];
+
+      if (!source) return;
+
+      portalState.selectedContactId = source.id;
+      portalState.selectedContactName = source.name;
+
+      // If you have a tab switcher, call it here.
+      console.log("Selected relationship source from overview:", {
+        id: source.id,
+        name: source.name
+      });
+    });
+  });
+}
+
