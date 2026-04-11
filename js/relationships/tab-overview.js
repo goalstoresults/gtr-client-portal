@@ -1,6 +1,5 @@
 // /js/relationships/tab-overview.js
-
-// Relationships → Overview (table-based analytics dashboard)
+// Relationships → Overview (table-based analytics with sortable grids + inline expand)
 
 import { escapeHtml } from "../utilities.js";
 
@@ -22,32 +21,48 @@ export async function renderRelOverview(container, portalState) {
         <h2>Relationship Overview</h2>
       </div>
 
-      <!-- Stats -->
-      <section id="relOverviewStats" style="margin-bottom:16px; font-size:0.9em; color:#444;">
-        <div class="muted">Loading stats…</div>
-      </section>
-
-      <!-- Drilldown -->
-      <section id="relOverviewDrilldown" style="margin-top:8px; font-size:0.9em; color:#444;">
-        <div class="muted">Click any count to see the underlying rows.</div>
-      </section>
+      <section id="relOverviewTotals" style="margin-bottom:16px;"></section>
+      <section id="relOverviewTypes" style="margin-bottom:16px;"></section>
+      <section id="relOverviewRoles" style="margin-bottom:16px;"></section>
     </section>
   `;
 
-  const statsContainer = container.querySelector("#relOverviewStats");
-  const drilldownContainer = container.querySelector("#relOverviewDrilldown");
+  const totalsContainer = container.querySelector("#relOverviewTotals");
+  const typesContainer = container.querySelector("#relOverviewTypes");
+  const rolesContainer = container.querySelector("#relOverviewRoles");
 
-  // Load data
   const { contacts, relationships } = await loadOverviewData(project);
-
-  // Build contact map for quick lookup
   const contactMap = buildContactMap(contacts);
 
-  // Build stats model + datasets for drilldown
-  const { statsRows, datasets } = buildStatsModel(contacts, relationships);
+  const stats = buildStatsModel(contacts, relationships, contactMap);
 
-  // Render stats table
-  renderStatsTable(statsContainer, statsRows, datasets, drilldownContainer, contactMap, portalState);
+  renderSection(
+    totalsContainer,
+    "Totals",
+    "totals",
+    stats.totals.rows,
+    stats.totals.datasets,
+    contactMap,
+    portalState
+  );
+  renderSection(
+    typesContainer,
+    "Types",
+    "types",
+    stats.types.rows,
+    stats.types.datasets,
+    contactMap,
+    portalState
+  );
+  renderSection(
+    rolesContainer,
+    "Roles",
+    "roles",
+    stats.roles.rows,
+    stats.roles.datasets,
+    contactMap,
+    portalState
+  );
 }
 
 /* -------------------------------------------------------
@@ -77,7 +92,7 @@ async function loadOverviewData(projectId) {
 }
 
 /* -------------------------------------------------------
-Helpers: contact map
+Contact map
 ------------------------------------------------------- */
 
 function buildContactMap(contacts) {
@@ -98,13 +113,37 @@ function buildContactMap(contacts) {
 }
 
 /* -------------------------------------------------------
-Stats model builder
+Stats model
 ------------------------------------------------------- */
 
-function buildStatsModel(contacts, relationships) {
+function buildStatsModel(contacts, relationships, contactMap) {
   const totalRelationships = relationships.length;
-  const clients = contacts.filter(c => (c.contact_type || "") === "Client");
-  const totalClients = clients.length;
+
+  // Clients with relationships (source_contact_id with contact_type = 'Client')
+  const clientRelCounts = {};
+  relationships.forEach(r => {
+    const cid = r.source_contact_id;
+    if (!cid) return;
+    const c = contactMap[cid];
+    if (!c) return;
+    if (c.type !== "Client") return;
+    clientRelCounts[cid] = (clientRelCounts[cid] || 0) + 1;
+  });
+
+  const clientIds = Object.keys(clientRelCounts);
+  const clientsWithRelationships = clientIds
+    .map(id => {
+      const c = contactMap[id];
+      if (!c) return null;
+      return {
+        contact_id: c.id,
+        name: c.name,
+        email: c.email,
+        contact_type: c.type,
+        relationship_count: clientRelCounts[id]
+      };
+    })
+    .filter(Boolean);
 
   // Relationship types
   const typeCounts = {};
@@ -117,7 +156,7 @@ function buildStatsModel(contacts, relationships) {
     typeCounts[t].rows.push(r);
   });
 
-  // Relationship roles (assuming field name relationship_role)
+  // Relationship roles (relationship_role field)
   const roleCounts = {};
   relationships.forEach(r => {
     const role = r.relationship_role || "Unknown";
@@ -128,204 +167,311 @@ function buildStatsModel(contacts, relationships) {
     roleCounts[role].rows.push(r);
   });
 
-  const statsRows = [];
-  const datasets = {};
+  const totalsRows = [];
+  const totalsDatasets = {};
 
-  // Total relationships
-  statsRows.push({
-    category: "Total Relationships",
+  totalsRows.push({
     key: "totalRelationships",
+    category: "Total Relationships",
     count: totalRelationships,
-    percent: "",
-    group: "Totals"
+    percentText: "",
+    percentValue: 0
   });
-  datasets["totalRelationships"] = {
-    label: "All Relationships",
+  totalsDatasets["totalRelationships"] = {
     type: "relationships",
+    label: "All Relationships",
     rows: relationships
   };
 
-  // Total clients
-  statsRows.push({
-    category: "Total Clients",
-    key: "totalClients",
-    count: totalClients,
-    percent: "",
-    group: "Totals"
+  totalsRows.push({
+    key: "totalClientsWithRelationships",
+    category: "Total Clients With Relationships",
+    count: clientsWithRelationships.length,
+    percentText: "",
+    percentValue: 0
   });
-  datasets["totalClients"] = {
-    label: "Client Contacts",
+  totalsDatasets["totalClientsWithRelationships"] = {
     type: "clients",
-    rows: clients
+    label: "Clients With Relationships",
+    rows: clientsWithRelationships
   };
 
-  // Relationship types
+  const typesRows = [];
+  const typesDatasets = {};
+
   Object.keys(typeCounts)
     .sort((a, b) => a.localeCompare(b))
     .forEach(type => {
       const { count, rows } = typeCounts[type];
-      const pct =
-        totalRelationships > 0
-          ? ((count / totalRelationships) * 100).toFixed(1) + "%"
-          : "";
+      const pctVal =
+        totalRelationships > 0 ? (count / totalRelationships) * 100 : 0;
+      const pctText =
+        totalRelationships > 0 ? pctVal.toFixed(1) + "%" : "";
       const key = `type:${type}`;
-      statsRows.push({
-        category: `Relationship Type: ${type}`,
+      typesRows.push({
         key,
+        category: type,
         count,
-        percent: pct,
-        group: "Types"
+        percentText: pctText,
+        percentValue: pctVal
       });
-      datasets[key] = {
-        label: `Relationships of type "${type}"`,
+      typesDatasets[key] = {
         type: "relationships",
+        label: `Relationships of type "${type}"`,
         rows
       };
     });
 
-  // Relationship roles
+  const rolesRows = [];
+  const rolesDatasets = {};
+
   Object.keys(roleCounts)
     .sort((a, b) => a.localeCompare(b))
     .forEach(role => {
       const { count, rows } = roleCounts[role];
-      const pct =
-        totalRelationships > 0
-          ? ((count / totalRelationships) * 100).toFixed(1) + "%"
-          : "";
+      const pctVal =
+        totalRelationships > 0 ? (count / totalRelationships) * 100 : 0;
+      const pctText =
+        totalRelationships > 0 ? pctVal.toFixed(1) + "%" : "";
       const key = `role:${role}`;
-      statsRows.push({
-        category: `Relationship Role: ${role}`,
+      rolesRows.push({
         key,
+        category: role,
         count,
-        percent: pct,
-        group: "Roles"
+        percentText: pctText,
+        percentValue: pctVal
       });
-      datasets[key] = {
-        label: `Relationships with role "${role}"`,
+      rolesDatasets[key] = {
         type: "relationships",
+        label: `Relationships with role "${role}"`,
         rows
       };
     });
 
-  return { statsRows, datasets };
+  return {
+    totals: { rows: totalsRows, datasets: totalsDatasets },
+    types: { rows: typesRows, datasets: typesDatasets },
+    roles: { rows: rolesRows, datasets: rolesDatasets }
+  };
 }
 
 /* -------------------------------------------------------
-Stats table rendering
+Section rendering (sortable + expandable)
 ------------------------------------------------------- */
 
-function renderStatsTable(
+function renderSection(
   container,
-  statsRows,
+  title,
+  sectionKey,
+  rows,
   datasets,
-  drilldownContainer,
   contactMap,
   portalState
 ) {
-  if (!statsRows.length) {
-    container.innerHTML = `<span class="muted">No relationship data available.</span>`;
+  if (!rows || !rows.length) {
+    container.innerHTML = `
+      <h3 style="margin:8px 0 4px 0; font-size:1em;">${escapeHtml(title)}</h3>
+      <p class="muted">(no data)</p>
+    `;
     return;
   }
 
-  // Group rows by group label
-  const groups = {};
-  statsRows.forEach(row => {
-    if (!groups[row.group]) groups[row.group] = [];
-    groups[row.group].push(row);
-  });
+  let sortField = "category";
+  let sortDirection = "asc";
+  let expandedKey = null;
 
-  let html = "";
+  function arrowsFor(field) {
+    const isSorted = sortField === field;
+    const up = isSorted && sortDirection === "asc" ? "▲" : "△";
+    const down = isSorted && sortDirection === "desc" ? "▼" : "▽";
+    return `
+      <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+        <span class="sort-up">${up}</span>
+        <span class="sort-down">${down}</span>
+      </span>
+    `;
+  }
 
-  Object.keys(groups)
-    .sort((a, b) => a.localeCompare(b))
-    .forEach(groupName => {
-      const rows = groups[groupName];
+  function sortRows() {
+    const sorted = [...rows];
+    sorted.sort((a, b) => {
+      if (sortField === "count") {
+        const A = Number(a.count || 0);
+        const B = Number(b.count || 0);
+        return sortDirection === "asc" ? A - B : B - A;
+      }
+      if (sortField === "percent") {
+        const A = Number(a.percentValue || 0);
+        const B = Number(b.percentValue || 0);
+        return sortDirection === "asc" ? A - B : B - A;
+      }
+      const A = (a.category || "").toLowerCase();
+      const B = (b.category || "").toLowerCase();
+      return sortDirection === "asc"
+        ? A.localeCompare(B)
+        : B.localeCompare(A);
+    });
+    return sorted;
+  }
+
+  function render() {
+    const sorted = sortRows();
+
+    let headerLabel = "Category";
+    if (sectionKey === "types") headerLabel = "Relationship Type";
+    if (sectionKey === "roles") headerLabel = "Relationship Role";
+
+    let html = `
+      <h3 style="margin:8px 0 4px 0; font-size:1em;">${escapeHtml(
+        title
+      )}</h3>
+      <table class="notes-table">
+        <thead>
+          <tr>
+            <th class="sortable" data-field="category">
+              ${escapeHtml(headerLabel)} ${arrowsFor("category")}
+            </th>
+            <th class="sortable" data-field="count" style="width:120px; text-align:right;">
+              Count ${arrowsFor("count")}
+            </th>
+            <th class="sortable" data-field="percent" style="width:160px; text-align:right;">
+              % of total relationships ${arrowsFor("percent")}
+            </th>
+            <th style="width:80px; text-align:center;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    sorted.forEach(row => {
+      const isExpanded = expandedKey === row.key;
+      const safeKey = sanitizeKey(row.key);
 
       html += `
-        <h3 style="margin:8px 0 4px 0; font-size:1em;">${escapeHtml(
-          groupName
-        )}</h3>
-        <table class="table table-sm" style="width:100%; margin-bottom:8px;">
-          <thead>
-            <tr>
-              <th style="width:60%;">Category</th>
-              <th style="width:20%; text-align:right;">Count</th>
-              <th style="width:20%; text-align:right;">% of total relationships</th>
-            </tr>
-          </thead>
-          <tbody>
+        <tr data-key="${escapeHtml(row.key)}">
+          <td>${escapeHtml(row.category)}</td>
+          <td style="text-align:right;">${row.count}</td>
+          <td style="text-align:right;">${row.percentText || ""}</td>
+          <td style="text-align:center;">
+            <button class="btn-secondary expand-btn" data-key="${escapeHtml(
+              row.key
+            )}">
+              ${isExpanded ? "▼" : "▶"}
+            </button>
+          </td>
+        </tr>
       `;
 
-      rows.forEach(row => {
+      if (isExpanded) {
         html += `
-          <tr>
-            <td>${escapeHtml(row.category)}</td>
-            <td style="text-align:right;">
-              <a href="#" 
-                 class="rel-stat-count" 
-                 data-stat-key="${escapeHtml(row.key)}"
-                 style="text-decoration:none;">
-                ${row.count}
-              </a>
+          <tr class="expand-row" data-expand-for="${escapeHtml(row.key)}">
+            <td colspan="4">
+              <div id="drill-${sectionKey}-${safeKey}" class="expand-container" style="background:#fafafa; border-top:1px solid #ddd; padding:8px;"></div>
             </td>
-            <td style="text-align:right;">${row.percent || ""}</td>
           </tr>
         `;
+      }
+    });
+
+    html += `
+        </tbody>
+      </table>
+    `;
+
+    container.innerHTML = html;
+
+    // Sort handlers
+    container.querySelectorAll("th.sortable").forEach(th => {
+      th.addEventListener("click", () => {
+        const field = th.dataset.field;
+        if (field === "category" || field === "count" || field === "percent") {
+          if (sortField === field) {
+            sortDirection = sortDirection === "asc" ? "desc" : "asc";
+          } else {
+            sortField = field;
+            sortDirection = "asc";
+          }
+          expandedKey = null; // collapse on sort
+          render();
+        }
       });
-
-      html += `
-          </tbody>
-        </table>
-      `;
     });
 
-  container.innerHTML = html;
+    // Expand handlers
+    container.querySelectorAll(".expand-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const key = btn.getAttribute("data-key");
+        if (expandedKey === key) {
+          expandedKey = null;
+          render();
+        } else {
+          expandedKey = key;
+          render();
+          const safeKey = sanitizeKey(key);
+          const drillContainer = container.querySelector(
+            `#drill-${sectionKey}-${safeKey}`
+          );
+          if (drillContainer) {
+            const dataset = datasets[key];
+            if (dataset) {
+              renderDrilldownTable(
+                drillContainer,
+                dataset,
+                contactMap,
+                portalState
+              );
+            }
+          }
+        }
+      });
+    });
 
-  // Attach click handlers
-  const links = container.querySelectorAll(".rel-stat-count");
-  links.forEach(link => {
-    link.addEventListener("click", evt => {
-      evt.preventDefault();
-      const key = link.getAttribute("data-stat-key");
-      const dataset = datasets[key];
-      if (!dataset) return;
-      renderDrilldownTable(
-        drilldownContainer,
-        dataset,
-        contactMap,
-        portalState
+    // After render, if something is expanded, fill its drilldown
+    if (expandedKey) {
+      const safeKey = sanitizeKey(expandedKey);
+      const drillContainer = container.querySelector(
+        `#drill-${sectionKey}-${safeKey}`
       );
-    });
-  });
+      if (drillContainer) {
+        const dataset = datasets[expandedKey];
+        if (dataset) {
+          renderDrilldownTable(
+            drillContainer,
+            dataset,
+            contactMap,
+            portalState
+          );
+        }
+      }
+    }
+  }
+
+  render();
+}
+
+function sanitizeKey(key) {
+  return String(key).replace(/[^a-zA-Z0-9_-]/g, "_");
 }
 
 /* -------------------------------------------------------
-Drilldown table rendering
+Drilldown rendering
 ------------------------------------------------------- */
 
 function renderDrilldownTable(container, dataset, contactMap, portalState) {
-  const { label, type, rows } = dataset;
+  const { type, label, rows } = dataset;
 
   if (!rows || !rows.length) {
     container.innerHTML = `
-      <div style="margin-top:8px;">
-        <strong>${escapeHtml(label)}</strong><br>
-        <span class="muted">No rows found for this selection.</span>
-      </div>
+      <strong>${escapeHtml(label)}</strong><br>
+      <span class="muted">(no rows)</span>
     `;
     return;
   }
 
   if (type === "clients") {
-    container.innerHTML = renderClientsTableHtml(label, rows);
-    attachClientRowHandlers(container, rows, portalState);
+    renderClientsDrilldown(container, label, rows, portalState);
   } else {
-    container.innerHTML = renderRelationshipsTableHtml(
-      label,
-      rows,
-      contactMap
-    );
-    attachRelationshipRowHandlers(container, rows, contactMap, portalState);
+    renderRelationshipsDrilldown(container, label, rows, contactMap, portalState);
   }
 }
 
@@ -333,71 +479,55 @@ function renderDrilldownTable(container, dataset, contactMap, portalState) {
 Clients drilldown
 ------------------------------------------------------- */
 
-function renderClientsTableHtml(label, clients) {
+function renderClientsDrilldown(container, label, clients, portalState) {
   let html = `
-    <div style="margin-top:8px;">
-      <strong>${escapeHtml(label)}</strong>
-      <div style="margin-top:4px; max-height:360px; overflow:auto;">
-        <table class="table table-sm" style="width:100%;">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Type</th>
-              <th>Email</th>
-            </tr>
-          </thead>
-          <tbody>
+    <strong>${escapeHtml(label)}</strong>
+    <div style="margin-top:4px; max-height:360px; overflow:auto;">
+      <table class="notes-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Type</th>
+            <th style="width:140px; text-align:right;">Relationships</th>
+          </tr>
+        </thead>
+        <tbody>
   `;
 
   clients.forEach(c => {
-    const name =
-      c.contact_name ||
-      `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
-      c.contact_id;
-    const email = c.email || c.primary_email || "";
-    const type = c.contact_type || "Unknown";
-
     html += `
       <tr class="drill-client-row" data-contact-id="${escapeHtml(
         c.contact_id
       )}">
-        <td>${escapeHtml(name)}</td>
-        <td>${escapeHtml(type)}</td>
-        <td>${escapeHtml(email)}</td>
+        <td>${escapeHtml(c.name || "")}</td>
+        <td>${escapeHtml(c.email || "")}</td>
+        <td>${escapeHtml(c.contact_type || "")}</td>
+        <td style="text-align:right;">${c.relationship_count || 0}</td>
       </tr>
     `;
   });
 
   html += `
-          </tbody>
-        </table>
-      </div>
+        </tbody>
+      </table>
     </div>
   `;
 
-  return html;
-}
+  container.innerHTML = html;
 
-function attachClientRowHandlers(container, clients, portalState) {
-  const rows = container.querySelectorAll(".drill-client-row");
-  rows.forEach(row => {
+  container.querySelectorAll(".drill-client-row").forEach(row => {
     row.addEventListener("click", () => {
       const contactId = row.getAttribute("data-contact-id");
-      const contact = clients.find(c => c.contact_id === contactId);
-      if (!contact) return;
+      const client = clients.find(c => c.contact_id === contactId);
+      if (!client) return;
 
-      const name =
-        contact.contact_name ||
-        `${contact.first_name || ""} ${contact.last_name || ""}`.trim() ||
-        contact.contact_id;
+      portalState.selectedContactId = client.contact_id;
+      portalState.selectedContactName = client.name || client.contact_id;
 
-      portalState.selectedContactId = contact.contact_id;
-      portalState.selectedContactName = name;
-
-      // If you have a tab switcher, call it here.
       console.log("Selected client from overview:", {
-        id: contact.contact_id,
-        name
+        id: client.contact_id,
+        name: client.name
       });
     });
   });
@@ -407,21 +537,26 @@ function attachClientRowHandlers(container, clients, portalState) {
 Relationships drilldown
 ------------------------------------------------------- */
 
-function renderRelationshipsTableHtml(label, relationships, contactMap) {
+function renderRelationshipsDrilldown(
+  container,
+  label,
+  relationships,
+  contactMap,
+  portalState
+) {
   let html = `
-    <div style="margin-top:8px;">
-      <strong>${escapeHtml(label)}</strong>
-      <div style="margin-top:4px; max-height:360px; overflow:auto;">
-        <table class="table table-sm" style="width:100%;">
-          <thead>
-            <tr>
-              <th>Source</th>
-              <th>Target</th>
-              <th>Type</th>
-              <th>Role</th>
-            </tr>
-          </thead>
-          <tbody>
+    <strong>${escapeHtml(label)}</strong>
+    <div style="margin-top:4px; max-height:360px; overflow:auto;">
+      <table class="notes-table">
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Target</th>
+            <th>Type</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
   `;
 
   relationships.forEach(r => {
@@ -430,7 +565,6 @@ function renderRelationshipsTableHtml(label, relationships, contactMap) {
 
     const sName = s ? s.name : r.source_contact_id || "(unknown)";
     const tName = t ? t.name : r.related_contact_id || "(unknown)";
-
     const relType = r.relationship_type || "";
     const role = r.relationship_role || "";
 
@@ -447,36 +581,24 @@ function renderRelationshipsTableHtml(label, relationships, contactMap) {
   });
 
   html += `
-          </tbody>
-        </table>
-      </div>
+        </tbody>
+      </table>
     </div>
   `;
 
-  return html;
-}
+  container.innerHTML = html;
 
-function attachRelationshipRowHandlers(
-  container,
-  relationships,
-  contactMap,
-  portalState
-) {
   const rows = container.querySelectorAll(".drill-rel-row");
   rows.forEach((row, index) => {
     row.addEventListener("click", () => {
       const rel = relationships[index];
       if (!rel) return;
-
-      const sourceId = rel.source_contact_id;
-      const source = contactMap[sourceId];
-
+      const source = contactMap[rel.source_contact_id];
       if (!source) return;
 
       portalState.selectedContactId = source.id;
       portalState.selectedContactName = source.name;
 
-      // If you have a tab switcher, call it here.
       console.log("Selected relationship source from overview:", {
         id: source.id,
         name: source.name
