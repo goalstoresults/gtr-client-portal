@@ -1,5 +1,5 @@
 // /js/relationships/tab-overview.js
-// Relationships → Overview (table-based analytics with sortable grids + inline expand)
+// Relationships → Overview (sortable grids + inline expand/collapse identical to Notes)
 
 import { escapeHtml } from "../utilities.js";
 
@@ -156,7 +156,7 @@ function buildStatsModel(contacts, relationships, contactMap) {
     typeCounts[t].rows.push(r);
   });
 
-  // Relationship roles (relationship_role field)
+  // Relationship roles
   const roleCounts = {};
   relationships.forEach(r => {
     const role = r.relationship_role || "Unknown";
@@ -256,7 +256,7 @@ function buildStatsModel(contacts, relationships, contactMap) {
 }
 
 /* -------------------------------------------------------
-Section rendering (sortable + expandable)
+Section rendering (sortable + inline expand/collapse)
 ------------------------------------------------------- */
 
 function renderSection(
@@ -337,7 +337,7 @@ function renderSection(
             <th class="sortable" data-field="percent" style="width:160px; text-align:right;">
               % of total relationships ${arrowsFor("percent")}
             </th>
-            <th style="width:80px; text-align:center;">Action</th>
+            <th style="width:140px; text-align:center;">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -356,7 +356,7 @@ function renderSection(
             <button class="btn-secondary expand-btn" data-key="${escapeHtml(
               row.key
             )}">
-              ${isExpanded ? "▼" : "▶"}
+              ${isExpanded ? "▼ Collapse" : "▶ Expand"}
             </button>
           </td>
         </tr>
@@ -536,7 +536,6 @@ function renderClientsDrilldown(container, label, clients, portalState) {
 /* -------------------------------------------------------
 Relationships drilldown
 ------------------------------------------------------- */
-
 function renderRelationshipsDrilldown(
   container,
   label,
@@ -593,6 +592,7 @@ function renderRelationshipsDrilldown(
     row.addEventListener("click", () => {
       const rel = relationships[index];
       if (!rel) return;
+
       const source = contactMap[rel.source_contact_id];
       if (!source) return;
 
