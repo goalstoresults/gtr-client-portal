@@ -543,22 +543,25 @@ async function loadDrilldownData(container, sectionKey, key, portalState) {
     }
     // ----------------------------------------------
 
-    const contactMap = {};
-    contacts.forEach(c => {
-      const name =
-        c.search_name ||
-        `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
-        c.business_name ||
-        c.email ||
-        "(unknown)";
+const contactMap = {};
+contacts.forEach(c => {
+  const name =
+    c.contact_name ||
+    c.search_name ||
+    `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
+    c.business_name ||
+    c.email ||
+    c.contact_id ||
+    "(unknown)";
 
-      contactMap[c.contact_id] = {
-        id: c.contact_id,
-        name,
-        email: c.email || "",
-        type: c.contact_type || ""
-      };
-    });
+  contactMap[c.contact_id] = {
+    id: c.contact_id,
+    name,
+    email: c.email || "",
+    type: c.contact_type || ""
+  };
+});
+
 
     const label = buildSectionLabel(key);
 
