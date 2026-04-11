@@ -8,12 +8,15 @@ import { escapeHtml } from "../utils/escapeHtml.js";
   High-level architecture:
 
   - On load:
-      - Fetch ONLY overview totals (no contacts, no relationships)
-      - Render summary rows with Expand/Collapse controls
+      - Use your existing loadOverviewData() to fetch:
+          • ALL relationships (unlimited)
+          • FIRST 1000 contacts (for summary only)
+      - Compute totals from relationships
+      - Render summary rows
 
   - On expand of a row:
       - Fetch ONLY the relationships for that row (backend-filtered)
-      - Extract unique contact IDs from those relationships
+      - Extract unique contact IDs
       - Fetch ONLY those contacts by ID (bulk endpoint)
       - Build a contactMap from those contacts
       - Render drilldown table with guaranteed names
@@ -39,7 +42,11 @@ export async function renderRelOverview(container, portalState) {
 
   try {
     const project = portalState?.project;
-    const totals = await loadOverviewTotals(project);
+
+    // ⭐ Use your existing loadOverviewData()
+    const { contacts, relationships } = await loadOverviewData(project);
+
+    const totals = computeOverviewTotals(relationships);
 
     renderOverviewSummary(
       container.querySelector("#rel-overview-summary"),
@@ -60,104 +67,62 @@ export async function renderRelOverview(container, portalState) {
 }
 
 /* -------------------------------------------------------
-Backend data loading (totals only)
+Totals computation (from full relationships dataset)
 ------------------------------------------------------- */
 
-/**
- * Load only the summary totals for the overview.
- * No contacts, no relationships here.
- */
-async function loadOverviewTotals(project) {
-  // Adjust endpoint/params to match your backend
-  const params = new URLSearchParams();
-  if (project) params.set("project", project);
+function computeOverviewTotals(relationships) {
+  const total_relationship_records = relationships.length;
 
-  const res = await fetch(`/api/relationships/overview-totals?${params.toString()}`);
-  if (!res.ok) {
-    throw new Error("Failed to load overview totals");
-  }
-  const data = await res.json();
+  const clientsWithRels = new Set();
+  const uniqueRelated = new Set();
+  const byTypeMap = {};
 
-  // Expected shape (example):
-  // {
-  //   total_relationship_records: 40,
-  //   total_clients_with_relationships: 12,
-  //   total_unique_related_contacts: 25,
-  //   by_type: [
-  //     { type: "Client - Vendor", count: 20 },
-  //     { type: "Family", count: 12 },
-  //     ...
-  //   ]
-  // }
+  relationships.forEach(r => {
+    if (r.source_contact_id) clientsWithRels.add(r.source_contact_id);
+    if (r.related_contact_id) uniqueRelated.add(r.related_contact_id);
 
-  return data;
+    const t = r.relationship_type || "Unknown";
+    byTypeMap[t] = (byTypeMap[t] || 0) + 1;
+  });
+
+  const by_type = Object.entries(byTypeMap).map(([type, count]) => ({
+    type,
+    count
+  }));
+
+  return {
+    total_relationship_records,
+    total_clients_with_relationships: clientsWithRels.size,
+    total_unique_related_contacts: uniqueRelated.size,
+    by_type
+  };
 }
 
 /* -------------------------------------------------------
-Backend data loading (lazy-loaded detail)
+Backend calls for expand logic
 ------------------------------------------------------- */
 
-/**
- * Fetch relationships for a specific section key.
- * Section key examples:
- *   - "total_relationship_records"
- *   - "total_clients_with_relationships"
- *   - "total_unique_related_contacts"
- *   - "type:Client - Vendor"
- *   - "type:Family"
- */
-async function loadRelationshipsForSection(project, sectionKey) {
-  const params = new URLSearchParams();
-  if (project) params.set("project", project);
-  params.set("section", sectionKey);
+async function fetchSectionRows(project, sectionKey) {
+  const url = `https://contacts-module.dennis-e64.workers.dev/relationships/overview-section?project=${encodeURIComponent(
+    project
+  )}&section=${encodeURIComponent(sectionKey)}`;
 
-  const res = await fetch(`/api/relationships/overview-section?${params.toString()}`);
-  if (!res.ok) {
-    throw new Error("Failed to load relationships for section");
-  }
-  const data = await res.json();
-
-  // Expected shape:
-  // {
-  //   rows: [ { ...relationshipRow }, ... ],
-  //   total_count: number
-  // }
-
-  return data;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Failed to load section rows");
+  return res.json();
 }
 
-/**
- * Fetch contacts by a set of IDs (bulk).
- * Expects an array of IDs (strings).
- */
-async function loadContactsByIds(project, ids) {
-  if (!ids || !ids.length) return [];
+async function fetchContactsByIds(project, ids) {
+  const url = `https://contacts-module.dennis-e64.workers.dev/contacts/bulk-get`;
 
-  const body = {
-    ids,
-  };
-  if (project) {
-    body.project = project;
-  }
-
-  const res = await fetch(`/api/contacts/bulk-get`, {
+  const res = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ project, ids })
   });
 
-  if (!res.ok) {
-    throw new Error("Failed to load contacts by IDs");
-  }
-
-  const data = await res.json();
-
-  // Expected shape:
-  // [ { id, name, email, contact_type, ... }, ... ]
-
-  return data;
+  if (!res.ok) throw new Error("Failed to load contacts by IDs");
+  return res.json();
 }
 
 /* -------------------------------------------------------
@@ -171,10 +136,10 @@ function renderOverviewSummary(container, totals, portalState) {
   }
 
   const {
-    total_relationship_records = 0,
-    total_clients_with_relationships = 0,
-    total_unique_related_contacts = 0,
-    by_type = [],
+    total_relationship_records,
+    total_clients_with_relationships,
+    total_unique_related_contacts,
+    by_type
   } = totals;
 
   const grandTotal = total_relationship_records || 0;
@@ -192,44 +157,39 @@ function renderOverviewSummary(container, totals, portalState) {
       <tbody>
   `;
 
-  // Total Relationship Records
   html += renderSummaryRow({
     label: "Total Relationship Records",
     key: "total_relationship_records",
     count: total_relationship_records,
-    grandTotal,
+    grandTotal
   });
 
-  // Total Clients With Relationships
   html += renderSummaryRow({
     label: "Total Clients With Relationships",
     key: "total_clients_with_relationships",
     count: total_clients_with_relationships,
-    grandTotal,
+    grandTotal
   });
 
-  // Total Unique Related Contacts
   html += renderSummaryRow({
     label: "Total Unique Related Contacts",
     key: "total_unique_related_contacts",
     count: total_unique_related_contacts,
-    grandTotal,
+    grandTotal
   });
 
-  // Spacer row
   html += `
     <tr class="section-divider">
       <td colspan="4">By Relationship Type</td>
     </tr>
   `;
 
-  // By Type rows
   by_type.forEach(row => {
     html += renderSummaryRow({
       label: `Relationships of type "${row.type}"`,
       key: `type:${row.type}`,
       count: row.count,
-      grandTotal,
+      grandTotal
     });
   });
 
@@ -240,40 +200,32 @@ function renderOverviewSummary(container, totals, portalState) {
 
   container.innerHTML = html;
 
-  // Wire up expand/collapse handlers
-  container
-    .querySelectorAll(".rel-summary-expand-btn")
-    .forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const tr = btn.closest("tr");
-        if (!tr) return;
+  container.querySelectorAll(".rel-summary-expand-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const tr = btn.closest("tr");
+      if (!tr) return;
 
-        const sectionKey = tr.dataset.sectionKey;
-        const expanded = tr.dataset.expanded === "true";
+      const sectionKey = tr.dataset.sectionKey;
+      const expanded = tr.dataset.expanded === "true";
 
-        if (expanded) {
-          // Collapse
-          collapseSection(tr);
-        } else {
-          // Expand
-          await expandSection(tr, sectionKey, portalState);
-        }
-      });
+      if (expanded) {
+        collapseSection(tr);
+      } else {
+        await expandSection(tr, sectionKey, portalState);
+      }
     });
+  });
 }
 
 function renderSummaryRow({ label, key, count, grandTotal }) {
   const pct =
-    grandTotal && count
-      ? ((count / grandTotal) * 100).toFixed(1)
-      : "0.0";
-
-  const safeLabel = escapeHtml(label);
-  const safeKey = escapeHtml(key);
+    grandTotal && count ? ((count / grandTotal) * 100).toFixed(1) : "0.0";
 
   return `
-    <tr class="rel-summary-row" data-section-key="${safeKey}" data-expanded="false">
-      <td>${safeLabel}</td>
+    <tr class="rel-summary-row" data-section-key="${escapeHtml(
+      key
+    )}" data-expanded="false">
+      <td>${escapeHtml(label)}</td>
       <td class="numeric">${count}</td>
       <td class="numeric">${pct}%</td>
       <td class="actions">
@@ -288,18 +240,14 @@ function renderSummaryRow({ label, key, count, grandTotal }) {
 }
 
 /* -------------------------------------------------------
-Expand / Collapse logic (lazy-load detail)
+Expand / Collapse logic
 ------------------------------------------------------- */
 
 async function expandSection(rowEl, sectionKey, portalState) {
-  if (!sectionKey) return;
-
-  // Mark as expanded
   rowEl.dataset.expanded = "true";
   const btn = rowEl.querySelector(".rel-summary-expand-btn");
   if (btn) btn.textContent = "Collapse";
 
-  // Insert a new row below for the drilldown container
   const tableBody = rowEl.parentElement;
   const drillRow = document.createElement("tr");
   drillRow.className = "rel-drilldown-row";
@@ -320,44 +268,44 @@ async function expandSection(rowEl, sectionKey, portalState) {
   try {
     const project = portalState?.project;
 
-    // 1) Load relationships for this section
-    const { rows, total_count } = await loadRelationshipsForSection(
-      project,
-      sectionKey
-    );
+    const { rows, total_count } = await fetchSectionRows(project, sectionKey);
 
-    const allRows = Array.isArray(rows) ? rows : [];
-    const totalCount = typeof total_count === "number" ? total_count : allRows.length;
-
-    // 2) If more than 1000, cap display but show message
     const DISPLAY_LIMIT = 1000;
     const displayRows =
-      allRows.length > DISPLAY_LIMIT
-        ? allRows.slice(0, DISPLAY_LIMIT)
-        : allRows;
+      rows.length > DISPLAY_LIMIT ? rows.slice(0, DISPLAY_LIMIT) : rows;
 
-    // 3) Extract unique contact IDs from these rows
     const idSet = new Set();
     displayRows.forEach(r => {
       if (r.source_contact_id) idSet.add(r.source_contact_id);
       if (r.related_contact_id) idSet.add(r.related_contact_id);
-      if (r.contact_id) idSet.add(r.contact_id); // in case of client-based sections
+      if (r.contact_id) idSet.add(r.contact_id);
     });
 
     const ids = Array.from(idSet);
 
-    // 4) Fetch ONLY those contacts
-    const contacts = await loadContactsByIds(project, ids);
+    const contacts = await fetchContactsByIds(project, ids);
 
-    // 5) Build contactMap
-    const contactMap = buildContactMapFromContacts(contacts);
+    const contactMap = {};
+    contacts.forEach(c => {
+      const name =
+        c.search_name ||
+        `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
+        c.business_name ||
+        c.email ||
+        "(unknown)";
+      contactMap[c.contact_id] = {
+        id: c.contact_id,
+        name,
+        email: c.email || "",
+        type: c.contact_type || ""
+      };
+    });
 
-    // 6) Render drilldown
     renderSectionDrilldown(
       drillContainer,
       sectionKey,
       displayRows,
-      totalCount,
+      total_count,
       contactMap,
       portalState
     );
@@ -383,36 +331,7 @@ function collapseSection(rowEl) {
 }
 
 /* -------------------------------------------------------
-Contact map builder
-------------------------------------------------------- */
-
-function buildContactMapFromContacts(contacts) {
-  const map = {};
-  if (!Array.isArray(contacts)) return map;
-
-  contacts.forEach(c => {
-    if (!c || !c.id) return;
-
-    const name =
-      c.name ||
-      [c.first_name, c.last_name].filter(Boolean).join(" ") ||
-      c.email ||
-      c.business_name ||
-      "";
-
-    map[c.id] = {
-      id: c.id,
-      name,
-      email: c.email || "",
-      contact_type: c.contact_type || c.type || "",
-    };
-  });
-
-  return map;
-}
-
-/* -------------------------------------------------------
-Section drilldown rendering
+Drilldown rendering
 ------------------------------------------------------- */
 
 function renderSectionDrilldown(
@@ -423,33 +342,8 @@ function renderSectionDrilldown(
   contactMap,
   portalState
 ) {
-  if (!rows || !rows.length) {
-    container.innerHTML = `
-      <div class="muted">(no rows)</div>
-    `;
-    return;
-  }
-
-  // Determine dataset type based on sectionKey
-  // For now, we treat:
-  //   - "total_clients_with_relationships" as clients
-  //   - everything else as relationships
-  let datasetType = "relationships";
-
-  if (sectionKey === "total_clients_with_relationships") {
-    datasetType = "clients";
-  }
-
-  // Build dataset object
   const label = buildSectionLabel(sectionKey);
-  const dataset = {
-    type: datasetType,
-    label,
-    rows,
-    totalCount,
-  };
 
-  // Render header + optional "showing first N" message
   let html = `
     <div class="rel-drilldown-header">
       <strong>${escapeHtml(label)}</strong>
@@ -463,15 +357,19 @@ function renderSectionDrilldown(
     `;
   }
 
-  html += `</div>`;
-
-  html += `<div class="rel-drilldown-body"></div>`;
+  html += `</div><div class="rel-drilldown-body"></div>`;
 
   container.innerHTML = html;
 
   const bodyEl = container.querySelector(".rel-drilldown-body");
 
-  renderDrilldownTable(bodyEl, dataset, contactMap, portalState);
+  if (sectionKey === "total_clients_with_relationships") {
+    renderClientsDrilldown(bodyEl, rows, contactMap, portalState);
+  } else if (sectionKey === "total_unique_related_contacts") {
+    renderClientsDrilldown(bodyEl, rows, contactMap, portalState);
+  } else {
+    renderRelationshipsDrilldown(bodyEl, rows, contactMap, portalState);
+  }
 }
 
 function buildSectionLabel(sectionKey) {
@@ -492,31 +390,10 @@ function buildSectionLabel(sectionKey) {
 }
 
 /* -------------------------------------------------------
-Drilldown rendering
+Clients drilldown
 ------------------------------------------------------- */
 
-function renderDrilldownTable(container, dataset, contactMap, portalState) {
-  const { type, label, rows } = dataset;
-
-  if (!rows || !rows.length) {
-    container.innerHTML = `
-      <span class="muted">(no rows)</span>
-    `;
-    return;
-  }
-
-  if (type === "clients") {
-    renderClientsDrilldown(container, label, rows, contactMap, portalState);
-  } else {
-    renderRelationshipsDrilldown(container, label, rows, contactMap, portalState);
-  }
-}
-
-/* -------------------------------------------------------
-Clients drilldown (Name only clickable)
-------------------------------------------------------- */
-
-function renderClientsDrilldown(container, label, rows, contactMap, portalState) {
+function renderClientsDrilldown(container, rows, contactMap, portalState) {
   let html = `
     <div style="margin-top:4px; max-height:360px; overflow:auto;">
       <table class="notes-table">
@@ -531,26 +408,23 @@ function renderClientsDrilldown(container, label, rows, contactMap, portalState)
   `;
 
   rows.forEach(r => {
-    const c =
-      (r.contact_id && contactMap[r.contact_id]) ||
-      (r.id && contactMap[r.id]) ||
-      null;
+    const c = contactMap[r.contact_id] || null;
 
-    const name = c?.name || r.contact_name || r.name || r.contact_id || "(unknown)";
-    const email = c?.email || r.email || "";
-    const contactType = c?.contact_type || r.contact_type || "";
-
-    const contactId = c?.id || r.contact_id || r.id || "";
+    const name = c?.name || r.contact_id || "(unknown)";
+    const email = c?.email || "";
+    const type = c?.type || "";
 
     html += `
-      <tr class="drill-client-row" data-contact-id="${escapeHtml(contactId)}">
+      <tr>
         <td>
-          <a href="#" class="drill-contact" data-id="${escapeHtml(contactId)}">
+          <a href="#" class="drill-contact" data-id="${escapeHtml(
+            r.contact_id
+          )}">
             ${escapeHtml(name)}
           </a>
         </td>
         <td>${escapeHtml(email)}</td>
-        <td>${escapeHtml(contactType)}</td>
+        <td>${escapeHtml(type)}</td>
       </tr>
     `;
   });
@@ -563,7 +437,6 @@ function renderClientsDrilldown(container, label, rows, contactMap, portalState)
 
   container.innerHTML = html;
 
-  // Clickable names → Details tab
   container.querySelectorAll(".drill-contact").forEach(a => {
     a.addEventListener("click", evt => {
       evt.preventDefault();
@@ -573,7 +446,6 @@ function renderClientsDrilldown(container, label, rows, contactMap, portalState)
       portalState.selectedContactId = id;
       portalState.selectedContactName = name;
 
-      // Auto-switch to Details tab
       document
         .querySelector('#relationships-subtabs button[data-subtab="details"]')
         ?.click();
@@ -582,16 +454,10 @@ function renderClientsDrilldown(container, label, rows, contactMap, portalState)
 }
 
 /* -------------------------------------------------------
-Relationships drilldown (Source + Target names clickable)
+Relationships drilldown
 ------------------------------------------------------- */
 
-function renderRelationshipsDrilldown(
-  container,
-  label,
-  relationships,
-  contactMap,
-  portalState
-) {
+function renderRelationshipsDrilldown(container, rows, contactMap, portalState) {
   let html = `
     <div style="margin-top:4px; max-height:360px; overflow:auto;">
       <table class="notes-table">
@@ -606,42 +472,31 @@ function renderRelationshipsDrilldown(
         <tbody>
   `;
 
-  relationships.forEach(r => {
-    const s = r.source_contact_id ? contactMap[r.source_contact_id] : null;
-    const t = r.related_contact_id ? contactMap[r.related_contact_id] : null;
+  rows.forEach(r => {
+    const s = contactMap[r.source_contact_id];
+    const t = contactMap[r.related_contact_id];
 
-    const sName =
-      s?.name ||
-      r.source_contact_name ||
-      r.source_contact_id ||
-      "(unknown)";
-
-    const tName =
-      t?.name ||
-      r.related_contact_name ||
-      r.related_contact_id ||
-      "(unknown)";
-
-    const relType = r.relationship_type || r.type || "";
-    const role = r.relationship_role || r.role || "";
-
-    const sourceId = s?.id || r.source_contact_id || "";
-    const targetId = t?.id || r.related_contact_id || "";
+    const sName = s?.name || r.source_contact_id || "(unknown)";
+    const tName = t?.name || r.related_contact_id || "(unknown)";
 
     html += `
       <tr>
         <td>
-          <a href="#" class="drill-contact" data-id="${escapeHtml(sourceId)}">
+          <a href="#" class="drill-contact" data-id="${escapeHtml(
+            r.source_contact_id
+          )}">
             ${escapeHtml(sName)}
           </a>
         </td>
         <td>
-          <a href="#" class="drill-contact" data-id="${escapeHtml(targetId)}">
+          <a href="#" class="drill-contact" data-id="${escapeHtml(
+            r.related_contact_id
+          )}">
             ${escapeHtml(tName)}
           </a>
         </td>
-        <td>${escapeHtml(relType)}</td>
-        <td>${escapeHtml(role)}</td>
+        <td>${escapeHtml(r.relationship_type || "")}</td>
+        <td>${escapeHtml(r.relationship_role || "")}</td>
       </tr>
     `;
   });
@@ -654,7 +509,6 @@ function renderRelationshipsDrilldown(
 
   container.innerHTML = html;
 
-  // Clickable names → Details tab
   container.querySelectorAll(".drill-contact").forEach(a => {
     a.addEventListener("click", evt => {
       evt.preventDefault();
@@ -664,7 +518,6 @@ function renderRelationshipsDrilldown(
       portalState.selectedContactId = id;
       portalState.selectedContactName = name;
 
-      // Auto-switch to Details tab
       document
         .querySelector('#relationships-subtabs button[data-subtab="details"]')
         ?.click();
@@ -673,5 +526,5 @@ function renderRelationshipsDrilldown(
 }
 
 /* -------------------------------------------------------
-(End of file)
+END OF FILE
 ------------------------------------------------------- */
