@@ -2,7 +2,7 @@
 Relationships Overview Tab (Lazy-load, efficient)
 ------------------------------------------------------- */
 
-import { escapeHtml } from "../utils/escapeHtml.js";
+import { escapeHtml } from "../utilities.js";
 
 /*
   High-level architecture:
