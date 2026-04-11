@@ -1,68 +1,84 @@
-/* -------------------------------------------------------
-Relationships Overview Tab (Lazy-load, efficient)
-------------------------------------------------------- */
+// /js/relationships/tab-overview.js
+// Relationships → Overview (lazy-loaded drilldowns + accurate totals)
 
 import { escapeHtml } from "../utilities.js";
 
-/*
-  High-level architecture:
+/* -------------------------------------------------------
+Data loading (your original logic — unchanged)
+------------------------------------------------------- */
 
-  - On load:
-      - Use your existing loadOverviewData() to fetch:
-          • ALL relationships (unlimited)
-          • FIRST 1000 contacts (for summary only)
-      - Compute totals from relationships
-      - Render summary rows
+async function loadOverviewData(projectId) {
+  const contactsUrl = `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${encodeURIComponent(
+    projectId
+  )}&limit=1000`;
 
-  - On expand of a row:
-      - Fetch ONLY the relationships for that row (backend-filtered)
-      - Extract unique contact IDs
-      - Fetch ONLY those contacts by ID (bulk endpoint)
-      - Build a contactMap from those contacts
-      - Render drilldown table with guaranteed names
-      - If > 1000 rows, show "Showing first 1000 of X" message
+  const relUrl = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${encodeURIComponent(
+    projectId
+  )}`;
 
-  - On collapse:
-      - Remove drilldown container for that row
-*/
+  const [contactsRes, relRes] = await Promise.all([
+    fetch(contactsUrl, { cache: "no-cache" }),
+    fetch(relUrl, { cache: "no-cache" })
+  ]);
+
+  let contacts = await contactsRes.json().catch(() => []);
+  let relationships = await relRes.json().catch(() => []);
+
+  if (!Array.isArray(contacts)) contacts = [];
+  if (!Array.isArray(relationships)) relationships = [];
+
+  return { contacts, relationships };
+}
 
 /* -------------------------------------------------------
 Entry point
 ------------------------------------------------------- */
 
 export async function renderRelOverview(container, portalState) {
+  const project = portalState.project;
+
+  if (!project) {
+    container.innerHTML = `
+      <section class="card">
+        <p>Missing project. Select a project to view relationship overview.</p>
+      </section>
+    `;
+    return;
+  }
+
   container.innerHTML = `
-    <div class="rel-overview">
-      <h3>Relationships Overview</h3>
-      <div id="rel-overview-summary" class="rel-overview-summary">
-        <div class="loading">Loading relationship summary...</div>
+    <section class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h2>Relationship Overview</h2>
       </div>
-    </div>
+
+      <section id="relOverviewStats" style="margin-bottom:16px; font-size:0.9em; color:#444;">
+        <div class="muted">Loading stats…</div>
+      </section>
+
+      <section id="relOverviewDrilldown" style="margin-top:8px; font-size:0.9em; color:#444;">
+        <div class="muted">Click any count to see the underlying rows.</div>
+      </section>
+    </section>
   `;
 
-  try {
-    const project = portalState?.project;
+  const statsContainer = container.querySelector("#relOverviewStats");
+  const drilldownContainer = container.querySelector("#relOverviewDrilldown");
 
-    // ⭐ Use your existing loadOverviewData()
+  try {
     const { contacts, relationships } = await loadOverviewData(project);
 
     const totals = computeOverviewTotals(relationships);
 
     renderOverviewSummary(
-      container.querySelector("#rel-overview-summary"),
+      statsContainer,
       totals,
+      drilldownContainer,
       portalState
     );
   } catch (err) {
     console.error("Error loading relationship overview:", err);
-    const summaryEl = container.querySelector("#rel-overview-summary");
-    if (summaryEl) {
-      summaryEl.innerHTML = `
-        <div class="error">
-          Failed to load relationship overview.
-        </div>
-      `;
-    }
+    statsContainer.innerHTML = `<div class="error">Failed to load relationship overview.</div>`;
   }
 }
 
@@ -126,15 +142,10 @@ async function fetchContactsByIds(project, ids) {
 }
 
 /* -------------------------------------------------------
-Overview summary rendering
+Render summary table
 ------------------------------------------------------- */
 
-function renderOverviewSummary(container, totals, portalState) {
-  if (!totals) {
-    container.innerHTML = `<div class="muted">No relationship data available.</div>`;
-    return;
-  }
-
+function renderOverviewSummary(container, totals, drilldownContainer, portalState) {
   const {
     total_relationship_records,
     total_clients_with_relationships,
@@ -157,26 +168,9 @@ function renderOverviewSummary(container, totals, portalState) {
       <tbody>
   `;
 
-  html += renderSummaryRow({
-    label: "Total Relationship Records",
-    key: "total_relationship_records",
-    count: total_relationship_records,
-    grandTotal
-  });
-
-  html += renderSummaryRow({
-    label: "Total Clients With Relationships",
-    key: "total_clients_with_relationships",
-    count: total_clients_with_relationships,
-    grandTotal
-  });
-
-  html += renderSummaryRow({
-    label: "Total Unique Related Contacts",
-    key: "total_unique_related_contacts",
-    count: total_unique_related_contacts,
-    grandTotal
-  });
+  html += summaryRow("Total Relationship Records", "total_relationship_records", total_relationship_records, grandTotal);
+  html += summaryRow("Total Clients With Relationships", "total_clients_with_relationships", total_clients_with_relationships, grandTotal);
+  html += summaryRow("Total Unique Related Contacts", "total_unique_related_contacts", total_unique_related_contacts, grandTotal);
 
   html += `
     <tr class="section-divider">
@@ -185,46 +179,38 @@ function renderOverviewSummary(container, totals, portalState) {
   `;
 
   by_type.forEach(row => {
-    html += renderSummaryRow({
-      label: `Relationships of type "${row.type}"`,
-      key: `type:${row.type}`,
-      count: row.count,
+    html += summaryRow(
+      `Relationships of type "${row.type}"`,
+      `type:${row.type}`,
+      row.count,
       grandTotal
-    });
+    );
   });
 
-  html += `
-      </tbody>
-    </table>
-  `;
+  html += `</tbody></table>`;
 
   container.innerHTML = html;
 
   container.querySelectorAll(".rel-summary-expand-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
       const tr = btn.closest("tr");
-      if (!tr) return;
-
       const sectionKey = tr.dataset.sectionKey;
       const expanded = tr.dataset.expanded === "true";
 
       if (expanded) {
         collapseSection(tr);
       } else {
-        await expandSection(tr, sectionKey, portalState);
+        await expandSection(tr, sectionKey, drilldownContainer, portalState);
       }
     });
   });
 }
 
-function renderSummaryRow({ label, key, count, grandTotal }) {
-  const pct =
-    grandTotal && count ? ((count / grandTotal) * 100).toFixed(1) : "0.0";
+function summaryRow(label, key, count, grandTotal) {
+  const pct = grandTotal && count ? ((count / grandTotal) * 100).toFixed(1) : "0.0";
 
   return `
-    <tr class="rel-summary-row" data-section-key="${escapeHtml(
-      key
-    )}" data-expanded="false">
+    <tr class="rel-summary-row" data-section-key="${escapeHtml(key)}" data-expanded="false">
       <td>${escapeHtml(label)}</td>
       <td class="numeric">${count}</td>
       <td class="numeric">${pct}%</td>
@@ -240,39 +226,22 @@ function renderSummaryRow({ label, key, count, grandTotal }) {
 }
 
 /* -------------------------------------------------------
-Expand / Collapse logic
+Expand / Collapse
 ------------------------------------------------------- */
 
-async function expandSection(rowEl, sectionKey, portalState) {
+async function expandSection(rowEl, sectionKey, drilldownContainer, portalState) {
   rowEl.dataset.expanded = "true";
-  const btn = rowEl.querySelector(".rel-summary-expand-btn");
-  if (btn) btn.textContent = "Collapse";
+  rowEl.querySelector(".rel-summary-expand-btn").textContent = "Collapse";
 
-  const tableBody = rowEl.parentElement;
-  const drillRow = document.createElement("tr");
-  drillRow.className = "rel-drilldown-row";
-
-  const colCount = rowEl.children.length;
-  drillRow.innerHTML = `
-    <td colspan="${colCount}">
-      <div class="rel-drilldown-container">
-        <div class="loading">Loading details...</div>
-      </div>
-    </td>
-  `;
-
-  tableBody.insertBefore(drillRow, rowEl.nextSibling);
-
-  const drillContainer = drillRow.querySelector(".rel-drilldown-container");
+  drilldownContainer.innerHTML = `<div class="loading">Loading details…</div>`;
 
   try {
-    const project = portalState?.project;
+    const project = portalState.project;
 
     const { rows, total_count } = await fetchSectionRows(project, sectionKey);
 
     const DISPLAY_LIMIT = 1000;
-    const displayRows =
-      rows.length > DISPLAY_LIMIT ? rows.slice(0, DISPLAY_LIMIT) : rows;
+    const displayRows = rows.length > DISPLAY_LIMIT ? rows.slice(0, DISPLAY_LIMIT) : rows;
 
     const idSet = new Set();
     displayRows.forEach(r => {
@@ -281,9 +250,7 @@ async function expandSection(rowEl, sectionKey, portalState) {
       if (r.contact_id) idSet.add(r.contact_id);
     });
 
-    const ids = Array.from(idSet);
-
-    const contacts = await fetchContactsByIds(project, ids);
+    const contacts = await fetchContactsByIds(project, Array.from(idSet));
 
     const contactMap = {};
     contacts.forEach(c => {
@@ -301,91 +268,54 @@ async function expandSection(rowEl, sectionKey, portalState) {
       };
     });
 
-    renderSectionDrilldown(
-      drillContainer,
-      sectionKey,
-      displayRows,
-      total_count,
-      contactMap,
-      portalState
-    );
+    renderDrilldown(drilldownContainer, sectionKey, displayRows, total_count, contactMap, portalState);
   } catch (err) {
-    console.error("Error expanding section:", err);
-    drillContainer.innerHTML = `
-      <div class="error">
-        Failed to load details for this section.
-      </div>
-    `;
+    console.error(err);
+    drilldownContainer.innerHTML = `<div class="error">Failed to load details.</div>`;
   }
 }
 
 function collapseSection(rowEl) {
   rowEl.dataset.expanded = "false";
-  const btn = rowEl.querySelector(".rel-summary-expand-btn");
-  if (btn) btn.textContent = "Expand";
-
-  const nextRow = rowEl.nextElementSibling;
-  if (nextRow && nextRow.classList.contains("rel-drilldown-row")) {
-    nextRow.remove();
-  }
+  rowEl.querySelector(".rel-summary-expand-btn").textContent = "Expand";
 }
 
 /* -------------------------------------------------------
 Drilldown rendering
 ------------------------------------------------------- */
 
-function renderSectionDrilldown(
-  container,
-  sectionKey,
-  rows,
-  totalCount,
-  contactMap,
-  portalState
-) {
+function renderDrilldown(container, sectionKey, rows, totalCount, contactMap, portalState) {
   const label = buildSectionLabel(sectionKey);
 
   let html = `
     <div class="rel-drilldown-header">
       <strong>${escapeHtml(label)}</strong>
+      ${
+        rows.length < totalCount
+          ? `<div class="muted">Showing first ${rows.length} of ${totalCount} records.</div>`
+          : ""
+      }
+    </div>
+    <div class="rel-drilldown-body"></div>
   `;
-
-  if (rows.length < totalCount) {
-    html += `
-      <div class="muted">
-        Showing first ${rows.length} of ${totalCount} records. Apply filters to narrow results.
-      </div>
-    `;
-  }
-
-  html += `</div><div class="rel-drilldown-body"></div>`;
 
   container.innerHTML = html;
 
   const bodyEl = container.querySelector(".rel-drilldown-body");
 
-  if (sectionKey === "total_clients_with_relationships") {
-    renderClientsDrilldown(bodyEl, rows, contactMap, portalState);
-  } else if (sectionKey === "total_unique_related_contacts") {
-    renderClientsDrilldown(bodyEl, rows, contactMap, portalState);
+  if (sectionKey === "total_clients_with_relationships" ||
+      sectionKey === "total_unique_related_contacts") {
+    renderClients(bodyEl, rows, contactMap, portalState);
   } else {
-    renderRelationshipsDrilldown(bodyEl, rows, contactMap, portalState);
+    renderRelationships(bodyEl, rows, contactMap, portalState);
   }
 }
 
 function buildSectionLabel(sectionKey) {
-  if (sectionKey === "total_relationship_records") {
-    return "All Relationship Records";
-  }
-  if (sectionKey === "total_clients_with_relationships") {
-    return "Clients With At Least One Relationship";
-  }
-  if (sectionKey === "total_unique_related_contacts") {
-    return "Unique Related Contacts";
-  }
-  if (sectionKey.startsWith("type:")) {
-    const t = sectionKey.slice("type:".length);
-    return `Relationships of type "${t}"`;
-  }
+  if (sectionKey === "total_relationship_records") return "All Relationship Records";
+  if (sectionKey === "total_clients_with_relationships") return "Clients With At Least One Relationship";
+  if (sectionKey === "total_unique_related_contacts") return "Unique Related Contacts";
+  if (sectionKey.startsWith("type:")) return `Relationships of type "${sectionKey.slice(5)}"`;
   return sectionKey;
 }
 
@@ -393,62 +323,36 @@ function buildSectionLabel(sectionKey) {
 Clients drilldown
 ------------------------------------------------------- */
 
-function renderClientsDrilldown(container, rows, contactMap, portalState) {
+function renderClients(container, rows, contactMap, portalState) {
   let html = `
     <div style="margin-top:4px; max-height:360px; overflow:auto;">
       <table class="notes-table">
         <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Type</th>
-          </tr>
+          <tr><th>Name</th><th>Email</th><th>Type</th></tr>
         </thead>
         <tbody>
   `;
 
   rows.forEach(r => {
-    const c = contactMap[r.contact_id] || null;
-
-    const name = c?.name || r.contact_id || "(unknown)";
-    const email = c?.email || "";
-    const type = c?.type || "";
-
+    const c = contactMap[r.contact_id] || {};
     html += `
       <tr>
-        <td>
-          <a href="#" class="drill-contact" data-id="${escapeHtml(
-            r.contact_id
-          )}">
-            ${escapeHtml(name)}
-          </a>
-        </td>
-        <td>${escapeHtml(email)}</td>
-        <td>${escapeHtml(type)}</td>
+        <td><a href="#" class="drill-contact" data-id="${escapeHtml(r.contact_id)}">${escapeHtml(c.name || "(unknown)")}</a></td>
+        <td>${escapeHtml(c.email || "")}</td>
+        <td>${escapeHtml(c.type || "")}</td>
       </tr>
     `;
   });
 
-  html += `
-        </tbody>
-      </table>
-    </div>
-  `;
-
+  html += `</tbody></table></div>`;
   container.innerHTML = html;
 
   container.querySelectorAll(".drill-contact").forEach(a => {
     a.addEventListener("click", evt => {
       evt.preventDefault();
-      const id = a.dataset.id;
-      const name = a.textContent.trim();
-
-      portalState.selectedContactId = id;
-      portalState.selectedContactName = name;
-
-      document
-        .querySelector('#relationships-subtabs button[data-subtab="details"]')
-        ?.click();
+      portalState.selectedContactId = a.dataset.id;
+      portalState.selectedContactName = a.textContent.trim();
+      document.querySelector('#relationships-subtabs button[data-subtab="details"]')?.click();
     });
   });
 }
@@ -457,70 +361,39 @@ function renderClientsDrilldown(container, rows, contactMap, portalState) {
 Relationships drilldown
 ------------------------------------------------------- */
 
-function renderRelationshipsDrilldown(container, rows, contactMap, portalState) {
+function renderRelationships(container, rows, contactMap, portalState) {
   let html = `
     <div style="margin-top:4px; max-height:360px; overflow:auto;">
       <table class="notes-table">
         <thead>
-          <tr>
-            <th>Source</th>
-            <th>Target</th>
-            <th>Type</th>
-            <th>Role</th>
-          </tr>
+          <tr><th>Source</th><th>Target</th><th>Type</th><th>Role</th></tr>
         </thead>
         <tbody>
   `;
 
   rows.forEach(r => {
-    const s = contactMap[r.source_contact_id];
-    const t = contactMap[r.related_contact_id];
-
-    const sName = s?.name || r.source_contact_id || "(unknown)";
-    const tName = t?.name || r.related_contact_id || "(unknown)";
+    const s = contactMap[r.source_contact_id] || {};
+    const t = contactMap[r.related_contact_id] || {};
 
     html += `
       <tr>
-        <td>
-          <a href="#" class="drill-contact" data-id="${escapeHtml(
-            r.source_contact_id
-          )}">
-            ${escapeHtml(sName)}
-          </a>
-        </td>
-        <td>
-          <a href="#" class="drill-contact" data-id="${escapeHtml(
-            r.related_contact_id
-          )}">
-            ${escapeHtml(tName)}
-          </a>
-        </td>
+        <td><a href="#" class="drill-contact" data-id="${escapeHtml(r.source_contact_id)}">${escapeHtml(s.name || "(unknown)")}</a></td>
+        <td><a href="#" class="drill-contact" data-id="${escapeHtml(r.related_contact_id)}">${escapeHtml(t.name || "(unknown)")}</a></td>
         <td>${escapeHtml(r.relationship_type || "")}</td>
         <td>${escapeHtml(r.relationship_role || "")}</td>
       </tr>
     `;
   });
 
-  html += `
-        </tbody>
-      </table>
-    </div>
-  `;
-
+  html += `</tbody></table></div>`;
   container.innerHTML = html;
 
   container.querySelectorAll(".drill-contact").forEach(a => {
     a.addEventListener("click", evt => {
       evt.preventDefault();
-      const id = a.dataset.id;
-      const name = a.textContent.trim();
-
-      portalState.selectedContactId = id;
-      portalState.selectedContactName = name;
-
-      document
-        .querySelector('#relationships-subtabs button[data-subtab="details"]')
-        ?.click();
+      portalState.selectedContactId = a.dataset.id;
+      portalState.selectedContactName = a.textContent.trim();
+      document.querySelector('#relationships-subtabs button[data-subtab="details"]')?.click();
     });
   });
 }
@@ -528,3 +401,4 @@ function renderRelationshipsDrilldown(container, rows, contactMap, portalState) 
 /* -------------------------------------------------------
 END OF FILE
 ------------------------------------------------------- */
+
