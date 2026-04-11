@@ -71,9 +71,8 @@ Data loading
 ------------------------------------------------------- */
 
 async function loadOverviewData(projectId) {
-  const contactsUrl = `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${encodeURIComponent(
-    projectId
-  )}&limit=1000`;
+  const contactsUrl =
+  `https://contacts-module.dennis-e64.workers.dev/contacts/all?project=${encodeURIComponent(projectId)}`;
 
   const relUrl = `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${encodeURIComponent(
     projectId
