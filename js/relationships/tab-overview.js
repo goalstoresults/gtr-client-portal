@@ -113,37 +113,43 @@ function buildContactMap(contacts) {
 }
 
 /* -------------------------------------------------------
-Stats model
+Stats model (4 totals rows)
 ------------------------------------------------------- */
 
 function buildStatsModel(contacts, relationships, contactMap) {
-  const totalRelationships = relationships.length;
+  const totalRelationshipRecords = relationships.length;
 
-  // Clients with relationships (source_contact_id with contact_type = 'Client')
-  const clientRelCounts = {};
+  // Total Clients
+  const allClients = contacts.filter(c => c.contact_type === "Client");
+
+  // Clients with relationships (source OR related)
+  const clientsWithRelSet = new Set();
   relationships.forEach(r => {
-    const cid = r.source_contact_id;
-    if (!cid) return;
-    const c = contactMap[cid];
-    if (!c) return;
-    if (c.type !== "Client") return;
-    clientRelCounts[cid] = (clientRelCounts[cid] || 0) + 1;
+    if (contactMap[r.source_contact_id]?.type === "Client") {
+      clientsWithRelSet.add(r.source_contact_id);
+    }
+    if (contactMap[r.related_contact_id]?.type === "Client") {
+      clientsWithRelSet.add(r.related_contact_id);
+    }
   });
 
-  const clientIds = Object.keys(clientRelCounts);
-  const clientsWithRelationships = clientIds
-    .map(id => {
-      const c = contactMap[id];
-      if (!c) return null;
-      return {
-        contact_id: c.id,
-        name: c.name,
-        email: c.email,
-        contact_type: c.type,
-        relationship_count: clientRelCounts[id]
-      };
-    })
-    .filter(Boolean);
+  const clientsWithRelationships = [...clientsWithRelSet].map(id => {
+    const c = contactMap[id];
+    return {
+      contact_id: c.id,
+      name: c.name,
+      email: c.email,
+      contact_type: c.type
+    };
+  });
+
+  // Total client relationships (rows where either side is a client)
+  const clientRelationships = relationships.filter(r => {
+    return (
+      contactMap[r.source_contact_id]?.type === "Client" ||
+      contactMap[r.related_contact_id]?.type === "Client"
+    );
+  });
 
   // Relationship types
   const typeCounts = {};
@@ -167,22 +173,28 @@ function buildStatsModel(contacts, relationships, contactMap) {
     roleCounts[role].rows.push(r);
   });
 
+  /* -------------------------
+     Build Totals section rows
+     ------------------------- */
+
   const totalsRows = [];
   const totalsDatasets = {};
 
+  // 1. Total Clients
   totalsRows.push({
-    key: "totalRelationships",
-    category: "Total Relationships",
-    count: totalRelationships,
+    key: "totalClients",
+    category: "Total Clients",
+    count: allClients.length,
     percentText: "",
     percentValue: 0
   });
-  totalsDatasets["totalRelationships"] = {
-    type: "relationships",
-    label: "All Relationships",
-    rows: relationships
+  totalsDatasets["totalClients"] = {
+    type: "clients",
+    label: "All Clients",
+    rows: allClients
   };
 
+  // 2. Total Clients With Relationships
   totalsRows.push({
     key: "totalClientsWithRelationships",
     category: "Total Clients With Relationships",
@@ -196,6 +208,38 @@ function buildStatsModel(contacts, relationships, contactMap) {
     rows: clientsWithRelationships
   };
 
+  // 3. Total Client Relationships
+  totalsRows.push({
+    key: "totalClientRelationships",
+    category: "Total Client Relationships",
+    count: clientRelationships.length,
+    percentText: "",
+    percentValue: 0
+  });
+  totalsDatasets["totalClientRelationships"] = {
+    type: "relationships",
+    label: "Client Relationships",
+    rows: clientRelationships
+  };
+
+  // 4. Total Relationship Records
+  totalsRows.push({
+    key: "totalRelationshipRecords",
+    category: "Total Relationship Records",
+    count: totalRelationshipRecords,
+    percentText: "",
+    percentValue: 0
+  });
+  totalsDatasets["totalRelationshipRecords"] = {
+    type: "relationships",
+    label: "All Relationship Records",
+    rows: relationships
+  };
+
+  /* -------------------------
+     Build Types section rows
+     ------------------------- */
+
   const typesRows = [];
   const typesDatasets = {};
 
@@ -204,9 +248,11 @@ function buildStatsModel(contacts, relationships, contactMap) {
     .forEach(type => {
       const { count, rows } = typeCounts[type];
       const pctVal =
-        totalRelationships > 0 ? (count / totalRelationships) * 100 : 0;
+        totalRelationshipRecords > 0
+          ? (count / totalRelationshipRecords) * 100
+          : 0;
       const pctText =
-        totalRelationships > 0 ? pctVal.toFixed(1) + "%" : "";
+        totalRelationshipRecords > 0 ? pctVal.toFixed(1) + "%" : "";
       const key = `type:${type}`;
       typesRows.push({
         key,
@@ -222,6 +268,10 @@ function buildStatsModel(contacts, relationships, contactMap) {
       };
     });
 
+  /* -------------------------
+     Build Roles section rows
+     ------------------------- */
+
   const rolesRows = [];
   const rolesDatasets = {};
 
@@ -230,9 +280,11 @@ function buildStatsModel(contacts, relationships, contactMap) {
     .forEach(role => {
       const { count, rows } = roleCounts[role];
       const pctVal =
-        totalRelationships > 0 ? (count / totalRelationships) * 100 : 0;
+        totalRelationshipRecords > 0
+          ? (count / totalRelationshipRecords) * 100
+          : 0;
       const pctText =
-        totalRelationships > 0 ? pctVal.toFixed(1) + "%" : "";
+        totalRelationshipRecords > 0 ? pctVal.toFixed(1) + "%" : "";
       const key = `role:${role}`;
       rolesRows.push({
         key,
@@ -254,7 +306,6 @@ function buildStatsModel(contacts, relationships, contactMap) {
     roles: { rows: rolesRows, datasets: rolesDatasets }
   };
 }
-
 /* -------------------------------------------------------
 Section rendering (sortable + inline expand/collapse)
 ------------------------------------------------------- */
@@ -380,7 +431,9 @@ function renderSection(
 
     container.innerHTML = html;
 
-    // Sort handlers
+    /* -------------------------
+       Sorting handlers
+       ------------------------- */
     container.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
@@ -391,13 +444,15 @@ function renderSection(
             sortField = field;
             sortDirection = "asc";
           }
-          expandedKey = null; // collapse on sort
+          expandedKey = null;
           render();
         }
       });
     });
 
-    // Expand handlers
+    /* -------------------------
+       Expand handlers
+       ------------------------- */
     container.querySelectorAll(".expand-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         const key = btn.getAttribute("data-key");
@@ -426,7 +481,9 @@ function renderSection(
       });
     });
 
-    // After render, if something is expanded, fill its drilldown
+    /* -------------------------
+       After render, fill drilldown
+       ------------------------- */
     if (expandedKey) {
       const safeKey = sanitizeKey(expandedKey);
       const drillContainer = container.querySelector(
@@ -452,7 +509,6 @@ function renderSection(
 function sanitizeKey(key) {
   return String(key).replace(/[^a-zA-Z0-9_-]/g, "_");
 }
-
 /* -------------------------------------------------------
 Drilldown rendering
 ------------------------------------------------------- */
@@ -476,7 +532,7 @@ function renderDrilldownTable(container, dataset, contactMap, portalState) {
 }
 
 /* -------------------------------------------------------
-Clients drilldown
+Clients drilldown (Name only clickable)
 ------------------------------------------------------- */
 
 function renderClientsDrilldown(container, label, clients, portalState) {
@@ -489,7 +545,6 @@ function renderClientsDrilldown(container, label, clients, portalState) {
             <th>Name</th>
             <th>Email</th>
             <th>Type</th>
-            <th style="width:140px; text-align:right;">Relationships</th>
           </tr>
         </thead>
         <tbody>
@@ -500,10 +555,15 @@ function renderClientsDrilldown(container, label, clients, portalState) {
       <tr class="drill-client-row" data-contact-id="${escapeHtml(
         c.contact_id
       )}">
-        <td>${escapeHtml(c.name || "")}</td>
+        <td>
+          <a href="#" class="drill-contact" data-id="${escapeHtml(
+            c.contact_id
+          )}">
+            ${escapeHtml(c.name || "")}
+          </a>
+        </td>
         <td>${escapeHtml(c.email || "")}</td>
         <td>${escapeHtml(c.contact_type || "")}</td>
-        <td style="text-align:right;">${c.relationship_count || 0}</td>
       </tr>
     `;
   });
@@ -516,26 +576,28 @@ function renderClientsDrilldown(container, label, clients, portalState) {
 
   container.innerHTML = html;
 
-  container.querySelectorAll(".drill-client-row").forEach(row => {
-    row.addEventListener("click", () => {
-      const contactId = row.getAttribute("data-contact-id");
-      const client = clients.find(c => c.contact_id === contactId);
-      if (!client) return;
+  /* -------------------------
+     Clickable names → Details
+     ------------------------- */
+  container.querySelectorAll(".drill-contact").forEach(a => {
+    a.addEventListener("click", evt => {
+      evt.preventDefault();
+      const id = a.dataset.id;
+      portalState.selectedContactId = id;
+      portalState.selectedContactName = a.textContent.trim();
 
-      portalState.selectedContactId = client.contact_id;
-      portalState.selectedContactName = client.name || client.contact_id;
-
-      console.log("Selected client from overview:", {
-        id: client.contact_id,
-        name: client.name
-      });
+      // Auto-switch to Details tab
+      document
+        .querySelector('#relationships-subtabs button[data-subtab="details"]')
+        ?.click();
     });
   });
 }
 
 /* -------------------------------------------------------
-Relationships drilldown
+Relationships drilldown (Source + Target names clickable)
 ------------------------------------------------------- */
+
 function renderRelationshipsDrilldown(
   container,
   label,
@@ -568,11 +630,21 @@ function renderRelationshipsDrilldown(
     const role = r.relationship_role || "";
 
     html += `
-      <tr class="drill-rel-row" data-source-id="${escapeHtml(
-        r.source_contact_id || ""
-      )}">
-        <td>${escapeHtml(sName)}</td>
-        <td>${escapeHtml(tName)}</td>
+      <tr>
+        <td>
+          <a href="#" class="drill-contact" data-id="${escapeHtml(
+            r.source_contact_id || ""
+          )}">
+            ${escapeHtml(sName)}
+          </a>
+        </td>
+        <td>
+          <a href="#" class="drill-contact" data-id="${escapeHtml(
+            r.related_contact_id || ""
+          )}">
+            ${escapeHtml(tName)}
+          </a>
+        </td>
         <td>${escapeHtml(relType)}</td>
         <td>${escapeHtml(role)}</td>
       </tr>
@@ -587,22 +659,22 @@ function renderRelationshipsDrilldown(
 
   container.innerHTML = html;
 
-  const rows = container.querySelectorAll(".drill-rel-row");
-  rows.forEach((row, index) => {
-    row.addEventListener("click", () => {
-      const rel = relationships[index];
-      if (!rel) return;
+  /* -------------------------
+     Clickable names → Details
+     ------------------------- */
+  container.querySelectorAll(".drill-contact").forEach(a => {
+    a.addEventListener("click", evt => {
+      evt.preventDefault();
+      const id = a.dataset.id;
+      const name = a.textContent.trim();
 
-      const source = contactMap[rel.source_contact_id];
-      if (!source) return;
+      portalState.selectedContactId = id;
+      portalState.selectedContactName = name;
 
-      portalState.selectedContactId = source.id;
-      portalState.selectedContactName = source.name;
-
-      console.log("Selected relationship source from overview:", {
-        id: source.id,
-        name: source.name
-      });
+      // Auto-switch to Details tab
+      document
+        .querySelector('#relationships-subtabs button[data-subtab="details"]')
+        ?.click();
     });
   });
 }
