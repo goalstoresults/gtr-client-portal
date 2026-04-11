@@ -529,7 +529,19 @@ async function loadDrilldownData(container, sectionKey, key, portalState) {
       if (r.contact_id) idSet.add(r.contact_id);
     });
 
-    const contacts = await fetchContactsByIds(project, Array.from(idSet));
+    // --- NEW: normalize backend response safely ---
+    let contacts = await fetchContactsByIds(project, Array.from(idSet));
+
+    if (!Array.isArray(contacts)) {
+      if (contacts && Array.isArray(contacts.data)) {
+        contacts = contacts.data;
+      } else if (contacts && Array.isArray(contacts.contacts)) {
+        contacts = contacts.contacts;
+      } else {
+        contacts = [];
+      }
+    }
+    // ----------------------------------------------
 
     const contactMap = {};
     contacts.forEach(c => {
@@ -539,6 +551,7 @@ async function loadDrilldownData(container, sectionKey, key, portalState) {
         c.business_name ||
         c.email ||
         "(unknown)";
+
       contactMap[c.contact_id] = {
         id: c.contact_id,
         name,
@@ -549,9 +562,12 @@ async function loadDrilldownData(container, sectionKey, key, portalState) {
 
     const label = buildSectionLabel(key);
 
+    // Clients drilldown
     if (key.startsWith("totalClients") || key.startsWith("totalClientsWith")) {
       renderClientsDrilldown(container, label, displayRows, portalState);
-    } else {
+    }
+    // Relationships drilldown
+    else {
       renderRelationshipsDrilldown(
         container,
         label,
@@ -565,6 +581,7 @@ async function loadDrilldownData(container, sectionKey, key, portalState) {
     container.innerHTML = `<div class="error">Failed to load details.</div>`;
   }
 }
+
 
 function buildSectionLabel(key) {
   if (key === "totalClients") return "All Clients";
