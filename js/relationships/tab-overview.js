@@ -32,7 +32,6 @@ export async function renderRelOverview(container, portalState) {
   const rolesContainer = container.querySelector("#relOverviewRoles");
 
   const { contacts, relationships } = await loadOverviewData(project);
-
   const contactMap = buildContactMap(contacts);
   const stats = buildStatsModel(contacts, relationships, contactMap);
 
@@ -68,7 +67,7 @@ export async function renderRelOverview(container, portalState) {
 }
 
 /* -------------------------------------------------------
-Data loading (unchanged)
+Data loading
 ------------------------------------------------------- */
 
 async function loadOverviewData(projectId) {
@@ -95,21 +94,21 @@ async function loadOverviewData(projectId) {
 }
 
 /* -------------------------------------------------------
-Contact map (unchanged)
+Contact map — FIXED NAME RESOLVER
 ------------------------------------------------------- */
 
 function buildContactMap(contacts) {
   const map = {};
-  contacts.forEach(c => {
-const name =
-  c.search_name ||
-  c.contact_name ||
-  `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
-  c.business_name ||
-  c.email ||
-  c.contact_id ||
-  "(unknown)";
 
+  contacts.forEach(c => {
+    const name =
+      c.search_name ||
+      c.contact_name ||
+      `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
+      c.business_name ||
+      c.email ||
+      c.contact_id ||
+      "(unknown)";
 
     map[c.contact_id] = {
       id: c.contact_id,
@@ -118,6 +117,7 @@ const name =
       email: c.email || c.primary_email || ""
     };
   });
+
   return map;
 }
 
@@ -183,6 +183,7 @@ function buildStatsModel(contacts, relationships, contactMap) {
     percentText: "",
     percentValue: 0
   });
+
   totalsDatasets["totalClients"] = {
     type: "clients",
     label: "All Clients",
@@ -196,10 +197,11 @@ function buildStatsModel(contacts, relationships, contactMap) {
     percentText: "",
     percentValue: 0
   });
+
   totalsDatasets["totalClientsWithRelationships"] = {
-    type: "clients",
+    type: "relationships",
     label: "Clients With Relationships",
-    rows: clientsWithRelationships
+    rows: clientRelationships
   };
 
   totalsRows.push({
@@ -209,6 +211,7 @@ function buildStatsModel(contacts, relationships, contactMap) {
     percentText: "",
     percentValue: 0
   });
+
   totalsDatasets["totalClientRelationships"] = {
     type: "relationships",
     label: "Client Relationships",
@@ -222,6 +225,7 @@ function buildStatsModel(contacts, relationships, contactMap) {
     percentText: "",
     percentValue: 0
   });
+
   totalsDatasets["totalRelationshipRecords"] = {
     type: "relationships",
     label: "All Relationship Records",
@@ -296,7 +300,7 @@ function buildStatsModel(contacts, relationships, contactMap) {
 }
 
 /* -------------------------------------------------------
-NEW BACKEND EXPAND LOGIC
+Backend expand logic
 ------------------------------------------------------- */
 
 async function fetchSectionRows(project, sectionKey) {
@@ -323,7 +327,7 @@ async function fetchContactsByIds(project, ids) {
 }
 
 /* -------------------------------------------------------
-Section rendering (UI unchanged)
+Section rendering
 ------------------------------------------------------- */
 
 function renderSection(
@@ -337,7 +341,9 @@ function renderSection(
 ) {
   if (!rows || !rows.length) {
     container.innerHTML = `
-      <h3 style="margin:8px 0 4px 0; font-size:1em;">${escapeHtml(title)}</h3>
+      <h3 style="margin:8px 0 4px 0; font-size:1em;">${escapeHtml(
+        title
+      )}</h3>
       <p class="muted">(no data)</p>
     `;
     return;
@@ -361,23 +367,27 @@ function renderSection(
 
   function sortRows() {
     const sorted = [...rows];
+
     sorted.sort((a, b) => {
       if (sortField === "count") {
         const A = Number(a.count || 0);
         const B = Number(b.count || 0);
         return sortDirection === "asc" ? A - B : B - A;
       }
+
       if (sortField === "percent") {
         const A = Number(a.percentValue || 0);
         const B = Number(b.percentValue || 0);
         return sortDirection === "asc" ? A - B : B - A;
       }
+
       const A = (a.category || "").toLowerCase();
       const B = (b.category || "").toLowerCase();
       return sortDirection === "asc"
         ? A.localeCompare(B)
         : B.localeCompare(A);
     });
+
     return sorted;
   }
 
@@ -451,6 +461,7 @@ function renderSection(
     container.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
+
         if (field === "category" || field === "count" || field === "percent") {
           if (sortField === field) {
             sortDirection = sortDirection === "asc" ? "desc" : "asc";
@@ -458,6 +469,7 @@ function renderSection(
             sortField = field;
             sortDirection = "asc";
           }
+
           expandedKey = null;
           render();
         }
@@ -512,7 +524,7 @@ function sanitizeKey(key) {
 }
 
 /* -------------------------------------------------------
-NEW DRILLDOWN LOADING (UI unchanged)
+Drilldown loading — FIXED ROUTING
 ------------------------------------------------------- */
 
 async function loadDrilldownData(container, sectionKey, key, portalState) {
@@ -534,7 +546,6 @@ async function loadDrilldownData(container, sectionKey, key, portalState) {
       if (r.contact_id) idSet.add(r.contact_id);
     });
 
-    // --- NEW: normalize backend response safely ---
     let contacts = await fetchContactsByIds(project, Array.from(idSet));
 
     if (!Array.isArray(contacts)) {
@@ -546,36 +557,32 @@ async function loadDrilldownData(container, sectionKey, key, portalState) {
         contacts = [];
       }
     }
-    // ----------------------------------------------
 
-const contactMap = {};
-contacts.forEach(c => {
-  const name =
-    c.contact_name ||
-    c.search_name ||
-    `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
-    c.business_name ||
-    c.email ||
-    c.contact_id ||
-    "(unknown)";
+    const contactMap = {};
+    contacts.forEach(c => {
+      const name =
+        c.search_name ||
+        c.contact_name ||
+        `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
+        c.business_name ||
+        c.email ||
+        c.contact_id ||
+        "(unknown)";
 
-  contactMap[c.contact_id] = {
-    id: c.contact_id,
-    name,
-    email: c.email || "",
-    type: c.contact_type || ""
-  };
-});
-
+      contactMap[c.contact_id] = {
+        id: c.contact_id,
+        name,
+        email: c.email || "",
+        type: c.contact_type || ""
+      };
+    });
 
     const label = buildSectionLabel(key);
 
-    // Clients drilldown
-    if (key.startsWith("totalClients") {
+    // 🔥 FIXED ROUTING
+    if (key === "totalClients") {
       renderClientsDrilldown(container, label, displayRows, portalState);
-    }
-    // Relationships drilldown
-    else {
+    } else {
       renderRelationshipsDrilldown(
         container,
         label,
@@ -589,7 +596,6 @@ contacts.forEach(c => {
     container.innerHTML = `<div class="error">Failed to load details.</div>`;
   }
 }
-
 
 function buildSectionLabel(key) {
   if (key === "totalClients") return "All Clients";
@@ -605,8 +611,9 @@ function buildSectionLabel(key) {
 }
 
 /* -------------------------------------------------------
-Clients drilldown (UI unchanged)
+Clients drilldown
 ------------------------------------------------------- */
+
 function renderClientsDrilldown(container, label, clients, portalState) {
   let html = `
     <strong>${escapeHtml(label)}</strong>
@@ -743,4 +750,3 @@ function renderRelationshipsDrilldown(
     });
   });
 }
-
