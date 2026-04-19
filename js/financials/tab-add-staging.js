@@ -574,7 +574,7 @@ window.showBulkUploadModal = function () {
   modal.innerHTML = `
     <div style="background:white; padding:20px; width:500px; border-radius:6px;">
       <h3>Bulk Upload</h3>
-      <p>Select a CSV file to upload. First row must contain column names.</p>
+      <p>Select a CSV file to upload. First row must contain column names. (Names must be transaction_date, invoice_number, customer_name, amount)</p>
       <input type="file" id="bulkCsvFile" accept=".csv" style="margin-top:10px;" />
       <div style="margin-top:16px; display:flex; justify-content:flex-end; gap:10px;">
         <button id="bulkCancel">Cancel</button>
