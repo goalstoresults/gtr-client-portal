@@ -322,80 +322,94 @@ function summarizeByYearReferral(payments, nameById) {
 }
 
 function summarizeByGroup(payments, groupByContactId) {
-  const map = new Map();
 
-  for (const p of payments) {
-    const groupInfo =
-      groupByContactId.get(p.referral_id) || {
-        group_id: null,
-        group_name: "(none)"
-      };
-    const key = groupInfo.group_id || "(none)";
+    const map = new Map();
 
-    if (!map.has(key)) {
-      map.set(key, {
-        group_id: groupInfo.group_id,
-        group_name: groupInfo.group_name,
-        total_amount: 0,
-        count: 0,
-        clients: new Set(),
-        referrals: new Set()
-      });
+    for (const p of payments) {
+
+        const groupInfo =
+            groupByContactId.get(p.referral_id) || {
+                group_id: null,
+                group_name: "(none)"
+            };
+
+        // ⭐ HIDE "(none)" groups
+        if (!groupInfo.group_id) continue;
+
+        const key = groupInfo.group_id;
+
+        if (!map.has(key)) {
+            map.set(key, {
+                group_id: groupInfo.group_id,
+                group_name: groupInfo.group_name,
+                total_amount: 0,
+                count: 0,
+                clients: new Set(),
+                referrals: new Set()
+            });
+        }
+
+        const row = map.get(key);
+        row.total_amount += Number(p.amount) || 0;
+        row.count++;
+        row.clients.add(p.contact_id);
+        row.referrals.add(p.referral_id);
     }
 
-    const row = map.get(key);
-    row.total_amount += Number(p.amount) || 0;
-    row.count++;
-    row.clients.add(p.contact_id);
-    row.referrals.add(p.referral_id);
-  }
-
-  return [...map.values()].map(r => ({
-    ...r,
-    clients: r.clients.size,
-    referrals: r.referrals.size
-  }));
+    return [...map.values()].map(r => ({
+        ...r,
+        clients: r.clients.size,
+        referrals: r.referrals.size
+    }));
 }
+
 
 function summarizeByGroupYear(payments, groupByContactId) {
-  const map = new Map();
 
-  for (const p of payments) {
-    const year = p.transaction_year;
-    if (!year) continue;
+    const map = new Map();
 
-    const groupInfo =
-      groupByContactId.get(p.referral_id) || {
-        group_id: null,
-        group_name: "(none)"
-      };
-    const key = `${groupInfo.group_id || "(none)"}-${year}`;
+    for (const p of payments) {
 
-    if (!map.has(key)) {
-      map.set(key, {
-        year,
-        group_id: groupInfo.group_id,
-        group_name: groupInfo.group_name,
-        total_amount: 0,
-        count: 0,
-        clients: new Set(),
-        referrals: new Set()
-      });
+        const year = p.transaction_year;
+        if (!year) continue;
+
+        const groupInfo =
+            groupByContactId.get(p.referral_id) || {
+                group_id: null,
+                group_name: "(none)"
+            };
+
+        // ⭐ HIDE "(none)" groups
+        if (!groupInfo.group_id) continue;
+
+        const key = `${groupInfo.group_id}-${year}`;
+
+        if (!map.has(key)) {
+            map.set(key, {
+                year,
+                group_id: groupInfo.group_id,
+                group_name: groupInfo.group_name,
+                total_amount: 0,
+                count: 0,
+                clients: new Set(),
+                referrals: new Set()
+            });
+        }
+
+        const row = map.get(key);
+        row.total_amount += Number(p.amount) || 0;
+        row.count++;
+        row.clients.add(p.contact_id);
+        row.referrals.add(p.referral_id);
     }
 
-    const row = map.get(key);
-    row.total_amount += Number(p.amount) || 0;
-    row.count++;
-    row.clients.add(p.contact_id);
-    row.referrals.add(p.referral_id);
-  }
-
-  return [...map.values()].map(r => ({
-    ...r,
-    clients: r.clients.size,
-    referrals: r.referrals.size
-  }));
+    return [...map.values()].map(r => ({
+        ...r,
+        clients: r.clients.size,
+        referrals: r.referrals.size
+    }));
 }
+
 
 /* =========================================================
 RENDER SUMMARY GRID (SORTABLE + EXPANDABLE)
