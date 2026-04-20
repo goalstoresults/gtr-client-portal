@@ -9,7 +9,18 @@ ENTRY POINT: Render Summary Tab
 export async function renderFinancialSummary(container, portalState) {
   container.innerHTML = `
 <section class="card">
-  <h3>Financial Summary</h3>
+//  <h3>Financial Summary</h3>
+<h3>
+  Financial Summary
+  <div style="font-size:0.8em; color:#666; margin-top:4px;">
+    <strong>portalState.project:</strong> ${portalState.project} &nbsp;|&nbsp;
+    <strong>portalState.projectId:</strong> ${portalState.projectId ?? "null"} &nbsp;|&nbsp;
+    <strong>portalState.selectedProjectId:</strong> ${portalState.selectedProjectId ?? "null"} &nbsp;|&nbsp;
+    <strong>portalState.staffSelectedProjectId:</strong> ${portalState.staffSelectedProjectId ?? "null"} &nbsp;|&nbsp;
+    <strong>portalState.activeProject:</strong> ${portalState.activeProject ?? "null"}
+  </div>
+</h3>
+
   <div id="summaryFilters" style="margin-bottom: 12px;">
     <label>Summary Type:</label>
     <select id="summaryType">
