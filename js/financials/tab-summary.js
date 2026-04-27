@@ -416,336 +416,340 @@ RENDER SUMMARY GRID (SORTABLE + EXPANDABLE)
 ========================================================= */
 function renderSummaryGrid(rows, type, portalState, nameById) {
 
-  const container = document.getElementById("summaryGrid");
-
-  if (!rows.length) {
-    container.innerHTML = "<p>No data found.</p>";
-    return;
-  }
-
-  const columnSets = {
-    client: [
-      { key: "expand", label: "" },
-      { key: "client_name", label: "Client" },
-      { key: "total_amount", label: "Total Amount", numeric: true },
-      { key: "count", label: "# of Payments", numeric: true },
-      { key: "referral_name", label: "Referral" }
-    ],
-
-    referral: [
-      { key: "expand", label: "" },
-      { key: "referral_name", label: "Referral" },
-      { key: "total_amount", label: "Total Amount", numeric: true },
-      { key: "count", label: "# of Payments", numeric: true },
-      { key: "clients", label: "# of Clients", numeric: true }
-    ],
-
-    year: [
-      { key: "expand", label: "" },
-      { key: "year", label: "Year", numeric: true },
-      { key: "total_amount", label: "Total Amount", numeric: true },
-      { key: "count", label: "# of Payments", numeric: true },
-      { key: "clients", label: "# of Clients", numeric: true },
-      { key: "referrals", label: "# of Referrals", numeric: true }
-    ],
-
-    year_client: [
-      { key: "expand", label: "" },
-      { key: "year", label: "Year", numeric: true },
-      { key: "client_name", label: "Client" },
-      { key: "total_amount", label: "Total Amount", numeric: true },
-      { key: "count", label: "# of Payments", numeric: true },
-      { key: "referral_name", label: "Referral" }
-    ],
-
-    year_referral: [
-      { key: "expand", label: "" },
-      { key: "year", label: "Year", numeric: true },
-      { key: "referral_name", label: "Referral" },
-      { key: "total_amount", label: "Total Amount", numeric: true },
-      { key: "count", label: "# of Payments", numeric: true }
-    ],
-
-    group: [
-      { key: "expand", label: "" },
-      { key: "group_name", label: "Group" },
-      { key: "total_amount", label: "Total Amount", numeric: true },
-      { key: "count", label: "# of Payments", numeric: true },
-      { key: "clients", label: "# of Clients", numeric: true },
-      { key: "referrals", label: "# of Referrals", numeric: true }
-    ],
-
-    group_year: [
-      { key: "expand", label: "" },
-      { key: "year", label: "Year", numeric: true },
-      { key: "group_name", label: "Group" },
-      { key: "total_amount", label: "Total Amount", numeric: true },
-      { key: "count", label: "# of Payments", numeric: true },
-      { key: "clients", label: "# of Clients", numeric: true },
-      { key: "referrals", label: "# of Referrals", numeric: true }
-    ]
-  };
-
-  const columns = columnSets[type];
-
-  let currentSortField = columns[1].key;
-  let currentSortDirection = "asc";
-
-  function sortRows() {
-    rows.sort((a, b) => {
-      let A = a[currentSortField];
-      let B = b[currentSortField];
-
-      const col = columns.find(c => c.key === currentSortField);
-
-      if (col?.numeric) {
-        A = Number(A) || 0;
-        B = Number(B) || 0;
-      } else {
-        A = (A || "").toString().toLowerCase();
-        B = (B || "").toString().toLowerCase();
-      }
-
-      if (A < B) return currentSortDirection === "asc" ? -1 : 1;
-      if (A > B) return currentSortDirection === "asc" ? 1 : -1;
-      return 0;
-    });
-  }
-
-  function formatCurrency(n) {
-    return Number(n).toLocaleString("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-  }
-
-  function computeTotals(rows, columns) {
-    const totals = {};
-    for (const col of columns) {
-      if (col.numeric && col.key !== "year") {
-        totals[col.key] = rows.reduce((sum, r) => {
-          return sum + (Number(r[col.key]) || 0);
-        }, 0);
-      }
-    }
-    return totals;
-  }
-
-  async function loadDetails(row) {
-    const yearFilter = document.getElementById("summaryYear").value;
-    const project = portalState.project;
-
-    let url = `https://financials-module.dennis-e64.workers.dev/payments/details?project=${project}`;
-
-    if (type === "client" || type === "year_client") {
-      if (row.contact_id) url += `&contact_id=${encodeURIComponent(row.contact_id)}`;
+    const container = document.getElementById("summaryGrid");
+    if (!rows.length) {
+        container.innerHTML = "<p>No data found.</p>";
+        return;
     }
 
-    if (type === "referral" || type === "year_referral") {
-      if (row.referral_id) url += `&referral_id=${encodeURIComponent(row.referral_id)}`;
+    const columnSets = {
+        client: [
+            { key: "expand", label: "" },
+            { key: "client_name", label: "Client" },
+            { key: "total_amount", label: "Total Amount", numeric: true },
+            { key: "count", label: "# of Payments", numeric: true },
+            { key: "referral_name", label: "Referral" }
+        ],
+        referral: [
+            { key: "expand", label: "" },
+            { key: "referral_name", label: "Referral" },
+            { key: "total_amount", label: "Total Amount", numeric: true },
+            { key: "count", label: "# of Payments", numeric: true },
+            { key: "clients", label: "# of Clients", numeric: true }
+        ],
+        year: [
+            { key: "expand", label: "" },
+            { key: "year", label: "Year", numeric: true },
+            { key: "total_amount", label: "Total Amount", numeric: true },
+            { key: "count", label: "# of Payments", numeric: true },
+            { key: "clients", label: "# of Clients", numeric: true },
+            { key: "referrals", label: "# of Referrals", numeric: true }
+        ],
+        year_client: [
+            { key: "expand", label: "" },
+            { key: "year", label: "Year", numeric: true },
+            { key: "client_name", label: "Client" },
+            { key: "total_amount", label: "Total Amount", numeric: true },
+            { key: "count", label: "# of Payments", numeric: true },
+            { key: "referral_name", label: "Referral" }
+        ],
+        year_referral: [
+            { key: "expand", label: "" },
+            { key: "year", label: "Year", numeric: true },
+            { key: "referral_name", label: "Referral" },
+            { key: "total_amount", label: "Total Amount", numeric: true },
+            { key: "count", label: "# of Payments", numeric: true }
+        ],
+        group: [
+            { key: "expand", label: "" },
+            { key: "group_name", label: "Group" },
+            { key: "total_amount", label: "Total Amount", numeric: true },
+            { key: "count", label: "# of Payments", numeric: true },
+            { key: "clients", label: "# of Clients", numeric: true },
+            { key: "referrals", label: "# of Referrals", numeric: true }
+        ],
+        group_year: [
+            { key: "expand", label: "" },
+            { key: "year", label: "Year", numeric: true },
+            { key: "group_name", label: "Group" },
+            { key: "total_amount", label: "Total Amount", numeric: true },
+            { key: "count", label: "# of Payments", numeric: true },
+            { key: "clients", label: "# of Clients", numeric: true },
+            { key: "referrals", label: "# of Referrals", numeric: true }
+        ]
+    };
+
+    const columns = columnSets[type];
+
+    let currentSortField = columns[1].key;
+    let currentSortDirection = "asc";
+
+    function sortRows() {
+        rows.sort((a, b) => {
+            let A = a[currentSortField];
+            let B = b[currentSortField];
+            const col = columns.find(c => c.key === currentSortField);
+
+            if (col?.numeric) {
+                A = Number(A) || 0;
+                B = Number(B) || 0;
+            } else {
+                A = (A || "").toString().toLowerCase();
+                B = (B || "").toString().toLowerCase();
+            }
+
+            if (A < B) return currentSortDirection === "asc" ? -1 : 1;
+            if (A > B) return currentSortDirection === "asc" ? 1 : -1;
+            return 0;
+        });
     }
 
-    if (type === "group" || type === "group_year") {
-      if (row.group_id) url += `&group_id=${encodeURIComponent(row.group_id)}`;
+    function formatCurrency(n) {
+        return Number(n).toLocaleString("en-US", {
+            style: "currency",
+            currency: "USD",
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
     }
 
-    if (type === "year" || type === "year_client" || type === "year_referral" || type === "group_year") {
-      if (row.year) url += `&year=${encodeURIComponent(row.year)}`;
-    } else if (yearFilter !== "all") {
-      url += `&year=${encodeURIComponent(yearFilter)}`;
+    function computeTotals(rows, columns) {
+        const totals = {};
+        for (const col of columns) {
+            if (col.numeric && col.key !== "year") {
+                totals[col.key] = rows.reduce((sum, r) => {
+                    return sum + (Number(r[col.key]) || 0);
+                }, 0);
+            }
+        }
+        return totals;
     }
 
-    const res = await fetch(url, { cache: "no-cache" });
+    async function loadDetails(row) {
+        const yearFilter = document.getElementById("summaryYear").value;
+        const project = portalState.project;
 
-    let data = [];
-    try {
-      data = await res.json();
-    } catch {
-      data = [];
-    }
+        let url = `https://financials-module.dennis-e64.workers.dev/payments/details?project=${project}`;
 
-    return Array.isArray(data) ? data : [];
-  }
-
-  function render() {
-    sortRows();
-
-    const totals = computeTotals(rows, columns);
-
-    const headerHtml = columns
-      .map(col => {
-        if (col.key === "expand") {
-          return `<th style="width:24px;"></th>`;
+        if (type === "client" || type === "year_client") {
+            if (row.contact_id) url += `&contact_id=${encodeURIComponent(row.contact_id)}`;
         }
 
-        const isSorted = currentSortField === col.key;
-        const upArrow = isSorted && currentSortDirection === "asc" ? "▲" : "△";
-        const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
-
-        return `
-<th class="sortable" data-field="${col.key}">
-  ${col.label}
-  <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-    <span class="sort-up">${upArrow}</span>
-    <span class="sort-down">${downArrow}</span>
-  </span>
-</th>`;
-      })
-      .join("");
-
-    const rowsHtml = rows
-      .map((r, i) => {
-        const detailRowId = `detail-${i}`;
-
-        return `
-<tr style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};">
-  <td style="width:24px; text-align:center; cursor:pointer;" data-expand="${detailRowId}">▶</td>
-  ${columns
-    .filter(c => c.key !== "expand")
-    .map(col => {
-      let val = r[col.key];
-      if (col.numeric && col.key === "total_amount") {
-        val = formatCurrency(val);
-      }
-      return `<td style="${col.numeric ? "text-align:right;" : ""}">${val}</td>`;
-    })
-    .join("")}
-</tr>
-
-<tr id="${detailRowId}" style="display:none; background:#f1f5ff;">
-  <td colspan="${columns.length}">
-    <div class="detail-container" style="padding:10px; font-size:0.9em;">Loading...</div>
-  </td>
-</tr>`;
-      })
-      .join("");
-
-    const totalsRowHtml = `
-<tr style="background:#e8f0fe; font-weight:bold;">
-  <td></td>
-  ${columns
-    .filter(c => c.key !== "expand")
-    .map(col => {
-      if (col.numeric && col.key !== "year") {
-        const raw = totals[col.key] || 0;
-        const val =
-          col.key === "total_amount"
-            ? formatCurrency(raw)
-            : raw.toLocaleString("en-US");
-        return `<td style="text-align:right;">${val}</td>`;
-      }
-      return `<td></td>`;
-    })
-    .join("")}
-</tr>`;
-
-    container.innerHTML = `
-<table class="notes-table" style="width:100%; border-collapse:collapse;">
-  <thead><tr>${headerHtml}</tr></thead>
-  <tbody>
-    ${rowsHtml}
-    ${totalsRowHtml}
-  </tbody>
-</table>`;
-
-    container.querySelectorAll("th.sortable").forEach(th => {
-      th.addEventListener("click", () => {
-        const field = th.dataset.field;
-        if (currentSortField === field) {
-          currentSortDirection =
-            currentSortDirection === "asc" ? "desc" : "asc";
-        } else {
-          currentSortField = field;
-          currentSortDirection = "asc";
+        if (type === "referral" || type === "year_referral") {
+            if (row.referral_id) url += `&referral_id=${encodeURIComponent(row.referral_id)}`;
         }
-        render();
-      });
-    });
 
-    container.querySelectorAll("[data-expand]").forEach(cell => {
-      cell.addEventListener("click", async () => {
-        const id = cell.dataset.expand;
-        const rowEl = document.getElementById(id);
-        const icon = cell;
+        if (type === "group" || type === "group_year") {
+            if (row.group_id) url += `&group_id=${encodeURIComponent(row.group_id)}`;
+        }
 
-        if (rowEl.style.display === "none") {
-          icon.textContent = "▼";
-          rowEl.style.display = "";
+        if (type === "year" || type === "year_client" || type === "year_referral" || type === "group_year") {
+            if (row.year) url += `&year=${encodeURIComponent(row.year)}`;
+        } else if (yearFilter !== "all") {
+            url += `&year=${encodeURIComponent(yearFilter)}`;
+        }
 
-          const index = Number(id.replace("detail-", ""));
-          const detailData = await loadDetails(rows[index]);
+        const res = await fetch(url, { cache: "no-cache" });
+        let data = [];
+        try {
+            data = await res.json();
+        } catch {
+            data = [];
+        }
 
-          // --- DETAIL GRID (conditional by summary type) ---
-          const html = detailData.length
-            ? (() => {
+        return Array.isArray(data) ? data : [];
+    }
 
-                // GROUP + GROUP_YEAR: show CLIENT NAME
-                if (type === "group" || type === "group_year") {
-                  return `
-<table style="width:100%; border-collapse:collapse;">
-  <thead>
-    <tr style="background:#dce6ff;">
-      <th>Date</th>
-      <th>Client</th>
-      <th>Amount</th>
-      <th>Invoice</th>
-    </tr>
-  </thead>
-  <tbody>
-    ${detailData
-      .map(d => {
-        const clientName = nameById.get(d.contact_id) || "(unknown)";
-        return `
-        <tr>
-          <td>${d.transaction_date || ""}</td>
-          <td>${escapeHtml(clientName)}</td>
-          <td style="text-align:right;">${formatCurrency(d.amount || 0)}</td>
-          <td>${escapeHtml(d.invoice_number || "")}</td>
-        </tr>`;
-      })
-      .join("")}
-  </tbody>
-</table>`;
+    function render() {
+        sortRows();
+        const totals = computeTotals(rows, columns);
+
+        const headerHtml = columns
+            .map(col => {
+                if (col.key === "expand") {
+                    return `<th style="width:24px;"></th>`;
                 }
 
-                // ALL OTHER SUMMARY TYPES: NO DESCRIPTION, NO CLIENT COLUMN
+                const isSorted = currentSortField === col.key;
+                const upArrow = isSorted && currentSortDirection === "asc" ? "▲" : "△";
+                const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+
                 return `
-<table style="width:100%; border-collapse:collapse;">
-  <thead>
-    <tr style="background:#dce6ff;">
-      <th>Date</th>
-      <th>Amount</th>
-      <th>Invoice</th>
-    </tr>
-  </thead>
-  <tbody>
-    ${detailData
-      .map(d => {
-        return `
-        <tr>
-          <td>${d.transaction_date || ""}</td>
-          <td style="text-align:right;">${formatCurrency(d.amount || 0)}</td>
-          <td>${escapeHtml(d.invoice_number || "")}</td>
+                <th class="sortable" data-field="${col.key}">
+                    ${col.label}
+                    <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+                        <span class="sort-up">${upArrow}</span>
+                        <span class="sort-down">${downArrow}</span>
+                    </span>
+                </th>`;
+            })
+            .join("");
+
+        const rowsHtml = rows
+            .map((r, i) => {
+                const detailRowId = `detail-${i}`;
+                return `
+                <tr style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};">
+                    <td style="width:24px; text-align:center; cursor:pointer;" data-expand="${detailRowId}">▶</td>
+                    ${columns
+                        .filter(c => c.key !== "expand")
+                        .map(col => {
+                            let val = r[col.key];
+                            if (col.numeric && col.key === "total_amount") {
+                                val = formatCurrency(val);
+                            }
+                            return `<td style="${col.numeric ? "text-align:right;" : ""}">${val}</td>`;
+                        })
+                        .join("")}
+                </tr>
+
+                <tr id="${detailRowId}" style="display:none; background:#f1f5ff;">
+                    <td colspan="${columns.length}">
+                        <div class="detail-container" style="padding:10px; font-size:0.9em;">Loading...</div>
+                    </td>
+                </tr>`;
+            })
+            .join("");
+
+        const totalsRowHtml = `
+        <tr style="background:#e8f0fe; font-weight:bold;">
+            <td></td>
+            ${columns
+                .filter(c => c.key !== "expand")
+                .map(col => {
+                    if (col.numeric && col.key !== "year") {
+                        const raw = totals[col.key] || 0;
+                        const val =
+                            col.key === "total_amount"
+                                ? formatCurrency(raw)
+                                : raw.toLocaleString("en-US");
+                        return `<td style="text-align:right;">${val}</td>`;
+                    }
+                    return `<td></td>`;
+                })
+                .join("")}
         </tr>`;
-      })
-      .join("")}
-  </tbody>
-</table>`;
-              })()
-            : `<div>No detail rows found.</div>`;
 
-          rowEl.querySelector(".detail-container").innerHTML = html;
+        container.innerHTML = `
+        <table class="notes-table" style="width:100%; border-collapse:collapse;">
+            <thead><tr>${headerHtml}</tr></thead>
+            <tbody>
+                ${rowsHtml}
+                ${totalsRowHtml}
+            </tbody>
+        </table>`;
 
-        } else {
-          icon.textContent = "▶";
-          rowEl.style.display = "none";
-        }
-      });
-    });
-  }
+        container.querySelectorAll("th.sortable").forEach(th => {
+            th.addEventListener("click", () => {
+                const field = th.dataset.field;
+                if (currentSortField === field) {
+                    currentSortDirection =
+                        currentSortDirection === "asc" ? "desc" : "asc";
+                } else {
+                    currentSortField = field;
+                    currentSortDirection = "asc";
+                }
+                render();
+            });
+        });
 
-  render();
+        container.querySelectorAll("[data-expand]").forEach(cell => {
+            cell.addEventListener("click", async () => {
+                const id = cell.dataset.expand;
+                const rowEl = document.getElementById(id);
+                const icon = cell;
+
+                if (rowEl.style.display === "none") {
+                    icon.textContent = "▼";
+                    rowEl.style.display = "";
+
+                    const index = Number(id.replace("detail-", ""));
+                    const detailData = await loadDetails(rows[index]);
+
+                    // ⭐⭐⭐ SHOW CLIENT COLUMN FOR: referral, year, year_referral, group, group_year
+                    const showClient =
+                        type === "group" ||
+                        type === "group_year" ||
+                        type === "referral" ||
+                        type === "year" ||
+                        type === "year_referral";
+
+                    const html = detailData.length
+                        ? (() => {
+                              if (showClient) {
+                                  return `
+                                  <table style="width:100%; border-collapse:collapse;">
+                                      <thead>
+                                          <tr style="background:#dce6ff;">
+                                              <th>Date</th>
+                                              <th>Client</th>
+                                              <th>Amount</th>
+                                              <th>Invoice</th>
+                                          </tr>
+                                      </thead>
+                                      <tbody>
+                                          ${detailData
+                                              .map(d => {
+                                                  const clientName =
+                                                      nameById.get(d.contact_id) ||
+                                                      "(unknown)";
+                                                  return `
+                                                  <tr>
+                                                      <td>${d.transaction_date || ""}</td>
+                                                      <td>${escapeHtml(clientName)}</td>
+                                                      <td style="text-align:right;">${formatCurrency(
+                                                          d.amount || 0
+                                                      )}</td>
+                                                      <td>${escapeHtml(
+                                                          d.invoice_number || ""
+                                                      )}</td>
+                                                  </tr>`;
+                                              })
+                                              .join("")}
+                                      </tbody>
+                                  </table>`;
+                              }
+
+                              // DEFAULT (no client column)
+                              return `
+                              <table style="width:100%; border-collapse:collapse;">
+                                  <thead>
+                                      <tr style="background:#dce6ff;">
+                                          <th>Date</th>
+                                          <th>Amount</th>
+                                          <th>Invoice</th>
+                                      </tr>
+                                  </thead>
+                                  <tbody>
+                                      ${detailData
+                                          .map(d => {
+                                              return `
+                                              <tr>
+                                                  <td>${d.transaction_date || ""}</td>
+                                                  <td style="text-align:right;">${formatCurrency(
+                                                      d.amount || 0
+                                                  )}</td>
+                                                  <td>${escapeHtml(
+                                                      d.invoice_number || ""
+                                                  )}</td>
+                                              </tr>`;
+                                          })
+                                          .join("")}
+                                  </tbody>
+                              </table>`;
+                          })()
+                        : `<div>No detail rows found.</div>`;
+
+                    rowEl.querySelector(".detail-container").innerHTML = html;
+                } else {
+                    icon.textContent = "▶";
+                    rowEl.style.display = "none";
+                }
+            });
+        });
+    }
+
+    render();
 }
+
 
