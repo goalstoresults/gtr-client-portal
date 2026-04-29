@@ -171,11 +171,11 @@ export async function renderAgentFilter(container, portalState) {
   const sqftGrid = document.getElementById("agent-sqft-grid");
 
   nhGrid.innerHTML = NEIGHBORHOODS.map(n => `
-    <label><input type="checkbox" value="${n}" checked> ${n}</label>
+    <label><input type="checkbox" value="${n}"> ${n}</label>
   `).join("");
 
   sqftGrid.innerHTML = SQFT.map(s => `
-    <label><input type="checkbox" value="${s}" checked> ${s}</label>
+    <label><input type="checkbox" value="${s}"> ${s}</label>
   `).join("");
 
   // ------------------------------------------------------------
