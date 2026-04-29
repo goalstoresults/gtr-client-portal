@@ -498,4 +498,44 @@ export async function renderAgentFilter(container, portalState) {
   document.getElementById("agent-savecsv").onclick = async () => {
     const rows = Array.from(document.querySelectorAll("#agent-results-body tr"));
     const checkedRows = rows.filter(r => r.querySelector(".row-check")?.checked);
+    if (!checkedRows.length) {
+      alert("No rows selected.");
+      return;
+    }
+
+    const headers = [
+      "Email",
+      "Name",
+      "Business",
+      "Industry",
+      "Vertical",
+      "Neighborhood",
+      "Square Footage",
+      "Lead Level",
+      "Type",
+      "Last Email"
+    ];
+
+    let csv = headers.join(",") + "\n";
+
+    checkedRows.forEach(tr => {
+      const tds = Array.from(tr.querySelectorAll("td")).slice(1); // skip checkbox
+      const row = tds.map(td =>
+        `"${td.textContent.replace(/"/g, '""')}"`
+      ).join(",");
+      csv += row + "\n";
+    });
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "jw_contacts_selected.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+}
 
