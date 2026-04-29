@@ -1,5 +1,5 @@
 // /js/filter/agent_run.js
-// Agent Filter — Phase 1.7: 4-column grid + fieldset boxes + filename on its own row
+// Agent Filter — Phase 1.8: 4-column NH, 5-column SqFt, filename row fix
 
 import { escapeHtml, formatDateOnly } from "../utilities.js";
 
@@ -25,7 +25,7 @@ export async function renderAgentFilter(container, portalState) {
       <!-- NEIGHBORHOODS BOX -->
       <div class="fieldset-box">
         <label>Neighborhoods</label>
-        <div id="agent-nh-grid" class="checkbox-grid"></div>
+        <div id="agent-nh-grid" class="checkbox-grid-nh"></div>
         <div class="btn-row">
           <button id="agent-nh-selectall" class="secondary">Select All</button>
           <button id="agent-nh-clear" class="secondary">Clear</button>
@@ -35,7 +35,7 @@ export async function renderAgentFilter(container, portalState) {
       <!-- SQFT BOX -->
       <div class="fieldset-box" style="margin-top:20px;">
         <label>Square Footage</label>
-        <div id="agent-sqft-grid" class="checkbox-grid"></div>
+        <div id="agent-sqft-grid" class="checkbox-grid-sqft"></div>
         <div class="btn-row">
           <button id="agent-sqft-selectall" class="secondary">Select All</button>
           <button id="agent-sqft-clear" class="secondary">Clear</button>
@@ -107,22 +107,36 @@ export async function renderAgentFilter(container, portalState) {
   </section>
 
   <style>
-    .checkbox-grid {
+    /* Neighborhoods = 4 columns */
+    .checkbox-grid-nh {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 6px 18px;
       margin-bottom: 12px;
     }
-    .checkbox-grid label {
+
+    /* SqFt = 5 columns */
+    .checkbox-grid-sqft {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px 18px;
+      margin-bottom: 12px;
+    }
+
+    .checkbox-grid-nh label,
+    .checkbox-grid-sqft label {
       display: flex;
       align-items: center;
       gap: 6px;
       font-size: 14px;
       white-space: nowrap;
     }
-    .checkbox-grid input[type="checkbox"] {
+
+    .checkbox-grid-nh input[type="checkbox"],
+    .checkbox-grid-sqft input[type="checkbox"] {
       margin: 0;
     }
+
     .fieldset-box {
       border: 1px solid #ccc;
       padding: 12px;
@@ -149,7 +163,7 @@ export async function renderAgentFilter(container, portalState) {
   }
 
   // ------------------------------------------------------------
-  // Render 4-column checkbox grids
+  // Render checkbox grids
   // ------------------------------------------------------------
   const nhGrid = document.getElementById("agent-nh-grid");
   const sqftGrid = document.getElementById("agent-sqft-grid");
@@ -426,4 +440,3 @@ export async function renderAgentFilter(container, portalState) {
   };
 
 }
-
