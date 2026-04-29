@@ -1,5 +1,5 @@
 // /js/filter/agent_run.js
-// Agent Filter — with business_name, industry, vertical_market, row selection, and CSV of selected rows
+// Agent Filter — with business_name, industry, vertical_market, row selection, Selected count, and CSV of selected rows
 
 import { escapeHtml, formatDateOnly } from "../utilities.js";
 
@@ -81,6 +81,7 @@ export async function renderAgentFilter(container, portalState) {
       <h3>Results</h3>
       <div id="agent-message" class="mini-label"></div>
       <div id="agent-total" style="font-weight:bold; margin-top:8px;"></div>
+      <div id="agent-selected" style="font-weight:bold; margin-top:4px;"></div>
 
       <div class="btn-row" style="margin-top:12px;">
         <button id="agent-selectall" class="secondary">Select All</button>
@@ -217,6 +218,13 @@ export async function renderAgentFilter(container, portalState) {
     runBySelect.value = savedRunner;
   }
 
+  // ------------------------------------------------------------
+  // Selected count helper
+  // ------------------------------------------------------------
+  function updateSelectedCount() {
+    const selected = document.querySelectorAll(".row-check:checked").length;
+    document.getElementById("agent-selected").textContent = `Selected: ${selected}`;
+  }
 
   // ------------------------------------------------------------
   // Row selection helpers
@@ -232,6 +240,7 @@ export async function renderAgentFilter(container, portalState) {
         } else {
           tr.classList.remove("selected-row");
         }
+        updateSelectedCount();
       });
     });
   }
@@ -242,6 +251,7 @@ export async function renderAgentFilter(container, portalState) {
       const tr = cb.closest("tr");
       if (tr) tr.classList.add("selected-row");
     });
+    updateSelectedCount();
   };
 
   document.getElementById("agent-clearall").onclick = () => {
@@ -250,7 +260,17 @@ export async function renderAgentFilter(container, portalState) {
       const tr = cb.closest("tr");
       if (tr) tr.classList.remove("selected-row");
     });
+    updateSelectedCount();
   };
+
+  // ------------------------------------------------------------
+  // Clear Results (leftover UI reset)
+  // ------------------------------------------------------------
+  document.getElementById("agent-message").textContent = "";
+  document.getElementById("agent-results-body").innerHTML = "";
+  document.getElementById("agent-total").textContent = "";
+  document.getElementById("agent-selected").textContent = "";
+  window.currentContactIds = [];
 
   // ------------------------------------------------------------
   // Run Filter
@@ -266,6 +286,7 @@ export async function renderAgentFilter(container, portalState) {
     table.style.display = "none";
     body.innerHTML = "";
     total.textContent = "";
+    document.getElementById("agent-selected").textContent = "";
     window.currentContactIds = [];
 
     const neighborhoods = Array.from(
@@ -459,6 +480,9 @@ export async function renderAgentFilter(container, portalState) {
 
         // Wire row selection highlighting
         wireRowSelection();
+
+        // Update selected count
+        updateSelectedCount();
       }
 
       renderResultsTable();
@@ -475,43 +499,3 @@ export async function renderAgentFilter(container, portalState) {
     const rows = Array.from(document.querySelectorAll("#agent-results-body tr"));
     const checkedRows = rows.filter(r => r.querySelector(".row-check")?.checked);
 
-    if (!checkedRows.length) {
-      alert("No rows selected.");
-      return;
-    }
-
-    const headers = [
-      "Email",
-      "Name",
-      "Business",
-      "Industry",
-      "Vertical",
-      "Neighborhood",
-      "Square Footage",
-      "Lead Level",
-      "Type",
-      "Last Email"
-    ];
-
-    let csv = headers.join(",") + "\n";
-
-    checkedRows.forEach(tr => {
-      const tds = Array.from(tr.querySelectorAll("td")).slice(1); // skip checkbox
-      const row = tds.map(td =>
-        `"${td.textContent.replace(/"/g, '""')}"`
-      ).join(",");
-      csv += row + "\n";
-    });
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "jw_contacts_selected.csv";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-}
