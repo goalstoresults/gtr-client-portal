@@ -1,12 +1,12 @@
 // /js/filter/agent_run.js
-// Agent Filter — Phase 1.5: duplicate of run.js but with 2-column checkbox UI
+// Agent Filter — Phase 1.6: 4-column grid layout for Neighborhoods + SqFt
 
 import { escapeHtml, formatDateOnly } from "../utilities.js";
 
 export async function renderAgentFilter(container, portalState) {
 
   // ------------------------------------------------------------
-  // Initialize sort state (same as run.js)
+  // Initialize sort state
   // ------------------------------------------------------------
   if (!portalState.agentFilterSort) {
     portalState.agentFilterSort = {
@@ -22,31 +22,23 @@ export async function renderAgentFilter(container, portalState) {
     <div class="left-panel">
       <h3>Agent Filter</h3>
 
-      <div class="two-col-grid">
-
-        <!-- Neighborhood Column -->
-        <div>
-          <label>Neighborhoods</label>
-          <div id="agent-nh-list" class="checkbox-vertical"></div>
-          <div class="btn-row">
-            <button id="agent-nh-selectall" class="secondary">Select All</button>
-            <button id="agent-nh-clear" class="secondary">Clear</button>
-          </div>
-        </div>
-
-        <!-- SqFt Column -->
-        <div>
-          <label>Square Footage</label>
-          <div id="agent-sqft-list" class="checkbox-vertical"></div>
-          <div class="btn-row">
-            <button id="agent-sqft-selectall" class="secondary">Select All</button>
-            <button id="agent-sqft-clear" class="secondary">Clear</button>
-          </div>
-        </div>
-
+      <!-- NEIGHBORHOODS -->
+      <label>Neighborhoods</label>
+      <div id="agent-nh-grid" class="checkbox-grid"></div>
+      <div class="btn-row">
+        <button id="agent-nh-selectall" class="secondary">Select All</button>
+        <button id="agent-nh-clear" class="secondary">Clear</button>
       </div>
 
-      <label>Run By</label>
+      <!-- SQFT -->
+      <label style="margin-top:20px;">Square Footage</label>
+      <div id="agent-sqft-grid" class="checkbox-grid"></div>
+      <div class="btn-row">
+        <button id="agent-sqft-selectall" class="secondary">Select All</button>
+        <button id="agent-sqft-clear" class="secondary">Clear</button>
+      </div>
+
+      <label style="margin-top:20px;">Run By</label>
       <select id="agent-runby"></select>
 
       <label>Filename</label>
@@ -109,20 +101,20 @@ export async function renderAgentFilter(container, portalState) {
   </section>
 
   <style>
-    .two-col-grid {
+    .checkbox-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
-      align-items: start;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px 18px;
+      margin-bottom: 12px;
     }
-    .checkbox-vertical label {
+    .checkbox-grid label {
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 2px 0;
       font-size: 14px;
+      white-space: nowrap;
     }
-    .checkbox-vertical input[type="checkbox"] {
+    .checkbox-grid input[type="checkbox"] {
       margin: 0;
     }
   </style>
@@ -145,35 +137,33 @@ export async function renderAgentFilter(container, portalState) {
   }
 
   // ------------------------------------------------------------
-  // Render checkbox lists (vertical, aligned)
+  // Render 4-column checkbox grids
   // ------------------------------------------------------------
-  const nhList = document.getElementById("agent-nh-list");
-  const sqftList = document.getElementById("agent-sqft-list");
+  const nhGrid = document.getElementById("agent-nh-grid");
+  const sqftGrid = document.getElementById("agent-sqft-grid");
 
-  nhList.innerHTML = NEIGHBORHOODS.map(n => `
+  nhGrid.innerHTML = NEIGHBORHOODS.map(n => `
     <label><input type="checkbox" value="${n}" checked> ${n}</label>
   `).join("");
 
-  sqftList.innerHTML = SQFT.map(s => `
+  sqftGrid.innerHTML = SQFT.map(s => `
     <label><input type="checkbox" value="${s}" checked> ${s}</label>
   `).join("");
 
   // ------------------------------------------------------------
   // Select/Clear logic
   // ------------------------------------------------------------
-  document.getElementById("agent-nh-selectall").onclick = () => {
-    nhList.querySelectorAll("input").forEach(cb => cb.checked = true);
-  };
-  document.getElementById("agent-nh-clear").onclick = () => {
-    nhList.querySelectorAll("input").forEach(cb => cb.checked = false);
-  };
+  document.getElementById("agent-nh-selectall").onclick = () =>
+    nhGrid.querySelectorAll("input").forEach(cb => cb.checked = true);
 
-  document.getElementById("agent-sqft-selectall").onclick = () => {
-    sqftList.querySelectorAll("input").forEach(cb => cb.checked = true);
-  };
-  document.getElementById("agent-sqft-clear").onclick = () => {
-    sqftList.querySelectorAll("input").forEach(cb => cb.checked = false);
-  };
+  document.getElementById("agent-nh-clear").onclick = () =>
+    nhGrid.querySelectorAll("input").forEach(cb => cb.checked = false);
+
+  document.getElementById("agent-sqft-selectall").onclick = () =>
+    sqftGrid.querySelectorAll("input").forEach(cb => cb.checked = true);
+
+  document.getElementById("agent-sqft-clear").onclick = () =>
+    sqftGrid.querySelectorAll("input").forEach(cb => cb.checked = false);
 
   // ------------------------------------------------------------
   // Run By choices
@@ -215,11 +205,11 @@ export async function renderAgentFilter(container, portalState) {
     window.currentContactIds = [];
 
     const neighborhoods = Array.from(
-      nhList.querySelectorAll("input:checked")
+      nhGrid.querySelectorAll("input:checked")
     ).map(cb => cb.value);
 
     const sqft = Array.from(
-      sqftList.querySelectorAll("input:checked")
+      sqftGrid.querySelectorAll("input:checked")
     ).map(cb => cb.value);
 
     if (!neighborhoods.length || !sqft.length) {
@@ -424,4 +414,3 @@ export async function renderAgentFilter(container, portalState) {
   };
 
 }
-
