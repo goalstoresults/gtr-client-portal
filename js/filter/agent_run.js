@@ -1,5 +1,5 @@
 // /js/filter/agent_run.js
-// Agent Filter — Phase 1: duplicate of run.js but with checkbox UI for NH + SqFt
+// Agent Filter — Phase 1.5: duplicate of run.js but with 2-column checkbox UI
 
 import { escapeHtml, formatDateOnly } from "../utilities.js";
 
@@ -22,18 +22,28 @@ export async function renderAgentFilter(container, portalState) {
     <div class="left-panel">
       <h3>Agent Filter</h3>
 
-      <label>Neighborhoods</label>
-      <div id="agent-nh-list" class="checkbox-list"></div>
-      <div class="btn-row">
-        <button id="agent-nh-selectall" class="secondary">Select All</button>
-        <button id="agent-nh-clear" class="secondary">Clear</button>
-      </div>
+      <div class="two-col-grid">
 
-      <label>Square Footage</label>
-      <div id="agent-sqft-list" class="checkbox-list"></div>
-      <div class="btn-row">
-        <button id="agent-sqft-selectall" class="secondary">Select All</button>
-        <button id="agent-sqft-clear" class="secondary">Clear</button>
+        <!-- Neighborhood Column -->
+        <div>
+          <label>Neighborhoods</label>
+          <div id="agent-nh-list" class="checkbox-vertical"></div>
+          <div class="btn-row">
+            <button id="agent-nh-selectall" class="secondary">Select All</button>
+            <button id="agent-nh-clear" class="secondary">Clear</button>
+          </div>
+        </div>
+
+        <!-- SqFt Column -->
+        <div>
+          <label>Square Footage</label>
+          <div id="agent-sqft-list" class="checkbox-vertical"></div>
+          <div class="btn-row">
+            <button id="agent-sqft-selectall" class="secondary">Select All</button>
+            <button id="agent-sqft-clear" class="secondary">Clear</button>
+          </div>
+        </div>
+
       </div>
 
       <label>Run By</label>
@@ -97,10 +107,29 @@ export async function renderAgentFilter(container, portalState) {
     </div>
 
   </section>
+
+  <style>
+    .two-col-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+    .checkbox-vertical label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 0;
+      font-size: 14px;
+    }
+    .checkbox-vertical input[type="checkbox"] {
+      margin: 0;
+    }
+  </style>
   `;
 
   // ------------------------------------------------------------
-  // Load Lookups (same endpoint as run.js)
+  // Load Lookups
   // ------------------------------------------------------------
   const LOOKUP_URL = "https://filter-module.dennis-e64.workers.dev/lookups";
   let NEIGHBORHOODS = [];
@@ -116,7 +145,7 @@ export async function renderAgentFilter(container, portalState) {
   }
 
   // ------------------------------------------------------------
-  // Render checkbox lists
+  // Render checkbox lists (vertical, aligned)
   // ------------------------------------------------------------
   const nhList = document.getElementById("agent-nh-list");
   const sqftList = document.getElementById("agent-sqft-list");
@@ -147,7 +176,7 @@ export async function renderAgentFilter(container, portalState) {
   };
 
   // ------------------------------------------------------------
-  // Run By choices (same as run.js)
+  // Run By choices
   // ------------------------------------------------------------
   const runBySelect = document.getElementById("agent-runby");
   const RUNNERS = ["Jacob", "Benji"];
@@ -170,7 +199,7 @@ export async function renderAgentFilter(container, portalState) {
   };
 
   // ------------------------------------------------------------
-  // Run Filter (same logic as run.js, but using checkbox values)
+  // Run Filter
   // ------------------------------------------------------------
   document.getElementById("agent-run").onclick = async () => {
 
@@ -248,7 +277,7 @@ export async function renderAgentFilter(container, portalState) {
       });
 
       // ------------------------------------------------------------
-      // AUTO-SAVE COMMIT (same as run.js)
+      // AUTO-SAVE COMMIT
       // ------------------------------------------------------------
       const autoSave = document.getElementById("agent-autosave").checked;
       if (autoSave) {
@@ -271,7 +300,7 @@ export async function renderAgentFilter(container, portalState) {
       }
 
       // ------------------------------------------------------------
-      // SORT + RENDER TABLE (same as run.js)
+      // SORT + RENDER TABLE
       // ------------------------------------------------------------
       function sortResults() {
         const { column, direction } = portalState.agentFilterSort;
@@ -367,7 +396,7 @@ export async function renderAgentFilter(container, portalState) {
   };
 
   // ------------------------------------------------------------
-  // Save CSV (same as run.js)
+  // Save CSV
   // ------------------------------------------------------------
   document.getElementById("agent-savecsv").onclick = async () => {
     const table = document.getElementById("agent-results");
@@ -395,3 +424,4 @@ export async function renderAgentFilter(container, portalState) {
   };
 
 }
+
