@@ -2,6 +2,7 @@
 // Filter module controller — loads HTML, initializes subtabs, routes to subtab modules
 
 import { renderRunFilter } from "./filter/run.js";
+import { renderAgentFilter } from "./filter/agent_run.js";   // <-- NEW
 import { renderFilterHistory } from "./filter/history.js";
 import { renderFilterCoverage } from "./filter/coverage.js";
 import { renderFilterNeighborhoods } from "./filter/neighborhoods.js";
@@ -91,6 +92,7 @@ async function loadFilterSubtab(subtab, portalState) {
 
   // Route to subtab modules
   if (subtab === "run") return renderRunFilter(container, portalState);
+  if (subtab === "agent") return renderAgentFilter(container, portalState);   // <-- NEW
   if (subtab === "history") return renderFilterHistory(container, portalState);
   if (subtab === "coverage") return renderFilterCoverage(container, portalState);
   if (subtab === "neighborhoods") return renderFilterNeighborhoods(container, portalState);
