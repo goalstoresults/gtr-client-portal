@@ -1,5 +1,5 @@
 // /js/filter/agent_run.js
-// Agent Filter — Phase 1.9: Add business_name, industry, vertical_market to results grid
+// Agent Filter — with business_name, industry, vertical_market, row selection, and CSV of selected rows
 
 import { escapeHtml, formatDateOnly } from "../utilities.js";
 
@@ -83,6 +83,8 @@ export async function renderAgentFilter(container, portalState) {
       <div id="agent-total" style="font-weight:bold; margin-top:8px;"></div>
 
       <div class="btn-row" style="margin-top:12px;">
+        <button id="agent-selectall" class="secondary">Select All</button>
+        <button id="agent-clearall" class="secondary">Clear All</button>
         <button id="agent-clear" class="secondary">Clear</button>
         <button id="agent-savecsv" class="secondary">Save CSV</button>
       </div>
@@ -90,6 +92,7 @@ export async function renderAgentFilter(container, portalState) {
       <table id="agent-results" class="notes-table" style="display:none; margin-top:16px;">
         <thead>
           <tr id="agent-header-row">
+            <th>Select</th>
             <th>Email</th>
             <th>Name</th>
             <th>Business</th>
@@ -145,6 +148,16 @@ export async function renderAgentFilter(container, portalState) {
       border-radius: 6px;
       background: #fafafa;
     }
+
+    /* Highlight selected rows */
+    tr.selected-row {
+      background-color: #fff9d6;
+    }
+
+    th.sortable {
+      cursor: pointer;
+      user-select: none;
+    }
   </style>
   `;
 
@@ -165,7 +178,7 @@ export async function renderAgentFilter(container, portalState) {
   }
 
   // ------------------------------------------------------------
-  // Render checkbox grids
+  // Render checkbox grids (unchecked by default)
   // ------------------------------------------------------------
   const nhGrid = document.getElementById("agent-nh-grid");
   const sqftGrid = document.getElementById("agent-sqft-grid");
@@ -179,7 +192,7 @@ export async function renderAgentFilter(container, portalState) {
   `).join("");
 
   // ------------------------------------------------------------
-  // Select/Clear logic
+  // Select/Clear logic for lookups
   // ------------------------------------------------------------
   document.getElementById("agent-nh-selectall").onclick = () =>
     nhGrid.querySelectorAll("input").forEach(cb => cb.checked = true);
@@ -214,6 +227,40 @@ export async function renderAgentFilter(container, portalState) {
     document.getElementById("agent-results-body").innerHTML = "";
     document.getElementById("agent-total").textContent = "";
     window.currentContactIds = [];
+  };
+
+  // ------------------------------------------------------------
+  // Row selection helpers
+  // ------------------------------------------------------------
+  function wireRowSelection() {
+    const body = document.getElementById("agent-results-body");
+    body.querySelectorAll(".row-check").forEach(cb => {
+      cb.addEventListener("change", () => {
+        const tr = cb.closest("tr");
+        if (!tr) return;
+        if (cb.checked) {
+          tr.classList.add("selected-row");
+        } else {
+          tr.classList.remove("selected-row");
+        }
+      });
+    });
+  }
+
+  document.getElementById("agent-selectall").onclick = () => {
+    document.querySelectorAll(".row-check").forEach(cb => {
+      cb.checked = true;
+      const tr = cb.closest("tr");
+      if (tr) tr.classList.add("selected-row");
+    });
+  };
+
+  document.getElementById("agent-clearall").onclick = () => {
+    document.querySelectorAll(".row-check").forEach(cb => {
+      cb.checked = false;
+      const tr = cb.closest("tr");
+      if (tr) tr.classList.remove("selected-row");
+    });
   };
 
   // ------------------------------------------------------------
@@ -322,11 +369,15 @@ export async function renderAgentFilter(container, portalState) {
       // ------------------------------------------------------------
       function sortResults() {
         const { column, direction } = portalState.agentFilterSort;
+
+        // Do not sort on the "select" column
+        if (column === "select") return;
+
         results.sort((a, b) => {
           let A = a[column];
           let B = b[column];
 
-          if (column === "last_email_date" || column === "last_reply_date") {
+          if (column === "last_email_date") {
             A = A ? new Date(A) : 0;
             B = B ? new Date(B) : 0;
           } else {
@@ -344,6 +395,7 @@ export async function renderAgentFilter(container, portalState) {
         sortResults();
 
         const headerConfig = [
+          { key: "select", label: "Select" },
           { key: "email", label: "Email" },
           { key: "name", label: "Name" },
           { key: "business_name", label: "Business" },
@@ -357,6 +409,10 @@ export async function renderAgentFilter(container, portalState) {
         ];
 
         const headerHtml = headerConfig.map(col => {
+          if (col.key === "select") {
+            return `<th>${col.label}</th>`;
+          }
+
           const isSorted = portalState.agentFilterSort.column === col.key;
           const up = isSorted && portalState.agentFilterSort.direction === "asc" ? "▲" : "△";
           const down = isSorted && portalState.agentFilterSort.direction === "desc" ? "▼" : "▽";
@@ -374,6 +430,7 @@ export async function renderAgentFilter(container, portalState) {
 
         document.getElementById("agent-header-row").innerHTML = headerHtml;
 
+        const body = document.getElementById("agent-results-body");
         body.innerHTML = results.map(c => {
           const name = [c.first_name, c.last_name].filter(Boolean).join(" ");
           const nh = Array.isArray(c.neighborhood) ? c.neighborhood.join(", ") : (c.neighborhood || "");
@@ -381,6 +438,7 @@ export async function renderAgentFilter(container, portalState) {
 
           return `
             <tr>
+              <td><input type="checkbox" class="row-check" data-id="${c.contact_id}"></td>
               <td>${escapeHtml(c.email || "")}</td>
               <td>${escapeHtml(name)}</td>
               <td>${escapeHtml(c.business_name || "")}</td>
@@ -395,6 +453,7 @@ export async function renderAgentFilter(container, portalState) {
           `;
         }).join("");
 
+        // Wire sorting
         document.querySelectorAll("th.sortable").forEach(th => {
           th.addEventListener("click", () => {
             const field = th.dataset.field;
@@ -408,6 +467,9 @@ export async function renderAgentFilter(container, portalState) {
             renderResultsTable();
           });
         });
+
+        // Wire row selection highlighting
+        wireRowSelection();
       }
 
       renderResultsTable();
@@ -418,27 +480,45 @@ export async function renderAgentFilter(container, portalState) {
   };
 
   // ------------------------------------------------------------
-  // Save CSV
+  // Save CSV (only selected rows)
   // ------------------------------------------------------------
   document.getElementById("agent-savecsv").onclick = async () => {
-    const table = document.getElementById("agent-results");
     const rows = Array.from(document.querySelectorAll("#agent-results-body tr"));
-    if (!rows.length) return alert("No data to save");
+    const checkedRows = rows.filter(r => r.querySelector(".row-check")?.checked);
 
-    const trs = Array.from(table.querySelectorAll("tr"));
-    const csv = trs
-      .map(tr =>
-        Array.from(tr.querySelectorAll("th,td"))
-          .map(td => `"${td.textContent.replace(/"/g, '""')}"`)
-          .join(",")
-      )
-      .join("\n");
+    if (!checkedRows.length) {
+      alert("No rows selected.");
+      return;
+    }
+
+    const headers = [
+      "Email",
+      "Name",
+      "Business",
+      "Industry",
+      "Vertical",
+      "Neighborhood",
+      "Square Footage",
+      "Lead Level",
+      "Type",
+      "Last Email"
+    ];
+
+    let csv = headers.join(",") + "\n";
+
+    checkedRows.forEach(tr => {
+      const tds = Array.from(tr.querySelectorAll("td")).slice(1); // skip checkbox
+      const row = tds.map(td =>
+        `"${td.textContent.replace(/"/g, '""')}"`
+      ).join(",");
+      csv += row + "\n";
+    });
 
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "jw_contacts_agent.csv";
+    a.download = "jw_contacts_selected.csv";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
