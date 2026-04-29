@@ -100,7 +100,6 @@ export async function renderAgentFilter(container, portalState) {
             <th>Lead Level</th>
             <th>Type</th>
             <th>Last Email</th>
-            <th>Last Reply</th>
           </tr>
         </thead>
         <tbody id="agent-results-body"></tbody>
@@ -354,8 +353,7 @@ export async function renderAgentFilter(container, portalState) {
           { key: "square_footage", label: "Square Footage" },
           { key: "lead_level", label: "Lead Level" },
           { key: "type", label: "Type" },
-          { key: "last_email_date", label: "Last Email" },
-          { key: "last_reply_date", label: "Last Reply" }
+          { key: "last_email_date", label: "Last Email" }
         ];
 
         const headerHtml = headerConfig.map(col => {
@@ -393,7 +391,6 @@ export async function renderAgentFilter(container, portalState) {
               <td>${escapeHtml(c.lead_level || "")}</td>
               <td>${escapeHtml(c.type || "")}</td>
               <td>${formatDateOnly(c.last_email_date)}</td>
-              <td>${formatDateOnly(c.last_reply_date)}</td>
             </tr>
           `;
         }).join("");
