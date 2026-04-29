@@ -1,5 +1,5 @@
 // /js/filter/agent_run.js
-// Agent Filter — Phase 1.6: 4-column grid layout for Neighborhoods + SqFt
+// Agent Filter — Phase 1.7: 4-column grid + fieldset boxes + filename on its own row
 
 import { escapeHtml, formatDateOnly } from "../utilities.js";
 
@@ -22,26 +22,32 @@ export async function renderAgentFilter(container, portalState) {
     <div class="left-panel">
       <h3>Agent Filter</h3>
 
-      <!-- NEIGHBORHOODS -->
-      <label>Neighborhoods</label>
-      <div id="agent-nh-grid" class="checkbox-grid"></div>
-      <div class="btn-row">
-        <button id="agent-nh-selectall" class="secondary">Select All</button>
-        <button id="agent-nh-clear" class="secondary">Clear</button>
+      <!-- NEIGHBORHOODS BOX -->
+      <div class="fieldset-box">
+        <label>Neighborhoods</label>
+        <div id="agent-nh-grid" class="checkbox-grid"></div>
+        <div class="btn-row">
+          <button id="agent-nh-selectall" class="secondary">Select All</button>
+          <button id="agent-nh-clear" class="secondary">Clear</button>
+        </div>
       </div>
 
-      <!-- SQFT -->
-      <label style="margin-top:20px;">Square Footage</label>
-      <div id="agent-sqft-grid" class="checkbox-grid"></div>
-      <div class="btn-row">
-        <button id="agent-sqft-selectall" class="secondary">Select All</button>
-        <button id="agent-sqft-clear" class="secondary">Clear</button>
+      <!-- SQFT BOX -->
+      <div class="fieldset-box" style="margin-top:20px;">
+        <label>Square Footage</label>
+        <div id="agent-sqft-grid" class="checkbox-grid"></div>
+        <div class="btn-row">
+          <button id="agent-sqft-selectall" class="secondary">Select All</button>
+          <button id="agent-sqft-clear" class="secondary">Clear</button>
+        </div>
       </div>
 
+      <!-- RUN BY -->
       <label style="margin-top:20px;">Run By</label>
       <select id="agent-runby"></select>
 
-      <label>Filename</label>
+      <!-- FILENAME ON ITS OWN ROW -->
+      <label style="margin-top:12px;">Filename</label>
       <input id="agent-filename" type="text" placeholder="e.g. Bryant Park — Q4 Outreach" style="width:100%;" />
 
       <div class="inline" style="margin-top:12px;">
@@ -116,6 +122,12 @@ export async function renderAgentFilter(container, portalState) {
     }
     .checkbox-grid input[type="checkbox"] {
       margin: 0;
+    }
+    .fieldset-box {
+      border: 1px solid #ccc;
+      padding: 12px;
+      border-radius: 6px;
+      background: #fafafa;
     }
   </style>
   `;
@@ -414,3 +426,4 @@ export async function renderAgentFilter(container, portalState) {
   };
 
 }
+
