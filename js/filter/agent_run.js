@@ -1,5 +1,5 @@
 // /js/filter/agent_run.js
-// Agent Filter — Phase 1.8: 4-column NH, 5-column SqFt, filename row fix
+// Agent Filter — Phase 1.9: Add business_name, industry, vertical_market to results grid
 
 import { escapeHtml, formatDateOnly } from "../utilities.js";
 
@@ -43,16 +43,12 @@ export async function renderAgentFilter(container, portalState) {
       </div>
 
       <!-- RUN BY -->
-      <div>
       <label style="margin-top:20px;">Run By</label>
       <select id="agent-runby"></select>
-      </div>
 
       <!-- FILENAME ON ITS OWN ROW -->
-      <div>
       <label style="margin-top:12px;">Filename</label>
       <input id="agent-filename" type="text" placeholder="e.g. Bryant Park — Q4 Outreach" style="width:100%;" />
-      </div>
 
       <div class="inline" style="margin-top:12px;">
         <input type="checkbox" id="agent-autosave" checked />
@@ -96,6 +92,9 @@ export async function renderAgentFilter(container, portalState) {
           <tr id="agent-header-row">
             <th>Email</th>
             <th>Name</th>
+            <th>Business</th>
+            <th>Industry</th>
+            <th>Vertical</th>
             <th>Neighborhood</th>
             <th>Square Footage</th>
             <th>Lead Level</th>
@@ -348,6 +347,9 @@ export async function renderAgentFilter(container, portalState) {
         const headerConfig = [
           { key: "email", label: "Email" },
           { key: "name", label: "Name" },
+          { key: "business_name", label: "Business" },
+          { key: "industry", label: "Industry" },
+          { key: "vertical_market", label: "Vertical" },
           { key: "neighborhood", label: "Neighborhood" },
           { key: "square_footage", label: "Square Footage" },
           { key: "lead_level", label: "Lead Level" },
@@ -383,6 +385,9 @@ export async function renderAgentFilter(container, portalState) {
             <tr>
               <td>${escapeHtml(c.email || "")}</td>
               <td>${escapeHtml(name)}</td>
+              <td>${escapeHtml(c.business_name || "")}</td>
+              <td>${escapeHtml(c.industry || "")}</td>
+              <td>${escapeHtml(c.vertical_market || "")}</td>
               <td>${escapeHtml(nh)}</td>
               <td>${escapeHtml(sq)}</td>
               <td>${escapeHtml(c.lead_level || "")}</td>
