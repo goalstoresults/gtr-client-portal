@@ -43,12 +43,16 @@ export async function renderAgentFilter(container, portalState) {
       </div>
 
       <!-- RUN BY -->
+      <div>
       <label style="margin-top:20px;">Run By</label>
       <select id="agent-runby"></select>
+      </div>
 
       <!-- FILENAME ON ITS OWN ROW -->
+      <div>
       <label style="margin-top:12px;">Filename</label>
       <input id="agent-filename" type="text" placeholder="e.g. Bryant Park — Q4 Outreach" style="width:100%;" />
+      </div>
 
       <div class="inline" style="margin-top:12px;">
         <input type="checkbox" id="agent-autosave" checked />
