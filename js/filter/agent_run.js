@@ -85,7 +85,6 @@ export async function renderAgentFilter(container, portalState) {
       <div class="btn-row" style="margin-top:12px;">
         <button id="agent-selectall" class="secondary">Select All</button>
         <button id="agent-clearall" class="secondary">Clear All</button>
-        <button id="agent-clear" class="secondary">Clear</button>
         <button id="agent-savecsv" class="secondary">Save CSV</button>
       </div>
 
@@ -218,16 +217,6 @@ export async function renderAgentFilter(container, portalState) {
     runBySelect.value = savedRunner;
   }
 
-  // ------------------------------------------------------------
-  // Clear Results
-  // ------------------------------------------------------------
-  document.getElementById("agent-clear").onclick = () => {
-    document.getElementById("agent-message").textContent = "";
-    document.getElementById("agent-results").style.display = "none";
-    document.getElementById("agent-results-body").innerHTML = "";
-    document.getElementById("agent-total").textContent = "";
-    window.currentContactIds = [];
-  };
 
   // ------------------------------------------------------------
   // Row selection helpers
