@@ -93,12 +93,23 @@ function renderYoY(yoy) {
     diffPct[key] = b === 0 ? null : ((a - b) / b) * 100;
   }
 
-  // YTD (always 12 months)
-  const totalThis = Object.values(thisY).reduce((a, b) => a + b, 0);
-  const totalLast = Object.values(lastY).reduce((a, b) => a + b, 0);
+  // YTD: only months where current year has revenue, compare to same months last year
+  let ytdThis = 0;
+  let ytdLast = 0;
 
-  const ytdAmt = totalThis - totalLast;
-  const ytdPct = totalLast === 0 ? null : (ytdAmt / totalLast) * 100;
+  for (let i = 1; i <= 12; i++) {
+    const key = String(i).padStart(2, "0");
+    const a = thisY[key] || 0;
+    const b = lastY[key] || 0;
+
+    if (a === 0) continue; // only include months where current year has revenue
+
+    ytdThis += a;
+    ytdLast += b;
+  }
+
+  const ytdAmt = ytdThis - ytdLast;
+  const ytdPct = ytdLast === 0 ? null : (ytdAmt / ytdLast) * 100;
 
   const row = (obj, formatter) =>
     months
@@ -134,13 +145,13 @@ function renderYoY(yoy) {
           <tr>
             <td><strong>This Year</strong></td>
             ${row(thisY, v => formatCurrency(v))}
-            <td><strong>${formatCurrency(totalThis)}</strong></td>
+            <td><strong>${formatCurrency(ytdThis)}</strong></td>
           </tr>
 
           <tr>
             <td><strong>Last Year</strong></td>
             ${row(lastY, v => formatCurrency(v))}
-            <td><strong>${formatCurrency(totalLast)}</strong></td>
+            <td><strong>${formatCurrency(ytdLast)}</strong></td>
           </tr>
 
           <tr>
