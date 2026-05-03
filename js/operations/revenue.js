@@ -13,11 +13,13 @@ content.innerHTML = `
 
   <div id="rev-yoy"></div>
 
+  <h3 style="margin-top: 20px;">Month By Month Revenue — (<span id="rev-year-label"></span>)</h3>
   <div id="rev-grid"></div>
 </section>
 `;
 
 const yearSelect = document.getElementById("rev-year-select");
+const yearLabel = document.getElementById("rev-year-label");
 const yoyDiv = document.getElementById("rev-yoy");
 const grid = document.getElementById("rev-grid");
 
@@ -46,6 +48,8 @@ yearSelect.addEventListener("change", () => {
 // LOAD YEAR (YoY + Detailed Grid)
 // ------------------------------------------------------------
 async function loadYear(year) {
+  yearLabel.textContent = year;
+
   const yoy = await fetchYoY(portalState.project, year);
   renderYoY(yoy);
 
@@ -73,20 +77,37 @@ function renderYoY(yoy) {
   const diffAmt = {};
   const diffPct = {};
 
+  // Month-specific differences only
   for (let i = 1; i <= 12; i++) {
     const key = String(i).padStart(2, "0");
     const a = thisY[key] || 0;
     const b = lastY[key] || 0;
 
+    if (a === 0) {
+      diffAmt[key] = null;
+      diffPct[key] = null;
+      continue;
+    }
+
     diffAmt[key] = a - b;
     diffPct[key] = b === 0 ? null : ((a - b) / b) * 100;
   }
 
-  const row = (label, obj, formatter) =>
+  // YTD (always 12 months)
+  const totalThis = Object.values(thisY).reduce((a, b) => a + b, 0);
+  const totalLast = Object.values(lastY).reduce((a, b) => a + b, 0);
+
+  const ytdAmt = totalThis - totalLast;
+  const ytdPct = totalLast === 0 ? null : (ytdAmt / totalLast) * 100;
+
+  const row = (obj, formatter) =>
     months
       .map((_, idx) => {
         const key = String(idx + 1).padStart(2, "0");
-        return `<td>${formatter(obj[key])}</td>`;
+        const val = obj[key];
+
+        if (val === null || val === undefined) return `<td></td>`;
+        return `<td>${formatter(val)}</td>`;
       })
       .join("");
 
@@ -94,6 +115,9 @@ function renderYoY(yoy) {
   <section class="card" style="margin-bottom: 20px;">
     <h3 style="cursor:pointer;" id="yoy-toggle">
       Year‑Over‑Year Comparison (${yoy.year} vs ${yoy.year - 1})
+      <span id="yoy-hint" style="font-weight: normal; font-size: 0.85em; opacity: 0.7;">
+        (click to expand)
+      </span>
     </h3>
 
     <div id="yoy-body" style="display:none; margin-top:12px;">
@@ -109,39 +133,50 @@ function renderYoY(yoy) {
         <tbody>
           <tr>
             <td><strong>This Year</strong></td>
-            ${row("This", thisY, v => formatCurrency(v))}
-            <td><strong>${formatCurrency(yoy.totals.thisYear)}</strong></td>
+            ${row(thisY, v => formatCurrency(v))}
+            <td><strong>${formatCurrency(totalThis)}</strong></td>
           </tr>
 
           <tr>
             <td><strong>Last Year</strong></td>
-            ${row("Last", lastY, v => formatCurrency(v))}
-            <td><strong>${formatCurrency(yoy.totals.lastYear)}</strong></td>
+            ${row(lastY, v => formatCurrency(v))}
+            <td><strong>${formatCurrency(totalLast)}</strong></td>
           </tr>
 
           <tr>
             <td><strong>Δ Amount</strong></td>
-            ${row("Diff", diffAmt, v => {
-              const cls = v > 0 ? "rev-up" : v < 0 ? "rev-down" : "rev-same";
-              const arrow = v > 0 ? " ▲" : v < 0 ? " ▼" : "";
-              return `<span class="${cls}">${formatCurrency(v)}${arrow}</span>`;
-            })}
-            <td><strong>${formatCurrency(yoy.totals.thisYear - yoy.totals.lastYear)}</strong></td>
+            ${months
+              .map((_, idx) => {
+                const key = String(idx + 1).padStart(2, "0");
+                const v = diffAmt[key];
+
+                if (v === null) return `<td></td>`;
+
+                const cls = v > 0 ? "rev-up" : v < 0 ? "rev-down" : "rev-same";
+                const arrow = v > 0 ? " ▲" : v < 0 ? " ▼" : "";
+
+                return `<td><span class="${cls}">${formatCurrency(v)}${arrow}</span></td>`;
+              })
+              .join("")}
+            <td><strong>${formatCurrency(ytdAmt)}</strong></td>
           </tr>
 
           <tr>
             <td><strong>Δ Percent</strong></td>
-            ${row("Pct", diffPct, v => {
-              if (v === null) return `<span class="rev-same">—</span>`;
-              const cls = v > 0 ? "rev-up" : v < 0 ? "rev-down" : "rev-same";
-              const arrow = v > 0 ? " ▲" : v < 0 ? " ▼" : "";
-              return `<span class="${cls}">${v.toFixed(1)}%${arrow}</span>`;
-            })}
-            <td><strong>${
-              yoy.totals.lastYear === 0
-                ? "—"
-                : ((yoy.totals.thisYear - yoy.totals.lastYear) / yoy.totals.lastYear * 100).toFixed(1) + "%"
-            }</strong></td>
+            ${months
+              .map((_, idx) => {
+                const key = String(idx + 1).padStart(2, "0");
+                const v = diffPct[key];
+
+                if (v === null) return `<td></td>`;
+
+                const cls = v > 0 ? "rev-up" : v < 0 ? "rev-down" : "rev-same";
+                const arrow = v > 0 ? " ▲" : v < 0 ? " ▼" : "";
+
+                return `<td><span class="${cls}">${v.toFixed(1)}%${arrow}</span></td>`;
+              })
+              .join("")}
+            <td><strong>${ytdPct === null ? "" : ytdPct.toFixed(1) + "%"}</strong></td>
           </tr>
         </tbody>
       </table>
@@ -149,10 +184,15 @@ function renderYoY(yoy) {
   </section>
   `;
 
-  // Toggle
+  // Toggle with hint update
   document.getElementById("yoy-toggle").onclick = () => {
     const body = document.getElementById("yoy-body");
-    body.style.display = body.style.display === "none" ? "block" : "none";
+    const hint = document.getElementById("yoy-hint");
+
+    const isClosed = body.style.display === "none";
+    body.style.display = isClosed ? "block" : "none";
+
+    hint.textContent = isClosed ? "(click to collapse)" : "(click to expand)";
   };
 }
 
