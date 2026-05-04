@@ -124,6 +124,7 @@ export async function renderAgentFilter(container, portalState) {
     .checkbox-grid-sqft {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
+      grid-auto-flow: column;
       gap: 6px 18px;
       margin-bottom: 12px;
     }
