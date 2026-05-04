@@ -93,23 +93,26 @@ function renderYoY(yoy) {
     diffPct[key] = b === 0 ? null : ((a - b) / b) * 100;
   }
 
-  // YTD: only months where current year has revenue, compare to same months last year
+  // YTD: only months where current year has revenue
   let ytdThis = 0;
-  let ytdLast = 0;
+  let ytdLastMatching = 0;
 
   for (let i = 1; i <= 12; i++) {
     const key = String(i).padStart(2, "0");
     const a = thisY[key] || 0;
     const b = lastY[key] || 0;
 
-    if (a === 0) continue; // only include months where current year has revenue
+    if (a === 0) continue;
 
     ytdThis += a;
-    ytdLast += b;
+    ytdLastMatching += b;
   }
 
-  const ytdAmt = ytdThis - ytdLast;
-  const ytdPct = ytdLast === 0 ? null : (ytdAmt / ytdLast) * 100;
+  const ytdAmt = ytdThis - ytdLastMatching;
+  const ytdPct = ytdLastMatching === 0 ? null : (ytdAmt / ytdLastMatching) * 100;
+
+  // FULL YEAR last-year total (for display only)
+  const fullLastYearTotal = yoy.totals.lastYear;
 
   const row = (obj, formatter) =>
     months
@@ -151,7 +154,7 @@ function renderYoY(yoy) {
           <tr>
             <td><strong>Last Year</strong></td>
             ${row(lastY, v => formatCurrency(v))}
-            <td><strong>${formatCurrency(ytdLast)}</strong></td>
+            <td><strong>${formatCurrency(fullLastYearTotal)}</strong></td>
           </tr>
 
           <tr>
@@ -337,3 +340,4 @@ async function fetchYoY(project, year) {
 }
 
 }
+
