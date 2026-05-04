@@ -199,16 +199,16 @@ function chunkVertical(list, columns) {
 
 const sqftColumns = chunkVertical(SQFT, 5);
 
-// Render SQFT so values increase top→bottom in each of 5 columns
+// --- Force SQFT to increase top→bottom in 5 columns ---
 const columns = 5;
 const total = SQFT.length;
 const rows = Math.ceil(total / columns);
 
 let sqftHtml = "";
 
-for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < columns; c++) {
-        const idx = r + c * rows; // vertical ordering
+for (let c = 0; c < columns; c++) {
+    for (let r = 0; r < rows; r++) {
+        const idx = c * rows + r;
         if (idx >= total) continue;
         const s = SQFT[idx];
         sqftHtml += `
@@ -218,6 +218,7 @@ for (let r = 0; r < rows; r++) {
 }
 
 sqftGrid.innerHTML = sqftHtml;
+
 
 
 
