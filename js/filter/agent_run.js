@@ -189,7 +189,7 @@ export async function renderAgentFilter(container, portalState) {
 
   // Hard-coded SQFT in 5-across order so each column reads top→bottom sorted
   sqftGrid.innerHTML = `
-    <label><input type="checkbox" value="0.5K - 1K"> .5K - 1K</label>
+    <label><input type="checkbox" value=".5K - 1K"> 0.5K - 1K</label>
     <label><input type="checkbox" value="6.5K - 7K"> 6.5K - 7K</label>
     <label><input type="checkbox" value="18.5K - 20K"> 18.5K - 20K</label>
     <label><input type="checkbox" value="75K - 85K"> 75K - 85K</label>
