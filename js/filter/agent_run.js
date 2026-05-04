@@ -124,7 +124,6 @@ export async function renderAgentFilter(container, portalState) {
     .checkbox-grid-sqft {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
-      grid-auto-flow: column;
       gap: 6px 18px;
       margin-bottom: 12px;
     }
@@ -200,11 +199,26 @@ function chunkVertical(list, columns) {
 
 const sqftColumns = chunkVertical(SQFT, 5);
 
-sqftGrid.innerHTML = sqftColumns
-    .map(col => col.map(s => `
-        <label><input type="checkbox" value="${s}"> ${s}</label>
-    `).join(""))
-    .join("");
+// Render SQFT so values increase top→bottom in each of 5 columns
+const columns = 5;
+const total = SQFT.length;
+const rows = Math.ceil(total / columns);
+
+let sqftHtml = "";
+
+for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < columns; c++) {
+        const idx = r + c * rows; // vertical ordering
+        if (idx >= total) continue;
+        const s = SQFT[idx];
+        sqftHtml += `
+            <label><input type="checkbox" value="${s}"> ${s}</label>
+        `;
+    }
+}
+
+sqftGrid.innerHTML = sqftHtml;
+
 
 
   // ------------------------------------------------------------
