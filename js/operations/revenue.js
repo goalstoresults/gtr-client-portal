@@ -51,7 +51,7 @@ async function loadYear(year) {
   yearLabel.textContent = year;
 
   const yoy = await fetchYoY(portalState.project, year);
-  renderYoY(yoy);
+  renderYoY(yoy, year);
 
   const data = await fetchMonthlyDetailed(portalState.project, year);
   renderGrid(data);
@@ -60,8 +60,21 @@ async function loadYear(year) {
 // ------------------------------------------------------------
 // RENDER YOY BLOCK
 // ------------------------------------------------------------
-function renderYoY(yoy) {
+function renderYoY(yoy, selectedYear) {
   if (!yoy || !yoy.thisYear) {
+    yoyDiv.innerHTML = "";
+    return;
+  }
+
+  const thisYearNum = selectedYear;
+  const lastYearNum = selectedYear - 1;
+
+  const thisY = yoy.thisYear;
+  const lastY = yoy.lastYear;
+
+  // If prior year has no revenue → HIDE YoY entirely
+  const lastYearHasRevenue = Object.values(lastY).some(v => v > 0);
+  if (!lastYearHasRevenue) {
     yoyDiv.innerHTML = "";
     return;
   }
@@ -70,9 +83,6 @@ function renderYoY(yoy) {
     "Jan","Feb","Mar","Apr","May","Jun",
     "Jul","Aug","Sep","Oct","Nov","Dec"
   ];
-
-  const thisY = yoy.thisYear;
-  const lastY = yoy.lastYear;
 
   const diffAmt = {};
   const diffPct = {};
@@ -128,7 +138,7 @@ function renderYoY(yoy) {
   yoyDiv.innerHTML = `
   <section class="card" style="margin-bottom: 20px;">
     <h3 style="cursor:pointer;" id="yoy-toggle">
-      Year‑Over‑Year Comparison (${yoy.year} vs ${yoy.year - 1})
+      Year‑Over‑Year Comparison (${thisYearNum} vs ${lastYearNum})
       <span id="yoy-hint" style="font-weight: normal; font-size: 0.85em; opacity: 0.7;">
         (click to expand)
       </span>
@@ -146,13 +156,13 @@ function renderYoY(yoy) {
 
         <tbody>
           <tr>
-            <td><strong>This Year</strong></td>
+            <td><strong>${thisYearNum}</strong></td>
             ${row(thisY, v => formatCurrency(v))}
             <td><strong>${formatCurrency(ytdThis)}</strong></td>
           </tr>
 
           <tr>
-            <td><strong>Last Year</strong></td>
+            <td><strong>${lastYearNum}</strong></td>
             ${row(lastY, v => formatCurrency(v))}
             <td><strong>${formatCurrency(fullLastYearTotal)}</strong></td>
           </tr>
@@ -340,4 +350,5 @@ async function fetchYoY(project, year) {
 }
 
 }
+
 
