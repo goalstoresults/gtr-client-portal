@@ -199,82 +199,34 @@ function chunkVertical(list, columns) {
 
 const sqftColumns = chunkVertical(SQFT, 5);
 
-// --- Force SQFT to increase top→bottom in 5 columns ---
+// --- Force SQFT to increase top→bottom in 5 columns (correct for uneven lists) ---
 const columns = 5;
 const total = SQFT.length;
 const rows = Math.ceil(total / columns);
 
-let sqftHtml = "";
+let matrix = Array.from({ length: rows }, () => Array(columns).fill(null));
 
+let index = 0;
 for (let c = 0; c < columns; c++) {
     for (let r = 0; r < rows; r++) {
-        const idx = c * rows + r;
-        if (idx >= total) continue;
-        const s = SQFT[idx];
-        sqftHtml += `
-            <label><input type="checkbox" value="${s}"> ${s}</label>
-        `;
+        if (index < total) {
+            matrix[r][c] = SQFT[index++];
+        }
     }
 }
 
-sqftGrid.innerHTML = `
-<label><input type="checkbox" value=".5K - 1K"> .5K - 1K</label>
-<label><input type="checkbox" value="1K - 1.5K"> 1K - 1.5K</label>
-<label><input type="checkbox" value="1.5K - 2K"> 1.5K - 2K</label>
-<label><input type="checkbox" value="2K - 2.5K"> 2K - 2.5K</label>
-<label><input type="checkbox" value="2.5K - 3K"> 2.5K - 3K</label>
-<label><input type="checkbox" value="3K - 3.5K"> 3K - 3.5K</label>
-<label><input type="checkbox" value="3.5K - 4K"> 3.5K - 4K</label>
-<label><input type="checkbox" value="4K - 4.5K"> 4K - 4.5K</label>
-<label><input type="checkbox" value="4.5K - 5K"> 4.5K - 5K</label>
-<label><input type="checkbox" value="5K - 5.5K"> 5K - 5.5K</label>
-<label><input type="checkbox" value="5.5K - 6K"> 5.5K - 6K</label>
-<label><input type="checkbox" value="6K - 6.5K"> 6K - 6.5K</label>
-<label><input type="checkbox" value="6.5K - 7K"> 6.5K - 7K</label>
-<label><input type="checkbox" value="7K - 7.5K"> 7K - 7.5K</label>
-<label><input type="checkbox" value="7.5K - 8K"> 7.5K - 8K</label>
-<label><input type="checkbox" value="8K - 8.5K"> 8K - 8.5K</label>
-<label><input type="checkbox" value="8.5K - 9.5K"> 8.5K - 9.5K</label>
-<label><input type="checkbox" value="9.5K - 10.5K"> 9.5K - 10.5K</label>
-<label><input type="checkbox" value="10.5K - 11.5K"> 10.5K - 11.5K</label>
-<label><input type="checkbox" value="11.5K - 12.5K"> 11.5K - 12.5K</label>
-<label><input type="checkbox" value="12.5K - 13.5K"> 12.5K - 13.5K</label>
-<label><input type="checkbox" value="13.5K - 15K"> 13.5K - 15K</label>
-<label><input type="checkbox" value="15K - 16.5K"> 15K - 16.5K</label>
-<label><input type="checkbox" value="16.5K - 18.5K"> 16.5K - 18.5K</label>
-<label><input type="checkbox" value="18.5K - 20K"> 18.5K - 20K</label>
-<label><input type="checkbox" value="20K - 23K"> 20K - 23K</label>
-<label><input type="checkbox" value="23K - 25K"> 23K - 25K</label>
-<label><input type="checkbox" value="25K - 26K"> 25K - 26K</label>
-<label><input type="checkbox" value="26K - 29K"> 26K - 29K</label>
-<label><input type="checkbox" value="29K - 33K"> 29K - 33K</label>
-<label><input type="checkbox" value="33K - 37K"> 33K - 37K</label>
-<label><input type="checkbox" value="37K - 42K"> 37K - 42K</label>
-<label><input type="checkbox" value="42K - 47K"> 42K - 47K</label>
-<label><input type="checkbox" value="47K - 55K"> 47K - 55K</label>
-<label><input type="checkbox" value="55K - 65K"> 55K - 65K</label>
-<label><input type="checkbox" value="65K - 75K"> 65K - 75K</label>
-<label><input type="checkbox" value="75K - 85K"> 75K - 85K</label>
-<label><input type="checkbox" value="85K - 100K"> 85K - 100K</label>
-<label><input type="checkbox" value="100K - 120K"> 100K - 120K</label>
-<label><input type="checkbox" value="120K - 140K"> 120K - 140K</label>
-<label><input type="checkbox" value="140K - 160K"> 140K - 160K</label>
-<label><input type="checkbox" value="160K - 180K"> 160K - 180K</label>
-<label><input type="checkbox" value="180K - 200K"> 180K - 200K</label>
-<label><input type="checkbox" value="200K - 240K"> 200K - 240K</label>
-<label><input type="checkbox" value="240K - 270K"> 240K - 270K</label>
-<label><input type="checkbox" value="270K - 300K"> 270K - 300K</label>
-<label><input type="checkbox" value="300K - 350K"> 300K - 350K</label>
-<label><input type="checkbox" value="350K - 400K"> 350K - 400K</label>
-<label><input type="checkbox" value="400K - 450K"> 400K - 450K</label>
-<label><input type="checkbox" value="450K - 500K"> 450K - 500K</label>
-<label><input type="checkbox" value="500K - 600K"> 500K - 600K</label>
-<label><input type="checkbox" value="600K - 700K"> 600K - 700K</label>
-<label><input type="checkbox" value="700K - 800K"> 700K - 800K</label>
-<label><input type="checkbox" value="800K - 900K"> 800K - 900K</label>
-<label><input type="checkbox" value="900K - 1M"> 900K - 1M</label>
-<label><input type="checkbox" value="1M+"> 1M+</label>
-`;
+let sqftHtml = "";
+matrix.forEach(row => {
+    row.forEach(cell => {
+        if (!cell) return;
+        sqftHtml += `
+            <label><input type="checkbox" value="${cell}"> ${cell}</label>
+        `;
+    });
+});
+
+sqftGrid.innerHTML = sqftHtml;
+
 
 
 
