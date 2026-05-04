@@ -128,6 +128,12 @@ export async function renderAgentFilter(container, portalState) {
       margin-bottom: 12px;
     }
 
+    .sqft-spacer {
+      visibility: hidden;
+    }
+
+
+
     .checkbox-grid-nh label,
     .checkbox-grid-sqft label {
       display: flex;
@@ -241,21 +247,25 @@ export async function renderAgentFilter(container, portalState) {
     <label><input type="checkbox" value="12.5K - 13.5K"> 12.5K - 13.5K</label>
     <label><input type="checkbox" value="42K - 47K"> 42K - 47K</label>
     <label><input type="checkbox" value="240K - 270K"> 240K - 270K</label>
+    <span class="sqft-spacer"></span>
 
     <label><input type="checkbox" value="5K - 5.5K"> 5K - 5.5K</label>
     <label><input type="checkbox" value="13.5K - 15K"> 13.5K - 15K</label>
     <label><input type="checkbox" value="47K - 55K"> 47K - 55K</label>
     <label><input type="checkbox" value="270K - 300K"> 270K - 300K</label>
+    <span class="sqft-spacer"></span>
 
     <label><input type="checkbox" value="5.5K - 6K"> 5.5K - 6K</label>
     <label><input type="checkbox" value="15K - 16.5K"> 15K - 16.5K</label>
     <label><input type="checkbox" value="55K - 65K"> 55K - 65K</label>
     <label><input type="checkbox" value="300K - 350K"> 300K - 350K</label>
-
+    <span class="sqft-spacer"></span>
+    
     <label><input type="checkbox" value="6K - 6.5K"> 6K - 6.5K</label>
     <label><input type="checkbox" value="16.5K - 18.5K"> 16.5K - 18.5K</label>
     <label><input type="checkbox" value="65K - 75K"> 65K - 75K</label>
     <label><input type="checkbox" value="350K - 400K"> 350K - 400K</label>
+    <span class="sqft-spacer"></span>
   `;
 
 
