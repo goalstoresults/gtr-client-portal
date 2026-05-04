@@ -187,9 +187,24 @@ export async function renderAgentFilter(container, portalState) {
     <label><input type="checkbox" value="${n}"> ${n}</label>
   `).join("");
 
-  sqftGrid.innerHTML = SQFT.map(s => `
-    <label><input type="checkbox" value="${s}"> ${s}</label>
-  `).join("");
+// --- Vertical 5-column SQFT layout (Option A) ---
+function chunkVertical(list, columns) {
+    const perCol = Math.ceil(list.length / columns);
+    const chunks = [];
+    for (let i = 0; i < columns; i++) {
+        chunks.push(list.slice(i * perCol, (i + 1) * perCol));
+    }
+    return chunks;
+}
+
+const sqftColumns = chunkVertical(SQFT, 5);
+
+sqftGrid.innerHTML = sqftColumns
+    .map(col => col.map(s => `
+        <label><input type="checkbox" value="${s}"> ${s}</label>
+    `).join(""))
+    .join("");
+
 
   // ------------------------------------------------------------
   // Select/Clear logic for lookups
@@ -442,7 +457,7 @@ export async function renderAgentFilter(container, portalState) {
 
         const body = document.getElementById("agent-results-body");
         body.innerHTML = results.map(c => {
-          const name = [c.first_name, c.last_name].filter(Boolean).join(" ");
+          const name = c.first_name || "";
           const nh = Array.isArray(c.neighborhood) ? c.neighborhood.join(", ") : (c.neighborhood || "");
           const sq = Array.isArray(c.square_footage) ? c.square_footage.join(", ") : (c.square_footage || "");
 
