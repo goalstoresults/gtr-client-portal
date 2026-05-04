@@ -120,13 +120,15 @@ export async function renderAgentFilter(container, portalState) {
       margin-bottom: 12px;
     }
 
-    /* SqFt = 5 columns */
+    /* Square Foot = 5 columns */
     .checkbox-grid-sqft {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 6px 18px;
-      margin-bottom: 12px;
-    }
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-auto-flow: column;   /* <-- THIS IS THE FIX */
+    gap: 6px 18px;
+    margin-bottom: 12px;
+}
+
 
     .checkbox-grid-nh label,
     .checkbox-grid-sqft label {
