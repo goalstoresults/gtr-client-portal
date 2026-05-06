@@ -381,19 +381,32 @@ function expandVendorRow(btn, vendorId, rows, contactMap, portalState) {
           <tbody>
   `;
 
-  (rows || []).forEach(r => {
-    const client = contactMap[r.clientId];
+(rows || []).forEach(r => {
+  const client = contactMap[r.clientId];
+
+  // SAFETY CHECK — client missing from contactMap
+  if (!client) {
     html += `
-      <tr>
-        <td>
-          <a href="#" class="cv-link" data-id="${escapeHtml(client.id)}">
-            ${escapeHtml(client.name)}
-          </a>
-        </td>
-        <td>${escapeHtml(r.role)}</td>
-      </tr>
-    `;
-  });
+<tr>
+  <td>(missing contact: ${escapeHtml(r.clientId)})</td>
+  <td>${escapeHtml(r.role)}</td>
+</tr>
+`;
+    return;
+  }
+
+  html += `
+<tr>
+  <td>
+    <a href="#" class="cv-link" data-id="${escapeHtml(client.id)}">
+      ${escapeHtml(client.name)}
+    </a>
+  </td>
+  <td>${escapeHtml(r.role)}</td>
+</tr>
+`;
+});
+
 
   html += `
           </tbody>
