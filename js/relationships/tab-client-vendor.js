@@ -462,9 +462,7 @@ function expandVendorRow(btn, vendorId, rows, contactMap, portalState) {
     <td>${escapeHtml(v.type)}</td>
     <td>Client- Vendor</td>
     <td style="text-align:center;">
-      <button class="btn-secondary cv-expand" data-id="${escapeHtml(
-        v.id
-      )}">▶ Expand</button>
+    <button class="btn-primary cv-details" data-id="${escapeHtml(v.id)}">Details</button>
     </td>
   </tr>
   `;
