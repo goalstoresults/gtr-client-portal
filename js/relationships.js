@@ -4,6 +4,7 @@
 import { renderRelList } from "./relationships/tab-list.js";
 import { renderRelDetails } from "./relationships/tab-details.js";
 import { renderRelOverview } from "./relationships/tab-overview.js";
+import { renderClientVendorTab } from "./relationships/tab-client-vendor.js";   // ⭐ NEW IMPORT
 
 export async function loadRelationshipsTab({ portalState, tabContent }) {
   // Load base HTML template
@@ -39,6 +40,11 @@ export async function loadRelationshipsTab({ portalState, tabContent }) {
         return;
       }
 
+      if (subtab === "clientVendor") {                     // ⭐ NEW ROUTER CASE
+        await renderClientVendorTab(content, portalState);
+        return;
+      }
+
       // Fallback
       content.innerHTML = `
         <section class="card">
@@ -58,3 +64,4 @@ export async function loadRelationshipsTab({ portalState, tabContent }) {
 
   await renderRelList(content, portalState);
 }
+
