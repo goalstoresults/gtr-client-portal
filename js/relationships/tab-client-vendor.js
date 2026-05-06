@@ -97,57 +97,37 @@ function buildContactMap(contacts) {
   return map;
 }
 
-/* -------------------------------------------------------
-Model builder
-------------------------------------------------------- */
-
 function buildClientVendorModel(contacts, clientVendorRels, contactMap) {
-  const isClient = x => (x?.type || "") === "Client";
-  const isVendor = x => (x?.type || "") === "Client Vendor";
+  // ------------------------------------------------------------
+  // 1. CLIENTS = DISTINCT source_contact_id
+  // ------------------------------------------------------------
+  const clientIdSet = new Set(
+    clientVendorRels.map(r => r.source_contact_id).filter(Boolean)
+  );
 
-  // Clients list
-  const clientsList = contacts
-    .filter(c => isClient(c))
-    .map(c => contactMap[c.contact_id])
+  const clientsList = [...clientIdSet]
+    .map(id => contactMap[id])
     .filter(Boolean);
 
-  // Vendors list
-  const vendorsSet = new Set();
+  // ------------------------------------------------------------
+  // 2. VENDORS = DISTINCT related_contact_id
+  // ------------------------------------------------------------
+  const vendorIdSet = new Set(
+    clientVendorRels.map(r => r.related_contact_id).filter(Boolean)
+  );
 
-  clientVendorRels.forEach(r => {
-    const s = contactMap[r.source_contact_id];
-    const t = contactMap[r.related_contact_id];
+  const vendorsList = [...vendorIdSet]
+    .map(id => contactMap[id])
+    .filter(Boolean);
 
-    if (isVendor(s)) vendorsSet.add(s.id);
-    if (isVendor(t)) vendorsSet.add(t.id);
-  });
-
-  const vendorsList = [...vendorsSet].map(id => contactMap[id]);
-
-  // Grouping
+  // ------------------------------------------------------------
+  // 3. GROUP BY CLIENT (client → vendors)
+  // ------------------------------------------------------------
   const groupedByClient = {};
-  const groupedByVendor = {};
-
   clientVendorRels.forEach(r => {
-    const s = contactMap[r.source_contact_id];
-    const t = contactMap[r.related_contact_id];
-
-    const sIsClient = isClient(s);
-    const tIsClient = isClient(t);
-    const sIsVendor = isVendor(s);
-    const tIsVendor = isVendor(t);
-
-    let clientId, vendorId;
-
-    if (sIsClient && tIsVendor) {
-      clientId = s.id;
-      vendorId = t.id;
-    } else if (tIsClient && sIsVendor) {
-      clientId = t.id;
-      vendorId = s.id;
-    } else {
-      return; // ignore invalid pairs
-    }
+    const clientId = r.source_contact_id;
+    const vendorId = r.related_contact_id;
+    if (!clientId || !vendorId) return;
 
     if (!groupedByClient[clientId]) groupedByClient[clientId] = [];
     groupedByClient[clientId].push({
@@ -155,6 +135,16 @@ function buildClientVendorModel(contacts, clientVendorRels, contactMap) {
       role: r.relationship_role || "",
       rel: r
     });
+  });
+
+  // ------------------------------------------------------------
+  // 4. GROUP BY VENDOR (vendor → clients)
+  // ------------------------------------------------------------
+  const groupedByVendor = {};
+  clientVendorRels.forEach(r => {
+    const clientId = r.source_contact_id;
+    const vendorId = r.related_contact_id;
+    if (!clientId || !vendorId) return;
 
     if (!groupedByVendor[vendorId]) groupedByVendor[vendorId] = [];
     groupedByVendor[vendorId].push({
@@ -164,7 +154,38 @@ function buildClientVendorModel(contacts, clientVendorRels, contactMap) {
     });
   });
 
-  return { clientsList, vendorsList, groupedByClient, groupedByVendor };
+  // ------------------------------------------------------------
+  // 5. TYPE MISMATCH = vendors where contact_type != "Client Vendor"
+  // ------------------------------------------------------------
+  const mismatchesList = [...vendorIdSet]
+    .map(id => contactMap[id])
+    .filter(c => c && c.type !== "Client Vendor");
+
+  // Group mismatches (vendor → clients)
+  const groupedByMismatch = {};
+  clientVendorRels.forEach(r => {
+    const vendorId = r.related_contact_id;
+    if (!vendorId) return;
+
+    const vendor = contactMap[vendorId];
+    if (!vendor || vendor.type === "Client Vendor") return;
+
+    if (!groupedByMismatch[vendorId]) groupedByMismatch[vendorId] = [];
+    groupedByMismatch[vendorId].push({
+      clientId: r.source_contact_id,
+      role: r.relationship_role || "",
+      rel: r
+    });
+  });
+
+  return {
+    clientsList,
+    vendorsList,
+    groupedByClient,
+    groupedByVendor,
+    mismatchesList,
+    groupedByMismatch
+  };
 }
 
 /* -------------------------------------------------------
