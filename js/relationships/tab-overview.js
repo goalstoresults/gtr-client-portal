@@ -121,7 +121,7 @@ function buildContactMap(contacts) {
 }
 
 /* -------------------------------------------------------
-Rebuilt Stats Model — clean, human‑friendly, no duplicates
+Rebuilt Stats Model — simplified, no duplicates
 ------------------------------------------------------- */
 
 function buildStatsModel(contacts, relationships, contactMap) {
@@ -152,34 +152,8 @@ function buildStatsModel(contacts, relationships, contactMap) {
     };
   });
 
-  // 3) Relationship rows that involve a client
-  const clientInvolvedRelationships = relationships.filter(r => {
-    return (
-      contactMap[r.source_contact_id]?.type === "Client" ||
-      contactMap[r.related_contact_id]?.type === "Client"
-    );
-  });
-
-  // 4) Relationship type counts
-  const typeCounts = {};
-  relationships.forEach(r => {
-    const t = r.relationship_type || "Unknown";
-    if (!typeCounts[t]) typeCounts[t] = { count: 0, rows: [] };
-    typeCounts[t].count++;
-    typeCounts[t].rows.push(r);
-  });
-
-  // 5) Relationship role counts
-  const roleCounts = {};
-  relationships.forEach(r => {
-    const role = r.relationship_role || "Unknown";
-    if (!roleCounts[role]) roleCounts[role] = { count: 0, rows: [] };
-    roleCounts[role].count++;
-    roleCounts[role].rows.push(r);
-  });
-
   /* -------------------------------------------------------
-  Build Totals Section — CLEAN + CORRECT
+  Totals Section — ONLY THREE BUCKETS
   ------------------------------------------------------- */
 
   const totalsRows = [];
@@ -199,7 +173,7 @@ function buildStatsModel(contacts, relationships, contactMap) {
     rows: allClients
   };
 
-  // Clients With Relationships (UNIQUE CLIENTS — FIXED)
+  // Clients With Relationships (UNIQUE CLIENTS)
   totalsRows.push({
     key: "totalClientsWithRelationships",
     category: "Clients With Relationships",
@@ -211,20 +185,6 @@ function buildStatsModel(contacts, relationships, contactMap) {
     type: "clients",
     label: "Clients With Relationships",
     rows: clientsWithRelationships
-  };
-
-  // Client-Involved Relationship Records
-  totalsRows.push({
-    key: "clientInvolvedRelationships",
-    category: "Client-Involved Relationship Records",
-    count: clientInvolvedRelationships.length,
-    percentText: "",
-    percentValue: 0
-  });
-  totalsDatasets["clientInvolvedRelationships"] = {
-    type: "relationships",
-    label: "Relationships Involving Clients",
-    rows: clientInvolvedRelationships
   };
 
   // Total Relationship Records
@@ -245,9 +205,16 @@ function buildStatsModel(contacts, relationships, contactMap) {
   Types + Roles (unchanged)
   ------------------------------------------------------- */
 
+  const typeCounts = {};
+  relationships.forEach(r => {
+    const t = r.relationship_type || "Unknown";
+    if (!typeCounts[t]) typeCounts[t] = { count: 0, rows: [] };
+    typeCounts[t].count++;
+    typeCounts[t].rows.push(r);
+  });
+
   const typesRows = [];
   const typesDatasets = {};
-
   Object.keys(typeCounts)
     .sort((a, b) => a.localeCompare(b))
     .forEach(type => {
@@ -276,9 +243,16 @@ function buildStatsModel(contacts, relationships, contactMap) {
       };
     });
 
+  const roleCounts = {};
+  relationships.forEach(r => {
+    const role = r.relationship_role || "Unknown";
+    if (!roleCounts[role]) roleCounts[role] = { count: 0, rows: [] };
+    roleCounts[role].count++;
+    roleCounts[role].rows.push(r);
+  });
+
   const rolesRows = [];
   const rolesDatasets = {};
-
   Object.keys(roleCounts)
     .sort((a, b) => a.localeCompare(b))
     .forEach(role => {
@@ -313,6 +287,7 @@ function buildStatsModel(contacts, relationships, contactMap) {
     roles: { rows: rolesRows, datasets: rolesDatasets }
   };
 }
+
 
 
 /* -------------------------------------------------------
