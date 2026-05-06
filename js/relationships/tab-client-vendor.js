@@ -40,7 +40,9 @@ export async function renderClientVendorTab(container, portalState) {
     clientsList,
     vendorsList,
     groupedByClient,
-    groupedByVendor
+    groupedByVendor,
+    mismatchesList,
+    groupedByMismatch
   } = buildClientVendorModel(contacts, clientVendorRels, contactMap);
 
   renderClientSection(clientsContainer, clientsList, groupedByClient, contactMap, portalState);
