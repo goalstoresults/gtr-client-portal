@@ -373,4 +373,129 @@ function expandVendorRow(btn, vendorId, rows, contactMap, portalState) {
         ?.click();
     });
   });
+
+  /* -------------------------------------------------------
+  Rendering — Type Mismatches
+  ------------------------------------------------------- */
+  
+  function renderMismatchSection(
+    container,
+    mismatchesList,
+    groupedByMismatch,
+    contactMap,
+    portalState
+  ) {
+    let html = `
+  <h3>Contacts With Type Mismatch (${mismatchesList.length})</h3>
+  <table class="notes-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Contact Type</th>
+        <th>Relationship Type</th>
+        <th style="width:140px; text-align:center;">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+  `;
+  
+    mismatchesList.forEach(v => {
+      html += `
+  <tr data-id="${escapeHtml(v.id)}">
+    <td>${escapeHtml(v.name)}</td>
+    <td>${escapeHtml(v.type)}</td>
+    <td>Client- Vendor</td>
+    <td style="text-align:center;">
+      <button class="btn-secondary cv-expand" data-id="${escapeHtml(
+        v.id
+      )}">▶ Expand</button>
+    </td>
+  </tr>
+  `;
+    });
+  
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+  
+    container.querySelectorAll(".cv-expand").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id;
+        const expanded = btn.textContent.includes("Collapse");
+        if (expanded) {
+          collapseRow(btn);
+        } else {
+          expandMismatchRow(
+            btn,
+            id,
+            groupedByMismatch[id],
+            contactMap,
+            portalState
+          );
+        }
+      });
+    });
+  }
+  
+  function expandMismatchRow(
+    btn,
+    vendorId,
+    rows,
+    contactMap,
+    portalState
+  ) {
+    btn.textContent = "▼ Collapse";
+  
+    const tr = btn.closest("tr");
+    const newRow = document.createElement("tr");
+    newRow.classList.add("cv-expand-row");
+  
+    let html = `
+  <td colspan="4">
+    <div style="background:#fafafa; padding:8px;">
+      <strong>Clients (for this mismatched vendor)</strong>
+      <table class="notes-table" style="margin-top:6px;">
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+  
+    (rows || []).forEach(r => {
+      const client = contactMap[r.clientId];
+      if (!client) return;
+      html += `
+  <tr>
+    <td>
+      <a href="#" class="cv-link" data-id="${escapeHtml(client.id)}">
+        ${escapeHtml(client.name)}
+      </a>
+    </td>
+    <td>${escapeHtml(r.role)}</td>
+  </tr>
+  `;
+    });
+  
+    html += `
+        </tbody>
+      </table>
+    </div>
+  </td>
+  `;
+  
+    newRow.innerHTML = html;
+    tr.after(newRow);
+  
+    newRow.querySelectorAll(".cv-link").forEach(a => {
+      a.addEventListener("click", evt => {
+        evt.preventDefault();
+        portalState.selectedContactId = a.dataset.id;
+        document
+          .querySelector('#relationships-subtabs button[data-subtab="details"]')
+          ?.click();
+      });
+    });
+  }
 }
