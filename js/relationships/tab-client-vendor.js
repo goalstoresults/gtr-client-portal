@@ -196,4 +196,51 @@ function expandClientRow(btn, clientId, rows, contactMap, portalState) {
   const newRow = document.createElement("tr");
   newRow.classList.add("cv-expand-row");
 
-  let html =
+  let html = `
+    <td colspan="2">
+      <div style="background:#fafafa; padding:8px;">
+        <strong>Vendors</strong>
+        <table class="notes-table" style="margin-top:6px;">
+          <thead>
+            <tr>
+              <th>Vendor</th>
+              <th>Role</th>
+            </tr>
+          </thead>
+          <tbody>
+  `;
+
+  (rows || []).forEach(r => {
+    const vendor = contactMap[r.vendorId];
+    html += `
+      <tr>
+        <td>
+          <a href="#" class="cv-link" data-id="${escapeHtml(vendor.id)}">
+            ${escapeHtml(vendor.name)}
+          </a>
+        </td>
+        <td>${escapeHtml(r.role)}</td>
+      </tr>
+    `;
+  });
+
+  html += `
+          </tbody>
+        </table>
+      </div>
+    </td>
+  `;
+
+  newRow.innerHTML = html;
+  tr.after(newRow);
+
+  newRow.querySelectorAll(".cv-link").forEach(a => {
+    a.addEventListener("click", evt => {
+      evt.preventDefault();
+      portalState.selectedContactId = a.dataset.id;
+      document
+        .querySelector('#relationships-subtabs button[data-subtab="details"]')
+        ?.click();
+    });
+  });
+}
