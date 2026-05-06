@@ -17,7 +17,7 @@ export async function renderClientVendorTab(container, portalState) {
 
   container.innerHTML = `
   <section class="card">
-    <h2>Client–Vendor Explorer</h2>
+    <h2>Client–Vendor Explorer 2</h2>
     <section id="cvClients" style="margin-top:16px;"></section>
     <section id="cvVendors" style="margin-top:32px;"></section>
     <section id="cvMismatches" style="margin-top:32px;"></section>
@@ -27,6 +27,8 @@ export async function renderClientVendorTab(container, portalState) {
 
   const clientsContainer = container.querySelector("#cvClients");
   const vendorsContainer = container.querySelector("#cvVendors");
+  const mismatchesContainer = container.querySelector("#cvMismatches");
+
 
   const { contacts, relationships } = await loadClientVendorData(project);
   const contactMap = buildContactMap(contacts);
