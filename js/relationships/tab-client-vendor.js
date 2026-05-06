@@ -1,377 +1,137 @@
-// /js/relationships/tab-client-vendor.js
-// Client–Vendor Explorer (Client = "Client", Vendor = "Client Vendor")
+// tab-client-vendor.js — UPDATED WITH CORRECT LOGIC + TYPE MISMATCH SECTION
 
-import { escapeHtml } from "../utilities.js";
+import { createElement } from "../utils/dom.js";
+import { fetchContacts, fetchRelationships } from "../api/data.js";
 
-export async function renderClientVendorTab(container, portalState) {
-  const project = portalState.project;
+export async function renderClientVendorTab(container) {
+  container.innerHTML = "<p>Loading Client–Vendor data…</p>";
 
-  if (!project) {
-    container.innerHTML = `
-      <section class="card">
-        <p>Missing project. Select a project to view client–vendor relationships.</p>
-      </section>
-    `;
-    return;
-  }
+  const [contacts, relationships] = await Promise.all([
+    fetchContacts(),
+    fetchRelationships()
+  ]);
 
-  container.innerHTML = `
-    <section class="card">
-      <h2>Client–Vendor Explorer</h2>
+  const contactMap = Object.fromEntries(
+    contacts.map(c => [c.contact_id, c])
+  );
 
-      <section id="cvClients" style="margin-top:16px;"></section>
-      <section id="cvVendors" style="margin-top:32px;"></section>
-    </section>
-  `;
-
-  const clientsContainer = container.querySelector("#cvClients");
-  const vendorsContainer = container.querySelector("#cvVendors");
-
-  const { contacts, relationships } = await loadClientVendorData(project);
-  const contactMap = buildContactMap(contacts);
-
-  // EXACT match to your DB
+  // ------------------------------------------------------------
+  // 1. FILTER RELATIONSHIPS BY EXACT TYPE
+  // ------------------------------------------------------------
   const clientVendorRels = relationships.filter(
     r => r.relationship_type === "Client- Vendor"
   );
 
-  const {
-    clientsList,
-    vendorsList,
-    groupedByClient,
-    groupedByVendor
-  } = buildClientVendorModel(contacts, clientVendorRels, contactMap);
-
-  renderClientSection(clientsContainer, clientsList, groupedByClient, contactMap, portalState);
-  renderVendorSection(vendorsContainer, vendorsList, groupedByVendor, contactMap, portalState);
-}
-
-/* -------------------------------------------------------
-Data loading
-------------------------------------------------------- */
-
-async function loadClientVendorData(projectId) {
-  const contactsUrl =
-    `https://contacts-module.dennis-e64.workers.dev/contacts/all?project=${encodeURIComponent(projectId)}`;
-  const relUrl =
-    `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${encodeURIComponent(projectId)}`;
-
-  const [contactsRes, relRes] = await Promise.all([
-    fetch(contactsUrl, { cache: "no-cache" }),
-    fetch(relUrl, { cache: "no-cache" })
-  ]);
-
-  let contacts = await contactsRes.json().catch(() => []);
-  let relationships = await relRes.json().catch(() => []);
-
-  if (!Array.isArray(contacts)) contacts = [];
-  if (!Array.isArray(relationships)) relationships = [];
-
-  return { contacts, relationships };
-}
-
-/* -------------------------------------------------------
-Contact map
-------------------------------------------------------- */
-
-function buildContactMap(contacts) {
-  const map = {};
-  contacts.forEach(c => {
-    const name =
-      c.search_name ||
-      c.contact_name ||
-      `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
-      c.business_name ||
-      c.email ||
-      c.contact_id ||
-      "(unknown)";
-
-    map[c.contact_id] = {
-      id: c.contact_id,
-      name,
-      type: c.contact_type || "Unknown",
-      email: c.email || c.primary_email || ""
-    };
-  });
-  return map;
-}
-
-/* -------------------------------------------------------
-Model builder
-------------------------------------------------------- */
-
-function buildClientVendorModel(contacts, clientVendorRels, contactMap) {
-  const isClient = x => (x?.type || "") === "Client";
-  const isVendor = x => (x?.type || "") === "Client Vendor";
-
-  // Clients list
-  const clientsList = contacts
-    .filter(c => isClient(c))
-    .map(c => contactMap[c.contact_id])
+  // ------------------------------------------------------------
+  // 2. CLIENTS = source_contact_id ONLY
+  // ------------------------------------------------------------
+  const clientIds = new Set(clientVendorRels.map(r => r.source_contact_id));
+  const clientsList = [...clientIds]
+    .map(id => contactMap[id])
     .filter(Boolean);
 
-  // Vendors list
-  const vendorsSet = new Set();
+  // ------------------------------------------------------------
+  // 3. VENDORS = related_contact_id ONLY
+  // ------------------------------------------------------------
+  const vendorIds = new Set(clientVendorRels.map(r => r.related_contact_id));
+  const vendorsList = [...vendorIds]
+    .map(id => contactMap[id])
+    .filter(Boolean);
 
-  clientVendorRels.forEach(r => {
-    const s = contactMap[r.source_contact_id];
-    const t = contactMap[r.related_contact_id];
+  // ------------------------------------------------------------
+  // 4. TYPE MISMATCH = related_contact_id where contact_type != "Client Vendor"
+  // ------------------------------------------------------------
+  const mismatches = [...vendorIds]
+    .map(id => contactMap[id])
+    .filter(c => c && c.contact_type !== "Client Vendor")
+    .map(c => ({
+      id: c.contact_id,
+      name: c.contact_name,
+      contactType: c.contact_type,
+      relationshipType: "Client- Vendor"
+    }));
 
-    if (isVendor(s)) vendorsSet.add(s.id);
-    if (isVendor(t)) vendorsSet.add(t.id);
-  });
+  // ------------------------------------------------------------
+  // RENDERING
+  // ------------------------------------------------------------
+  container.innerHTML = "";
 
-  const vendorsList = [...vendorsSet].map(id => contactMap[id]);
+  // CLIENTS SECTION
+  container.appendChild(sectionHeader(`Clients (${clientsList.length})`));
+  container.appendChild(
+    buildTable(["Name", "Contact Type", "Link"], clientsList.map(c => [
+      c.contact_name,
+      c.contact_type,
+      linkToContact(c.contact_id)
+    ]))
+  );
 
-  // Grouping
-  const groupedByClient = {};
-  const groupedByVendor = {};
+  // VENDORS SECTION
+  container.appendChild(sectionHeader(`Client Vendors (${vendorsList.length})`));
+  container.appendChild(
+    buildTable(["Name", "Contact Type", "Link"], vendorsList.map(c => [
+      c.contact_name,
+      c.contact_type,
+      linkToContact(c.contact_id)
+    ]))
+  );
 
-  clientVendorRels.forEach(r => {
-    const s = contactMap[r.source_contact_id];
-    const t = contactMap[r.related_contact_id];
-
-    const sIsClient = isClient(s);
-    const tIsClient = isClient(t);
-    const sIsVendor = isVendor(s);
-    const tIsVendor = isVendor(t);
-
-    let clientId, vendorId;
-
-    if (sIsClient && tIsVendor) {
-      clientId = s.id;
-      vendorId = t.id;
-    } else if (tIsClient && sIsVendor) {
-      clientId = t.id;
-      vendorId = s.id;
-    } else {
-      return; // ignore invalid pairs
-    }
-
-    if (!groupedByClient[clientId]) groupedByClient[clientId] = [];
-    groupedByClient[clientId].push({
-      vendorId,
-      role: r.relationship_role || "",
-      rel: r
-    });
-
-    if (!groupedByVendor[vendorId]) groupedByVendor[vendorId] = [];
-    groupedByVendor[vendorId].push({
-      clientId,
-      role: r.relationship_role || "",
-      rel: r
-    });
-  });
-
-  return { clientsList, vendorsList, groupedByClient, groupedByVendor };
+  // TYPE MISMATCH SECTION
+  container.appendChild(sectionHeader(`⚠️ Type Mismatches (${mismatches.length})`));
+  container.appendChild(
+    buildTable(["Name", "Contact Type", "Relationship Type", "Link"], mismatches.map(m => [
+      m.name,
+      m.contactType,
+      m.relationshipType,
+      linkToContact(m.id)
+    ]))
+  );
 }
 
-/* -------------------------------------------------------
-Rendering — Clients
-------------------------------------------------------- */
+// ------------------------------------------------------------
+// HELPERS
+// ------------------------------------------------------------
+function sectionHeader(text) {
+  const h = document.createElement("h3");
+  h.textContent = text;
+  return h;
+}
 
-function renderClientSection(container, clientsList, groupedByClient, contactMap, portalState) {
-  let html = `
-    <h3>Clients (${clientsList.length})</h3>
-    <table class="notes-table">
-      <thead>
-        <tr>
-          <th>Client</th>
-          <th style="width:140px; text-align:center;">Action</th>
-        </tr>
-      </thead>
-      <tbody>
-  `;
+function buildTable(headers, rows) {
+  const table = document.createElement("table");
+  table.className = "cv-table";
 
-  clientsList.forEach(c => {
-    html += `
-      <tr data-id="${escapeHtml(c.id)}">
-        <td>${escapeHtml(c.name)}</td>
-        <td style="text-align:center;">
-          <button class="btn-secondary cv-expand" data-id="${escapeHtml(c.id)}">▶ Expand</button>
-        </td>
-      </tr>
-    `;
+  const thead = document.createElement("thead");
+  const tr = document.createElement("tr");
+  headers.forEach(h => {
+    const th = document.createElement("th");
+    th.textContent = h;
+    tr.appendChild(th);
   });
+  thead.appendChild(tr);
+  table.appendChild(thead);
 
-  html += `</tbody></table>`;
-  container.innerHTML = html;
-
-  container.querySelectorAll(".cv-expand").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const id = btn.dataset.id;
-      const expanded = btn.textContent.includes("Collapse");
-
-      if (expanded) {
-        collapseRow(btn);
-      } else {
-        expandClientRow(btn, id, groupedByClient[id], contactMap, portalState);
-      }
+  const tbody = document.createElement("tbody");
+  rows.forEach(row => {
+    const tr = document.createElement("tr");
+    row.forEach(cell => {
+      const td = document.createElement("td");
+      if (cell instanceof HTMLElement) td.appendChild(cell);
+      else td.textContent = cell;
+      tr.appendChild(td);
     });
+    tbody.appendChild(tr);
   });
+  table.appendChild(tbody);
+
+  return table;
 }
 
-function expandClientRow(btn, clientId, rows, contactMap, portalState) {
-  btn.textContent = "▼ Collapse";
-
-  const tr = btn.closest("tr");
-  const newRow = document.createElement("tr");
-  newRow.classList.add("cv-expand-row");
-
-  let html = `
-    <td colspan="2">
-      <div style="background:#fafafa; padding:8px;">
-        <strong>Vendors</strong>
-        <table class="notes-table" style="margin-top:6px;">
-          <thead>
-            <tr>
-              <th>Vendor</th>
-              <th>Role</th>
-            </tr>
-          </thead>
-          <tbody>
-  `;
-
-  (rows || []).forEach(r => {
-    const vendor = contactMap[r.vendorId];
-    html += `
-      <tr>
-        <td>
-          <a href="#" class="cv-link" data-id="${escapeHtml(vendor.id)}">
-            ${escapeHtml(vendor.name)}
-          </a>
-        </td>
-        <td>${escapeHtml(r.role)}</td>
-      </tr>
-    `;
-  });
-
-  html += `
-          </tbody>
-        </table>
-      </div>
-    </td>
-  `;
-
-  newRow.innerHTML = html;
-  tr.after(newRow);
-
-  newRow.querySelectorAll(".cv-link").forEach(a => {
-    a.addEventListener("click", evt => {
-      evt.preventDefault();
-      portalState.selectedContactId = a.dataset.id;
-      document
-        .querySelector('#relationships-subtabs button[data-subtab="details"]')
-        ?.click();
-    });
-  });
+function linkToContact(id) {
+  const a = document.createElement("a");
+  a.href = `#/contacts/${id}`;
+  a.textContent = "View";
+  return a;
 }
 
-function collapseRow(btn) {
-  btn.textContent = "▶ Expand";
-  const tr = btn.closest("tr");
-  const next = tr.nextElementSibling;
-  if (next && next.classList.contains("cv-expand-row")) next.remove();
-}
-
-/* -------------------------------------------------------
-Rendering — Vendors
-------------------------------------------------------- */
-
-function renderVendorSection(container, vendorsList, groupedByVendor, contactMap, portalState) {
-  let html = `
-    <h3>Client Vendors (${vendorsList.length})</h3>
-    <table class="notes-table">
-      <thead>
-        <tr>
-          <th>Vendor</th>
-          <th style="width:140px; text-align:center;">Action</th>
-        </tr>
-      </thead>
-      <tbody>
-  `;
-
-  vendorsList.forEach(v => {
-    html += `
-      <tr data-id="${escapeHtml(v.id)}">
-        <td>${escapeHtml(v.name)}</td>
-        <td style="text-align:center;">
-          <button class="btn-secondary cv-expand" data-id="${escapeHtml(v.id)}">▶ Expand</button>
-        </td>
-      </tr>
-    `;
-  });
-
-  html += `</tbody></table>`;
-  container.innerHTML = html;
-
-  container.querySelectorAll(".cv-expand").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const id = btn.dataset.id;
-      const expanded = btn.textContent.includes("Collapse");
-
-      if (expanded) {
-        collapseRow(btn);
-      } else {
-        expandVendorRow(btn, id, groupedByVendor[id], contactMap, portalState);
-      }
-    });
-  });
-}
-
-function expandVendorRow(btn, vendorId, rows, contactMap, portalState) {
-  btn.textContent = "▼ Collapse";
-
-  const tr = btn.closest("tr");
-  const newRow = document.createElement("tr");
-  newRow.classList.add("cv-expand-row");
-
-  let html = `
-    <td colspan="2">
-      <div style="background:#fafafa; padding:8px;">
-        <strong>Clients</strong>
-        <table class="notes-table" style="margin-top:6px;">
-          <thead>
-            <tr>
-              <th>Client</th>
-              <th>Role</th>
-            </tr>
-          </thead>
-          <tbody>
-  `;
-
-  (rows || []).forEach(r => {
-    const client = contactMap[r.clientId];
-    html += `
-      <tr>
-        <td>
-          <a href="#" class="cv-link" data-id="${escapeHtml(client.id)}">
-            ${escapeHtml(client.name)}
-          </a>
-        </td>
-        <td>${escapeHtml(r.role)}</td>
-      </tr>
-    `;
-  });
-
-  html += `
-          </tbody>
-        </table>
-      </div>
-    </td>
-  `;
-
-  newRow.innerHTML = html;
-  tr.after(newRow);
-
-  newRow.querySelectorAll(".cv-link").forEach(a => {
-    a.addEventListener("click", evt => {
-      evt.preventDefault();
-      portalState.selectedContactId = a.dataset.id;
-      document
-        .querySelector('#relationships-subtabs button[data-subtab="details"]')
-        ?.click();
-    });
-  });
-}
 
