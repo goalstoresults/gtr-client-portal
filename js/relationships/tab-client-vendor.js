@@ -402,6 +402,8 @@ function expandVendorRow(btn, vendorId, rows, contactMap, portalState) {
     });
   });
 
+  }
+  
   /* -------------------------------------------------------
   Rendering — Type Mismatches
   ------------------------------------------------------- */
@@ -526,4 +528,3 @@ function expandVendorRow(btn, vendorId, rows, contactMap, portalState) {
       });
     });
   }
-}
