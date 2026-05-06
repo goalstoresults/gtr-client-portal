@@ -16,13 +16,14 @@ export async function renderClientVendorTab(container, portalState) {
   }
 
   container.innerHTML = `
-    <section class="card">
-      <h2>Client–Vendor Explorer</h2>
-
-      <section id="cvClients" style="margin-top:16px;"></section>
-      <section id="cvVendors" style="margin-top:32px;"></section>
-    </section>
+  <section class="card">
+    <h2>Client–Vendor Explorer</h2>
+    <section id="cvClients" style="margin-top:16px;"></section>
+    <section id="cvVendors" style="margin-top:32px;"></section>
+    <section id="cvMismatches" style="margin-top:32px;"></section>
+  </section>
   `;
+
 
   const clientsContainer = container.querySelector("#cvClients");
   const vendorsContainer = container.querySelector("#cvVendors");
