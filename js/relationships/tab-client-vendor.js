@@ -1,5 +1,5 @@
 // /js/relationships/tab-client-vendor.js
-// NEW TAB: Client–Vendor Explorer
+// NEW TAB: Client–Vendor Explorer (Client = "Client", Vendor = "Client Vendor")
 
 import { escapeHtml } from "../utilities.js";
 
@@ -30,9 +30,10 @@ export async function renderClientVendorTab(container, portalState) {
   const { contacts, relationships } = await loadClientVendorData(project);
   const contactMap = buildContactMap(contacts);
 
-  const clientVendorRels = relationships.filter(
-    r => r.relationship_type === "Client-Vendor"
-  );
+  const clientVendorRels = relationships.filter(r => {
+    const t = (r.relationship_type || "").toLowerCase();
+    return t.includes("client") && t.includes("vendor");
+  });
 
   const {
     clientsList,
@@ -100,19 +101,22 @@ Model builder
 ------------------------------------------------------- */
 
 function buildClientVendorModel(contacts, clientVendorRels, contactMap) {
-  // FIX: hydrate clients using contactMap
+  const isClient = x => (x?.type || "").toLowerCase() === "client";
+  const isVendor = x => (x?.type || "").toLowerCase() === "client vendor";
+
   const clientsList = contacts
-    .filter(c => c.contact_type === "Client")
+    .filter(c => isClient(c))
     .map(c => contactMap[c.contact_id])
     .filter(Boolean);
 
   const vendorsSet = new Set();
+
   clientVendorRels.forEach(r => {
     const s = contactMap[r.source_contact_id];
     const t = contactMap[r.related_contact_id];
 
-    if (s?.type !== "Client") vendorsSet.add(s.id);
-    if (t?.type !== "Client") vendorsSet.add(t.id);
+    if (isVendor(s)) vendorsSet.add(s.id);
+    if (isVendor(t)) vendorsSet.add(t.id);
   });
 
   const vendorsList = [...vendorsSet].map(id => contactMap[id]);
@@ -124,14 +128,21 @@ function buildClientVendorModel(contacts, clientVendorRels, contactMap) {
     const s = contactMap[r.source_contact_id];
     const t = contactMap[r.related_contact_id];
 
+    const sIsClient = isClient(s);
+    const tIsClient = isClient(t);
+    const sIsVendor = isVendor(s);
+    const tIsVendor = isVendor(t);
+
     let clientId, vendorId;
 
-    if (s?.type === "Client") {
+    if (sIsClient && tIsVendor) {
       clientId = s.id;
       vendorId = t.id;
-    } else {
+    } else if (tIsClient && sIsVendor) {
       clientId = t.id;
       vendorId = s.id;
+    } else {
+      return;
     }
 
     if (!groupedByClient[clientId]) groupedByClient[clientId] = [];
@@ -360,3 +371,4 @@ function expandVendorRow(btn, vendorId, rows, contactMap, portalState) {
     });
   });
 }
+
