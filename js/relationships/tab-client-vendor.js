@@ -1,5 +1,5 @@
 // /js/relationships/tab-client-vendor.js
-// NEW TAB: Client–Vendor Explorer (Client = "Client", Vendor = "Client Vendor")
+// Client–Vendor Explorer (Client = "Client", Vendor = "Client Vendor")
 
 import { escapeHtml } from "../utilities.js";
 
@@ -30,10 +30,10 @@ export async function renderClientVendorTab(container, portalState) {
   const { contacts, relationships } = await loadClientVendorData(project);
   const contactMap = buildContactMap(contacts);
 
-  const clientVendorRels = relationships.filter(r => {
-    const t = (r.relationship_type || "").toLowerCase();
-    return t.includes("client") && t.includes("vendor");
-  });
+  // EXACT match to your DB
+  const clientVendorRels = relationships.filter(
+    r => r.relationship_type === "Client- Vendor"
+  );
 
   const {
     clientsList,
@@ -101,14 +101,16 @@ Model builder
 ------------------------------------------------------- */
 
 function buildClientVendorModel(contacts, clientVendorRels, contactMap) {
-  const isClient = x => (x?.type || "").toLowerCase() === "client";
-  const isVendor = x => (x?.type || "").toLowerCase() === "client vendor";
+  const isClient = x => (x?.type || "") === "Client";
+  const isVendor = x => (x?.type || "") === "Client Vendor";
 
+  // Clients list
   const clientsList = contacts
     .filter(c => isClient(c))
     .map(c => contactMap[c.contact_id])
     .filter(Boolean);
 
+  // Vendors list
   const vendorsSet = new Set();
 
   clientVendorRels.forEach(r => {
@@ -121,6 +123,7 @@ function buildClientVendorModel(contacts, clientVendorRels, contactMap) {
 
   const vendorsList = [...vendorsSet].map(id => contactMap[id]);
 
+  // Grouping
   const groupedByClient = {};
   const groupedByVendor = {};
 
@@ -142,7 +145,7 @@ function buildClientVendorModel(contacts, clientVendorRels, contactMap) {
       clientId = t.id;
       vendorId = s.id;
     } else {
-      return;
+      return; // ignore invalid pairs
     }
 
     if (!groupedByClient[clientId]) groupedByClient[clientId] = [];
