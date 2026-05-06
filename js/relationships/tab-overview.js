@@ -523,7 +523,7 @@ function sanitizeKey(key) {
 }
 
 /* -------------------------------------------------------
-Drilldown loading — FIXED ROUTING
+Drilldown loading — FULLY REWRITTEN + CONSISTENT HYDRATION
 ------------------------------------------------------- */
 
 async function loadDrilldownData(container, sectionKey, key, portalState) {
@@ -532,12 +532,15 @@ async function loadDrilldownData(container, sectionKey, key, portalState) {
   container.innerHTML = `<div class="muted">Loading…</div>`;
 
   try {
+    // 1) Fetch raw rows from backend
     const { rows, total_count } = await fetchSectionRows(project, key);
 
+    // 2) Limit rows for safety
     const DISPLAY_LIMIT = 1000;
     const displayRows =
       rows.length > DISPLAY_LIMIT ? rows.slice(0, DISPLAY_LIMIT) : rows;
 
+    // 3) Collect all contact IDs referenced in these rows
     const idSet = new Set();
     displayRows.forEach(r => {
       if (r.source_contact_id) idSet.add(r.source_contact_id);
@@ -545,8 +548,10 @@ async function loadDrilldownData(container, sectionKey, key, portalState) {
       if (r.contact_id) idSet.add(r.contact_id);
     });
 
+    // 4) Fetch contacts for hydration
     let contacts = await fetchContactsByIds(project, Array.from(idSet));
 
+    // Normalize backend variations
     if (!Array.isArray(contacts)) {
       if (contacts && Array.isArray(contacts.data)) {
         contacts = contacts.data;
@@ -557,6 +562,7 @@ async function loadDrilldownData(container, sectionKey, key, portalState) {
       }
     }
 
+    // 5) Build a local contactMap for hydration
     const contactMap = {};
     contacts.forEach(c => {
       const name =
@@ -576,25 +582,56 @@ async function loadDrilldownData(container, sectionKey, key, portalState) {
       };
     });
 
+    // 6) Build label
     const label = buildSectionLabel(key);
 
-    // 🔥 FIXED ROUTING
+    // 7) ROUTING — hydrate based on section type
     if (key === "totalClients") {
-      renderClientsDrilldown(container, label, displayRows, portalState);
-    } else {
-      renderRelationshipsDrilldown(
-        container,
-        label,
-        displayRows,
-        contactMap,
-        portalState
-      );
+      // Hydrate client rows
+      const hydratedClients = displayRows.map(r => {
+        const c = contactMap[r.contact_id] || {};
+        return {
+          contact_id: r.contact_id,
+          name: c.name || r.name || "",
+          email: c.email || r.email || "",
+          contact_type: c.type || r.contact_type || ""
+        };
+      });
+
+      renderClientsDrilldown(container, label, hydratedClients, portalState);
+      return;
     }
+
+    // All other sections = relationships
+    const hydratedRelationships = displayRows.map(r => {
+      const s = contactMap[r.source_contact_id] || {};
+      const t = contactMap[r.related_contact_id] || {};
+
+      return {
+        ...r,
+        source_name: s.name || r.source_contact_id || "(unknown)",
+        target_name: t.name || r.related_contact_id || "(unknown)",
+        source_email: s.email || "",
+        target_email: t.email || "",
+        source_type: s.type || "",
+        target_type: t.type || ""
+      };
+    });
+
+    renderRelationshipsDrilldown(
+      container,
+      label,
+      hydratedRelationships,
+      contactMap,
+      portalState
+    );
+
   } catch (err) {
     console.error(err);
     container.innerHTML = `<div class="error">Failed to load details.</div>`;
   }
 }
+
 
 function buildSectionLabel(key) {
   if (key === "totalClients") return "All Clients";
