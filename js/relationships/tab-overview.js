@@ -121,14 +121,17 @@ function buildContactMap(contacts) {
 }
 
 /* -------------------------------------------------------
-Stats model (unchanged)
+Rebuilt Stats Model — clean, human‑friendly, no duplicates
 ------------------------------------------------------- */
 
 function buildStatsModel(contacts, relationships, contactMap) {
+
   const totalRelationshipRecords = relationships.length;
 
+  // 1) All clients
   const allClients = contacts.filter(c => c.contact_type === "Client");
 
+  // 2) Unique clients who appear in at least one relationship
   const clientsWithRelSet = new Set();
   relationships.forEach(r => {
     if (contactMap[r.source_contact_id]?.type === "Client") {
@@ -149,13 +152,15 @@ function buildStatsModel(contacts, relationships, contactMap) {
     };
   });
 
-  const clientRelationships = relationships.filter(r => {
+  // 3) Relationship rows that involve a client
+  const clientInvolvedRelationships = relationships.filter(r => {
     return (
       contactMap[r.source_contact_id]?.type === "Client" ||
       contactMap[r.related_contact_id]?.type === "Client"
     );
   });
 
+  // 4) Relationship type counts
   const typeCounts = {};
   relationships.forEach(r => {
     const t = r.relationship_type || "Unknown";
@@ -164,6 +169,7 @@ function buildStatsModel(contacts, relationships, contactMap) {
     typeCounts[t].rows.push(r);
   });
 
+  // 5) Relationship role counts
   const roleCounts = {};
   relationships.forEach(r => {
     const role = r.relationship_role || "Unknown";
@@ -172,9 +178,14 @@ function buildStatsModel(contacts, relationships, contactMap) {
     roleCounts[role].rows.push(r);
   });
 
+  /* -------------------------------------------------------
+  Build Totals Section — CLEAN + CORRECT
+  ------------------------------------------------------- */
+
   const totalsRows = [];
   const totalsDatasets = {};
 
+  // Total Clients
   totalsRows.push({
     key: "totalClients",
     category: "Total Clients",
@@ -182,41 +193,41 @@ function buildStatsModel(contacts, relationships, contactMap) {
     percentText: "",
     percentValue: 0
   });
-
   totalsDatasets["totalClients"] = {
     type: "clients",
     label: "All Clients",
     rows: allClients
   };
 
+  // Clients With Relationships (UNIQUE CLIENTS — FIXED)
   totalsRows.push({
     key: "totalClientsWithRelationships",
-    category: "Total Clients With Relationships",
+    category: "Clients With Relationships",
     count: clientsWithRelationships.length,
     percentText: "",
     percentValue: 0
   });
-
   totalsDatasets["totalClientsWithRelationships"] = {
-    type: "relationships",
+    type: "clients",
     label: "Clients With Relationships",
-    rows: clientRelationships
+    rows: clientsWithRelationships
   };
 
+  // Client-Involved Relationship Records
   totalsRows.push({
-    key: "totalClientRelationships",
-    category: "Total Client Relationships",
-    count: clientRelationships.length,
+    key: "clientInvolvedRelationships",
+    category: "Client-Involved Relationship Records",
+    count: clientInvolvedRelationships.length,
     percentText: "",
     percentValue: 0
   });
-
-  totalsDatasets["totalClientRelationships"] = {
+  totalsDatasets["clientInvolvedRelationships"] = {
     type: "relationships",
-    label: "Client Relationships",
-    rows: clientRelationships
+    label: "Relationships Involving Clients",
+    rows: clientInvolvedRelationships
   };
 
+  // Total Relationship Records
   totalsRows.push({
     key: "totalRelationshipRecords",
     category: "Total Relationship Records",
@@ -224,12 +235,15 @@ function buildStatsModel(contacts, relationships, contactMap) {
     percentText: "",
     percentValue: 0
   });
-
   totalsDatasets["totalRelationshipRecords"] = {
     type: "relationships",
     label: "All Relationship Records",
     rows: relationships
   };
+
+  /* -------------------------------------------------------
+  Types + Roles (unchanged)
+  ------------------------------------------------------- */
 
   const typesRows = [];
   const typesDatasets = {};
@@ -244,6 +258,7 @@ function buildStatsModel(contacts, relationships, contactMap) {
           : 0;
       const pctText =
         totalRelationshipRecords > 0 ? pctVal.toFixed(1) + "%" : "";
+
       const key = `type:${type}`;
 
       typesRows.push({
@@ -274,6 +289,7 @@ function buildStatsModel(contacts, relationships, contactMap) {
           : 0;
       const pctText =
         totalRelationshipRecords > 0 ? pctVal.toFixed(1) + "%" : "";
+
       const key = `role:${role}`;
 
       rolesRows.push({
@@ -297,6 +313,7 @@ function buildStatsModel(contacts, relationships, contactMap) {
     roles: { rows: rolesRows, datasets: rolesDatasets }
   };
 }
+
 
 /* -------------------------------------------------------
 Backend expand logic
