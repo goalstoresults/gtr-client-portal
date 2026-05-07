@@ -19,7 +19,7 @@ export async function renderClientVendorTab(container, portalState) {
 
   container.innerHTML = `
   <section class="card">
-    <h2>Client–Vendor Explorer</h2>
+    <h2>Client–Vendor Explorer 2</h2>
     <section id="cvClients" style="margin-top:16px;"></section>
     <section id="cvVendors" style="margin-top:32px;"></section>
     <section id="cvMismatches" style="margin-top:32px;"></section>
@@ -480,10 +480,16 @@ container.querySelectorAll(".cv-details").forEach(btn => {
     // 1. Switch to the Contacts top-level tab
     document.querySelector('#main-tabs button[data-tab="contacts"]')?.click();
 
-    // 2. Render the contact details directly
+    // 2. Wait for the Contacts tab to render its DOM
+    await new Promise(r => setTimeout(r, 0));
+
+    // 3. NOW the container exists
     const content = document.querySelector("#contactsContent");
+
+    // 4. Render the contact details
     await renderContactDetails(content, portalState, btn.dataset.id);
   });
 });
+
 
   }
