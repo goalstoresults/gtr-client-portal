@@ -1,9 +1,8 @@
 // /js/relationships/tab-client-vendor.js
+
 // Client–Vendor Explorer (Client = "Client", Vendor = "Client Vendor")
 
 import { escapeHtml } from "../utilities.js";
-import { renderContactDetails } from "../contacts/tab-details.js";
-
 
 export async function renderClientVendorTab(container, portalState) {
   const project = portalState.project;
@@ -18,19 +17,17 @@ export async function renderClientVendorTab(container, portalState) {
   }
 
   container.innerHTML = `
-  <section class="card">
-    <h2>Client–Vendor Explorer 2</h2>
-    <section id="cvClients" style="margin-top:16px;"></section>
-    <section id="cvVendors" style="margin-top:32px;"></section>
-    <section id="cvMismatches" style="margin-top:32px;"></section>
-  </section>
+    <section class="card">
+      <h2>Client–Vendor Explorer</h2>
+      <section id="cvClients" style="margin-top:16px;"></section>
+      <section id="cvVendors" style="margin-top:32px;"></section>
+      <section id="cvMismatches" style="margin-top:32px;"></section>
+    </section>
   `;
-
 
   const clientsContainer = container.querySelector("#cvClients");
   const vendorsContainer = container.querySelector("#cvVendors");
   const mismatchesContainer = container.querySelector("#cvMismatches");
-
 
   const { contacts, relationships } = await loadClientVendorData(project);
   const contactMap = buildContactMap(contacts);
@@ -52,11 +49,10 @@ export async function renderClientVendorTab(container, portalState) {
   renderClientSection(clientsContainer, clientsList, groupedByClient, contactMap, portalState);
   renderVendorSection(vendorsContainer, vendorsList, groupedByVendor, contactMap, portalState);
   renderMismatchSection(mismatchesContainer, mismatchesList, groupedByMismatch, contactMap, portalState);
-
 }
 
 /* -------------------------------------------------------
-Data loading
+   Data loading
 ------------------------------------------------------- */
 
 async function loadClientVendorData(projectId) {
@@ -80,11 +76,12 @@ async function loadClientVendorData(projectId) {
 }
 
 /* -------------------------------------------------------
-Contact map
+   Contact map
 ------------------------------------------------------- */
 
 function buildContactMap(contacts) {
   const map = {};
+
   contacts.forEach(c => {
     const name =
       c.search_name ||
@@ -102,35 +99,28 @@ function buildContactMap(contacts) {
       email: c.email || c.primary_email || ""
     };
   });
+
   return map;
 }
 
 function buildClientVendorModel(contacts, clientVendorRels, contactMap) {
-  // ------------------------------------------------------------
   // 1. CLIENTS = DISTINCT source_contact_id
-  // ------------------------------------------------------------
   const clientIdSet = new Set(
     clientVendorRels.map(r => r.source_contact_id).filter(Boolean)
   );
-
   const clientsList = [...clientIdSet]
     .map(id => contactMap[id])
     .filter(Boolean);
 
-  // ------------------------------------------------------------
   // 2. VENDORS = DISTINCT related_contact_id
-  // ------------------------------------------------------------
   const vendorIdSet = new Set(
     clientVendorRels.map(r => r.related_contact_id).filter(Boolean)
   );
-
   const vendorsList = [...vendorIdSet]
     .map(id => contactMap[id])
     .filter(Boolean);
 
-  // ------------------------------------------------------------
   // 3. GROUP BY CLIENT (client → vendors)
-  // ------------------------------------------------------------
   const groupedByClient = {};
   clientVendorRels.forEach(r => {
     const clientId = r.source_contact_id;
@@ -145,9 +135,7 @@ function buildClientVendorModel(contacts, clientVendorRels, contactMap) {
     });
   });
 
-  // ------------------------------------------------------------
   // 4. GROUP BY VENDOR (vendor → clients)
-  // ------------------------------------------------------------
   const groupedByVendor = {};
   clientVendorRels.forEach(r => {
     const clientId = r.source_contact_id;
@@ -162,14 +150,11 @@ function buildClientVendorModel(contacts, clientVendorRels, contactMap) {
     });
   });
 
-  // ------------------------------------------------------------
   // 5. TYPE MISMATCH = vendors where contact_type != "Client Vendor"
-  // ------------------------------------------------------------
   const mismatchesList = [...vendorIdSet]
     .map(id => contactMap[id])
     .filter(c => c && c.type !== "Client Vendor");
 
-  // Group mismatches (vendor → clients)
   const groupedByMismatch = {};
   clientVendorRels.forEach(r => {
     const vendorId = r.related_contact_id;
@@ -197,7 +182,7 @@ function buildClientVendorModel(contacts, clientVendorRels, contactMap) {
 }
 
 /* -------------------------------------------------------
-Rendering — Clients
+   Rendering — Clients
 ------------------------------------------------------- */
 
 function renderClientSection(container, clientsList, groupedByClient, contactMap, portalState) {
@@ -262,32 +247,30 @@ function expandClientRow(btn, clientId, rows, contactMap, portalState) {
           <tbody>
   `;
 
-(rows || []).forEach(r => {
-  const vendor = contactMap[r.vendorId];
+  (rows || []).forEach(r => {
+    const vendor = contactMap[r.vendorId];
 
-  // SAFETY CHECK — vendor missing from contactMap
-  if (!vendor) {
+    if (!vendor) {
+      html += `
+        <tr>
+          <td>(missing contact: ${escapeHtml(r.vendorId)})</td>
+          <td>${escapeHtml(r.role)}</td>
+        </tr>
+      `;
+      return;
+    }
+
     html += `
-<tr>
-  <td>(missing contact: ${escapeHtml(r.vendorId)})</td>
-  <td>${escapeHtml(r.role)}</td>
-</tr>
-`;
-    return;
-  }
-
-  html += `
-<tr>
-  <td>
-    <a href="#" class="cv-link" data-id="${escapeHtml(vendor.id)}">
-      ${escapeHtml(vendor.name)}
-    </a>
-  </td>
-  <td>${escapeHtml(r.role)}</td>
-</tr>
-`;
-});
-
+      <tr>
+        <td>
+          <a href="#" class="cv-link" data-id="${escapeHtml(vendor.id)}">
+            ${escapeHtml(vendor.name)}
+          </a>
+        </td>
+        <td>${escapeHtml(r.role)}</td>
+      </tr>
+    `;
+  });
 
   html += `
           </tbody>
@@ -318,7 +301,7 @@ function collapseRow(btn) {
 }
 
 /* -------------------------------------------------------
-Rendering — Vendors
+   Rendering — Vendors
 ------------------------------------------------------- */
 
 function renderVendorSection(container, vendorsList, groupedByVendor, contactMap, portalState) {
@@ -383,32 +366,30 @@ function expandVendorRow(btn, vendorId, rows, contactMap, portalState) {
           <tbody>
   `;
 
-(rows || []).forEach(r => {
-  const client = contactMap[r.clientId];
+  (rows || []).forEach(r => {
+    const client = contactMap[r.clientId];
 
-  // SAFETY CHECK — client missing from contactMap
-  if (!client) {
+    if (!client) {
+      html += `
+        <tr>
+          <td>(missing contact: ${escapeHtml(r.clientId)})</td>
+          <td>${escapeHtml(r.role)}</td>
+        </tr>
+      `;
+      return;
+    }
+
     html += `
-<tr>
-  <td>(missing contact: ${escapeHtml(r.clientId)})</td>
-  <td>${escapeHtml(r.role)}</td>
-</tr>
-`;
-    return;
-  }
-
-  html += `
-<tr>
-  <td>
-    <a href="#" class="cv-link" data-id="${escapeHtml(client.id)}">
-      ${escapeHtml(client.name)}
-    </a>
-  </td>
-  <td>${escapeHtml(r.role)}</td>
-</tr>
-`;
-});
-
+      <tr>
+        <td>
+          <a href="#" class="cv-link" data-id="${escapeHtml(client.id)}">
+            ${escapeHtml(client.name)}
+          </a>
+        </td>
+        <td>${escapeHtml(r.role)}</td>
+      </tr>
+    `;
+  });
 
   html += `
           </tbody>
@@ -429,67 +410,58 @@ function expandVendorRow(btn, vendorId, rows, contactMap, portalState) {
         ?.click();
     });
   });
+}
 
-  }
-  
-  /* -------------------------------------------------------
-  Rendering — Type Mismatches
-  ------------------------------------------------------- */
-  
-  function renderMismatchSection(
-    container,
-    mismatchesList,
-    groupedByMismatch,
-    contactMap,
-    portalState
-  ) {
-    let html = `
-  <h3>Contacts With Type Mismatch (${mismatchesList.length})</h3>
-  <table class="notes-table">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Contact Type</th>
-        <th>Relationship Type</th>
-        <th style="width:140px; text-align:center;">Action</th>
+/* -------------------------------------------------------
+   Rendering — Type Mismatches
+------------------------------------------------------- */
+
+function renderMismatchSection(
+  container,
+  mismatchesList,
+  groupedByMismatch,
+  contactMap,
+  portalState
+) {
+  let html = `
+    <h3>Contacts With Type Mismatch (${mismatchesList.length})</h3>
+    <table class="notes-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Contact Type</th>
+          <th>Relationship Type</th>
+          <th style="width:140px; text-align:center;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  mismatchesList.forEach(v => {
+    html += `
+      <tr data-id="${escapeHtml(v.id)}">
+        <td>${escapeHtml(v.name)}</td>
+        <td>${escapeHtml(v.type)}</td>
+        <td>Client- Vendor</td>
+        <td style="text-align:center;">
+          <button class="btn-primary cv-details" data-id="${escapeHtml(v.id)}">Details</button>
+        </td>
       </tr>
-    </thead>
-    <tbody>
-  `;
-  
-    mismatchesList.forEach(v => {
-      html += `
-  <tr data-id="${escapeHtml(v.id)}">
-    <td>${escapeHtml(v.name)}</td>
-    <td>${escapeHtml(v.type)}</td>
-    <td>Client- Vendor</td>
-    <td style="text-align:center;">
-    <button class="btn-primary cv-details" data-id="${escapeHtml(v.id)}">Details</button>
-    </td>
-  </tr>
-  `;
-    });
-  
-    html += `</tbody></table>`;
-    container.innerHTML = html;
-
-container.querySelectorAll(".cv-details").forEach(btn => {
-  btn.addEventListener("click", async () => {
-    portalState.selectedContactId = btn.dataset.id;
-
-    // 1. Switch to the Contacts top-level tab
-    document.querySelector('#main-tabs button[data-tab="contacts"]')?.click();
-
-    // 2. Wait for the Contacts tab to render its DOM
-    await new Promise(r => setTimeout(r, 0));
-
-    // 3. NOW the container exists
-    const content = document.querySelector("#contactsContent");
-
-    // 4. Render the contact details
-    await renderContactDetails(content, portalState, btn.dataset.id);
+    `;
   });
-});
 
+  html += `</tbody></table>`;
+  container.innerHTML = html;
 
-  }
+  container.querySelectorAll(".cv-details").forEach(btn => {
+    btn.addEventListener("click", () => {
+      portalState.selectedContactId = btn.dataset.id;
+
+      // Switch to the Contact Details subtab inside Relationships
+      document
+        .querySelector('#relationships-subtabs button[data-subtab="contact-details"]')
+        ?.click();
+    });
+  });
+}
+
