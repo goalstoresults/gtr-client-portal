@@ -17,7 +17,7 @@ export async function renderClientVendorTab(container, portalState) {
 
   container.innerHTML = `
   <section class="card">
-    <h2>Client–Vendor Explorer</h2>
+    <h2>Client–Vendor Explorer 2</h2>
     <section id="cvClients" style="margin-top:16px;"></section>
     <section id="cvVendors" style="margin-top:32px;"></section>
     <section id="cvMismatches" style="margin-top:32px;"></section>
@@ -471,14 +471,17 @@ function expandVendorRow(btn, vendorId, rows, contactMap, portalState) {
     html += `</tbody></table>`;
     container.innerHTML = html;
 
-    container.querySelectorAll(".cv-details").forEach(btn => {
-      btn.addEventListener("click", () => {
-        portalState.selectedContactId = btn.dataset.id;
-    
-        // ⭐ GO TO CONTACTS → DETAILS (top-level)
-        document
-          .querySelector('#contacts-subtabs button[data-subtab="details"]')
-          ?.click();
-      });
-    });
+container.querySelectorAll(".cv-details").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    portalState.selectedContactId = btn.dataset.id;
+
+    // 1. Switch to the Contacts top-level tab
+    document.querySelector('#main-tabs button[data-tab="contacts"]')?.click();
+
+    // 2. Render the contact details directly
+    const content = document.querySelector("#contactsContent");
+    await renderContactDetails(content, portalState, btn.dataset.id);
+  });
+});
+
   }
