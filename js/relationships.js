@@ -4,7 +4,8 @@
 import { renderRelList } from "./relationships/tab-list.js";
 import { renderRelDetails } from "./relationships/tab-details.js";
 import { renderRelOverview } from "./relationships/tab-overview.js";
-import { renderClientVendorTab } from "./relationships/tab-client-vendor.js";   // ⭐ NEW IMPORT
+import { renderClientVendorTab } from "./relationships/tab-client-vendor.js";
+import { renderContactDetails } from "../contacts/tab-details.js";   // ⭐ NEW IMPORT
 
 export async function loadRelationshipsTab({ portalState, tabContent }) {
   // Load base HTML template
@@ -40,8 +41,13 @@ export async function loadRelationshipsTab({ portalState, tabContent }) {
         return;
       }
 
-      if (subtab === "clientVendor") {                     // ⭐ NEW ROUTER CASE
+      if (subtab === "clientVendor") {
         await renderClientVendorTab(content, portalState);
+        return;
+      }
+
+      if (subtab === "contact-details") {     // ⭐ NEW ROUTER CASE
+        await renderContactDetails(content, portalState, portalState.selectedContactId);
         return;
       }
 
@@ -64,4 +70,5 @@ export async function loadRelationshipsTab({ portalState, tabContent }) {
 
   await renderRelList(content, portalState);
 }
+
 
