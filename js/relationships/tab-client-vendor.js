@@ -2,6 +2,8 @@
 // Client–Vendor Explorer (Client = "Client", Vendor = "Client Vendor")
 
 import { escapeHtml } from "../utilities.js";
+import { renderContactDetails } from "../contacts/tab-details.js";
+
 
 export async function renderClientVendorTab(container, portalState) {
   const project = portalState.project;
@@ -17,7 +19,7 @@ export async function renderClientVendorTab(container, portalState) {
 
   container.innerHTML = `
   <section class="card">
-    <h2>Client–Vendor Explorer 2</h2>
+    <h2>Client–Vendor Explorer</h2>
     <section id="cvClients" style="margin-top:16px;"></section>
     <section id="cvVendors" style="margin-top:32px;"></section>
     <section id="cvMismatches" style="margin-top:32px;"></section>
