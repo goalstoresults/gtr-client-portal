@@ -332,7 +332,7 @@ function startUmbrellaChallenge() {
 function renderUmbrellaRound() {
     umbrellaGrid.innerHTML = "";
 
-    // Column 1: always red umbrella
+    // Column 1: always red umbrella (target)
     const col1 = document.createElement("div");
     const img1 = document.createElement("img");
     img1.src = "./images/red-umbrella.png";
@@ -340,25 +340,25 @@ function renderUmbrellaRound() {
     col1.appendChild(img1);
     umbrellaGrid.appendChild(col1);
 
+    // Columns 2–4: one red, one yellow, one blue in random order
     const optionCols = [2, 3, 4];
-    const correctIndex = optionCols[Math.floor(Math.random() * optionCols.length)];
+    const colors = ["red", "yellow", "blue"];
 
-    const columnToImage = {};
-    columnToImage[correctIndex] = "red";
+    // Simple shuffle
+    for (let i = colors.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [colors[i], colors[j]] = [colors[j], colors[i]];
+    }
 
-    const remainingColors = ["yellow", "blue"];
-    const remainingCols = optionCols.filter(c => c !== correctIndex);
+    let correctCol = null;
 
-    columnToImage[remainingCols[0]] = remainingColors[0];
-    columnToImage[remainingCols[1]] = remainingColors[1];
+    optionCols.forEach((colNum, index) => {
+        const color = colors[index];
 
-    optionCols.forEach(colNum => {
         const wrapper = document.createElement("div");
         wrapper.dataset.col = String(colNum);
 
         const img = document.createElement("img");
-        const color = columnToImage[colNum];
-
         img.src =
             color === "red"
                 ? "./images/red-umbrella.png"
@@ -370,8 +370,12 @@ function renderUmbrellaRound() {
         wrapper.appendChild(img);
         umbrellaGrid.appendChild(wrapper);
 
+        if (color === "red") {
+            correctCol = colNum;
+        }
+
         wrapper.addEventListener("click", () => {
-            handleUmbrellaClick(colNum, correctIndex);
+            handleUmbrellaClick(colNum, correctCol);
         });
     });
 
@@ -384,6 +388,7 @@ function renderUmbrellaRound() {
         umbrellaInstruction.textContent = "Incorrect. You have one final attempt.";
     }
 }
+
 
 async function handleUmbrellaClick(clickedCol, correctCol) {
     // ✅ Correct umbrella selected
