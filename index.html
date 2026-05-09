@@ -242,7 +242,7 @@ async function checkIpLockout() {
             loginForm.style.display = "none";
             umbrellaChallenge.style.display = "none";
 
-            // Create a visible lockout message
+            // Show lockout message
             const lockoutMsg = document.createElement("div");
             lockoutMsg.style.textAlign = "center";
             lockoutMsg.style.marginTop = "40px";
@@ -257,7 +257,7 @@ async function checkIpLockout() {
             return;
         }
 
-        // Not blocked → show login normally
+        // Not blocked → show login AFTER check completes
         loginForm.style.display = "block";
 
     } catch (err) {
@@ -265,6 +265,7 @@ async function checkIpLockout() {
         loginForm.style.display = "block";
     }
 }
+
 
 
 /* ============================================================
