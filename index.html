@@ -332,7 +332,7 @@ function renderUmbrellaRound() {
     // Column 1: always red umbrella
     const col1 = document.createElement("div");
     const img1 = document.createElement("img");
-    img1.src = "./images/umbrellas/red-umbrella.png";
+    img1.src = "./images/red-umbrella.png";
     img1.alt = "Target umbrella";
     col1.appendChild(img1);
     umbrellaGrid.appendChild(col1);
@@ -358,10 +358,10 @@ function renderUmbrellaRound() {
 
         img.src =
             color === "red"
-                ? "./images/umbrellas/red-umbrella.png"
+                ? "./images/red-umbrella.png"
                 : color === "yellow"
-                ? "./images/umbrellas/yellow-umbrella.png"
-                : "./images/umbrellas/blue-umbrella.png";
+                ? "./images/yellow-umbrella.png"
+                : "./images/blue-umbrella.png";
 
         img.alt = "Umbrella option";
         wrapper.appendChild(img);
