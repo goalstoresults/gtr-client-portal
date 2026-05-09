@@ -20,6 +20,11 @@ body {
   padding: 20px;
 }
 
+#loginForm {
+    display: none;
+}
+
+
 /* Header */
 header {
   margin-bottom: 20px;
