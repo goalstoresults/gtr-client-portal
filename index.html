@@ -407,7 +407,7 @@ function renderUmbrellaRound() {
 
     const remaining = MAX_UMBRELLA_ATTEMPTS - umbrellaAttempts;
     if (umbrellaAttempts === 0) {
-        umbrellaInstruction.textContent = "Click the image that matches the one above.";
+        umbrellaInstruction.textContent = "Click the image in row 2 that matches the one in the top row.";
     } else if (remaining === 2) {
         umbrellaInstruction.textContent = "Incorrect. Try again. You have 2 more attempts.";
     } else if (remaining === 1) {
