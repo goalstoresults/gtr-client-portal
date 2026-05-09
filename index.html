@@ -75,25 +75,38 @@ footer {
     border-bottom: 2px solid #d4a017 !important;
 }
 
-/* ⭐ Umbrella Challenge (2-row, 3-column grid) */
+/* ⭐ Umbrella Challenge */
 #umbrellaChallenge {
     display: none;
     text-align: center;
     margin-top: 30px;
 }
 
+/* Inner container same width feel as login */
+#umbrellaInner {
+    max-width: 320px;
+    margin: 0 auto;
+}
+
+/* Target image centered, not clickable */
+#umbrellaTarget {
+    width: 100px;
+    height: 100px;
+    display: block;
+    margin: 0 auto 10px auto;
+}
+
+/* Row of 3 options, constrained width */
 #umbrellaGrid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    justify-items: center;
-    row-gap: 20px;
-    column-gap: 20px;
-    margin-top: 15px;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 10px;
 }
 
 #umbrellaGrid img {
-    width: 100px;
-    height: 100px;
+    width: 90px;
+    height: 90px;
     cursor: pointer;
     border: 3px solid transparent;
     border-radius: 8px;
@@ -125,10 +138,13 @@ footer {
     <div id="errorBox"></div>
 </div>
 
-<!-- ⭐ NEW — UMBRELLA CHALLENGE -->
+<!-- ⭐ UMBRELLA CHALLENGE -->
 <div id="umbrellaChallenge">
-    <p id="umbrellaInstruction">Click the image that matches the one above.</p>
-    <div id="umbrellaGrid"></div>
+    <div id="umbrellaInner">
+        <img id="umbrellaTarget" src="./images/red-umbrella.png" alt="Target umbrella" />
+        <p id="umbrellaInstruction">Click the image that matches the one above.</p>
+        <div id="umbrellaGrid"></div>
+    </div>
 </div>
 
 <!-- PORTAL UI -->
@@ -202,6 +218,7 @@ const tabContent = document.getElementById("tab-content");
 const umbrellaChallenge = document.getElementById("umbrellaChallenge");
 const umbrellaGrid = document.getElementById("umbrellaGrid");
 const umbrellaInstruction = document.getElementById("umbrellaInstruction");
+const umbrellaTarget = document.getElementById("umbrellaTarget");
 
 /* ============================================================
 SECURITY STATE
@@ -352,23 +369,14 @@ function startUmbrellaChallenge() {
 }
 
 function renderUmbrellaRound() {
+    // Target is always red, centered, non-clickable
+    umbrellaTarget.src = "./images/red-umbrella.png";
+    umbrellaTarget.alt = "Target umbrella";
+
+    // Clear options row
     umbrellaGrid.innerHTML = "";
 
-    // ROW 1: 3 columns, target in column 2
-    const emptyCell1 = document.createElement("div");
-    umbrellaGrid.appendChild(emptyCell1);
-
-    const targetCell = document.createElement("div");
-    const targetImg = document.createElement("img");
-    targetImg.src = "./images/red-umbrella.png";
-    targetImg.alt = "Target umbrella";
-    targetCell.appendChild(targetImg);
-    umbrellaGrid.appendChild(targetCell);
-
-    const emptyCell3 = document.createElement("div");
-    umbrellaGrid.appendChild(emptyCell3);
-
-    // ROW 2: 3 options (one red, one yellow, one blue) in random order
+    // 3 options: one red, one yellow, one blue in random order
     const colors = ["red", "yellow", "blue"];
 
     // Shuffle colors
@@ -377,12 +385,10 @@ function renderUmbrellaRound() {
         [colors[i], colors[j]] = [colors[j], colors[i]];
     }
 
-    let correctIndex = null; // 1, 2, or 3 (row 2 positions)
+    let correctIndex = null; // 1, 2, or 3
 
     colors.forEach((color, index) => {
-        const cell = document.createElement("div");
         const img = document.createElement("img");
-
         img.src =
             color === "red"
                 ? "./images/red-umbrella.png"
@@ -391,8 +397,6 @@ function renderUmbrellaRound() {
                 : "./images/blue-umbrella.png";
 
         img.alt = "Umbrella option";
-        cell.appendChild(img);
-        umbrellaGrid.appendChild(cell);
 
         const position = index + 1; // 1–3
 
@@ -400,14 +404,16 @@ function renderUmbrellaRound() {
             correctIndex = position;
         }
 
-        cell.addEventListener("click", () => {
+        img.addEventListener("click", () => {
             handleUmbrellaClick(position, correctIndex);
         });
+
+        umbrellaGrid.appendChild(img);
     });
 
     const remaining = MAX_UMBRELLA_ATTEMPTS - umbrellaAttempts;
     if (umbrellaAttempts === 0) {
-        umbrellaInstruction.textContent = "Click the image in row 2 that matches the one in the top row.";
+        umbrellaInstruction.textContent = "Click the image that matches the one above.";
     } else if (remaining === 2) {
         umbrellaInstruction.textContent = "Incorrect. Try again. You have 2 more attempts.";
     } else if (remaining === 1) {
