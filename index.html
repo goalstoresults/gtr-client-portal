@@ -301,7 +301,10 @@ async function attemptLogin() {
         pendingLoginContext = { project, email, result };
 
         // Start umbrella challenge
-        loginForm.style.display = "none";
+        emailInput.disabled = true;
+        loginBtn.disabled = true;
+        projectInput.disabled = true; // optional
+
         startUmbrellaChallenge();
 
     } catch (err) {
