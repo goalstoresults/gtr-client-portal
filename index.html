@@ -386,17 +386,22 @@ function renderUmbrellaRound() {
 }
 
 async function handleUmbrellaClick(clickedCol, correctCol) {
+    // ✅ Correct umbrella selected
     if (clickedCol === correctCol) {
         umbrellaChallenge.style.display = "none";
         completeLoginAfterSecurity(pendingLoginContext);
         return;
     }
 
+    // ❌ Wrong umbrella
     umbrellaAttempts++;
 
+    // ============================================================
+    // ⭐ HARD LOCKOUT AFTER 3 FAILED ATTEMPTS
+    // ============================================================
     if (umbrellaAttempts >= MAX_UMBRELLA_ATTEMPTS) {
-        umbrellaInstruction.textContent = "You cannot use the system for the rest of the day.";
 
+        // 1. Log the failure to backend
         try {
             await fetch(
                 "https://client-portal-api.dennis-e64.workers.dev/api/log_portal_failed_login",
@@ -408,14 +413,34 @@ async function handleUmbrellaClick(clickedCol, correctCol) {
                     })
                 }
             );
-        } catch (err) {}
+        } catch (err) {
+            console.error("Failed to log lockout:", err);
+        }
 
-        loginForm.style.display = "none";
+        // 2. Disable login form completely
+        loginForm.style.opacity = "0.2";
+        loginForm.style.pointerEvents = "none";
+
+        // 3. Remove all umbrella images and disable clicking
+        umbrellaGrid.innerHTML = "";
+        umbrellaGrid.style.pointerEvents = "none";
+
+        // 4. Disable entire challenge container
+        umbrellaChallenge.style.pointerEvents = "none";
+
+        // 5. Show final lockout message
+        umbrellaInstruction.textContent =
+            "You cannot use the system for the rest of the day.";
+
         return;
     }
 
+    // ============================================================
+    // ⭐ Still have attempts left → render next round
+    // ============================================================
     renderUmbrellaRound();
 }
+
 
 /* ============================================================
 COMPLETE LOGIN AFTER SECURITY
