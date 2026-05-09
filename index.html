@@ -237,15 +237,35 @@ async function checkIpLockout() {
         const result = await res.json();
 
         if (result.blocked) {
+
+            // Hide login + challenge
             loginForm.style.display = "none";
-            errorBox.textContent = result.message;
-        } else {
-            loginForm.style.display = "block";
+            umbrellaChallenge.style.display = "none";
+
+            // Create a visible lockout message
+            const lockoutMsg = document.createElement("div");
+            lockoutMsg.style.textAlign = "center";
+            lockoutMsg.style.marginTop = "40px";
+            lockoutMsg.style.fontSize = "20px";
+            lockoutMsg.style.fontWeight = "600";
+            lockoutMsg.style.color = "red";
+            lockoutMsg.textContent = result.message || 
+                "You cannot use the system for the rest of the day.";
+
+            document.body.appendChild(lockoutMsg);
+
+            return;
         }
+
+        // Not blocked → show login normally
+        loginForm.style.display = "block";
+
     } catch (err) {
+        // Fail open (show login)
         loginForm.style.display = "block";
     }
 }
+
 
 /* ============================================================
 LOGIN HANDLER (MODIFIED)
