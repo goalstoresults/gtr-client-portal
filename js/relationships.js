@@ -3,7 +3,6 @@
 
 import { renderRelList } from "./relationships/tab-list.js";
 import { renderRelDetails } from "./relationships/tab-details.js";
-import { renderRelOverview } from "./relationships/tab-overview.js";
 import { renderClientVendorTab } from "./relationships/tab-client-vendor.js";
 import { renderContactDetails } from "./contacts/tab-details.js";   // ⭐ NEW IMPORT
 
@@ -33,11 +32,6 @@ export async function loadRelationshipsTab({ portalState, tabContent }) {
 
       if (subtab === "details") {
         await renderRelDetails(content, portalState);
-        return;
-      }
-
-      if (subtab === "overview") {
-        await renderRelOverview(content, portalState);
         return;
       }
 
