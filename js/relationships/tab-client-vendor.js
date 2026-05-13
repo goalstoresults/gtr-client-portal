@@ -197,11 +197,12 @@ async function expandClientRow(btn, clientId, portalState, project) {
   let html = `
     <td colspan="3">
       <div style="background:#fafafa; padding:8px;">
-        <strong>Vendors</strong>
+        <strong>All Relationships</strong>
         <table class="notes-table" style="margin-top:6px;">
           <thead>
             <tr>
-              <th>Vendor</th>
+              <th>Type</th>
+              <th>Related Contact</th>
               <th>Role</th>
             </tr>
           </thead>
@@ -209,16 +210,29 @@ async function expandClientRow(btn, clientId, portalState, project) {
   `;
 
   rows.forEach(r => {
-    const vendor = r.vendor || {};
-    const name = vendor.search_name || "(missing contact)";
+    const isSource = r.source_contact_id === clientId;
+
+    const other =
+      isSource
+        ? r.related
+        : r.client;
+
+    const otherId =
+      isSource
+        ? r.related_contact_id
+        : r.source_contact_id;
+
+    const otherName = other?.search_name || "(missing contact)";
+    const otherType = other?.contact_type || "";
 
     html += `
       <tr>
+        <td>${escapeHtml(r.relationship_type || "")}</td>
         <td>
           ${
-            vendor.search_name
-              ? `<a href="#" class="cv-link" data-id="${escapeHtml(r.related_contact_id)}">${escapeHtml(name)}</a>`
-              : escapeHtml(name)
+            otherName !== "(missing contact)"
+              ? `<a href="#" class="cv-link" data-id="${escapeHtml(otherId)}">${escapeHtml(otherName)}</a>`
+              : escapeHtml(otherName)
           }
         </td>
         <td>${escapeHtml(r.relationship_role || "")}</td>
@@ -236,14 +250,17 @@ async function expandClientRow(btn, clientId, portalState, project) {
   newRow.innerHTML = html;
   tr.after(newRow);
 
+  // Link click → go to Relationship Details
   newRow.querySelectorAll(".cv-link").forEach(a => {
     a.addEventListener("click", evt => {
       evt.preventDefault();
       portalState.selectedContactId = a.dataset.id;
       document.querySelector('#relationships-subtabs button[data-subtab="details"]')?.click();
+      window.scrollTo({ top: 0, behavior: "auto" });
     });
   });
 }
+
 
 function collapseRow(btn) {
   btn.textContent = "▶ Expand";
