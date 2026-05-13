@@ -4,6 +4,8 @@
 
 import { escapeHtml } from "../utilities.js";
 
+const API_BASE = "https://relationships-topview.dennis-e64.workers.dev";
+
 export async function renderClientVendorTab(container, portalState) {
   const project = portalState.project;
 
@@ -19,6 +21,7 @@ export async function renderClientVendorTab(container, portalState) {
   container.innerHTML = `
     <section class="card">
       <h2>Client–Vendor Explorer</h2>
+
       <section id="cvClients" style="margin-top:16px;"></section>
       <section id="cvVendors" style="margin-top:32px;"></section>
       <section id="cvMismatches" style="margin-top:32px;"></section>
@@ -29,163 +32,38 @@ export async function renderClientVendorTab(container, portalState) {
   const vendorsContainer = container.querySelector("#cvVendors");
   const mismatchesContainer = container.querySelector("#cvMismatches");
 
-  const { contacts, relationships } = await loadClientVendorData(project);
-  const contactMap = buildContactMap(contacts);
-
-  // EXACT match to your DB
-  const clientVendorRels = relationships.filter(
-    r => r.relationship_type === "Client- Vendor"
-  );
-
-  const {
-    clientsList,
-    vendorsList,
-    groupedByClient,
-    groupedByVendor,
-    mismatchesList,
-    groupedByMismatch
-  } = buildClientVendorModel(contacts, clientVendorRels, contactMap);
-
-  renderClientSection(clientsContainer, clientsList, groupedByClient, contactMap, portalState);
-  renderVendorSection(vendorsContainer, vendorsList, groupedByVendor, contactMap, portalState);
-  renderMismatchSection(mismatchesContainer, mismatchesList, groupedByMismatch, contactMap, portalState);
-}
-
-/* -------------------------------------------------------
-   Data loading
-------------------------------------------------------- */
-
-async function loadClientVendorData(projectId) {
-  const contactsUrl =
-    `https://contacts-module.dennis-e64.workers.dev/contacts/all?project=${encodeURIComponent(projectId)}`;
-  const relUrl =
-    `https://contacts-module.dennis-e64.workers.dev/contact_relationships?project=${encodeURIComponent(projectId)}`;
-
-  const [contactsRes, relRes] = await Promise.all([
-    fetch(contactsUrl, { cache: "no-cache" }),
-    fetch(relUrl, { cache: "no-cache" })
+  // Load top-level grids (small, filtered payloads)
+  const [clients, vendors, mismatches] = await Promise.all([
+    fetchJson(`${API_BASE}/client-vendor/clients?project=${encodeURIComponent(project)}`),
+    fetchJson(`${API_BASE}/client-vendor/vendors?project=${encodeURIComponent(project)}`),
+    fetchJson(`${API_BASE}/client-vendor/mismatches?project=${encodeURIComponent(project)}`)
   ]);
 
-  let contacts = await contactsRes.json().catch(() => []);
-  let relationships = await relRes.json().catch(() => []);
-
-  if (!Array.isArray(contacts)) contacts = [];
-  if (!Array.isArray(relationships)) relationships = [];
-
-  return { contacts, relationships };
+  renderClientSection(clientsContainer, clients || [], portalState, project);
+  renderVendorSection(vendorsContainer, vendors || [], portalState, project);
+  renderMismatchSection(mismatchesContainer, mismatches || [], portalState);
 }
 
 /* -------------------------------------------------------
-   Contact map
+   Utilities
 ------------------------------------------------------- */
 
-function buildContactMap(contacts) {
-  const map = {};
-
-  contacts.forEach(c => {
-    const name =
-      c.search_name ||
-      c.contact_name ||
-      `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
-      c.business_name ||
-      c.email ||
-      c.contact_id ||
-      "(unknown)";
-
-    map[c.contact_id] = {
-      id: c.contact_id,
-      name,
-      type: c.contact_type || "Unknown",
-      email: c.email || c.primary_email || ""
-    };
-  });
-
-  return map;
-}
-
-function buildClientVendorModel(contacts, clientVendorRels, contactMap) {
-  // 1. CLIENTS = DISTINCT source_contact_id
-  const clientIdSet = new Set(
-    clientVendorRels.map(r => r.source_contact_id).filter(Boolean)
-  );
-  const clientsList = [...clientIdSet]
-    .map(id => contactMap[id])
-    .filter(Boolean);
-
-  // 2. VENDORS = DISTINCT related_contact_id
-  const vendorIdSet = new Set(
-    clientVendorRels.map(r => r.related_contact_id).filter(Boolean)
-  );
-  const vendorsList = [...vendorIdSet]
-    .map(id => contactMap[id])
-    .filter(Boolean);
-
-  // 3. GROUP BY CLIENT (client → vendors)
-  const groupedByClient = {};
-  clientVendorRels.forEach(r => {
-    const clientId = r.source_contact_id;
-    const vendorId = r.related_contact_id;
-    if (!clientId || !vendorId) return;
-
-    if (!groupedByClient[clientId]) groupedByClient[clientId] = [];
-    groupedByClient[clientId].push({
-      vendorId,
-      role: r.relationship_role || "",
-      rel: r
-    });
-  });
-
-  // 4. GROUP BY VENDOR (vendor → clients)
-  const groupedByVendor = {};
-  clientVendorRels.forEach(r => {
-    const clientId = r.source_contact_id;
-    const vendorId = r.related_contact_id;
-    if (!clientId || !vendorId) return;
-
-    if (!groupedByVendor[vendorId]) groupedByVendor[vendorId] = [];
-    groupedByVendor[vendorId].push({
-      clientId,
-      role: r.relationship_role || "",
-      rel: r
-    });
-  });
-
-  // 5. TYPE MISMATCH = vendors where contact_type != "Client Vendor"
-  const mismatchesList = [...vendorIdSet]
-    .map(id => contactMap[id])
-    .filter(c => c && c.type !== "Client Vendor");
-
-  const groupedByMismatch = {};
-  clientVendorRels.forEach(r => {
-    const vendorId = r.related_contact_id;
-    if (!vendorId) return;
-
-    const vendor = contactMap[vendorId];
-    if (!vendor || vendor.type === "Client Vendor") return;
-
-    if (!groupedByMismatch[vendorId]) groupedByMismatch[vendorId] = [];
-    groupedByMismatch[vendorId].push({
-      clientId: r.source_contact_id,
-      role: r.relationship_role || "",
-      rel: r
-    });
-  });
-
-  return {
-    clientsList,
-    vendorsList,
-    groupedByClient,
-    groupedByVendor,
-    mismatchesList,
-    groupedByMismatch
-  };
+async function fetchJson(url) {
+  try {
+    const res = await fetch(url, { cache: "no-cache" });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : data.rows || [];
+  } catch {
+    return [];
+  }
 }
 
 /* -------------------------------------------------------
    Rendering — Clients
 ------------------------------------------------------- */
 
-function renderClientSection(container, clientsList, groupedByClient, contactMap, portalState) {
+function renderClientSection(container, clientsList, portalState, project) {
   let html = `
     <h3>Clients (${clientsList.length})</h3>
     <table class="notes-table">
@@ -200,10 +78,10 @@ function renderClientSection(container, clientsList, groupedByClient, contactMap
 
   clientsList.forEach(c => {
     html += `
-      <tr data-id="${escapeHtml(c.id)}">
-        <td>${escapeHtml(c.name)}</td>
+      <tr data-id="${escapeHtml(c.contact_id)}">
+        <td>${escapeHtml(c.search_name || "(unknown)")}</td>
         <td style="text-align:center;">
-          <button class="btn-secondary cv-expand" data-id="${escapeHtml(c.id)}">▶ Expand</button>
+          <button class="btn-secondary cv-expand" data-id="${escapeHtml(c.contact_id)}">▶ Expand</button>
         </td>
       </tr>
     `;
@@ -216,22 +94,27 @@ function renderClientSection(container, clientsList, groupedByClient, contactMap
     btn.addEventListener("click", () => {
       const id = btn.dataset.id;
       const expanded = btn.textContent.includes("Collapse");
-
       if (expanded) {
         collapseRow(btn);
       } else {
-        expandClientRow(btn, id, groupedByClient[id], contactMap, portalState);
+        expandClientRow(btn, id, portalState, project);
       }
     });
   });
 }
 
-function expandClientRow(btn, clientId, rows, contactMap, portalState) {
+async function expandClientRow(btn, clientId, portalState, project) {
   btn.textContent = "▼ Collapse";
 
   const tr = btn.closest("tr");
   const newRow = document.createElement("tr");
   newRow.classList.add("cv-expand-row");
+
+  // Lazy-load vendors for this client
+  const url = `${API_BASE}/client-vendor/expand-client/${encodeURIComponent(
+    clientId
+  )}?project=${encodeURIComponent(project)}`;
+  const rows = await fetchJson(url);
 
   let html = `
     <td colspan="2">
@@ -248,26 +131,22 @@ function expandClientRow(btn, clientId, rows, contactMap, portalState) {
   `;
 
   (rows || []).forEach(r => {
-    const vendor = contactMap[r.vendorId];
-
-    if (!vendor) {
-      html += `
-        <tr>
-          <td>(missing contact: ${escapeHtml(r.vendorId)})</td>
-          <td>${escapeHtml(r.role)}</td>
-        </tr>
-      `;
-      return;
-    }
-
+    const vendor = r.vendor || {};
+    const name =
+      vendor.search_name ||
+      "(missing contact)";
     html += `
       <tr>
         <td>
-          <a href="#" class="cv-link" data-id="${escapeHtml(vendor.id)}">
-            ${escapeHtml(vendor.name)}
-          </a>
+          ${
+            vendor.search_name
+              ? `<a href="#" class="cv-link" data-id="${escapeHtml(
+                  r.related_contact_id
+                )}">${escapeHtml(name)}</a>`
+              : escapeHtml(name)
+          }
         </td>
-        <td>${escapeHtml(r.role)}</td>
+        <td>${escapeHtml(r.relationship_role || "")}</td>
       </tr>
     `;
   });
@@ -293,18 +172,11 @@ function expandClientRow(btn, clientId, rows, contactMap, portalState) {
   });
 }
 
-function collapseRow(btn) {
-  btn.textContent = "▶ Expand";
-  const tr = btn.closest("tr");
-  const next = tr.nextElementSibling;
-  if (next && next.classList.contains("cv-expand-row")) next.remove();
-}
-
 /* -------------------------------------------------------
    Rendering — Vendors
 ------------------------------------------------------- */
 
-function renderVendorSection(container, vendorsList, groupedByVendor, contactMap, portalState) {
+function renderVendorSection(container, vendorsList, portalState, project) {
   let html = `
     <h3>Client Vendors (${vendorsList.length})</h3>
     <table class="notes-table">
@@ -319,10 +191,10 @@ function renderVendorSection(container, vendorsList, groupedByVendor, contactMap
 
   vendorsList.forEach(v => {
     html += `
-      <tr data-id="${escapeHtml(v.id)}">
-        <td>${escapeHtml(v.name)}</td>
+      <tr data-id="${escapeHtml(v.contact_id)}">
+        <td>${escapeHtml(v.search_name || "(unknown)")}</td>
         <td style="text-align:center;">
-          <button class="btn-secondary cv-expand" data-id="${escapeHtml(v.id)}">▶ Expand</button>
+          <button class="btn-secondary cv-expand" data-id="${escapeHtml(v.contact_id)}">▶ Expand</button>
         </td>
       </tr>
     `;
@@ -335,22 +207,27 @@ function renderVendorSection(container, vendorsList, groupedByVendor, contactMap
     btn.addEventListener("click", () => {
       const id = btn.dataset.id;
       const expanded = btn.textContent.includes("Collapse");
-
       if (expanded) {
         collapseRow(btn);
       } else {
-        expandVendorRow(btn, id, groupedByVendor[id], contactMap, portalState);
+        expandVendorRow(btn, id, portalState, project);
       }
     });
   });
 }
 
-function expandVendorRow(btn, vendorId, rows, contactMap, portalState) {
+async function expandVendorRow(btn, vendorId, portalState, project) {
   btn.textContent = "▼ Collapse";
 
   const tr = btn.closest("tr");
   const newRow = document.createElement("tr");
   newRow.classList.add("cv-expand-row");
+
+  // Lazy-load clients for this vendor
+  const url = `${API_BASE}/client-vendor/expand-vendor/${encodeURIComponent(
+    vendorId
+  )}?project=${encodeURIComponent(project)}`;
+  const rows = await fetchJson(url);
 
   let html = `
     <td colspan="2">
@@ -367,26 +244,22 @@ function expandVendorRow(btn, vendorId, rows, contactMap, portalState) {
   `;
 
   (rows || []).forEach(r => {
-    const client = contactMap[r.clientId];
-
-    if (!client) {
-      html += `
-        <tr>
-          <td>(missing contact: ${escapeHtml(r.clientId)})</td>
-          <td>${escapeHtml(r.role)}</td>
-        </tr>
-      `;
-      return;
-    }
-
+    const client = r.client || {};
+    const name =
+      client.search_name ||
+      "(missing contact)";
     html += `
       <tr>
         <td>
-          <a href="#" class="cv-link" data-id="${escapeHtml(client.id)}">
-            ${escapeHtml(client.name)}
-          </a>
+          ${
+            client.search_name
+              ? `<a href="#" class="cv-link" data-id="${escapeHtml(
+                  r.source_contact_id
+                )}">${escapeHtml(name)}</a>`
+              : escapeHtml(name)
+          }
         </td>
-        <td>${escapeHtml(r.role)}</td>
+        <td>${escapeHtml(r.relationship_role || "")}</td>
       </tr>
     `;
   });
@@ -416,13 +289,7 @@ function expandVendorRow(btn, vendorId, rows, contactMap, portalState) {
    Rendering — Type Mismatches
 ------------------------------------------------------- */
 
-function renderMismatchSection(
-  container,
-  mismatchesList,
-  groupedByMismatch,
-  contactMap,
-  portalState
-) {
+function renderMismatchSection(container, mismatchesList, portalState) {
   let html = `
     <h3>Contacts With Type Mismatch (${mismatchesList.length})</h3>
     <table class="notes-table">
@@ -439,12 +306,12 @@ function renderMismatchSection(
 
   mismatchesList.forEach(v => {
     html += `
-      <tr data-id="${escapeHtml(v.id)}">
-        <td>${escapeHtml(v.name)}</td>
-        <td>${escapeHtml(v.type)}</td>
+      <tr data-id="${escapeHtml(v.contact_id)}">
+        <td>${escapeHtml(v.search_name || "(unknown)")}</td>
+        <td>${escapeHtml(v.contact_type || "")}</td>
         <td>Client- Vendor</td>
         <td style="text-align:center;">
-          <button class="btn-primary cv-details" data-id="${escapeHtml(v.id)}">Details</button>
+          <button class="btn-primary cv-details" data-id="${escapeHtml(v.contact_id)}">Details</button>
         </td>
       </tr>
     `;
@@ -456,12 +323,21 @@ function renderMismatchSection(
   container.querySelectorAll(".cv-details").forEach(btn => {
     btn.addEventListener("click", () => {
       portalState.selectedContactId = btn.dataset.id;
-
-      // Switch to the Contact Details subtab inside Relationships
       document
         .querySelector('#relationships-subtabs button[data-subtab="contact-details"]')
         ?.click();
     });
   });
+}
+
+/* -------------------------------------------------------
+   Shared — Collapse
+------------------------------------------------------- */
+
+function collapseRow(btn) {
+  btn.textContent = "▶ Expand";
+  const tr = btn.closest("tr");
+  const next = tr.nextElementSibling;
+  if (next && next.classList.contains("cv-expand-row")) next.remove();
 }
 
