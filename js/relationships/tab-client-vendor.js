@@ -164,10 +164,21 @@ function renderClientSection(container, list, portalState, project) {
     // Details
     container.querySelectorAll(".cv-details").forEach(btn => {
       btn.addEventListener("click", () => {
-        portalState.selectedContactId = btn.dataset.id;
-        document.querySelector('#relationships-subtabs button[data-subtab="details"]')?.click();
+    
+        const id = btn.dataset.id;
+        const row = list.find(r => r.contact_id === id);
+    
+        portalState.selectedContactId = id;
+        portalState.selectedContactName = row?.search_name || "";
+    
+        document
+          .querySelector('#relationships-subtabs button[data-subtab="details"]')
+          ?.click();
+    
+        window.scrollTo({ top: 0, behavior: "auto" });
       });
     });
+
   }
 
   render();
@@ -326,10 +337,21 @@ function renderVendorSection(container, list, portalState, project) {
 
     container.querySelectorAll(".cv-details").forEach(btn => {
       btn.addEventListener("click", () => {
-        portalState.selectedContactId = btn.dataset.id;
-        document.querySelector('#relationships-subtabs button[data-subtab="details"]')?.click();
+    
+        const id = btn.dataset.id;
+        const row = list.find(r => r.contact_id === id);
+    
+        portalState.selectedContactId = id;
+        portalState.selectedContactName = row?.search_name || "";
+    
+        document
+          .querySelector('#relationships-subtabs button[data-subtab="details"]')
+          ?.click();
+    
+        window.scrollTo({ top: 0, behavior: "auto" });
       });
     });
+
   }
 
   render();
