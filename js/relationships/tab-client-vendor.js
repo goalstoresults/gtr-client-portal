@@ -436,11 +436,14 @@ function renderMismatchSection(container, list, portalState) {
     btn.addEventListener("click", () => {
       portalState.selectedContactId = btn.dataset.id;
 
-      // ⭐ FIXED: Jump to Contact Details tab, not Relationship Details
-      document.querySelector('#relationships-subtabs button[data-subtab="contact-details"]')?.click();
-      // ⭐ Force scroll to top of the tab content
-      const panel = document.querySelector('#relationships-content');
-      if (panel) panel.scrollTop = 0;
+      // Go to the Contact Details tab (right next to Client–Vendor)
+      document
+        .querySelector('#relationships-subtabs button[data-subtab="contact-details"]')
+        ?.click();
+
+      // Hard reset scroll to top of the page
+      window.scrollTo({ top: 0, behavior: "auto" });
     });
   });
 }
+
