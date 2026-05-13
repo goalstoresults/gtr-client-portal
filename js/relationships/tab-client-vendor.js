@@ -401,6 +401,7 @@ async function expandVendorRow(btn, vendorId, portalState, project) {
 ------------------------------------------------------- */
 
 function renderMismatchSection(container, list, portalState) {
+
   let html = `
     <h3>Contacts With Type Mismatch (${list.length})</h3>
     <table class="notes-table">
@@ -434,7 +435,9 @@ function renderMismatchSection(container, list, portalState) {
   container.querySelectorAll(".cv-details").forEach(btn => {
     btn.addEventListener("click", () => {
       portalState.selectedContactId = btn.dataset.id;
-      document.querySelector('#relationships-subtabs button[data-subtab="details"]')?.click();
+
+      // ⭐ FIXED: Jump to Contact Details tab, not Relationship Details
+      document.querySelector('#relationships-subtabs button[data-subtab="contact-details"]')?.click();
     });
   });
 }
