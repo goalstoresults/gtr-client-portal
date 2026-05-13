@@ -198,6 +198,10 @@ export async function openRelationshipForm(container, portalState, {
     }
 
     const filters = [`project.eq.${projectId}`];
+    
+    // 🚫 EXCLUDE the current contact from search results
+    filters.push(`contact_id.neq.${contactId}`);
+    
     if (first) filters.push(`first_name.ilike.${first}*`);
     if (last) filters.push(`last_name.ilike.${last}*`);
 
