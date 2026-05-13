@@ -1,13 +1,12 @@
 // /js/relationships/tab-client-vendor.js
 
-// FINAL REWRITE — Count column, sorting, arrows, lazy expand
+// FINAL REWRITE — Count column, sorting, arrows, lazy expand, section expand/collapse
 
 import { escapeHtml } from "../utilities.js";
 
 const API_BASE = "https://relationships-topview.dennis-e64.workers.dev";
 
 export async function renderClientVendorTab(container, portalState) {
-
   const project = portalState.project;
 
   if (!project) {
@@ -22,7 +21,6 @@ export async function renderClientVendorTab(container, portalState) {
   container.innerHTML = `
     <section class="card">
       <h2>Client–Vendor Explorer</h2>
-
       <section id="cvClients" style="margin-top:16px;"></section>
       <section id="cvVendors" style="margin-top:32px;"></section>
       <section id="cvMismatches" style="margin-top:32px;"></section>
@@ -99,20 +97,25 @@ function renderClientSection(container, list, portalState, project) {
     const rows = sortRows();
 
     let html = `
-      <h3>Clients (${rows.length})</h3>
-      <table class="notes-table">
-        <thead>
-          <tr>
-            <th class="sortable" data-field="name">
-              Client ${arrowsFor("name", sortField, sortDirection)}
-            </th>
-            <th class="sortable" data-field="count" style="width:80px; text-align:right;">
-              Count ${arrowsFor("count", sortField, sortDirection)}
-            </th>
-            <th style="width:160px; text-align:center;">Action</th>
-          </tr>
-        </thead>
-        <tbody>
+      <div class="cv-section" data-section="clients">
+        <div class="cv-section-header">
+          <span class="cv-section-title">Clients (${rows.length})</span>
+          <button class="btn-secondary cv-toggle">▼ Collapse</button>
+        </div>
+        <div class="cv-section-body">
+          <table class="notes-table">
+            <thead>
+              <tr>
+                <th class="sortable" data-field="name">
+                  Client ${arrowsFor("name", sortField, sortDirection)}
+                </th>
+                <th class="sortable" data-field="count" style="width:80px; text-align:right;">
+                  Count ${arrowsFor("count", sortField, sortDirection)}
+                </th>
+                <th style="width:160px; text-align:center;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
     `;
 
     rows.forEach(c => {
@@ -123,21 +126,52 @@ function renderClientSection(container, list, portalState, project) {
         <tr data-id="${escapeHtml(c.contact_id)}">
           <td>${escapeHtml(c.search_name || "(unknown)")}</td>
           <td style="text-align:right;">${count}</td>
-
-          <!-- ⭐ FIXED BUTTON LAYOUT -->
           <td style="text-align:center; white-space:nowrap;">
-            ${canExpand ? `<button class="btn-secondary cv-expand" data-id="${escapeHtml(c.contact_id)}" style="margin-right:6px;">▶ Expand</button>` : ""}
-            <button class="btn-primary cv-details" data-id="${escapeHtml(c.contact_id)}">Details</button>
+            ${
+              canExpand
+                ? `<button class="btn-secondary cv-expand" data-id="${escapeHtml(
+                    c.contact_id
+                  )}" style="margin-right:6px;">▶ Expand</button>`
+                : ""
+            }
+            <button class="btn-primary cv-details" data-id="${escapeHtml(
+              c.contact_id
+            )}">Details</button>
           </td>
         </tr>
       `;
     });
 
-    html += `</tbody></table>`;
+    html += `
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
     container.innerHTML = html;
 
+    const section = container.querySelector(".cv-section");
+    const body = section.querySelector(".cv-section-body");
+    const toggleBtn = section.querySelector(".cv-toggle");
+
+    // Clients: default expanded
+    body.style.display = "block";
+    toggleBtn.textContent = "▼ Collapse";
+
+    toggleBtn.addEventListener("click", () => {
+      const isCollapsed = body.style.display === "none";
+      if (isCollapsed) {
+        body.style.display = "block";
+        toggleBtn.textContent = "▼ Collapse";
+      } else {
+        body.style.display = "none";
+        toggleBtn.textContent = "▶ Expand";
+      }
+    });
+
     // Sorting
-    container.querySelectorAll("th.sortable").forEach(th => {
+    body.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
         if (field === "name") {
@@ -152,7 +186,7 @@ function renderClientSection(container, list, portalState, project) {
     });
 
     // Expand
-    container.querySelectorAll(".cv-expand").forEach(btn => {
+    body.querySelectorAll(".cv-expand").forEach(btn => {
       btn.addEventListener("click", () => {
         const id = btn.dataset.id;
         const expanded = btn.textContent.includes("Collapse");
@@ -162,23 +196,18 @@ function renderClientSection(container, list, portalState, project) {
     });
 
     // Details
-    container.querySelectorAll(".cv-details").forEach(btn => {
+    body.querySelectorAll(".cv-details").forEach(btn => {
       btn.addEventListener("click", () => {
-    
         const id = btn.dataset.id;
         const row = list.find(r => r.contact_id === id);
-    
         portalState.selectedContactId = id;
         portalState.selectedContactName = row?.search_name || "";
-    
         document
           .querySelector('#relationships-subtabs button[data-subtab="details"]')
           ?.click();
-    
         window.scrollTo({ top: 0, behavior: "auto" });
       });
     });
-
   }
 
   render();
@@ -191,7 +220,9 @@ async function expandClientRow(btn, clientId, portalState, project) {
   const newRow = document.createElement("tr");
   newRow.classList.add("cv-expand-row");
 
-  const url = `${API_BASE}/client-vendor/expand-client/${encodeURIComponent(clientId)}?project=${encodeURIComponent(project)}`;
+  const url = `${API_BASE}/client-vendor/expand-client/${encodeURIComponent(
+    clientId
+  )}?project=${encodeURIComponent(project)}`;
   const rows = await fetchJson(url);
 
   let html = `
@@ -212,18 +243,9 @@ async function expandClientRow(btn, clientId, portalState, project) {
   rows.forEach(r => {
     const isSource = r.source_contact_id === clientId;
 
-    const other =
-      isSource
-        ? r.related
-        : r.client;
-
-    const otherId =
-      isSource
-        ? r.related_contact_id
-        : r.source_contact_id;
-
+    const other = isSource ? r.related : r.client;
+    const otherId = isSource ? r.related_contact_id : r.source_contact_id;
     const otherName = other?.search_name || "(missing contact)";
-    const otherType = other?.contact_type || "";
 
     html += `
       <tr>
@@ -231,7 +253,9 @@ async function expandClientRow(btn, clientId, portalState, project) {
         <td>
           ${
             otherName !== "(missing contact)"
-              ? `<a href="#" class="cv-link" data-id="${escapeHtml(otherId)}">${escapeHtml(otherName)}</a>`
+              ? `<a href="#" class="cv-link" data-id="${escapeHtml(
+                  otherId
+                )}">${escapeHtml(otherName)}</a>`
               : escapeHtml(otherName)
           }
         </td>
@@ -255,12 +279,13 @@ async function expandClientRow(btn, clientId, portalState, project) {
     a.addEventListener("click", evt => {
       evt.preventDefault();
       portalState.selectedContactId = a.dataset.id;
-      document.querySelector('#relationships-subtabs button[data-subtab="details"]')?.click();
+      document
+        .querySelector('#relationships-subtabs button[data-subtab="details"]')
+        ?.click();
       window.scrollTo({ top: 0, behavior: "auto" });
     });
   });
 }
-
 
 function collapseRow(btn) {
   btn.textContent = "▶ Expand";
@@ -292,20 +317,25 @@ function renderVendorSection(container, list, portalState, project) {
     const rows = sortRows();
 
     let html = `
-      <h3>Client Vendors (${rows.length})</h3>
-      <table class="notes-table">
-        <thead>
-          <tr>
-            <th class="sortable" data-field="name">
-              Vendor ${arrowsFor("name", sortField, sortDirection)}
-            </th>
-            <th class="sortable" data-field="count" style="width:80px; text-align:right;">
-              Count ${arrowsFor("count", sortField, sortDirection)}
-            </th>
-            <th style="width:160px; text-align:center;">Action</th>
-          </tr>
-        </thead>
-        <tbody>
+      <div class="cv-section" data-section="vendors">
+        <div class="cv-section-header">
+          <span class="cv-section-title">Client Vendors (${rows.length})</span>
+          <button class="btn-secondary cv-toggle">▶ Expand</button>
+        </div>
+        <div class="cv-section-body" style="display:none;">
+          <table class="notes-table">
+            <thead>
+              <tr>
+                <th class="sortable" data-field="name">
+                  Vendor ${arrowsFor("name", sortField, sortDirection)}
+                </th>
+                <th class="sortable" data-field="count" style="width:80px; text-align:right;">
+                  Count ${arrowsFor("count", sortField, sortDirection)}
+                </th>
+                <th style="width:160px; text-align:center;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
     `;
 
     rows.forEach(v => {
@@ -316,20 +346,51 @@ function renderVendorSection(container, list, portalState, project) {
         <tr data-id="${escapeHtml(v.contact_id)}">
           <td>${escapeHtml(v.search_name || "(unknown)")}</td>
           <td style="text-align:right;">${count}</td>
-
-          <!-- ⭐ FIXED BUTTON LAYOUT -->
           <td style="text-align:center; white-space:nowrap;">
-            ${canExpand ? `<button class="btn-secondary cv-expand" data-id="${escapeHtml(v.contact_id)}" style="margin-right:6px;">▶ Expand</button>` : ""}
-            <button class="btn-primary cv-details" data-id="${escapeHtml(v.contact_id)}">Details</button>
+            ${
+              canExpand
+                ? `<button class="btn-secondary cv-expand" data-id="${escapeHtml(
+                    v.contact_id
+                  )}" style="margin-right:6px;">▶ Expand</button>`
+                : ""
+            }
+            <button class="btn-primary cv-details" data-id="${escapeHtml(
+              v.contact_id
+            )}">Details</button>
           </td>
         </tr>
       `;
     });
 
-    html += `</tbody></table>`;
+    html += `
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
     container.innerHTML = html;
 
-    container.querySelectorAll("th.sortable").forEach(th => {
+    const section = container.querySelector(".cv-section");
+    const body = section.querySelector(".cv-section-body");
+    const toggleBtn = section.querySelector(".cv-toggle");
+
+    // Vendors: default collapsed
+    body.style.display = "none";
+    toggleBtn.textContent = "▶ Expand";
+
+    toggleBtn.addEventListener("click", () => {
+      const isCollapsed = body.style.display === "none";
+      if (isCollapsed) {
+        body.style.display = "block";
+        toggleBtn.textContent = "▼ Collapse";
+      } else {
+        body.style.display = "none";
+        toggleBtn.textContent = "▶ Expand";
+      }
+    });
+
+    body.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
         if (field === "name") {
@@ -343,7 +404,7 @@ function renderVendorSection(container, list, portalState, project) {
       });
     });
 
-    container.querySelectorAll(".cv-expand").forEach(btn => {
+    body.querySelectorAll(".cv-expand").forEach(btn => {
       btn.addEventListener("click", () => {
         const id = btn.dataset.id;
         const expanded = btn.textContent.includes("Collapse");
@@ -352,23 +413,18 @@ function renderVendorSection(container, list, portalState, project) {
       });
     });
 
-    container.querySelectorAll(".cv-details").forEach(btn => {
+    body.querySelectorAll(".cv-details").forEach(btn => {
       btn.addEventListener("click", () => {
-    
         const id = btn.dataset.id;
         const row = list.find(r => r.contact_id === id);
-    
         portalState.selectedContactId = id;
         portalState.selectedContactName = row?.search_name || "";
-    
         document
           .querySelector('#relationships-subtabs button[data-subtab="details"]')
           ?.click();
-    
         window.scrollTo({ top: 0, behavior: "auto" });
       });
     });
-
   }
 
   render();
@@ -381,7 +437,9 @@ async function expandVendorRow(btn, vendorId, portalState, project) {
   const newRow = document.createElement("tr");
   newRow.classList.add("cv-expand-row");
 
-  const url = `${API_BASE}/client-vendor/expand-vendor/${encodeURIComponent(vendorId)}?project=${encodeURIComponent(project)}`;
+  const url = `${API_BASE}/client-vendor/expand-vendor/${encodeURIComponent(
+    vendorId
+  )}?project=${encodeURIComponent(project)}`;
   const rows = await fetchJson(url);
 
   let html = `
@@ -407,7 +465,9 @@ async function expandVendorRow(btn, vendorId, portalState, project) {
         <td>
           ${
             client.search_name
-              ? `<a href="#" class="cv-link" data-id="${escapeHtml(r.source_contact_id)}">${escapeHtml(name)}</a>`
+              ? `<a href="#" class="cv-link" data-id="${escapeHtml(
+                  r.source_contact_id
+                )}">${escapeHtml(name)}</a>`
               : escapeHtml(name)
           }
         </td>
@@ -430,7 +490,9 @@ async function expandVendorRow(btn, vendorId, portalState, project) {
     a.addEventListener("click", evt => {
       evt.preventDefault();
       portalState.selectedContactId = a.dataset.id;
-      document.querySelector('#relationships-subtabs button[data-subtab="details"]')?.click();
+      document
+        .querySelector('#relationships-subtabs button[data-subtab="details"]')
+        ?.click();
     });
   });
 }
@@ -440,19 +502,23 @@ async function expandVendorRow(btn, vendorId, portalState, project) {
 ------------------------------------------------------- */
 
 function renderMismatchSection(container, list, portalState) {
-
   let html = `
-    <h3>Contacts With Type Mismatch (${list.length})</h3>
-    <table class="notes-table">
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Contact Type</th>
-          <th>Relationship Type</th>
-          <th style="width:140px; text-align:center;">Action</th>
-        </tr>
-      </thead>
-      <tbody>
+    <div class="cv-section" data-section="mismatches">
+      <div class="cv-section-header">
+        <span class="cv-section-title">Contacts With Type Mismatch (${list.length})</span>
+        <button class="btn-secondary cv-toggle">▶ Expand</button>
+      </div>
+      <div class="cv-section-body" style="display:none;">
+        <table class="notes-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Contact Type</th>
+              <th>Relationship Type</th>
+              <th style="width:140px; text-align:center;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
   `;
 
   list.forEach(v => {
@@ -462,25 +528,48 @@ function renderMismatchSection(container, list, portalState) {
         <td>${escapeHtml(v.contact_type || "")}</td>
         <td>Client- Vendor</td>
         <td style="text-align:center;">
-          <button class="btn-primary cv-details" data-id="${escapeHtml(v.contact_id)}">Details</button>
+          <button class="btn-primary cv-details" data-id="${escapeHtml(
+            v.contact_id
+          )}">Details</button>
         </td>
       </tr>
     `;
   });
 
-  html += `</tbody></table>`;
+  html += `
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
   container.innerHTML = html;
 
-  container.querySelectorAll(".cv-details").forEach(btn => {
+  const section = container.querySelector(".cv-section");
+  const body = section.querySelector(".cv-section-body");
+  const toggleBtn = section.querySelector(".cv-toggle");
+
+  // Mismatches: default collapsed
+  body.style.display = "none";
+  toggleBtn.textContent = "▶ Expand";
+
+  toggleBtn.addEventListener("click", () => {
+    const isCollapsed = body.style.display === "none";
+    if (isCollapsed) {
+      body.style.display = "block";
+      toggleBtn.textContent = "▼ Collapse";
+    } else {
+      body.style.display = "none";
+      toggleBtn.textContent = "▶ Expand";
+    }
+  });
+
+  body.querySelectorAll(".cv-details").forEach(btn => {
     btn.addEventListener("click", () => {
       portalState.selectedContactId = btn.dataset.id;
-
-      // Go to the Contact Details tab (right next to Client–Vendor)
       document
         .querySelector('#relationships-subtabs button[data-subtab="contact-details"]')
         ?.click();
-
-      // Hard reset scroll to top of the page
       window.scrollTo({ top: 0, behavior: "auto" });
     });
   });
