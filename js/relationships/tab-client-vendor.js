@@ -438,6 +438,9 @@ function renderMismatchSection(container, list, portalState) {
 
       // ⭐ FIXED: Jump to Contact Details tab, not Relationship Details
       document.querySelector('#relationships-subtabs button[data-subtab="contact-details"]')?.click();
+      // ⭐ Force scroll to top of the tab content
+      const panel = document.querySelector('#relationships-content');
+      if (panel) panel.scrollTop = 0;
     });
   });
 }
