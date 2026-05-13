@@ -1,4 +1,5 @@
 // /js/relationships/tab-client-vendor.js
+
 // FINAL REWRITE — Count column, sorting, arrows, lazy expand
 
 import { escapeHtml } from "../utilities.js";
@@ -6,6 +7,7 @@ import { escapeHtml } from "../utilities.js";
 const API_BASE = "https://relationships-topview.dennis-e64.workers.dev";
 
 export async function renderClientVendorTab(container, portalState) {
+
   const project = portalState.project;
 
   if (!project) {
@@ -75,8 +77,8 @@ function arrowsFor(field, sortField, sortDirection) {
 ------------------------------------------------------- */
 
 function renderClientSection(container, list, portalState, project) {
-  let sortField = "count";      // default primary sort
-  let sortDirection = "desc";   // default direction
+  let sortField = "count"; // default primary sort
+  let sortDirection = "desc"; // default direction
 
   function sortRows() {
     const rows = [...list];
@@ -121,8 +123,10 @@ function renderClientSection(container, list, portalState, project) {
         <tr data-id="${escapeHtml(c.contact_id)}">
           <td>${escapeHtml(c.search_name || "(unknown)")}</td>
           <td style="text-align:right;">${count}</td>
-          <td style="text-align:center;">
-            ${canExpand ? `<button class="btn-secondary cv-expand" data-id="${escapeHtml(c.contact_id)}">▶ Expand</button>` : ""}
+
+          <!-- ⭐ FIXED BUTTON LAYOUT -->
+          <td style="text-align:center; white-space:nowrap;">
+            ${canExpand ? `<button class="btn-secondary cv-expand" data-id="${escapeHtml(c.contact_id)}" style="margin-right:6px;">▶ Expand</button>` : ""}
             <button class="btn-primary cv-details" data-id="${escapeHtml(c.contact_id)}">Details</button>
           </td>
         </tr>
@@ -196,6 +200,7 @@ async function expandClientRow(btn, clientId, portalState, project) {
   rows.forEach(r => {
     const vendor = r.vendor || {};
     const name = vendor.search_name || "(missing contact)";
+
     html += `
       <tr>
         <td>
@@ -283,8 +288,10 @@ function renderVendorSection(container, list, portalState, project) {
         <tr data-id="${escapeHtml(v.contact_id)}">
           <td>${escapeHtml(v.search_name || "(unknown)")}</td>
           <td style="text-align:right;">${count}</td>
-          <td style="text-align:center;">
-            ${canExpand ? `<button class="btn-secondary cv-expand" data-id="${escapeHtml(v.contact_id)}">▶ Expand</button>` : ""}
+
+          <!-- ⭐ FIXED BUTTON LAYOUT -->
+          <td style="text-align:center; white-space:nowrap;">
+            ${canExpand ? `<button class="btn-secondary cv-expand" data-id="${escapeHtml(v.contact_id)}" style="margin-right:6px;">▶ Expand</button>` : ""}
             <button class="btn-primary cv-details" data-id="${escapeHtml(v.contact_id)}">Details</button>
           </td>
         </tr>
@@ -355,6 +362,7 @@ async function expandVendorRow(btn, vendorId, portalState, project) {
   rows.forEach(r => {
     const client = r.client || {};
     const name = client.search_name || "(missing contact)";
+
     html += `
       <tr>
         <td>
