@@ -7,571 +7,472 @@ import { escapeHtml } from "../utilities.js";
 const API_BASE = "https://relationships-topview.dennis-e64.workers.dev";
 
 export async function renderClientVendorTab(container, portalState) {
-  const project = portalState.project;
 
-  if (!project) {
+    const project = portalState.project;
+
+    if (!project) {
+        container.innerHTML = `
+            <section class="card">
+                <p>Missing project. Select a project to view client–vendor relationships.</p>
+            </section>
+        `;
+        return;
+    }
+
     container.innerHTML = `
-      <section class="card">
-        <p>Missing project. Select a project to view client–vendor relationships.</p>
-      </section>
+        <section class="card">
+            <h2>Client–Vendor Explorer</h2>
+            <section id="cvClients" style="margin-top:16px;"></section>
+            <section id="cvVendors" style="margin-top:32px;"></section>
+        </section>
     `;
-    return;
-  }
 
-  container.innerHTML = `
-    <section class="card">
-      <h2>Client–Vendor Explorer</h2>
-      <section id="cvClients" style="margin-top:16px;"></section>
-      <section id="cvVendors" style="margin-top:32px;"></section>
-      <section id="cvMismatches" style="margin-top:32px;"></section>
-    </section>
-  `;
+    const clientsContainer = container.querySelector("#cvClients");
+    const vendorsContainer = container.querySelector("#cvVendors");
 
-  const clientsContainer = container.querySelector("#cvClients");
-  const vendorsContainer = container.querySelector("#cvVendors");
-  const mismatchesContainer = container.querySelector("#cvMismatches");
+    // Load top-level grids (NO MISMATCHES)
+    const [clients, vendors] = await Promise.all([
+        fetchJson(`${API_BASE}/client-vendor/clients?project=${encodeURIComponent(project)}`),
+        fetchJson(`${API_BASE}/client-vendor/vendors?project=${encodeURIComponent(project)}`)
+    ]);
 
-  // Load top-level grids
-  const [clients, vendors, mismatches] = await Promise.all([
-    fetchJson(`${API_BASE}/client-vendor/clients?project=${encodeURIComponent(project)}`),
-    fetchJson(`${API_BASE}/client-vendor/vendors?project=${encodeURIComponent(project)}`),
-    fetchJson(`${API_BASE}/client-vendor/mismatches?project=${encodeURIComponent(project)}`)
-  ]);
-
-  renderClientSection(clientsContainer, clients || [], portalState, project);
-  renderVendorSection(vendorsContainer, vendors || [], portalState, project);
-  renderMismatchSection(mismatchesContainer, mismatches || [], portalState);
+    renderClientSection(clientsContainer, clients || [], portalState, project);
+    renderVendorSection(vendorsContainer, vendors || [], portalState, project);
 }
 
 /* -------------------------------------------------------
-   Utilities
+Utilities
 ------------------------------------------------------- */
 
 async function fetchJson(url) {
-  try {
-    const res = await fetch(url, { cache: "no-cache" });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return Array.isArray(data) ? data : data.rows || [];
-  } catch {
-    return [];
-  }
+    try {
+        const res = await fetch(url, { cache: "no-cache" });
+        if (!res.ok) return [];
+        const data = await res.json();
+        return Array.isArray(data) ? data : data.rows || [];
+    } catch {
+        return [];
+    }
 }
 
 function arrowsFor(field, sortField, sortDirection) {
-  const isSorted = sortField === field;
-  const up = isSorted && sortDirection === "asc" ? "▲" : "△";
-  const down = isSorted && sortDirection === "desc" ? "▼" : "▽";
-  return `
-    <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-      <span class="sort-up">${up}</span>
-      <span class="sort-down">${down}</span>
-    </span>
-  `;
+    const isSorted = sortField === field;
+    const up = isSorted && sortDirection === "asc" ? "▲" : "△";
+    const down = isSorted && sortDirection === "desc" ? "▼" : "▽";
+    return `
+        <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+            <span class="sort-up">${up}</span>
+            <span class="sort-down">${down}</span>
+        </span>
+    `;
 }
 
 /* -------------------------------------------------------
-   Rendering — Clients
+Rendering — Clients
 ------------------------------------------------------- */
 
 function renderClientSection(container, list, portalState, project) {
-  let sortField = "count"; // default primary sort
-  let sortDirection = "desc"; // default direction
 
-  function sortRows() {
-    const rows = [...list];
-    rows.sort((a, b) => {
-      const A = Number(a.relationship_count || 0);
-      const B = Number(b.relationship_count || 0);
+    let sortField = "count";
+    let sortDirection = "desc";
 
-      // Primary: count desc
-      if (A !== B) return sortDirection === "asc" ? A - B : B - A;
+    function sortRows() {
+        const rows = [...list];
+        rows.sort((a, b) => {
+            const A = Number(a.relationship_count || 0);
+            const B = Number(b.relationship_count || 0);
+            if (A !== B) return sortDirection === "asc" ? A - B : B - A;
+            return (a.search_name || "").localeCompare(b.search_name || "");
+        });
+        return rows;
+    }
 
-      // Secondary: name asc
-      return (a.search_name || "").localeCompare(b.search_name || "");
-    });
-    return rows;
-  }
+    function render() {
+        const rows = sortRows();
 
-  function render() {
-    const rows = sortRows();
+        let html = `
+            <div class="cv-section" data-section="clients">
+                <div class="cv-section-header">
+                    <span class="cv-section-title">Clients (${rows.length})</span>
+                    <button class="btn-secondary cv-toggle">▼ Collapse</button>
+                </div>
+                <div class="cv-section-body">
+                    <table class="notes-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-field="name">
+                                    Client ${arrowsFor("name", sortField, sortDirection)}
+                                </th>
+                                <th class="sortable" data-field="count" style="width:80px; text-align:right;">
+                                    Count ${arrowsFor("count", sortField, sortDirection)}
+                                </th>
+                                <th style="width:160px; text-align:center;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
 
-    let html = `
-      <div class="cv-section" data-section="clients">
-        <div class="cv-section-header">
-          <span class="cv-section-title">Clients (${rows.length})</span>
-          <button class="btn-secondary cv-toggle">▼ Collapse</button>
-        </div>
-        <div class="cv-section-body">
-          <table class="notes-table">
-            <thead>
-              <tr>
-                <th class="sortable" data-field="name">
-                  Client ${arrowsFor("name", sortField, sortDirection)}
-                </th>
-                <th class="sortable" data-field="count" style="width:80px; text-align:right;">
-                  Count ${arrowsFor("count", sortField, sortDirection)}
-                </th>
-                <th style="width:160px; text-align:center;">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-    `;
+        rows.forEach(c => {
+            const count = Number(c.relationship_count || 0);
+            const canExpand = count > 0;
 
-    rows.forEach(c => {
-      const count = Number(c.relationship_count || 0);
-      const canExpand = count > 0;
+            html += `
+                <tr data-id="${escapeHtml(c.contact_id)}">
+                    <td>${escapeHtml(c.search_name || "(unknown)")}</td>
+                    <td style="text-align:right;">${count}</td>
+                    <td style="text-align:center; white-space:nowrap;">
+                        ${
+                            canExpand
+                                ? `<button class="btn-secondary cv-expand" data-id="${escapeHtml(
+                                      c.contact_id
+                                  )}" style="margin-right:6px;">▶ Expand</button>`
+                                : ""
+                        }
+                        <button class="btn-primary cv-details" data-id="${escapeHtml(
+                            c.contact_id
+                        )}">Details</button>
+                    </td>
+                </tr>
+            `;
+        });
 
-      html += `
-        <tr data-id="${escapeHtml(c.contact_id)}">
-          <td>${escapeHtml(c.search_name || "(unknown)")}</td>
-          <td style="text-align:right;">${count}</td>
-          <td style="text-align:center; white-space:nowrap;">
-            ${
-              canExpand
-                ? `<button class="btn-secondary cv-expand" data-id="${escapeHtml(
-                    c.contact_id
-                  )}" style="margin-right:6px;">▶ Expand</button>`
-                : ""
-            }
-            <button class="btn-primary cv-details" data-id="${escapeHtml(
-              c.contact_id
-            )}">Details</button>
-          </td>
-        </tr>
-      `;
-    });
+        html += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
 
-    html += `
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
+        container.innerHTML = html;
 
-    container.innerHTML = html;
+        const section = container.querySelector(".cv-section");
+        const body = section.querySelector(".cv-section-body");
+        const toggleBtn = section.querySelector(".cv-toggle");
 
-    const section = container.querySelector(".cv-section");
-    const body = section.querySelector(".cv-section-body");
-    const toggleBtn = section.querySelector(".cv-toggle");
-
-    // Clients: default expanded
-    body.style.display = "block";
-    toggleBtn.textContent = "▼ Collapse";
-
-    toggleBtn.addEventListener("click", () => {
-      const isCollapsed = body.style.display === "none";
-      if (isCollapsed) {
         body.style.display = "block";
         toggleBtn.textContent = "▼ Collapse";
-      } else {
-        body.style.display = "none";
-        toggleBtn.textContent = "▶ Expand";
-      }
-    });
 
-    // Sorting
-    body.querySelectorAll("th.sortable").forEach(th => {
-      th.addEventListener("click", () => {
-        const field = th.dataset.field;
-        if (field === "name") {
-          sortField = "name";
-          sortDirection = sortDirection === "asc" ? "desc" : "asc";
-        } else if (field === "count") {
-          sortField = "count";
-          sortDirection = sortDirection === "asc" ? "desc" : "asc";
-        }
-        render();
-      });
-    });
+        toggleBtn.addEventListener("click", () => {
+            const isCollapsed = body.style.display === "none";
+            body.style.display = isCollapsed ? "block" : "none";
+            toggleBtn.textContent = isCollapsed ? "▼ Collapse" : "▶ Expand";
+        });
 
-    // Expand
-    body.querySelectorAll(".cv-expand").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const id = btn.dataset.id;
-        const expanded = btn.textContent.includes("Collapse");
-        if (expanded) collapseRow(btn);
-        else expandClientRow(btn, id, portalState, project);
-      });
-    });
+        body.querySelectorAll("th.sortable").forEach(th => {
+            th.addEventListener("click", () => {
+                const field = th.dataset.field;
+                if (field === "name") {
+                    sortField = "name";
+                    sortDirection = sortDirection === "asc" ? "desc" : "asc";
+                } else if (field === "count") {
+                    sortField = "count";
+                    sortDirection = sortDirection === "asc" ? "desc" : "asc";
+                }
+                render();
+            });
+        });
 
-    // Details
-    body.querySelectorAll(".cv-details").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const id = btn.dataset.id;
-        const row = list.find(r => r.contact_id === id);
-        portalState.selectedContactId = id;
-        portalState.selectedContactName = row?.search_name || "";
-        document
-          .querySelector('#relationships-subtabs button[data-subtab="details"]')
-          ?.click();
-        window.scrollTo({ top: 0, behavior: "auto" });
-      });
-    });
-  }
+        body.querySelectorAll(".cv-expand").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const id = btn.dataset.id;
+                const expanded = btn.textContent.includes("Collapse");
+                if (expanded) collapseRow(btn);
+                else expandClientRow(btn, id, portalState, project);
+            });
+        });
 
-  render();
+        body.querySelectorAll(".cv-details").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const id = btn.dataset.id;
+                const row = list.find(r => r.contact_id === id);
+                portalState.selectedContactId = id;
+                portalState.selectedContactName = row?.search_name || "";
+                document
+                    .querySelector('#relationships-subtabs button[data-subtab="details"]')
+                    ?.click();
+                window.scrollTo({ top: 0, behavior: "auto" });
+            });
+        });
+    }
+
+    render();
 }
 
 async function expandClientRow(btn, clientId, portalState, project) {
-  btn.textContent = "▼ Collapse";
+    btn.textContent = "▼ Collapse";
 
-  const tr = btn.closest("tr");
-  const newRow = document.createElement("tr");
-  newRow.classList.add("cv-expand-row");
+    const tr = btn.closest("tr");
+    const newRow = document.createElement("tr");
+    newRow.classList.add("cv-expand-row");
 
-  const url = `${API_BASE}/client-vendor/expand-client/${encodeURIComponent(
-    clientId
-  )}?project=${encodeURIComponent(project)}`;
-  const rows = await fetchJson(url);
+    const url = `${API_BASE}/client-vendor/expand-client/${encodeURIComponent(
+        clientId
+    )}?project=${encodeURIComponent(project)}`;
 
-  let html = `
-    <td colspan="3">
-      <div style="background:#fafafa; padding:8px;">
-        <strong>All Relationships</strong>
-        <table class="notes-table" style="margin-top:6px;">
-          <thead>
+    const rows = await fetchJson(url);
+
+    let html = `
+        <td colspan="3">
+            <div style="background:#fafafa; padding:8px;">
+                <strong>All Relationships</strong>
+                <table class="notes-table" style="margin-top:6px;">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Related Contact</th>
+                            <th>Role</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+
+    rows.forEach(r => {
+        const isSource = r.source_contact_id === clientId;
+        const other = isSource ? r.related : r.client;
+        const otherId = isSource ? r.related_contact_id : r.source_contact_id;
+        const otherName = other?.search_name || "(missing contact)";
+
+        html += `
             <tr>
-              <th>Type</th>
-              <th>Related Contact</th>
-              <th>Role</th>
+                <td>${escapeHtml(r.relationship_type || "")}</td>
+                <td>
+                    ${
+                        otherName !== "(missing contact)"
+                            ? `<a href="#" class="cv-link" data-id="${escapeHtml(
+                                  otherId
+                              )}">${escapeHtml(otherName)}</a>`
+                            : escapeHtml(otherName)
+                    }
+                </td>
+                <td>${escapeHtml(r.relationship_role || "")}</td>
             </tr>
-          </thead>
-          <tbody>
-  `;
-
-  rows.forEach(r => {
-    const isSource = r.source_contact_id === clientId;
-
-    const other = isSource ? r.related : r.client;
-    const otherId = isSource ? r.related_contact_id : r.source_contact_id;
-    const otherName = other?.search_name || "(missing contact)";
+        `;
+    });
 
     html += `
-      <tr>
-        <td>${escapeHtml(r.relationship_type || "")}</td>
-        <td>
-          ${
-            otherName !== "(missing contact)"
-              ? `<a href="#" class="cv-link" data-id="${escapeHtml(
-                  otherId
-                )}">${escapeHtml(otherName)}</a>`
-              : escapeHtml(otherName)
-          }
+                    </tbody>
+                </table>
+            </div>
         </td>
-        <td>${escapeHtml(r.relationship_role || "")}</td>
-      </tr>
     `;
-  });
 
-  html += `
-          </tbody>
-        </table>
-      </div>
-    </td>
-  `;
+    newRow.innerHTML = html;
+    tr.after(newRow);
 
-  newRow.innerHTML = html;
-  tr.after(newRow);
-
-  // Link click → go to Relationship Details
-  newRow.querySelectorAll(".cv-link").forEach(a => {
-    a.addEventListener("click", evt => {
-      evt.preventDefault();
-      portalState.selectedContactId = a.dataset.id;
-      document
-        .querySelector('#relationships-subtabs button[data-subtab="details"]')
-        ?.click();
-      window.scrollTo({ top: 0, behavior: "auto" });
+    newRow.querySelectorAll(".cv-link").forEach(a => {
+        a.addEventListener("click", evt => {
+            evt.preventDefault();
+            portalState.selectedContactId = a.dataset.id;
+            document
+                .querySelector('#relationships-subtabs button[data-subtab="details"]')
+                ?.click();
+            window.scrollTo({ top: 0, behavior: "auto" });
+        });
     });
-  });
 }
 
 function collapseRow(btn) {
-  btn.textContent = "▶ Expand";
-  const tr = btn.closest("tr");
-  const next = tr.nextElementSibling;
-  if (next && next.classList.contains("cv-expand-row")) next.remove();
+    btn.textContent = "▶ Expand";
+    const tr = btn.closest("tr");
+    const next = tr.nextElementSibling;
+    if (next && next.classList.contains("cv-expand-row")) next.remove();
 }
 
 /* -------------------------------------------------------
-   Rendering — Vendors
+Rendering — Vendors
 ------------------------------------------------------- */
 
 function renderVendorSection(container, list, portalState, project) {
-  let sortField = "count";
-  let sortDirection = "desc";
 
-  function sortRows() {
-    const rows = [...list];
-    rows.sort((a, b) => {
-      const A = Number(a.relationship_count || 0);
-      const B = Number(b.relationship_count || 0);
-      if (A !== B) return sortDirection === "asc" ? A - B : B - A;
-      return (a.search_name || "").localeCompare(b.search_name || "");
-    });
-    return rows;
-  }
+    let sortField = "count";
+    let sortDirection = "desc";
 
-  function render() {
-    const rows = sortRows();
+    function sortRows() {
+        const rows = [...list];
+        rows.sort((a, b) => {
+            const A = Number(a.relationship_count || 0);
+            const B = Number(b.relationship_count || 0);
+            if (A !== B) return sortDirection === "asc" ? A - B : B - A;
+            return (a.search_name || "").localeCompare(b.search_name || "");
+        });
+        return rows;
+    }
 
-    let html = `
-      <div class="cv-section" data-section="vendors">
-        <div class="cv-section-header">
-          <span class="cv-section-title">Client Vendors (${rows.length})</span>
-          <button class="btn-secondary cv-toggle">▶ Expand</button>
-        </div>
-        <div class="cv-section-body" style="display:none;">
-          <table class="notes-table">
-            <thead>
-              <tr>
-                <th class="sortable" data-field="name">
-                  Vendor ${arrowsFor("name", sortField, sortDirection)}
-                </th>
-                <th class="sortable" data-field="count" style="width:80px; text-align:right;">
-                  Count ${arrowsFor("count", sortField, sortDirection)}
-                </th>
-                <th style="width:160px; text-align:center;">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-    `;
+    function render() {
+        const rows = sortRows();
 
-    rows.forEach(v => {
-      const count = Number(v.relationship_count || 0);
-      const canExpand = count > 0;
+        let html = `
+            <div class="cv-section" data-section="vendors">
+                <div class="cv-section-header">
+                    <span class="cv-section-title">Client Vendors (${rows.length})</span>
+                    <button class="btn-secondary cv-toggle">▶ Expand</button>
+                </div>
+                <div class="cv-section-body" style="display:none;">
+                    <table class="notes-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-field="name">
+                                    Vendor ${arrowsFor("name", sortField, sortDirection)}
+                                </th>
+                                <th class="sortable" data-field="count" style="width:80px; text-align:right;">
+                                    Count ${arrowsFor("count", sortField, sortDirection)}
+                                </th>
+                                <th style="width:160px; text-align:center;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
 
-      html += `
-        <tr data-id="${escapeHtml(v.contact_id)}">
-          <td>${escapeHtml(v.search_name || "(unknown)")}</td>
-          <td style="text-align:right;">${count}</td>
-          <td style="text-align:center; white-space:nowrap;">
-            ${
-              canExpand
-                ? `<button class="btn-secondary cv-expand" data-id="${escapeHtml(
-                    v.contact_id
-                  )}" style="margin-right:6px;">▶ Expand</button>`
-                : ""
-            }
-            <button class="btn-primary cv-details" data-id="${escapeHtml(
-              v.contact_id
-            )}">Details</button>
-          </td>
-        </tr>
-      `;
-    });
+        rows.forEach(v => {
+            const count = Number(v.relationship_count || 0);
+            const canExpand = count > 0;
 
-    html += `
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
+            html += `
+                <tr data-id="${escapeHtml(v.contact_id)}">
+                    <td>${escapeHtml(v.search_name || "(unknown)")}</td>
+                    <td style="text-align:right;">${count}</td>
+                    <td style="text-align:center; white-space:nowrap;">
+                        ${
+                            canExpand
+                                ? `<button class="btn-secondary cv-expand" data-id="${escapeHtml(
+                                      v.contact_id
+                                  )}" style="margin-right:6px;">▶ Expand</button>`
+                                : ""
+                        }
+                        <button class="btn-primary cv-details" data-id="${escapeHtml(
+                            v.contact_id
+                        )}">Details</button>
+                    </td>
+                </tr>
+            `;
+        });
 
-    container.innerHTML = html;
+        html += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
 
-    const section = container.querySelector(".cv-section");
-    const body = section.querySelector(".cv-section-body");
-    const toggleBtn = section.querySelector(".cv-toggle");
+        container.innerHTML = html;
 
-    // Vendors: default collapsed
-    body.style.display = "none";
-    toggleBtn.textContent = "▶ Expand";
+        const section = container.querySelector(".cv-section");
+        const body = section.querySelector(".cv-section-body");
+        const toggleBtn = section.querySelector(".cv-toggle");
 
-    toggleBtn.addEventListener("click", () => {
-      const isCollapsed = body.style.display === "none";
-      if (isCollapsed) {
-        body.style.display = "block";
-        toggleBtn.textContent = "▼ Collapse";
-      } else {
         body.style.display = "none";
         toggleBtn.textContent = "▶ Expand";
-      }
-    });
 
-    body.querySelectorAll("th.sortable").forEach(th => {
-      th.addEventListener("click", () => {
-        const field = th.dataset.field;
-        if (field === "name") {
-          sortField = "name";
-          sortDirection = sortDirection === "asc" ? "desc" : "asc";
-        } else if (field === "count") {
-          sortField = "count";
-          sortDirection = sortDirection === "asc" ? "desc" : "asc";
-        }
-        render();
-      });
-    });
+        toggleBtn.addEventListener("click", () => {
+            const isCollapsed = body.style.display === "none";
+            body.style.display = isCollapsed ? "block" : "none";
+            toggleBtn.textContent = isCollapsed ? "▼ Collapse" : "▶ Expand";
+        });
 
-    body.querySelectorAll(".cv-expand").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const id = btn.dataset.id;
-        const expanded = btn.textContent.includes("Collapse");
-        if (expanded) collapseRow(btn);
-        else expandVendorRow(btn, id, portalState, project);
-      });
-    });
+        body.querySelectorAll("th.sortable").forEach(th => {
+            th.addEventListener("click", () => {
+                const field = th.dataset.field;
+                if (field === "name") {
+                    sortField = "name";
+                    sortDirection = sortDirection === "asc" ? "desc" : "asc";
+                } else if (field === "count") {
+                    sortField = "count";
+                    sortDirection = sortDirection === "asc" ? "desc" : "asc";
+                }
+                render();
+            });
+        });
 
-    body.querySelectorAll(".cv-details").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const id = btn.dataset.id;
-        const row = list.find(r => r.contact_id === id);
-        portalState.selectedContactId = id;
-        portalState.selectedContactName = row?.search_name || "";
-        document
-          .querySelector('#relationships-subtabs button[data-subtab="details"]')
-          ?.click();
-        window.scrollTo({ top: 0, behavior: "auto" });
-      });
-    });
-  }
+        body.querySelectorAll(".cv-expand").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const id = btn.dataset.id;
+                const expanded = btn.textContent.includes("Collapse");
+                if (expanded) collapseRow(btn);
+                else expandVendorRow(btn, id, portalState, project);
+            });
+        });
 
-  render();
+        body.querySelectorAll(".cv-details").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const id = btn.dataset.id;
+                const row = list.find(r => r.contact_id === id);
+                portalState.selectedContactId = id;
+                portalState.selectedContactName = row?.search_name || "";
+                document
+                    .querySelector('#relationships-subtabs button[data-subtab="details"]')
+                    ?.click();
+                window.scrollTo({ top: 0, behavior: "auto" });
+            });
+        });
+    }
+
+    render();
 }
 
 async function expandVendorRow(btn, vendorId, portalState, project) {
-  btn.textContent = "▼ Collapse";
+    btn.textContent = "▼ Collapse";
 
-  const tr = btn.closest("tr");
-  const newRow = document.createElement("tr");
-  newRow.classList.add("cv-expand-row");
+    const tr = btn.closest("tr");
+    const newRow = document.createElement("tr");
+    newRow.classList.add("cv-expand-row");
 
-  const url = `${API_BASE}/client-vendor/expand-vendor/${encodeURIComponent(
-    vendorId
-  )}?project=${encodeURIComponent(project)}`;
-  const rows = await fetchJson(url);
+    const url = `${API_BASE}/client-vendor/expand-vendor/${encodeURIComponent(
+        vendorId
+    )}?project=${encodeURIComponent(project)}`;
 
-  let html = `
-    <td colspan="3">
-      <div style="background:#fafafa; padding:8px;">
-        <strong>Clients</strong>
-        <table class="notes-table" style="margin-top:6px;">
-          <thead>
+    const rows = await fetchJson(url);
+
+    let html = `
+        <td colspan="3">
+            <div style="background:#fafafa; padding:8px;">
+                <strong>Clients</strong>
+                <table class="notes-table" style="margin-top:6px;">
+                    <thead>
+                        <tr>
+                            <th>Client</th>
+                            <th>Role</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+
+    rows.forEach(r => {
+        const client = r.client || {};
+        const name = client.search_name || "(missing contact)";
+
+        html += `
             <tr>
-              <th>Client</th>
-              <th>Role</th>
+                <td>
+                    ${
+                        client.search_name
+                            ? `<a href="#" class="cv-link" data-id="${escapeHtml(
+                                  r.source_contact_id
+                              )}">${escapeHtml(name)}</a>`
+                            : escapeHtml(name)
+                    }
+                </td>
+                <td>${escapeHtml(r.relationship_role || "")}</td>
             </tr>
-          </thead>
-          <tbody>
-  `;
-
-  rows.forEach(r => {
-    const client = r.client || {};
-    const name = client.search_name || "(missing contact)";
+        `;
+    });
 
     html += `
-      <tr>
-        <td>
-          ${
-            client.search_name
-              ? `<a href="#" class="cv-link" data-id="${escapeHtml(
-                  r.source_contact_id
-                )}">${escapeHtml(name)}</a>`
-              : escapeHtml(name)
-          }
+                    </tbody>
+                </table>
+            </div>
         </td>
-        <td>${escapeHtml(r.relationship_role || "")}</td>
-      </tr>
     `;
-  });
 
-  html += `
-          </tbody>
-        </table>
-      </div>
-    </td>
-  `;
+    newRow.innerHTML = html;
+    tr.after(newRow);
 
-  newRow.innerHTML = html;
-  tr.after(newRow);
-
-  newRow.querySelectorAll(".cv-link").forEach(a => {
-    a.addEventListener("click", evt => {
-      evt.preventDefault();
-      portalState.selectedContactId = a.dataset.id;
-      document
-        .querySelector('#relationships-subtabs button[data-subtab="details"]')
-        ?.click();
+    newRow.querySelectorAll(".cv-link").forEach(a => {
+        a.addEventListener("click", evt => {
+            evt.preventDefault();
+            portalState.selectedContactId = a.dataset.id;
+            document
+                .querySelector('#relationships-subtabs button[data-subtab="details"]')
+                ?.click();
+        });
     });
-  });
 }
-
-/* -------------------------------------------------------
-   Rendering — Type Mismatches
-------------------------------------------------------- */
-
-function renderMismatchSection(container, list, portalState) {
-  let html = `
-    <div class="cv-section" data-section="mismatches">
-      <div class="cv-section-header">
-        <span class="cv-section-title">Contacts With Type Mismatch (${list.length})</span>
-        <button class="btn-secondary cv-toggle">▶ Expand</button>
-      </div>
-      <div class="cv-section-body" style="display:none;">
-        <table class="notes-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Contact Type</th>
-              <th>Relationship Type</th>
-              <th style="width:140px; text-align:center;">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-  `;
-
-  list.forEach(v => {
-    html += `
-      <tr data-id="${escapeHtml(v.contact_id)}">
-        <td>${escapeHtml(v.search_name || "(unknown)")}</td>
-        <td>${escapeHtml(v.contact_type || "")}</td>
-        <td>Client- Vendor</td>
-        <td style="text-align:center;">
-          <button class="btn-primary cv-details" data-id="${escapeHtml(
-            v.contact_id
-          )}">Details</button>
-        </td>
-      </tr>
-    `;
-  });
-
-  html += `
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-
-  container.innerHTML = html;
-
-  const section = container.querySelector(".cv-section");
-  const body = section.querySelector(".cv-section-body");
-  const toggleBtn = section.querySelector(".cv-toggle");
-
-  // Mismatches: default collapsed
-  body.style.display = "none";
-  toggleBtn.textContent = "▶ Expand";
-
-  toggleBtn.addEventListener("click", () => {
-    const isCollapsed = body.style.display === "none";
-    if (isCollapsed) {
-      body.style.display = "block";
-      toggleBtn.textContent = "▼ Collapse";
-    } else {
-      body.style.display = "none";
-      toggleBtn.textContent = "▶ Expand";
-    }
-  });
-
-  body.querySelectorAll(".cv-details").forEach(btn => {
-    btn.addEventListener("click", () => {
-      portalState.selectedContactId = btn.dataset.id;
-      document
-        .querySelector('#relationships-subtabs button[data-subtab="contact-details"]')
-        ?.click();
-      window.scrollTo({ top: 0, behavior: "auto" });
-    });
-  });
-}
-
