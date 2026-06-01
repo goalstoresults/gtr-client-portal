@@ -1,54 +1,68 @@
 // inspections.js
+// Main controller for the Inspections module
+
 import { renderInspectionAdd } from "./inspections/tab-add.js";
 import { renderInspectionList } from "./inspections/tab-list.js";
 import { renderInspectionSummary } from "./inspections/tab-summary.js";
 import { renderInspectionRevenue } from "./inspections/tab-revenue.js";
 
-export async function loadInspectionsTab({ portalState, tabContent }) {
-    const res = await fetch("./components/inspections.html", { cache: "no-cache" });
-    tabContent.innerHTML = await res.text();
+/* ============================================================
+   INIT MODULE
+============================================================ */
+export function initInspectionsModule(portalState) {
+  const container = document.getElementById("inspectionsContent");
+  const tabs = document.getElementById("inspectionsTabs");
 
-    let contextBar = document.getElementById("inspections-context-bar");
-    if (!contextBar) {
-        contextBar = document.createElement("div");
-        contextBar.id = "inspections-context-bar";
-        contextBar.className = "contact-context-bar";
-        tabContent.prepend(contextBar);
-    }
+  if (!container || !tabs) {
+    console.error("Inspections module container missing.");
+    return;
+  }
 
-    contextBar.textContent = portalState.selectedContactName
-        ? `Contact: ${portalState.selectedContactName}`
-        : "No contact selected";
+  // Default tab
+  loadTab("add");
 
-    const content = tabContent.querySelector("#inspectionsContent");
-    const buttons = tabContent.querySelectorAll("#inspections-subtabs button");
+  /* ------------------------------------------------------------
+     Wire tab buttons
+  ------------------------------------------------------------ */
+  tabs.querySelectorAll("[data-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const tab = btn.dataset.tab;
+      loadTab(tab);
+    });
+  });
 
-    buttons.forEach(btn => {
-        btn.addEventListener("click", async () => {
-            buttons.forEach(b => b.classList.remove("active"));
-            btn.classList.add("active");
-
-            const subtab = btn.dataset.subtab;
-
-            if (subtab === "add") return renderInspectionAdd(content, portalState);
-            if (subtab === "list") return renderInspectionList(content, portalState);
-            if (subtab === "summary") return renderInspectionSummary(content, portalState);
-            if (subtab === "revenue") return renderInspectionRevenue(content, portalState);
-
-            content.innerHTML = `
-                <section class="card">
-                    <p>Select a subtab to begin.</p>
-                </section>
-            `;
-        });
+  /* ------------------------------------------------------------
+     Load a tab
+  ------------------------------------------------------------ */
+  async function loadTab(tab) {
+    // Highlight active tab
+    tabs.querySelectorAll("[data-tab]").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.tab === tab);
     });
 
-    const defaultBtn = tabContent.querySelector(
-        '#inspections-subtabs button[data-subtab="list"]'
-    );
+    // Clear content
+    container.innerHTML = `<p>Loading...</p>`;
 
-    if (defaultBtn) {
-        defaultBtn.classList.add("active");
-        await renderInspectionList(content, portalState);
+    switch (tab) {
+      case "add":
+        await renderInspectionAdd(container, portalState);
+        break;
+
+      case "list":
+        await renderInspectionList(container, portalState);
+        break;
+
+      case "summary":
+        await renderInspectionSummary(container, portalState);
+        break;
+
+      case "revenue":
+        await renderInspectionRevenue(container, portalState);
+        break;
+
+      default:
+        container.innerHTML = `<p>Unknown tab: ${tab}</p>`;
+        break;
     }
+  }
 }
