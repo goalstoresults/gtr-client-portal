@@ -518,4 +518,36 @@ function renderStagingGrid(rows) {
    ACTION BUTTON LOGIC
 ========================================================= */
 function renderStagingActionButton(row) {
-  const hasClient = !!
+  const hasClient = !!row.client_contact_id;
+
+  // If client is missing but status isn't uploaded → show message
+  if (!hasClient && row.status !== "uploaded") {
+    return `<span style="color:red;">Missing client</span>`;
+  }
+
+  switch (row.status) {
+    case "uploaded":
+      // No client match yet → Populate only
+      return `<button onclick="autoMatchInspection('${row.id}')">Populate</button>`;
+
+    case "matched":
+      // Client matched but inspector missing → Populate + Insert
+      return `
+        <button onclick="autoMatchInspection('${row.id}')">Populate</button>
+        <button onclick="insertInspectionStagingRow('${row.id}')">Insert</button>
+      `;
+
+    case "ready":
+      // Client + inspector found → Insert only
+      return `<button onclick="insertInspectionStagingRow('${row.id}')">Insert</button>`;
+
+    case "error":
+      return `<button onclick="fixRow('${row.id}')">Fix Row</button>`;
+
+    case "imported":
+      return `<span style="color:green;">Imported</span>`;
+
+    default:
+      return "";
+  }
+}
