@@ -7,25 +7,23 @@ import { renderInspectionSummary } from "./inspections/tab-summary.js";
 import { renderInspectionRevenue } from "./inspections/tab-revenue.js";
 
 /* ============================================================
-   PUBLIC ENTRY POINT (required by your portal router)
+   PUBLIC ENTRY POINT (required by your portal)
 ============================================================ */
-
 export async function loadInspectionsTab({ portalState, tabContent }) {
-  // Load the HTML shell FIRST
-  await loadComponent("components/inspections.html");
+  // Load the HTML shell EXACTLY like financials.js
+  const res = await fetch("./components/inspections.html", { cache: "no-cache" });
+  tabContent.innerHTML = await res.text();
 
-  // Now the DOM exists → safe to initialize
-  initInspectionsModule(portalState);
+  // Now the HTML exists in the DOM
+  initInspectionsModule(portalState, tabContent);
 }
-
-
 
 /* ============================================================
    INIT MODULE
 ============================================================ */
-export function initInspectionsModule(portalState) {
-  const container = document.getElementById("inspectionsContent");
-  const tabs = document.getElementById("inspectionsTabs");
+export function initInspectionsModule(portalState, tabContent) {
+  const container = tabContent.querySelector("#inspectionsContent");
+  const tabs = tabContent.querySelector("#inspectionsTabs");
 
   if (!container || !tabs) {
     console.error("Inspections module container missing.");
@@ -36,7 +34,7 @@ export function initInspectionsModule(portalState) {
   loadTab("add");
 
   /* ------------------------------------------------------------
-     Wire tab buttons
+     Wire subtab buttons
   ------------------------------------------------------------ */
   tabs.querySelectorAll("[data-tab]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -49,12 +47,10 @@ export function initInspectionsModule(portalState) {
      Load a tab
   ------------------------------------------------------------ */
   async function loadTab(tab) {
-    // Highlight active tab
     tabs.querySelectorAll("[data-tab]").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.tab === tab);
     });
 
-    // Clear content
     container.innerHTML = `<p>Loading...</p>`;
 
     switch (tab) {
