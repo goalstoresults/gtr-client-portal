@@ -7,17 +7,15 @@ import { renderInspectionSummary } from "./inspections/tab-summary.js";
 import { renderInspectionRevenue } from "./inspections/tab-revenue.js";
 
 /* ============================================================
-   PUBLIC ENTRY POINT (required by your portal)
+   PUBLIC ENTRY POINT (required by your portal router)
 ============================================================ */
-export async function loadInspectionsTab({ portalState, tabContent }) {
-  // Load the HTML shell FIRST
-  await loadComponent("components/inspections.html");
+export function loadInspectionsTab({ portalState, tabContent }) {
+  // Clear the main content area (router expects this)
+  tabContent.innerHTML = "";
 
   // Now initialize the module
   initInspectionsModule(portalState);
 }
-
-
 
 /* ============================================================
    INIT MODULE
@@ -79,4 +77,3 @@ export function initInspectionsModule(portalState) {
     }
   }
 }
-
