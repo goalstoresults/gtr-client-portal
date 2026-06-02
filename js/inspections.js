@@ -14,7 +14,7 @@ export async function loadInspectionsTab({ portalState, tabContent }) {
   const res = await fetch("./components/inspections.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
 
-  // Now the HTML exists in the DOM
+  // Initialize module AFTER HTML is injected
   initInspectionsModule(portalState, tabContent);
 }
 
@@ -22,57 +22,43 @@ export async function loadInspectionsTab({ portalState, tabContent }) {
    INIT MODULE
 ============================================================ */
 export function initInspectionsModule(portalState, tabContent) {
+  // IMPORTANT: Look inside tabContent, not document
   const container = tabContent.querySelector("#inspectionsContent");
-  const tabs = tabContent.querySelector("#inspectionsTabs");
+  const tabs = tabContent.querySelector("#inspections-subtabs");
 
   if (!container || !tabs) {
     console.error("Inspections module container missing.");
     return;
   }
 
-  // Default tab
-  loadTab("add");
+  // Default subtab
+  loadTab("list");
 
-  /* ------------------------------------------------------------
-     Wire subtab buttons
-  ------------------------------------------------------------ */
-  tabs.querySelectorAll("[data-tab]").forEach((btn) => {
+  // Wire subtab buttons
+  tabs.querySelectorAll("button[data-subtab]").forEach(btn => {
     btn.addEventListener("click", () => {
-      const tab = btn.dataset.tab;
-      loadTab(tab);
+      const subtab = btn.dataset.subtab;
+      loadTab(subtab);
     });
   });
 
   /* ------------------------------------------------------------
-     Load a tab
+     Load a subtab
   ------------------------------------------------------------ */
-  async function loadTab(tab) {
-    tabs.querySelectorAll("[data-tab]").forEach((btn) => {
-      btn.classList.toggle("active", btn.dataset.tab === tab);
+  async function loadTab(subtab) {
+    // Highlight active button
+    tabs.querySelectorAll("button[data-subtab]").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.subtab === subtab);
     });
 
     container.innerHTML = `<p>Loading...</p>`;
 
-    switch (tab) {
-      case "add":
-        await renderInspectionAdd(container, portalState);
-        break;
+    if (subtab === "add") return renderInspectionAdd(container, portalState);
+    if (subtab === "list") return renderInspectionList(container, portalState);
+    if (subtab === "summary") return renderInspectionSummary(container, portalState);
+    if (subtab === "revenue") return renderInspectionRevenue(container, portalState);
 
-      case "list":
-        await renderInspectionList(container, portalState);
-        break;
-
-      case "summary":
-        await renderInspectionSummary(container, portalState);
-        break;
-
-      case "revenue":
-        await renderInspectionRevenue(container, portalState);
-        break;
-
-      default:
-        container.innerHTML = `<p>Unknown tab: ${tab}</p>`;
-        break;
-    }
+    container.innerHTML = `<p>Unknown subtab: ${subtab}</p>`;
   }
 }
+
