@@ -1,11 +1,13 @@
 // inspections/tab-add.js
-// Inspections → Add tab
-// Same look/feel/workflow as Financials Add, but for inspections.
+// Inspections → Add tab (Financials-style contact picker + bulk buttons)
 
 import {
   openInspectionBulkUpload,
   renderInspectionStaging
 } from "./tab-add-staging.js";
+
+const PORTAL_API_BASE = "https://client-portal-api.dennis-e64.workers.dev";
+const INSPECTIONS_API_BASE = "https://inspections-module.dennis-e64.workers.dev";
 
 export function renderInspectionAdd(container, portalState) {
   container.innerHTML = `
@@ -58,9 +60,7 @@ export function renderInspectionAdd(container, portalState) {
   const clearBtn = container.querySelector("#inspClearFilter");
   const resultsDiv = container.querySelector("#inspContactResults");
 
-  applyBtn.addEventListener("click", () => {
-    loadContacts();
-  });
+  applyBtn.addEventListener("click", loadContacts);
 
   clearBtn.addEventListener("click", () => {
     firstInput.value = "";
@@ -81,23 +81,26 @@ export function renderInspectionAdd(container, portalState) {
       contact_type: typeSelect.value === "ALL" ? null : typeSelect.value
     };
 
-    const res = await fetch(
-      "https://client-portal-api.dennis-e64.workers.dev/api/contacts/search",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      }
-    );
+    const res = await fetch(`${PORTAL_API_BASE}/api/contacts/search`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
 
-    const data = await res.json();
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      resultsDiv.innerHTML = `<p style="color:red;">Error parsing contacts response.</p>`;
+      return;
+    }
 
     if (!res.ok) {
       resultsDiv.innerHTML = `<p style="color:red;">${data.error || "Error loading contacts."}</p>`;
       return;
     }
 
-    if (!data.length) {
+    if (!Array.isArray(data) || !data.length) {
       resultsDiv.innerHTML = `<p>(no contacts found)</p>`;
       return;
     }
@@ -131,7 +134,6 @@ export function renderInspectionAdd(container, portalState) {
   }
 
   // Bulk buttons
-
   const reviewBulkBtn = container.querySelector("#inspReviewBulk");
   const addBulkBtn = container.querySelector("#inspAddBulk");
   const autoMatchAllBtn = container.querySelector("#inspAutoMatchAll");
@@ -149,15 +151,21 @@ export function renderInspectionAdd(container, portalState) {
     autoMatchAllBtn.textContent = "Auto-Matching…";
 
     const res = await fetch(
-      "https://client-portal-api.dennis-e64.workers.dev/api/inspections/staging/auto-match-all",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project: portalState.project })
-      }
+      `${INSPECTIONS_API_BASE}/staging/auto-match-all?project=${encodeURIComponent(
+        portalState.project
+      )}`,
+      { method: "POST" }
     );
 
-    const data = await res.json();
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      autoMatchAllBtn.disabled = false;
+      autoMatchAllBtn.textContent = "Auto-Match All";
+      alert("Error parsing auto-match response.");
+      return;
+    }
 
     autoMatchAllBtn.disabled = false;
     autoMatchAllBtn.textContent = "Auto-Match All";
@@ -167,9 +175,10 @@ export function renderInspectionAdd(container, portalState) {
       return;
     }
 
-    alert(`Auto-match complete. ${data.matched || 0} rows matched.`);
+    alert(
+      `Auto-match complete.\nMatched: ${data.matched || data.ready || 0}`
+    );
     renderInspectionStaging(container, portalState);
   });
 }
-
 
