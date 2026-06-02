@@ -1,17 +1,14 @@
 <!-- components/inspections.html -->
-<section id="inspectionsModule" style="display:none;">
 
-  <!-- Tabs -->
-  <div id="inspectionsTabs" class="tabs">
-    <button data-tab="add" class="tab-button active">Add</button>
-    <button data-tab="list" class="tab-button">List</button>
-    <button data-tab="summary" class="tab-button">Summary</button>
-    <button data-tab="revenue" class="tab-button">Revenue</button>
-  </div>
+<nav class="subtabs" id="inspections-subtabs">
+  <button data-subtab="add">Add</button>
+  <button data-subtab="list">List</button>
+  <button data-subtab="summary">Summary</button>
+  <button data-subtab="revenue">Revenue</button>
+</nav>
 
-  <!-- Content -->
-  <div id="inspectionsContent" class="tab-content">
-    <!-- Filled dynamically by inspections.js -->
-  </div>
-
-</section>
+<div id="inspectionsContent">
+  <section class="card">
+    <p>Select a subtab to begin.</p>
+  </section>
+</div>
