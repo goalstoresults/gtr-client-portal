@@ -13,9 +13,10 @@ export async function loadInspectionsTab({ portalState, tabContent }) {
   // Load the HTML shell FIRST
   await loadComponent("components/inspections.html");
 
-  // Now the DOM exists → safe to initialize
+  // Now initialize the module
   initInspectionsModule(portalState);
 }
+
 
 
 /* ============================================================
