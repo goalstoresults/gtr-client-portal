@@ -1,6 +1,8 @@
 // inspections/tab-add-staging.js
 // Staging UI wired to inspections-module Worker
 
+import { escapeHtml } from "../utilities.js";
+
 const INSPECTIONS_API_BASE = "https://inspections-module.dennis-e64.workers.dev";
 
 const REQUIRED_COLUMNS = [
