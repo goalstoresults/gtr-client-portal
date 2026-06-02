@@ -1,6 +1,7 @@
 // inspections/tab-add-staging.js
-// Matches your existing backend routes EXACTLY.
-// Exports the two functions tab-add.js imports.
+// Staging UI wired to inspections-module Worker
+
+const INSPECTIONS_API_BASE = "https://inspections-module.dennis-e64.workers.dev";
 
 const REQUIRED_COLUMNS = [
   "OID",
@@ -31,8 +32,7 @@ const REQUIRED_COLUMNS = [
 ];
 
 /* ============================================================
-   EXPORT 1: OPEN BULK UPLOAD POPUP
-   Calls: POST /staging/bulk-upload?project=...
+   Bulk Upload popup → POST /staging/bulk-upload?project=...
 ============================================================ */
 export function openInspectionBulkUpload(container, portalState) {
   const modal = document.createElement("div");
@@ -76,7 +76,7 @@ export function openInspectionBulkUpload(container, portalState) {
     const file = fileInput.files[0];
     const text = await file.text();
 
-    // Validate header BEFORE sending to backend
+    // Quick header sanity check before hitting Worker
     const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
     if (!lines.length) {
       statusDiv.innerHTML = `<p style="color:red;">CSV is empty.</p>`;
@@ -97,7 +97,9 @@ export function openInspectionBulkUpload(container, portalState) {
     statusDiv.innerHTML = `<p>Uploading…</p>`;
 
     const res = await fetch(
-      `/staging/bulk-upload?project=${encodeURIComponent(portalState.project)}`,
+      `${INSPECTIONS_API_BASE}/staging/bulk-upload?project=${encodeURIComponent(
+        portalState.project
+      )}`,
       {
         method: "POST",
         headers: { "Content-Type": "text/csv" },
@@ -105,14 +107,24 @@ export function openInspectionBulkUpload(container, portalState) {
       }
     );
 
-    const data = await res.json();
-
-    if (!res.ok) {
-      statusDiv.innerHTML = `<p style="color:red;">${data.error || "Upload failed"}</p>`;
+    let data = null;
+    try {
+      data = await res.json();
+    } catch {
+      statusDiv.innerHTML = `<p style="color:red;">Upload failed (invalid response).</p>`;
       return;
     }
 
-    statusDiv.innerHTML = `<p style="color:green;">Imported ${data.inserted} rows.</p>`;
+    if (!res.ok) {
+      statusDiv.innerHTML = `<p style="color:red;">${
+        data.error || "Upload failed"
+      }</p>`;
+      return;
+    }
+
+    statusDiv.innerHTML = `<p style="color:green;">Imported ${
+      data.inserted
+    } rows.</p>`;
 
     setTimeout(() => {
       modal.remove();
@@ -122,20 +134,22 @@ export function openInspectionBulkUpload(container, portalState) {
 }
 
 /* ============================================================
-   EXPORT 2: RENDER STAGING TABLE
-   Calls:
-     GET    /staging/list?project=...
-     POST   /staging/auto-match-all?project=...
-     PATCH  /staging/update-inline
-     DELETE /staging/delete-inline
-     POST   /inspections/add-from-staging?id=...&project=...
+   Staging table → GET /staging/list?project=...
 ============================================================ */
 export async function renderInspectionStaging(container, portalState) {
   const res = await fetch(
-    `/staging/list?project=${encodeURIComponent(portalState.project)}`
+    `${INSPECTIONS_API_BASE}/staging/list?project=${encodeURIComponent(
+      portalState.project
+    )}`
   );
 
-  let rows = await res.json();
+  let rows;
+  try {
+    rows = await res.json();
+  } catch {
+    rows = [];
+  }
+
   if (!Array.isArray(rows)) rows = [];
 
   container.innerHTML = `
@@ -153,30 +167,45 @@ export async function renderInspectionStaging(container, portalState) {
     </section>
   `;
 
-  // Auto-match all
-  container.querySelector("#inspAutoMatchAll").onclick = async () => {
-    const btn = container.querySelector("#inspAutoMatchAll");
-    btn.disabled = true;
-    btn.textContent = "Matching…";
+  const autoMatchAllBtn = container.querySelector("#inspAutoMatchAll");
+  autoMatchAllBtn.onclick = async () => {
+    autoMatchAllBtn.disabled = true;
+    autoMatchAllBtn.textContent = "Matching…";
 
     const res = await fetch(
-      `/staging/auto-match-all?project=${encodeURIComponent(portalState.project)}`,
+      `${INSPECTIONS_API_BASE}/staging/auto-match-all?project=${encodeURIComponent(
+        portalState.project
+      )}`,
       { method: "POST" }
     );
 
-    const data = await res.json();
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      autoMatchAllBtn.disabled = false;
+      autoMatchAllBtn.textContent = "Auto-Match All";
+      alert("Error parsing auto-match response.");
+      return;
+    }
 
-    btn.disabled = false;
-    btn.textContent = "Auto-Match All";
+    autoMatchAllBtn.disabled = false;
+    autoMatchAllBtn.textContent = "Auto-Match All";
 
-    alert(`Auto-match complete.\nMatched: ${data.matched || 0}`);
+    if (!res.ok) {
+      alert(data.error || "Error running auto-match.");
+      return;
+    }
 
+    alert(
+      `Auto-match complete.\nMatched: ${data.matched || data.ready || 0}`
+    );
     renderInspectionStaging(container, portalState);
   };
 }
 
 /* ============================================================
-   TABLE RENDERER
+   Simple table renderer (read-only for now)
 ============================================================ */
 function renderTable(rows) {
   if (!rows.length) return `<p>(no staging rows)</p>`;
@@ -202,4 +231,3 @@ function renderTable(rows) {
     </table>
   `;
 }
-
