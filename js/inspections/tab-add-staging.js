@@ -210,22 +210,49 @@ export async function renderInspectionStaging(container, portalState) {
 function renderTable(rows) {
   if (!rows.length) return `<p>(no staging rows)</p>`;
 
-  const cols = Object.keys(rows[0]);
-
   return `
-    <table class="staging-table">
+    <table class="notes-table" style="width:100%; border-collapse:collapse;">
       <thead>
-        <tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr>
+        <tr>
+          <th>Date</th>
+          <th>Client</th>
+          <th>Agent</th>
+          <th>Address</th>
+          <th>City</th>
+          <th>State</th>
+          <th>Zip</th>
+          <th>Type</th>
+          <th>Fee</th>
+          <th></th>
+        </tr>
       </thead>
       <tbody>
         ${rows
-          .map(
-            row => `
-          <tr>
-            ${cols.map(c => `<td>${row[c] ?? ""}</td>`).join("")}
-          </tr>
-        `
-          )
+          .map((r, i) => {
+            const bg = i % 2 === 0 ? "#ffffff" : "#f9f9f9";
+            return `
+              <tr style="background:${bg};">
+                <td>${escapeHtml(r.inspection_date || "")}</td>
+                <td>${escapeHtml(
+                  `${r.client_first_name || ""} ${r.client_last_name || ""}`
+                )}</td>
+                <td>${escapeHtml(
+                  `${r.buyer_agent_first_name || ""} ${r.buyer_agent_last_name || ""}`
+                )}</td>
+                <td>${escapeHtml(r.inspection_address || "")}</td>
+                <td>${escapeHtml(r.inspection_city || "")}</td>
+                <td>${escapeHtml(r.inspection_state || "")}</td>
+                <td>${escapeHtml(r.inspection_zip || "")}</td>
+                <td>${escapeHtml(r.inspection_type || "")}</td>
+                <td>${escapeHtml(r.total_fee || "")}</td>
+                <td>
+                  <button class="btn-small" onclick="importStaging('${r.id}')">
+                    Import
+                  </button>
+                </td>
+              </tr>
+            `;
+          })
           .join("")}
       </tbody>
     </table>
