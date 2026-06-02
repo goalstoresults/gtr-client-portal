@@ -9,9 +9,14 @@ import { renderInspectionRevenue } from "./inspections/tab-revenue.js";
 /* ============================================================
    PUBLIC ENTRY POINT (required by your portal)
 ============================================================ */
-export function loadInspectionsTab(portalState) {
+export async function loadInspectionsTab({ portalState, tabContent }) {
+  // Load the HTML shell FIRST
+  await loadComponent("components/inspections.html");
+
+  // Now the DOM exists → safe to initialize
   initInspectionsModule(portalState);
 }
+
 
 /* ============================================================
    INIT MODULE
