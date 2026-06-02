@@ -7,6 +7,13 @@ import { renderInspectionSummary } from "./inspections/tab-summary.js";
 import { renderInspectionRevenue } from "./inspections/tab-revenue.js";
 
 /* ============================================================
+   PUBLIC ENTRY POINT (required by your portal)
+============================================================ */
+export function loadInspectionsTab(portalState) {
+  initInspectionsModule(portalState);
+}
+
+/* ============================================================
    INIT MODULE
 ============================================================ */
 export function initInspectionsModule(portalState) {
@@ -66,3 +73,4 @@ export function initInspectionsModule(portalState) {
     }
   }
 }
+
