@@ -787,35 +787,27 @@ ACTION BUTTON LOGIC
 
 function renderInspectionActionButton(row) {
   const hasClient = !!row.client_contact_id;
+  const hasAgent = !!row.agent_contact_id;
 
-  // For anything *other* than uploaded, still enforce missing client
-  if (!hasClient && row.status !== "uploaded") {
-    return `<span style="color:red;">Missing client</span>`;
+  // Case 1: Neither found → Find only
+  if (!hasClient && !hasAgent) {
+    return `<button onclick="autoMatchInspection('${row.id}')">Find</button>`;
   }
 
-  switch (row.status) {
-    case "uploaded":
-      // Always show Find for uploaded rows
-      return `<button onclick="autoMatchInspection('${row.id}')">Find</button>`;
-
-    case "matched":
-      return `
-<button onclick="autoMatchInspection('${row.id}')">Find</button>
-<button onclick="insertStagingInspection('${row.id}')">Import</button>
-`;
-
-    case "ready":
-      return `<button onclick="insertStagingInspection('${row.id}')">Import</button>`;
-
-    case "error":
-      return `<button onclick="inspFixRow('${row.id}')">Fix Row</button>`;
-
-    case "imported":
-      return `<span style="color:green;">Imported</span>`;
-
-    default:
-      return "";
+  // Case 2: One found, one missing → Find + Import
+  if ((hasClient && !hasAgent) || (!hasClient && hasAgent)) {
+    return `
+      <button onclick="autoMatchInspection('${row.id}')">Find</button>
+      <button onclick="insertStagingInspection('${row.id}')">Import</button>
+    `;
   }
+
+  // Case 3: Both found → Import only
+  if (hasClient && hasAgent) {
+    return `<button onclick="insertStagingInspection('${row.id}')">Import</button>`;
+  }
+
+  return "";
 }
-
+}
 
