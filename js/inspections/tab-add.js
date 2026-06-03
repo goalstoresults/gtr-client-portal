@@ -24,7 +24,7 @@ export function renderInspectionAdd(container, portalState) {
   const autoMatchAllBtn = container.querySelector("#inspAutoMatchAll");
 
   reviewBulkBtn.onclick = () => {
-    renderInspectionStaging(container, portalState);   // ⭐ FIXED
+    renderInspectionStaging(container, portalState);   // ⭐ correct
   };
 
   addBulkBtn.onclick = () => {
@@ -62,6 +62,6 @@ export function renderInspectionAdd(container, portalState) {
 
     alert(`Auto-match complete.\nMatched: ${data.matched || data.ready || 0}`);
 
-    renderInspectionStaging(container, portalState);   // ⭐ FIXED
+    renderInspectionStaging(container, portalState);   // ⭐ correct
   };
 }
