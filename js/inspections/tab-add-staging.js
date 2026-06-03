@@ -296,6 +296,7 @@ window.autoMatchInspection = async function (id) {
   }
 
   let res, data = {};
+
   try {
     res = await fetch(
       `${INSPECTIONS_API_BASE}/staging/auto-match?id=${encodeURIComponent(id)}&project=${encodeURIComponent(project)}`,
@@ -327,22 +328,9 @@ window.autoMatchInspection = async function (id) {
     return;
   }
 
-  if (data.status === "uploaded") {
-    if (statusCell) {
-      statusCell.textContent = "uploaded";
-      statusCell.style.color = "orange";
-    }
-    if (errorCell) {
-      errorCell.textContent = "No contact match found";
-    }
-    if (actionCell) {
-      actionCell.innerHTML = `<button onclick="inspFixRow('${id}')">Fix Row</button>`;
-    }
-    return;
-  }
-
   await loadInspectionStagingData();
 };
+
 
 /* =========================================================
 IMPORT ROW
@@ -741,6 +729,55 @@ function renderInspectionStagingGrid(rows) {
   }
 
   renderTable();
+}
+
+function cleanName(name) {
+  if (!name) return "";
+  return name.replace(/\(.*?\)/, "").trim();
+}
+
+
+async function findContactId(project, email, name) {
+  const base = `${env.SUPABASE_URL}/rest/v1/contacts`;
+  const headers = {
+    apikey: env.SUPABASE_SERVICE_ROLE,
+    Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE}`
+  };
+
+  name = cleanName(name);
+
+  // 1) Try email first
+  if (email && email.trim()) {
+    const url =
+      `${base}?project=eq.${encodeURIComponent(project)}` +
+      `&email=eq.${encodeURIComponent(email.trim().toLowerCase())}` +
+      `&select=contact_id&limit=1`;
+
+    const res = await fetch(url, { headers });
+    const rows = await res.json();
+
+    if (Array.isArray(rows) && rows.length === 1) {
+      return rows[0].contact_id;
+    }
+  }
+
+  // 2) Try name (search_name)
+  if (name && name.trim()) {
+    const url =
+      `${base}?project=eq.${encodeURIComponent(project)}` +
+      `&search_name=eq.${encodeURIComponent(name.trim())}` +
+      `&select=contact_id&limit=1`;
+
+    const res = await fetch(url, { headers });
+    const rows = await res.json();
+
+    if (Array.isArray(rows) && rows.length === 1) {
+      return rows[0].contact_id;
+    }
+  }
+
+  // 3) No match
+  return null;
 }
 
 
