@@ -148,6 +148,7 @@ export async function renderInspectionStaging(container, portalState) {
       <div style="margin-bottom:12px; display:flex; gap:8px; align-items:center;">
         <button id="inspRefreshStaging" class="btn-primary">Refresh Grid</button>
         <button id="inspAutoMatchAll" class="secondary">Auto-Match All</button>
+        <button id="autoImportBtn">Auto Import All</button>
 
         <select id="inspStagingFilter" style="padding:4px 6px;">
           <option value="">All (except imported)</option>
@@ -165,6 +166,30 @@ export async function renderInspectionStaging(container, portalState) {
     </section>
   `;
 
+document.getElementById("autoImportBtn").addEventListener("click", async () => {
+  const project = currentProject; // however you store it
+
+  const res = await fetch(
+    `${API_BASE}/inspections/auto-import?project=${project}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" }
+    }
+  );
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    alert("Auto-import failed: " + JSON.stringify(data));
+    return;
+  }
+
+  alert(`Imported: ${data.imported} / ${data.attempted}`);
+  loadStagingGrid(); // refresh the table
+});
+
+
+  
   document.getElementById("inspRefreshStaging")
     .addEventListener("click", loadInspectionStagingData);
 
