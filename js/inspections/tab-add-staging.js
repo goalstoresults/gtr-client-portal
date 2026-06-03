@@ -809,5 +809,5 @@ function renderInspectionActionButton(row) {
 
   return "";
 }
-}
+
 
