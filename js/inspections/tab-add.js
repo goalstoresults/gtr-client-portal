@@ -14,7 +14,7 @@ export function renderInspectionAdd(container, portalState) {
       <div class="bulk-actions" style="margin-top:20px; display:flex; gap:12px;">
         <button id="inspReviewBulk" class="secondary">Review Bulk Data</button>
         <button id="inspAddBulk" class="primary">Add Bulk</button>
-        <button id="inspAutoMatchAll" class="secondary">Auto-Match All</button>
+       //  <button id="inspAutoMatchAll" class="secondary">Auto-Match All</button>
       </div>
     </section>
   `;
