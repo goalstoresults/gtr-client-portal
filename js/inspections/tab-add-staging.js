@@ -184,7 +184,7 @@ document.getElementById("autoImportBtn").addEventListener("click", async () => {
   }
 
   alert(`Imported: ${data.imported} / ${data.attempted}`);
-  loadStagingGrid(); // refresh the table
+  loadInspectionStagingData();
 });
 
 
