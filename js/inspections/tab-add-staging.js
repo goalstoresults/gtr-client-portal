@@ -597,8 +597,13 @@ function renderInspectionStagingGrid(rows) {
 
   const columns = [
     { key: "inspection_date", label: "Date", isDate: true },
+
+    // Names + IDs
     { key: "client_name", label: "Client" },
+    { key: "client_email", label: "Client Email" },
     { key: "agent_name", label: "Agent" },
+    { key: "buyer_agent_email", label: "Agent Email" },
+
     { key: "inspection_address", label: "Address" },
     { key: "inspection_city", label: "City" },
     { key: "inspection_state", label: "State" },
@@ -685,7 +690,10 @@ function renderInspectionStagingGrid(rows) {
   </td>
 
   <td class="insp-client-cell">${escapeHtml(clientDisplay)}</td>
+  <td>${escapeHtml(row.client_email || "")}</td>
+
   <td>${escapeHtml(agentDisplay)}</td>
+  <td>${escapeHtml(row.buyer_agent_email || "")}</td>
 
   <td>${escapeHtml(row.inspection_address || "")}</td>
   <td>${escapeHtml(row.inspection_city || "")}</td>
