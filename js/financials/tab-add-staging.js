@@ -536,4 +536,216 @@ window.inspSaveEdit = async function (id) {
 
   if (!res.ok) {
     console.error("Inspection staging update failed:", res.status, data);
-    alert("Update failed. Check
+    alert("Update failed. Check console.");
+    return;
+  }
+
+  // Reload grid before closing editor
+  await loadInspectionStagingData();
+
+  const editRow = document.querySelector(`#insp-edit-${id}`);
+  if (editRow) editRow.remove();
+};
+
+/* =========================================================
+DELETE STAGING ROW
+========================================================= */
+
+window.inspDeleteStagingRow = async function (id) {
+  const project = window.portalState?.project;
+  if (!project) {
+    alert("No project selected.");
+    return;
+  }
+
+  if (!confirm("Delete this staging row?")) return;
+
+  const res = await fetch(
+    `${INSPECTIONS_API_BASE}/staging/delete-inline?id=${encodeURIComponent(
+      id
+    )}&project=${encodeURIComponent(project)}`,
+    { method: "DELETE" }
+  );
+
+  let data = {};
+  try {
+    data = await res.json();
+  } catch {}
+
+  if (!res.ok) {
+    console.error("Inspection staging delete failed:", res.status, data);
+    alert("Delete failed. Check console.");
+    return;
+  }
+
+  const editRow = document.querySelector(`#insp-edit-${id}`);
+  if (editRow) editRow.remove();
+
+  await loadInspectionStagingData();
+};
+
+/* =========================================================
+GRID RENDERING (Full Clone Mode)
+========================================================= */
+
+function renderInspectionStagingGrid(rows) {
+  const container = document.getElementById("inspectionStagingGrid");
+  if (!container) return;
+
+  let currentSortField = "inspection_date";
+  let currentSortDirection = "asc";
+
+  const columns = [
+    { key: "inspection_date", label: "Date", isDate: true },
+    { key: "client_name", label: "Client" },
+    { key: "agent_name", label: "Agent" },
+    { key: "inspection_address", label: "Address" },
+    { key: "inspection_city", label: "City" },
+    { key: "inspection_state", label: "State" },
+    { key: "inspection_zip", label: "Zip" },
+    { key: "inspection_type", label: "Type" },
+    { key: "fee_total", label: "Fee", numeric: true },
+    { key: "status", label: "Status" },
+    { key: "error_message", label: "Error" },
+    { key: "action", label: "Action" }
+  ];
+
+  function sortRows() {
+    rows.sort((a, b) => {
+      let A = a[currentSortField];
+      let B = b[currentSortField];
+
+      const col = columns.find((c) => c.key === currentSortField);
+
+      if (col?.isDate) {
+        A = new Date(A);
+        B = new Date(B);
+      } else if (col?.numeric) {
+        A = Number(A) || 0;
+        B = Number(B) || 0;
+      } else {
+        A = (A || "").toString().toLowerCase();
+        B = (B || "").toString().toLowerCase();
+      }
+
+      if (A < B) return currentSortDirection === "asc" ? -1 : 1;
+      if (A > B) return currentSortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }
+
+  function renderTable() {
+    sortRows();
+
+    const headerHtml = columns
+      .map((col) => {
+        const isSorted = currentSortField === col.key;
+        const upArrow = isSorted && currentSortDirection === "asc" ? "▲" : "△";
+        const downArrow =
+          isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+
+        return `
+          <th class="sortable" data-field="${col.key}">
+            ${escapeHtml(col.label)}
+            <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+              <span class="sort-up">${upArrow}</span>
+              <span class="sort-down">${downArrow}</span>
+            </span>
+          </th>
+        `;
+      })
+      .join("");
+
+    const rowsHtml = rows
+      .map((row, i) => {
+        const fee = (Number(row.fee_total) || 0).toFixed(2);
+        const status = row.status || "";
+        const error = row.error_message || "";
+
+        const clientName = row.client_name || "(none)";
+        const agentName = row.agent_name || "(none)";
+
+        return `
+          <tr
+            id="insp-row-${row.id}"
+            style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};"
+          >
+            <td>
+              <a href="#" onclick="inspToggleEdit('${row.id}'); return false;">
+                ${escapeHtml(row.inspection_date || "")}
+              </a>
+            </td>
+            <td class="insp-client-cell">${escapeHtml(clientName)}</td>
+            <td>${escapeHtml(agentName)}</td>
+            <td>${escapeHtml(row.inspection_address || "")}</td>
+            <td>${escapeHtml(row.inspection_city || "")}</td>
+            <td>${escapeHtml(row.inspection_state || "")}</td>
+            <td>${escapeHtml(row.inspection_zip || "")}</td>
+            <td>${escapeHtml(row.inspection_type || "")}</td>
+            <td>${escapeHtml(fee)}</td>
+            <td class="insp-status-cell">${escapeHtml(status)}</td>
+            <td class="insp-error-cell" style="color:red;">
+              ${escapeHtml(error)}
+            </td>
+            <td class="insp-action-cell">
+              ${renderInspectionActionButton(row)}
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    container.innerHTML = `
+      <table class="notes-table" style="width:100%; border-collapse:collapse; margin-top:12px;">
+        <thead><tr>${headerHtml}</tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    `;
+
+    container.querySelectorAll("th.sortable").forEach((th) => {
+      th.addEventListener("click", () => {
+        const field = th.dataset.field;
+        if (currentSortField === field) {
+          currentSortDirection =
+            currentSortDirection === "asc" ? "desc" : "asc";
+        } else {
+          currentSortField = field;
+          currentSortDirection = "asc";
+        }
+        renderTable();
+      });
+    });
+  }
+
+  renderTable();
+}
+
+/* =========================================================
+ACTION BUTTON LOGIC
+========================================================= */
+
+function renderInspectionActionButton(row) {
+  const hasClient = !!row.client_contact_id;
+
+  if (!hasClient && row.status !== "uploaded") {
+    return `<span style="color:red;">Missing client</span>`;
+  }
+
+  switch (row.status) {
+    case "uploaded":
+      return `<button onclick="autoMatchInspection('${row.id}')">Populate</button>`;
+    case "matched":
+      return `
+        <button onclick="autoMatchInspection('${row.id}')">Populate</button>
+        <button onclick="insertStagingInspection('${row.id}')">Import</button>
+      `;
+    case "ready":
+      return `<button onclick="insertStagingInspection('${row.id}')">Import</button>`;
+    case "error":
+      return `<button onclick="inspFixRow('${row.id}')">Fix Row</button>`;
+    case "imported":
+      return `<span style="color:green;">Imported</span>`;
+    default:
+      return "";
+  }
+}
