@@ -16,8 +16,6 @@ export function renderInspectionAdd(container, portalState) {
         <button id="inspAddBulk" class="primary">Add Bulk</button>
         <button id="inspAutoMatchAll" class="secondary">Auto-Match All</button>
       </div>
-
-      <div id="inspectionStagingGrid" style="margin-top:20px;"></div>
     </section>
   `;
 
@@ -26,8 +24,7 @@ export function renderInspectionAdd(container, portalState) {
   const autoMatchAllBtn = container.querySelector("#inspAutoMatchAll");
 
   reviewBulkBtn.onclick = () => {
-    const grid = container.querySelector("#inspectionStagingGrid");
-    renderInspectionStaging(grid, portalState);   // ⭐ FIXED
+    renderInspectionStaging(container, portalState);   // ⭐ FIXED
   };
 
   addBulkBtn.onclick = () => {
@@ -65,7 +62,6 @@ export function renderInspectionAdd(container, portalState) {
 
     alert(`Auto-match complete.\nMatched: ${data.matched || data.ready || 0}`);
 
-    const grid = container.querySelector("#inspectionStagingGrid");
-    renderInspectionStaging(grid, portalState);   // ⭐ FIXED
+    renderInspectionStaging(container, portalState);   // ⭐ FIXED
   };
 }
