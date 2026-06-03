@@ -169,7 +169,7 @@ export async function renderInspectionStaging(container, portalState) {
 document.getElementById("autoImportBtn").addEventListener("click", async () => {
   const project = portalState.project;
   const res = await fetch(
-    `${API_BASE}/inspections/auto-import?project=${project}`,
+    `${INSPECTIONS_API_BASE}/inspections/auto-import?project=${project}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" }
