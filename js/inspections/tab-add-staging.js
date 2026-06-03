@@ -665,33 +665,46 @@ function renderInspectionStagingGrid(rows) {
         const clientName = row.client_name || "(none)";
         const agentName = row.agent_name || "(none)";
 
+        const clientDisplay = row.client_contact_id
+          ? `${clientName} (${row.client_contact_id})`
+          : clientName;
+
+        const agentDisplay = row.agent_contact_id
+          ? `${agentName} (${row.agent_contact_id})`
+          : agentName;
+
         return `
-          <tr
-            id="insp-row-${row.id}"
-            style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};"
-          >
-            <td>
-              <a href="#" onclick="inspToggleEdit('${row.id}'); return false;">
-                ${escapeHtml(row.inspection_date || "")}
-              </a>
-            </td>
-            <td class="insp-client-cell">${escapeHtml(clientName)}</td>
-            <td>${escapeHtml(agentName)}</td>
-            <td>${escapeHtml(row.inspection_address || "")}</td>
-            <td>${escapeHtml(row.inspection_city || "")}</td>
-            <td>${escapeHtml(row.inspection_state || "")}</td>
-            <td>${escapeHtml(row.inspection_zip || "")}</td>
-            <td>${escapeHtml(row.inspection_type || "")}</td>
-            <td>${escapeHtml(fee)}</td>
-            <td class="insp-status-cell">${escapeHtml(status)}</td>
-            <td class="insp-error-cell" style="color:red;">
-              ${escapeHtml(error)}
-            </td>
-            <td class="insp-action-cell">
-              ${renderInspectionActionButton(row)}
-            </td>
-          </tr>
-        `;
+<tr
+  id="insp-row-${row.id}"
+  style="background:${i % 2 === 0 ? "#ffffff" : "#f9f9f9"};"
+>
+  <td>
+    <a href="#" onclick="inspToggleEdit('${row.id}'); return false;">
+      ${escapeHtml(row.inspection_date || "")}
+    </a>
+  </td>
+
+  <td class="insp-client-cell">${escapeHtml(clientDisplay)}</td>
+  <td>${escapeHtml(agentDisplay)}</td>
+
+  <td>${escapeHtml(row.inspection_address || "")}</td>
+  <td>${escapeHtml(row.inspection_city || "")}</td>
+  <td>${escapeHtml(row.inspection_state || "")}</td>
+  <td>${escapeHtml(row.inspection_zip || "")}</td>
+  <td>${escapeHtml(row.inspection_type || "")}</td>
+  <td>${escapeHtml(fee)}</td>
+
+  <td class="insp-status-cell">${escapeHtml(status)}</td>
+
+  <td class="insp-error-cell" style="color:red;">
+    ${escapeHtml(error)}
+  </td>
+
+  <td class="insp-action-cell">
+    ${renderInspectionActionButton(row)}
+  </td>
+</tr>
+`;
       })
       .join("");
 
@@ -705,6 +718,7 @@ function renderInspectionStagingGrid(rows) {
     container.querySelectorAll("th.sortable").forEach((th) => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
+
         if (currentSortField === field) {
           currentSortDirection =
             currentSortDirection === "asc" ? "desc" : "asc";
@@ -712,6 +726,7 @@ function renderInspectionStagingGrid(rows) {
           currentSortField = field;
           currentSortDirection = "asc";
         }
+
         renderTable();
       });
     });
@@ -720,6 +735,7 @@ function renderInspectionStagingGrid(rows) {
   renderTable();
 }
 
+
 /* =========================================================
 ACTION BUTTON LOGIC
 ========================================================= */
@@ -727,26 +743,34 @@ ACTION BUTTON LOGIC
 function renderInspectionActionButton(row) {
   const hasClient = !!row.client_contact_id;
 
+  // For anything *other* than uploaded, still enforce missing client
   if (!hasClient && row.status !== "uploaded") {
     return `<span style="color:red;">Missing client</span>`;
   }
 
   switch (row.status) {
     case "uploaded":
-      return `<button onclick="autoMatchInspection('${row.id}')">Populate</button>`;
+      // Always show Find for uploaded rows
+      return `<button onclick="autoMatchInspection('${row.id}')">Find</button>`;
+
     case "matched":
       return `
-        <button onclick="autoMatchInspection('${row.id}')">Populate</button>
-        <button onclick="insertStagingInspection('${row.id}')">Import</button>
-      `;
+<button onclick="autoMatchInspection('${row.id}')">Find</button>
+<button onclick="insertStagingInspection('${row.id}')">Import</button>
+`;
+
     case "ready":
       return `<button onclick="insertStagingInspection('${row.id}')">Import</button>`;
+
     case "error":
       return `<button onclick="inspFixRow('${row.id}')">Fix Row</button>`;
+
     case "imported":
       return `<span style="color:green;">Imported</span>`;
+
     default:
       return "";
   }
 }
+
 
