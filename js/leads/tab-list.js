@@ -14,7 +14,7 @@ export async function renderLeadsList(container, portalState, updateLeadContextB
         <input type="text" id="leadSearchInput" placeholder="Search leads..." />
         <button id="applyLeadFilterBtn">Apply Filter</button>
         <button id="clearLeadFilterBtn">Clear Filter</button>
-        <button id="addLeadBtn" class="primary">Add Lead</button>
+        <button id="addLeadBtn" class="btn-primary">Add Lead</button>
       </div>
 
       <div id="leadListTable">
