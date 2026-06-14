@@ -28,6 +28,9 @@ export async function renderLeadClient(container, portalState) {
   const resultsDiv = document.getElementById("clientSearchResults");
   const formArea = document.getElementById("clientFormArea");
 
+  // ⭐ HIDE FORM ON LOAD
+  formArea.innerHTML = "";
+
   /* ============================================================
      FIND CLIENT
   ============================================================ */
@@ -54,7 +57,9 @@ export async function renderLeadClient(container, portalState) {
         search_name.ilike.${encoded},
         email.ilike.${encoded}
       )
-      &select=contact_id,first_name,last_name,email,contact_type,street_address,address2,city,postal_code,work_phone,home_phone,mobile_phone
+      &select=contact_id,first_name,last_name,email,contact_type,
+              street_address,address2,city,postal_code,
+              work_phone,home_phone,mobile_phone
     `.replace(/\s+/g, "");
 
     try {
@@ -84,6 +89,7 @@ export async function renderLeadClient(container, portalState) {
       resultsDiv.querySelectorAll(".contact-result").forEach(el => {
         el.addEventListener("click", () => {
           const data = JSON.parse(el.dataset.json);
+          resultsDiv.innerHTML = ""; // hide results
           renderClientForm(formArea, data, portalState);
         });
       });
@@ -99,6 +105,7 @@ export async function renderLeadClient(container, portalState) {
   ============================================================ */
 
   document.getElementById("btnAddClient").addEventListener("click", () => {
+    resultsDiv.innerHTML = ""; // hide results
     renderClientForm(formArea, null, portalState);
   });
 }
