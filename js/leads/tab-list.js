@@ -1,5 +1,7 @@
 // js/leads/tab-list.js
 
+import { escapeHtml } from "../utilities.js";
+
 export async function renderLeadsList(container, portalState, updateLeadContextBar) {
 
   /* ============================================================
