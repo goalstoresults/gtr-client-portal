@@ -119,46 +119,46 @@ function renderClientForm(container, contact, portalState) {
   const isNew = !contact;
 
   container.innerHTML = `
-    <section class="card" style="margin-top:20px;">
-      <h3>${isNew ? "Add New Client" : "Edit Client"}</h3>
+<section class="card" style="margin-top:20px;">
+  <h3>${isNew ? "Add New Client" : "Edit Client"}</h3>
 
-      <div class="form-grid">
+  <div class="form-grid-2col">
 
-        <label>First Name</label>
-        <input id="cf_first" value="${escapeHtml(contact?.first_name || "")}">
+    <label>First Name</label>
+    <input id="cf_first" value="${escapeHtml(contact?.first_name || "")}">
 
-        <label>Last Name</label>
-        <input id="cf_last" value="${escapeHtml(contact?.last_name || "")}">
+    <label>Last Name</label>
+    <input id="cf_last" value="${escapeHtml(contact?.last_name || "")}">
 
-        <label>Email Address</label>
-        <input id="cf_email" value="${escapeHtml(contact?.email || "")}">
+    <label>Email Address</label>
+    <input id="cf_email" value="${escapeHtml(contact?.email || "")}">
 
-        <label>Address 1</label>
-        <input id="cf_addr1" value="${escapeHtml(contact?.street_address || "")}">
+    <label>Address 1</label>
+    <input id="cf_addr1" value="${escapeHtml(contact?.street_address || "")}">
 
-        <label>Address 2</label>
-        <input id="cf_addr2" value="${escapeHtml(contact?.address2 || "")}">
+    <label>Address 2</label>
+    <input id="cf_addr2" value="${escapeHtml(contact?.address2 || "")}">
 
-        <label>City</label>
-        <input id="cf_city" value="${escapeHtml(contact?.city || "")}">
+    <label>City</label>
+    <input id="cf_city" value="${escapeHtml(contact?.city || "")}">
 
-        <label>Zip Code</label>
-        <input id="cf_zip" value="${escapeHtml(contact?.postal_code || "")}">
+    <label>Zip Code</label>
+    <input id="cf_zip" value="${escapeHtml(contact?.postal_code || "")}">
 
-        <label>Work Phone</label>
-        <input id="cf_work" value="${escapeHtml(contact?.work_phone || "")}">
+    <label>Work Phone</label>
+    <input id="cf_work" value="${escapeHtml(contact?.work_phone || "")}">
 
-        <label>Home Phone</label>
-        <input id="cf_home" value="${escapeHtml(contact?.home_phone || "")}">
+    <label>Home Phone</label>
+    <input id="cf_home" value="${escapeHtml(contact?.home_phone || "")}">
 
-        <label>Cell Phone</label>
-        <input id="cf_cell" value="${escapeHtml(contact?.mobile_phone || "")}">
-      </div>
+    <label>Cell Phone</label>
+    <input id="cf_cell" value="${escapeHtml(contact?.mobile_phone || "")}">
+  </div>
 
-      <button id="btnSaveClient" class="btn-primary" style="margin-top:16px;">
-        Save
-      </button>
-    </section>
+  <button id="btnSaveClient" class="btn-primary" style="margin-top:20px;">
+    Save
+  </button>
+</section>
   `;
 
   document.getElementById("btnSaveClient").addEventListener("click", async () => {
