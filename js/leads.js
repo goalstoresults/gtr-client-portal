@@ -11,70 +11,99 @@ import { renderLeadTimeline } from "./leads/tab-timeline.js";
 export async function loadLeadsTab({ portalState, tabContent }) {
 
   /* ============================================================
-     LOAD COMPONENTS
+     1. LOAD BASE HTML TEMPLATE (JUST LIKE CONTACTS)
   ============================================================ */
 
-  const contextHtml = await fetch("./components/leads-context.html").then(r => r.text());
-  const componentHtml = await fetch("./components/leads.html").then(r => r.text());
-
-  // Insert context bar + subtabs + content container
-  tabContent.innerHTML = contextHtml + componentHtml;
-
-  const leadBar = document.getElementById("lead-context-bar");
-  const subContent = document.getElementById("leadsContent");
+  const res = await fetch("./components/leads.html", { cache: "no-cache" });
+  tabContent.innerHTML = await res.text();
 
   /* ============================================================
-     INITIALIZE CONTEXT BAR
+     2. INJECT LEAD CONTEXT BAR (JUST LIKE CONTACTS)
   ============================================================ */
 
-  portalState.activeLeadId = null;
-  portalState.activeLeadName = null;
-  portalState.activeLeadContactName = null;
-
-  leadBar.style.display = "block";
-  leadBar.innerHTML = `<span style="opacity:0.7;">No lead selected.</span>`;
-
-  /* ============================================================
-     SUBTAB SWITCHING
-  ============================================================ */
-
-  async function show(subtab) {
-    switch (subtab) {
-      case "list":
-        await renderLeadsList(subContent, portalState, updateLeadContextBar);
-        break;
-
-      case "client":
-        await renderLeadClient(subContent, portalState);
-        break;
-
-      case "details":
-        await renderLeadDetails(subContent, portalState);
-        break;
-
-      case "services":
-        await renderLeadServices(subContent, portalState);
-        break;
-
-      case "pricing":
-        await renderLeadPricing(subContent, portalState);
-        break;
-
-      case "schedule":
-        await renderLeadSchedule(subContent, portalState);
-        break;
-
-      case "timeline":
-        await renderLeadTimeline(subContent, portalState);
-        break;
-
-      default:
-        subContent.innerHTML = `<section class="card"><p>Unknown subtab.</p></section>`;
-    }
+  let leadBar = document.getElementById("lead-context-bar");
+  if (!leadBar) {
+    leadBar = document.createElement("div");
+    leadBar.id = "lead-context-bar";
+    leadBar.className = "contact-context-bar";   // same styling as contacts
+    tabContent.prepend(leadBar);
   }
 
+  // Default state
+  leadBar.textContent = "No lead selected";
+  leadBar.style.display = "block";
+
   /* ============================================================
-     UPDATE BLUE CONTEXT BAR WHEN A LEAD IS SELECTED
+     3. GET CONTENT + SUBTABS
+  ============================================================ */
+
+  const content = tabContent.querySelector("#leadsContent");
+  const buttons = tabContent.querySelectorAll("#leads-subtabs button");
+
+  /* ============================================================
+     4. SUBTAB ROUTER (MATCHES CONTACTS PATTERN)
+  ============================================================ */
+
+  buttons.forEach(btn => {
+    btn.addEventListener("click", async () => {
+
+      // Reset active state
+      buttons.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+
+      const subtab = btn.dataset.subtab;
+
+      switch (subtab) {
+
+        case "list":
+          await renderLeadsList(content, portalState, updateLeadContextBar);
+          break;
+
+        case "client":
+          await renderLeadClient(content, portalState);
+          break;
+
+        case "details":
+          if (portalState.activeLeadId) {
+            await renderLeadDetails(content, portalState);
+          } else {
+            content.innerHTML = `
+              <section class="card">
+                <h2>Lead Details</h2>
+                <p>Select a lead from the list to view details.</p>
+              </section>
+            `;
+          }
+          break;
+
+        case "services":
+          await renderLeadServices(content, portalState);
+          break;
+
+        case "pricing":
+          await renderLeadPricing(content, portalState);
+          break;
+
+        case "schedule":
+          await renderLeadSchedule(content, portalState);
+          break;
+
+        case "timeline":
+          await renderLeadTimeline(content, portalState);
+          break;
+
+        default:
+          content.innerHTML = `
+            <section class="card">
+              <p>Select a subtab to begin.</p>
+            </section>
+          `;
+      }
+    });
+  });
+
+  /* ============================================================
+     5. UPDATE CONTEXT BAR WHEN A LEAD IS SELECTED
   ============================================================ */
 
   function updateLeadContextBar(lead) {
@@ -82,27 +111,17 @@ export async function loadLeadsTab({ portalState, tabContent }) {
     portalState.activeLeadName = lead.lead_name;
     portalState.activeLeadContactName = lead.contact_name;
 
+    leadBar.textContent = `${lead.lead_name} (${lead.contact_name})`;
     leadBar.style.display = "block";
-    leadBar.innerHTML = `
-      <strong>${lead.lead_name}</strong>
-      <span style="opacity:0.8;">(${lead.contact_name})</span>
-    `;
   }
 
   /* ============================================================
-     ATTACH SUBTAB CLICK HANDLERS
+     6. DEFAULT TO LIST VIEW (JUST LIKE CONTACTS)
   ============================================================ */
 
-  document.querySelectorAll("#leads-subtabs button").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const subtab = btn.dataset.subtab;
-      show(subtab);
-    });
-  });
-
-  /* ============================================================
-     DEFAULT SUBTAB = LIST
-  ============================================================ */
-
-  show("list");
+  const defaultBtn = tabContent.querySelector('#leads-subtabs button[data-subtab="list"]');
+  if (defaultBtn) {
+    defaultBtn.classList.add("active");
+    await renderLeadsList(content, portalState, updateLeadContextBar);
+  }
 }
