@@ -1,95 +1,108 @@
-// leads.js
+// js/leads.js
+
+import { renderLeadsList } from "./leads/tab-list.js";
+import { renderLeadClient } from "./leads/tab-client.js";
+import { renderLeadDetails } from "./leads/tab-details.js";
+import { renderLeadServices } from "./leads/tab-services.js";
+import { renderLeadPricing } from "./leads/tab-pricing.js";
+import { renderLeadSchedule } from "./leads/tab-schedule.js";
+import { renderLeadTimeline } from "./leads/tab-timeline.js";
+
 export async function loadLeadsTab({ portalState, tabContent }) {
 
-  // Store active lead in portalState
-  portalState.activeLeadId = portalState.activeLeadId || null;
+  /* ============================================================
+     LOAD COMPONENTS
+  ============================================================ */
 
-  // --- Main Layout ---
-  tabContent.innerHTML = `
-    <section class="card">
-      <h2>Leads</h2>
+  const contextHtml = await fetch("./components/leads-context.html").then(r => r.text());
+  const componentHtml = await fetch("./components/leads.html").then(r => r.text());
 
-      <nav class="subtabs">
-        <button data-tab="list">List</button>
-        <button data-tab="client">Client</button>
-        <button data-tab="details">Details</button>
-        <button data-tab="services">Services</button>
-        <button data-tab="pricing">Pricing Chart</button>
-        <button data-tab="schedule">Schedule</button>
-        <button data-tab="timeline">Timeline</button>
-      </nav>
+  // Insert context bar + subtabs + content container
+  tabContent.innerHTML = contextHtml + componentHtml;
 
-      <div id="leadsSubContent">Loading…</div>
-    </section>
-  `;
+  const leadBar = document.getElementById("lead-context-bar");
+  const subContent = document.getElementById("leadsContent");
 
-  const subContent = document.getElementById("leadsSubContent");
+  /* ============================================================
+     INITIALIZE CONTEXT BAR
+  ============================================================ */
 
-  // --- Subtab Loaders (Skeletons Only) ---
-  async function show(tab) {
-    switch (tab) {
+  portalState.activeLeadId = null;
+  portalState.activeLeadName = null;
+  portalState.activeLeadContactName = null;
 
+  leadBar.style.display = "block";
+  leadBar.innerHTML = `<span style="opacity:0.7;">No lead selected.</span>`;
+
+  /* ============================================================
+     SUBTAB SWITCHING
+  ============================================================ */
+
+  async function show(subtab) {
+    switch (subtab) {
       case "list":
-        subContent.innerHTML = `
-          <h3>Lead List</h3>
-          <p>Filter bar goes here…</p>
-          <p>Add Lead button goes here…</p>
-          <p>Lead table goes here…</p>
-        `;
+        await renderLeadsList(subContent, portalState, updateLeadContextBar);
         break;
 
       case "client":
-        subContent.innerHTML = `
-          <h3>Client</h3>
-          <p>Linked contact info will load here…</p>
-        `;
+        await renderLeadClient(subContent, portalState);
         break;
 
       case "details":
-        subContent.innerHTML = `
-          <h3>Lead Details</h3>
-          <p>Dynamic lead fields will load here…</p>
-        `;
+        await renderLeadDetails(subContent, portalState);
         break;
 
       case "services":
-        subContent.innerHTML = `
-          <h3>Services</h3>
-          <p>Lead services selection will load here…</p>
-        `;
+        await renderLeadServices(subContent, portalState);
         break;
 
       case "pricing":
-        subContent.innerHTML = `
-          <h3>Pricing Chart</h3>
-          <p>Pricing Engine output will load here…</p>
-        `;
+        await renderLeadPricing(subContent, portalState);
         break;
 
       case "schedule":
-        subContent.innerHTML = `
-          <h3>Schedule</h3>
-          <p>GHL calendar + PDF generation will load here…</p>
-        `;
+        await renderLeadSchedule(subContent, portalState);
         break;
 
       case "timeline":
-        subContent.innerHTML = `
-          <h3>Timeline</h3>
-          <p>Lead timeline events will load here…</p>
-        `;
+        await renderLeadTimeline(subContent, portalState);
         break;
 
       default:
-        subContent.innerHTML = `<p>Unknown tab.</p>`;
+        subContent.innerHTML = `<section class="card"><p>Unknown subtab.</p></section>`;
     }
   }
 
-  // --- Subtab Click Handlers ---
-  document.querySelectorAll(".subtabs button").forEach(btn => {
-    btn.addEventListener("click", () => show(btn.dataset.tab));
+  /* ============================================================
+     UPDATE BLUE CONTEXT BAR WHEN A LEAD IS SELECTED
+  ============================================================ */
+
+  function updateLeadContextBar(lead) {
+    portalState.activeLeadId = lead.lead_id;
+    portalState.activeLeadName = lead.lead_name;
+    portalState.activeLeadContactName = lead.contact_name;
+
+    leadBar.style.display = "block";
+    leadBar.innerHTML = `
+      <strong>${lead.lead_name}</strong>
+      <span style="opacity:0.8;">(${lead.contact_name})</span>
+    `;
+  }
+
+  /* ============================================================
+     ATTACH SUBTAB CLICK HANDLERS
+  ============================================================ */
+
+  document.querySelectorAll("#leads-subtabs button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const subtab = btn.dataset.subtab;
+      show(subtab);
+    });
   });
 
-  // Default tab
+  /* ============================================================
+     DEFAULT SUBTAB = LIST
+  ============================================================ */
+
   show("list");
 }
