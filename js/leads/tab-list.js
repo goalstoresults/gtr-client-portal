@@ -140,7 +140,10 @@ export async function renderLeadsList(container, portalState, updateLeadContextB
     alert("Clear filter logic coming soon.");
   });
 
-  document.getElementById("addLeadBtn").addEventListener("click", () => {
-    alert("Add Lead form coming soon.");
-  });
+document.getElementById("addLeadBtn").addEventListener("click", () => {
+  // Switch to Client tab
+  const clientBtn = document.querySelector('#leads-subtabs button[data-subtab="client"]');
+  if (clientBtn) clientBtn.click();
+});
+
 }
