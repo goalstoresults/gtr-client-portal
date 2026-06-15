@@ -3,10 +3,6 @@ import { escapeHtml } from "../utilities.js";
 
 export async function renderLeadClient(container, portalState) {
 
-  /* ============================================================
-     BASE UI — SEARCH + BUTTONS + EMPTY FORM AREA
-  ============================================================ */
-
   container.innerHTML = `
     <section class="card">
       <h2>Client</h2>
@@ -99,12 +95,10 @@ export async function renderLeadClient(container, portalState) {
         )
         .join("");
 
-      // CLICK HANDLER FOR RESULTS
       resultsDiv.querySelectorAll(".contact-result").forEach(el => {
         el.addEventListener("click", () => {
           const data = JSON.parse(el.dataset.json);
 
-          // Store pending client
           portalState.pendingContactId = data.contact_id;
           portalState.pendingContactName = `${data.first_name} ${data.last_name}`;
 
@@ -139,7 +133,7 @@ export async function renderLeadClient(container, portalState) {
   });
 
   /* ============================================================
-     CREATE LEAD (ONLY WHEN CLIENT + LEAD NAME EXIST)
+     CREATE LEAD
   ============================================================ */
 
   document.getElementById("btnCreateLead").addEventListener("click", async () => {
@@ -165,7 +159,7 @@ export async function renderLeadClient(container, portalState) {
             project: portalState.project,
             lead_name: leadName,
             contact_id: portalState.pendingContactId,
-            stage: "New",
+            stage_name: "New",
             status: "Open"
           })
         }
@@ -179,24 +173,20 @@ export async function renderLeadClient(container, portalState) {
         return;
       }
 
-      // Store new lead
       portalState.activeLeadId = data.lead_id;
       portalState.activeLeadName = leadName;
       portalState.activeLeadContactName = portalState.pendingContactName;
 
-      // ⭐ Persist globally
       localStorage.setItem("activeLeadId", data.lead_id);
       localStorage.setItem("activeLeadName", leadName);
       localStorage.setItem("activeLeadContactName", portalState.pendingContactName);
 
-      // Update blue bar
       const bar = document.getElementById("lead-context-bar");
       bar.textContent = `${leadName} (${portalState.pendingContactName})`;
       bar.style.display = "block";
 
       alert("✅ Lead created.");
 
-      // Switch to Details tab
       const detailsBtn = document.querySelector('#leads-subtabs button[data-subtab="details"]');
       if (detailsBtn) detailsBtn.click();
 
@@ -208,7 +198,7 @@ export async function renderLeadClient(container, portalState) {
 }
 
 /* ============================================================
-   RENDER CLIENT FORM (NEW OR EXISTING)
+   RENDER CLIENT FORM
 ============================================================ */
 
 function renderClientForm(container, contact, portalState) {
@@ -264,7 +254,7 @@ function renderClientForm(container, contact, portalState) {
 }
 
 /* ============================================================
-   SAVE CLIENT (NEW OR EXISTING)
+   SAVE CLIENT
 ============================================================ */
 
 async function saveClient(existing, portalState) {
@@ -286,7 +276,6 @@ async function saveClient(existing, portalState) {
     let res, data;
 
     if (existing) {
-      // UPDATE
       res = await fetch(
         `https://contacts-module.dennis-e64.workers.dev/contacts/edit/${existing.contact_id}`,
         {
@@ -297,7 +286,6 @@ async function saveClient(existing, portalState) {
       );
       data = await res.json();
     } else {
-      // CREATE
       res = await fetch(
         `https://contacts-module.dennis-e64.workers.dev/contacts/add`,
         {
@@ -317,7 +305,6 @@ async function saveClient(existing, portalState) {
 
     const contactId = existing ? existing.contact_id : data.contact_id;
 
-    // Store pending client
     portalState.pendingContactId = contactId;
     portalState.pendingContactName = `${payload.first_name} ${payload.last_name}`;
 
