@@ -593,6 +593,18 @@ th.sortable:hover .sort-arrows {
   max-width: 300px;
 }
 
+.calendar-wrapper {
+  width: 100%;
+  min-height: 900px; /* GHL needs this */
+  position: relative;
+}
+
+.calendar-wrapper iframe {
+  width: 100%;
+  min-height: 900px;
+}
+
+
 
 /* Subtle fade-in animation */
 @keyframes loginFadeIn {
