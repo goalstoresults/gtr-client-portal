@@ -184,6 +184,11 @@ export async function renderLeadClient(container, portalState) {
       portalState.activeLeadName = leadName;
       portalState.activeLeadContactName = portalState.pendingContactName;
 
+      // ⭐ Persist globally
+      localStorage.setItem("activeLeadId", data.lead_id);
+      localStorage.setItem("activeLeadName", leadName);
+      localStorage.setItem("activeLeadContactName", portalState.pendingContactName);
+
       // Update blue bar
       const bar = document.getElementById("lead-context-bar");
       bar.textContent = `${leadName} (${portalState.pendingContactName})`;
