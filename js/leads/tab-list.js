@@ -3,10 +3,6 @@ import { escapeHtml } from "../utilities.js";
 
 export async function renderLeadsList(container, portalState) {
 
-  /* ============================================================
-     BASE UI — FILTERS + ADD BUTTON + TABLE AREA
-  ============================================================ */
-
   container.innerHTML = `
     <section class="card">
       <h2>Leads</h2>
@@ -23,10 +19,6 @@ export async function renderLeadsList(container, portalState) {
 
   const listArea = document.getElementById("leadListArea");
 
-  /* ============================================================
-     LOAD LEADS
-  ============================================================ */
-
   async function loadLeads(filter = "") {
     listArea.textContent = "Loading…";
 
@@ -41,11 +33,10 @@ export async function renderLeadsList(container, portalState) {
 
       if (!Array.isArray(leads)) leads = [];
 
-      // Apply filter
       if (filter) {
         const f = filter.toLowerCase();
         leads = leads.filter(l =>
-          (l.opportunity_name || "").toLowerCase().includes(f) ||
+          (l.lead_name || "").toLowerCase().includes(f) ||
           (l.contact_name || "").toLowerCase().includes(f) ||
           (l.status || "").toLowerCase().includes(f)
         );
@@ -73,7 +64,7 @@ export async function renderLeadsList(container, portalState) {
                 (l) => `
               <tr class="lead-row"
                   data-json='${escapeHtml(JSON.stringify(l))}'>
-                <td>${escapeHtml(l.opportunity_name || "")}</td>
+                <td>${escapeHtml(l.lead_name || "")}</td>
                 <td>${escapeHtml(l.contact_name || "")}</td>
                 <td>${escapeHtml(l.stage_name || "")}</td>
                 <td>${escapeHtml(l.status || "")}</td>
@@ -86,29 +77,24 @@ export async function renderLeadsList(container, portalState) {
         </table>
       `;
 
-      // CLICK HANDLERS
       listArea.querySelectorAll(".lead-row").forEach((row) => {
         row.addEventListener("click", () => {
           const lead = JSON.parse(row.dataset.json);
 
-          // ⭐ SET GLOBAL STATE
           portalState.activeLeadId = lead.lead_id;
-          portalState.activeLeadName = lead.opportunity_name;
+          portalState.activeLeadName = lead.lead_name;
           portalState.activeLeadContactName = lead.contact_name;
 
-          // ⭐ PERSIST STATE
           localStorage.setItem("activeLeadId", lead.lead_id);
-          localStorage.setItem("activeLeadName", lead.opportunity_name);
+          localStorage.setItem("activeLeadName", lead.lead_name);
           localStorage.setItem("activeLeadContactName", lead.contact_name);
 
-          // ⭐ UPDATE BLUE BAR
           const bar = document.getElementById("lead-context-bar");
           if (bar) {
-            bar.textContent = `${lead.opportunity_name} (${lead.contact_name})`;
+            bar.textContent = `${lead.lead_name} (${lead.contact_name})`;
             bar.style.display = "block";
           }
 
-          // ⭐ SWITCH TO DETAILS TAB
           const detailsBtn = document.querySelector(
             '#leads-subtabs button[data-subtab="details"]'
           );
@@ -122,21 +108,12 @@ export async function renderLeadsList(container, portalState) {
     }
   }
 
-  // Initial load
   loadLeads();
-
-  /* ============================================================
-     FILTER BUTTON
-  ============================================================ */
 
   document.getElementById("btnFilterLeads").addEventListener("click", () => {
     const term = document.getElementById("leadFilterInput").value.trim();
     loadLeads(term);
   });
-
-  /* ============================================================
-     ADD LEAD BUTTON
-  ============================================================ */
 
   document.getElementById("btnAddLead").addEventListener("click", () => {
     const clientBtn = document.querySelector(
@@ -145,10 +122,6 @@ export async function renderLeadsList(container, portalState) {
     if (clientBtn) clientBtn.click();
   });
 }
-
-/* ============================================================
-   HELPERS
-============================================================ */
 
 function formatDate(dt) {
   if (!dt) return "";
