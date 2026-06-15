@@ -1,149 +1,102 @@
 // js/leads/tab-list.js
-
 import { escapeHtml } from "../utilities.js";
 
-export async function renderLeadsList(container, portalState, updateLeadContextBar) {
-
-  /* ============================================================
-     1. BASE UI (CLEAN + MATCHES CONTACTS)
-  ============================================================ */
+export async function renderLeadList(container, portalState) {
 
   container.innerHTML = `
     <section class="card">
-      <h2>Lead List</h2>
-
-      <div class="filter-row">
-        <input type="text" id="leadSearchInput" placeholder="Search leads..." />
-        <button id="applyLeadFilterBtn">Apply Filter</button>
-        <button id="clearLeadFilterBtn">Clear Filter</button>
-        <button id="addLeadBtn" class="btn-primary">Add Lead</button>
-      </div>
-
-      <div id="leadListTable">
-        <p style="opacity:0.6;">Loading leads…</p>
-      </div>
+      <h2>Leads</h2>
+      <div id="leadListArea">Loading leads…</div>
     </section>
   `;
 
-  const tableDiv = document.getElementById("leadListTable");
+  const listArea = document.getElementById("leadListArea");
 
-  /* ============================================================
-     2. REAL API CALL — NO MOCKS
-     GET /leads/list?project=...
-  ============================================================ */
-
-  let rows = [];
   try {
-    const endpoint = `https://leads-module.dennis-e64.workers.dev/leads/list?project=${encodeURIComponent(portalState.project)}`;
+    const url = `
+      https://leads-module.dennis-e64.workers.dev/leads/list?
+      project=${encodeURIComponent(portalState.project)}
+    `.replace(/\s+/g, "");
 
-    const res = await fetch(endpoint, { cache: "no-cache" });
-    rows = await res.json();
+    const res = await fetch(url);
+    const leads = await res.json();
 
-    if (!Array.isArray(rows)) rows = [];
+    if (!Array.isArray(leads) || leads.length === 0) {
+      listArea.innerHTML = `<p class="muted">No leads found.</p>`;
+      return;
+    }
 
-  } catch (err) {
-    console.error("Lead list fetch error:", err);
-    tableDiv.innerHTML = `<p style="color:red;">Error loading leads.</p>`;
-    return;
-  }
-
-  /* ============================================================
-     3. RENDER REAL GRID HEADERS (EVEN IF EMPTY)
-  ============================================================ */
-
-  let html = `
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Lead Name</th>
-          <th>Contact</th>
-          <th>Status</th>
-          <th>Created</th>
-        </tr>
-      </thead>
-      <tbody>
-  `;
-
-  /* ============================================================
-     4. IF NO LEADS, SHOW EMPTY GRID (NOTHING ELSE)
-  ============================================================ */
-
-  if (rows.length === 0) {
-    html += `
-      <tr>
-        <td colspan="4" style="text-align:center; opacity:0.6;">
-          No leads found.
-        </td>
-      </tr>
+    listArea.innerHTML = `
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Lead Name</th>
+            <th>Client</th>
+            <th>Stage</th>
+            <th>Status</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${leads
+            .map(
+              (l) => `
+            <tr class="lead-row"
+                data-json='${escapeHtml(JSON.stringify(l))}'>
+              <td>${escapeHtml(l.opportunity_name || "")}</td>
+              <td>${escapeHtml(l.contact_name || "")}</td>
+              <td>${escapeHtml(l.stage_name || "")}</td>
+              <td>${escapeHtml(l.status || "")}</td>
+              <td>${escapeHtml(formatDate(l.created_at))}</td>
+            </tr>
+          `
+            )
+            .join("")}
+        </tbody>
+      </table>
     `;
-  } else {
-    /* ============================================================
-       5. RENDER REAL ROWS
-    ============================================================ */
 
-    rows.forEach(lead => {
-      html += `
-        <tr class="lead-row" data-id="${lead.lead_id}">
-          <td>${lead.lead_name || ""}</td>
-          <td>${lead.contact_name || ""}</td>
-          <td>${lead.status || ""}</td>
-          <td>${lead.created_at || ""}</td>
-        </tr>
-      `;
+    // CLICK HANDLERS
+    listArea.querySelectorAll(".lead-row").forEach((row) => {
+      row.addEventListener("click", () => {
+        const lead = JSON.parse(row.dataset.json);
+
+        // ⭐ SET GLOBAL STATE
+        portalState.activeLeadId = lead.lead_id;
+        portalState.activeLeadName = lead.opportunity_name;
+        portalState.activeLeadContactName = lead.contact_name;
+
+        // ⭐ PERSIST STATE
+        localStorage.setItem("activeLeadId", lead.lead_id);
+        localStorage.setItem("activeLeadName", lead.opportunity_name);
+        localStorage.setItem("activeLeadContactName", lead.contact_name);
+
+        // ⭐ UPDATE BLUE BAR
+        const bar = document.getElementById("lead-context-bar");
+        if (bar) {
+          bar.textContent = `${lead.opportunity_name} (${lead.contact_name})`;
+          bar.style.display = "block";
+        }
+
+        // ⭐ SWITCH TO DETAILS TAB
+        const detailsBtn = document.querySelector(
+          '#leads-subtabs button[data-subtab="details"]'
+        );
+        if (detailsBtn) detailsBtn.click();
+      });
     });
+  } catch (err) {
+    console.error(err);
+    listArea.innerHTML = `<p class="error">Error loading leads.</p>`;
   }
+}
 
-  html += `
-      </tbody>
-    </table>
-  `;
+/* ============================================================
+   HELPERS
+============================================================ */
 
-  tableDiv.innerHTML = html;
-
-  /* ============================================================
-     6. CLICK HANDLER — SELECT A LEAD
-     (UPDATES BLUE CONTEXT BAR)
-  ============================================================ */
-
-  document.querySelectorAll(".lead-row").forEach(row => {
-    row.addEventListener("click", () => {
-
-      const leadId = row.dataset.id;
-      const lead = rows.find(l => l.lead_id === leadId);
-      if (!lead) return;
-
-      // Store in portalState
-      portalState.activeLeadId = lead.lead_id;
-      portalState.activeLeadName = lead.lead_name;
-      portalState.activeLeadContactName = lead.contact_name;
-
-      // Update the blue context bar
-      if (typeof updateLeadContextBar === "function") {
-        updateLeadContextBar(lead);
-      }
-
-      // Highlight selected row
-      document.querySelectorAll(".lead-row").forEach(r => r.classList.remove("selected"));
-      row.classList.add("selected");
-    });
-  });
-
-  /* ============================================================
-     7. FILTER BUTTONS (SKELETON ONLY)
-  ============================================================ */
-
-  document.getElementById("applyLeadFilterBtn").addEventListener("click", () => {
-    alert("Lead filter logic coming soon.");
-  });
-
-  document.getElementById("clearLeadFilterBtn").addEventListener("click", () => {
-    alert("Clear filter logic coming soon.");
-  });
-
-document.getElementById("addLeadBtn").addEventListener("click", () => {
-  // Switch to Client tab
-  const clientBtn = document.querySelector('#leads-subtabs button[data-subtab="client"]');
-  if (clientBtn) clientBtn.click();
-});
-
+function formatDate(dt) {
+  if (!dt) return "";
+  const d = new Date(dt);
+  return d.toLocaleDateString();
 }
