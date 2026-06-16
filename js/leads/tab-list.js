@@ -297,29 +297,30 @@ export async function renderLeadsList(container, portalState) {
     });
 
 document.getElementById("btnAddLead").addEventListener("click", () => {
-  // ⭐ 1. Clear global lead variables
+  // 1. Clear global lead variables
   portalState.activeLeadId = null;
   portalState.activeLeadName = "";
   portalState.activeLeadContactName = "";
 
-  // ⭐ 2. Clear persisted values
+  // 2. Clear persisted values
   localStorage.removeItem("activeLeadId");
   localStorage.removeItem("activeLeadName");
   localStorage.removeItem("activeLeadContactName");
 
-  // ⭐ 3. Clear blue bar
+  // 3. Update blue bar to show "No Lead Selected"
   const bar = document.getElementById("lead-context-bar");
   if (bar) {
-    bar.textContent = "";
-    bar.style.display = "none";
+    bar.textContent = "No Lead Selected";
+    bar.style.display = "block"; // ensure it stays visible
   }
 
-  // ⭐ 4. Switch to Client tab (existing behavior)
+  // 4. Switch to Client tab (existing behavior)
   const clientBtn = document.querySelector(
     '#leads-subtabs button[data-subtab="client"]'
   );
   if (clientBtn) clientBtn.click();
 });
+
 
     /* -------------------------------------------------------
        INITIAL LOAD
