@@ -68,7 +68,7 @@ export async function renderLeadsList(container, portalState) {
     }
 
     /* -------------------------------------------------------
-       ⭐ NEW: FETCH CONTACTS FOR NAME LOOKUP
+       FETCH CONTACTS FOR NAME LOOKUP
     ------------------------------------------------------- */
     async function fetchContacts() {
       const url = `
@@ -82,7 +82,7 @@ export async function renderLeadsList(container, portalState) {
     }
 
     /* -------------------------------------------------------
-       ⭐ NEW: MERGE CONTACT NAMES INTO LEADS
+       MERGE CONTACT NAMES INTO LEADS
     ------------------------------------------------------- */
     function mergeContactNames(leadRows, contactRows) {
       const nameById = new Map();
@@ -154,7 +154,7 @@ export async function renderLeadsList(container, portalState) {
     }
 
     /* -------------------------------------------------------
-       RENDER TABLE (UNCHANGED)
+       RENDER TABLE
     ------------------------------------------------------- */
     function renderTable() {
       const sorted = [...leads];
@@ -248,7 +248,7 @@ export async function renderLeadsList(container, portalState) {
     }
 
     /* -------------------------------------------------------
-       HELPERS (UNCHANGED)
+       HELPERS
     ------------------------------------------------------- */
     function sortableHeader(field, label) {
       const isSorted = currentSortField === field;
@@ -266,7 +266,15 @@ export async function renderLeadsList(container, portalState) {
       `;
     }
 
+    /* -------------------------------------------------------
+       ⭐ PATCHED renderRow — FIXES APOSTROPHES
+    ------------------------------------------------------- */
     function renderRow(l) {
+
+      // Escape double quotes for safe HTML attributes
+      const safeName = (l.lead_name || "").replace(/"/g, '&quot;');
+      const safeClient = (l.contact_name || "").replace(/"/g, '&quot;');
+
       return `
         <tr>
           <td>${escapeHtml(l.lead_name || "")}</td>
@@ -277,8 +285,8 @@ export async function renderLeadsList(container, portalState) {
           <td>
             <button class="btn-primary btn-select-lead"
               data-id="${l.lead_id}"
-              data-name="${escapeHtml(l.lead_name)}"
-              data-client="${escapeHtml(l.contact_name)}">
+              data-name="${safeName}"
+              data-client="${safeClient}">
               Select
             </button>
           </td>
@@ -287,7 +295,7 @@ export async function renderLeadsList(container, portalState) {
     }
 
     /* -------------------------------------------------------
-       BUTTONS (UNCHANGED)
+       BUTTONS
     ------------------------------------------------------- */
     document.getElementById("btnApplyLeadFilter").addEventListener("click", applyFilter);
 
@@ -296,31 +304,26 @@ export async function renderLeadsList(container, portalState) {
       await loadDefault();
     });
 
-document.getElementById("btnAddLead").addEventListener("click", () => {
-  // 1. Clear global lead variables
-  portalState.activeLeadId = null;
-  portalState.activeLeadName = "";
-  portalState.activeLeadContactName = "";
+    document.getElementById("btnAddLead").addEventListener("click", () => {
+      portalState.activeLeadId = null;
+      portalState.activeLeadName = "";
+      portalState.activeLeadContactName = "";
 
-  // 2. Clear persisted values
-  localStorage.removeItem("activeLeadId");
-  localStorage.removeItem("activeLeadName");
-  localStorage.removeItem("activeLeadContactName");
+      localStorage.removeItem("activeLeadId");
+      localStorage.removeItem("activeLeadName");
+      localStorage.removeItem("activeLeadContactName");
 
-  // 3. Update blue bar to show "No Lead Selected"
-  const bar = document.getElementById("lead-context-bar");
-  if (bar) {
-    bar.textContent = "No Lead Selected";
-    bar.style.display = "block"; // ensure it stays visible
-  }
+      const bar = document.getElementById("lead-context-bar");
+      if (bar) {
+        bar.textContent = "No Lead Selected";
+        bar.style.display = "block";
+      }
 
-  // 4. Switch to Client tab (existing behavior)
-  const clientBtn = document.querySelector(
-    '#leads-subtabs button[data-subtab="client"]'
-  );
-  if (clientBtn) clientBtn.click();
-});
-
+      const clientBtn = document.querySelector(
+        '#leads-subtabs button[data-subtab="client"]'
+      );
+      if (clientBtn) clientBtn.click();
+    });
 
     /* -------------------------------------------------------
        INITIAL LOAD
