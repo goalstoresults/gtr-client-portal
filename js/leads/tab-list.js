@@ -162,7 +162,6 @@ export async function renderLeadsList(container, portalState) {
         renderTable();
       });
     });
-
 /* ---------- SELECT EVENTS ---------- */
 container.querySelectorAll(".btn-select").forEach(btn => {
   btn.addEventListener("click", () => {
@@ -193,25 +192,14 @@ container.querySelectorAll(".btn-select").forEach(btn => {
       `;
     }
 
-    // ⭐ 4. Switch to Details tab (safe, no null errors)
-    setTimeout(() => {
-      const detailsTab = document.querySelector("#tab-details");
-      if (detailsTab) {
-        detailsTab.click();
-      }
-    }, 0);
-
-    // 5. Render details
-    setTimeout(() => {
-      if (window.renderLeadDetails) {
-        window.renderLeadDetails(
-          document.querySelector("#details-container"),
-          portalState
-        );
-      }
-    }, 10);
+    // 4. Render details directly
+    const detailsContainer = document.querySelector("#details-container");
+    if (detailsContainer && window.renderLeadDetails) {
+      window.renderLeadDetails(detailsContainer, portalState);
+    }
   });
 });
+
 
   }
 
