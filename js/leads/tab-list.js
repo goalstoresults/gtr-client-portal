@@ -163,48 +163,56 @@ export async function renderLeadsList(container, portalState) {
       });
     });
 
-    /* ---------- SELECT EVENTS ---------- */
-    container.querySelectorAll(".btn-select").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const id = btn.dataset.id;
-        const lead = leads.find(l => l.lead_id === id);
-        if (!lead) return;
+/* ---------- SELECT EVENTS ---------- */
+container.querySelectorAll(".btn-select").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const id = btn.dataset.id;
+    const lead = leads.find(l => l.lead_id === id);
+    if (!lead) return;
 
-        // ⭐ 1. Set global lead variables
-        portalState.activeLeadId = lead.lead_id;
-        portalState.activeLeadName = lead.lead_name;
-        portalState.activeLeadContactId = lead.contact_id;
-        portalState.activeLeadContactName = lead.contact_name;
+    // 1. Set global lead variables
+    portalState.activeLeadId = lead.lead_id;
+    portalState.activeLeadName = lead.lead_name;
+    portalState.activeLeadContactId = lead.contact_id;
+    portalState.activeLeadContactName = lead.contact_name;
 
-        // ⭐ 2. Persist to localStorage
-        localStorage.setItem("activeLeadId", lead.lead_id);
-        localStorage.setItem("activeLeadName", lead.lead_name);
-        localStorage.setItem("activeLeadContactId", lead.contact_id);
-        localStorage.setItem("activeLeadContactName", lead.contact_name);
+    // 2. Persist
+    localStorage.setItem("activeLeadId", lead.lead_id);
+    localStorage.setItem("activeLeadName", lead.lead_name);
+    localStorage.setItem("activeLeadContactId", lead.contact_id);
+    localStorage.setItem("activeLeadContactName", lead.contact_name);
 
-        // ⭐ 3. Update the blue bar
-        const bar = document.querySelector("#active-lead-bar");
-        if (bar) {
-          bar.innerHTML = `
-            <strong>Lead:</strong> ${escapeHtml(lead.lead_name)} 
-            <span style="margin-left:1rem;">
-              <strong>Client:</strong> ${escapeHtml(lead.contact_name)}
-            </span>
-          `;
-        }
+    // 3. Update blue bar
+    const bar = document.querySelector("#active-lead-bar");
+    if (bar) {
+      bar.innerHTML = `
+        <strong>Lead:</strong> ${escapeHtml(lead.lead_name)}
+        <span style="margin-left:1rem;">
+          <strong>Client:</strong> ${escapeHtml(lead.contact_name)}
+        </span>
+      `;
+    }
 
-        // ⭐ 4. Switch to Details tab
-        document.querySelector(`#tab-details`).click();
+    // ⭐ 4. Switch to Details tab (safe, no null errors)
+    setTimeout(() => {
+      const detailsTab = document.querySelector("#tab-details");
+      if (detailsTab) {
+        detailsTab.click();
+      }
+    }, 0);
 
-        // ⭐ 5. Trigger Details renderer
-        if (window.renderLeadDetails) {
-          window.renderLeadDetails(
-            document.querySelector("#details-container"),
-            portalState
-          );
-        }
-      });
-    });
+    // 5. Render details
+    setTimeout(() => {
+      if (window.renderLeadDetails) {
+        window.renderLeadDetails(
+          document.querySelector("#details-container"),
+          portalState
+        );
+      }
+    }, 10);
+  });
+});
+
   }
 
   renderTable();
