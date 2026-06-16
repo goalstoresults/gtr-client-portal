@@ -54,7 +54,7 @@ export async function renderLeadsList(container, portalState) {
     let currentSortDirection = "asc";
 
     /* -------------------------------------------------------
-       FETCH LEADS
+       FETCH LEADS (WITH CONTACT JOIN)
     ------------------------------------------------------- */
     async function fetchLeads() {
       const url = `
@@ -64,7 +64,16 @@ export async function renderLeadsList(container, portalState) {
 
       const res = await fetch(url, { cache: "no-cache" });
       const data = await res.json();
-      return Array.isArray(data) ? data : [];
+      const arr = Array.isArray(data) ? data : [];
+
+      // Normalize client name
+      arr.forEach(l => {
+        l.contact_name =
+          l.contact?.search_name ||
+          `${l.contact?.first_name || ""} ${l.contact?.last_name || ""}`.trim();
+      });
+
+      return arr;
     }
 
     /* -------------------------------------------------------
@@ -269,3 +278,4 @@ export async function renderLeadsList(container, portalState) {
     console.error("[Leads] Error:", err);
   }
 }
+
