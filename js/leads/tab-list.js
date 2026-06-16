@@ -1,207 +1,281 @@
-// leads/tab-list.js
-// List tab: leads listing, sorting, selecting
+// js/leads/tab-list.js
+// Lead List Tab — Fully aligned with Contacts List UX + behavior
 
 import { escapeHtml, formatDateTime } from "../utilities.js";
 
-/* =========================================================
-   RENDER: Leads List
-========================================================= */
-
 export async function renderLeadsList(container, portalState) {
-  /* ---------------------------------------------------------
-     1) Fetch leads
-  --------------------------------------------------------- */
-  const leadsRes = await fetch(
-    `https://leads-module.dennis-e64.workers.dev/leads/list?project=${portalState.project}&limit=1000`,
-    { cache: "no-cache" }
-  );
-
-  let leads = [];
   try {
-    const j = await leadsRes.json();
-    leads = Array.isArray(j) ? j : (Array.isArray(j?.data) ? j.data : []);
-  } catch {
-    leads = [];
-  }
 
-  /* ---------------------------------------------------------
-     2) Fetch contacts for name lookup (same pattern as Financials)
-  --------------------------------------------------------- */
-  const contactsRes = await fetch(
-    `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}&limit=2000`,
-    { cache: "no-cache" }
-  );
-
-  let contacts = [];
-  try {
-    const cj = await contactsRes.json();
-    contacts = Array.isArray(cj) ? cj : (Array.isArray(cj?.data) ? cj.data : []);
-  } catch {
-    contacts = [];
-  }
-
-  const nameById = new Map();
-  for (const c of contacts) {
-    nameById.set(c.contact_id, c.search_name || c.contact_name || c.contact_id);
-  }
-
-  /* ---------------------------------------------------------
-     3) Normalize leads rows
-  --------------------------------------------------------- */
-  leads = leads.map(l => ({
-    ...l,
-    contact_name: nameById.get(l.contact_id) || ""
-  }));
-
-  /* ---------------------------------------------------------
-     Sorting state
-  --------------------------------------------------------- */
-  let currentSortField = "created_at";
-  let currentSortDirection = "desc";
-
-  const columns = [
-    { key: "lead_name", label: "Lead" },
-    { key: "contact_name", label: "Contact" },
-    { key: "stage_name", label: "Stage" },
-    { key: "status", label: "Status" },
-    { key: "created_at", label: "Created", isDate: true },
-    { key: "actions", label: "Actions" }
-  ];
-
-  function sortLeads() {
-    leads.sort((a, b) => {
-      let A = a[currentSortField];
-      let B = b[currentSortField];
-
-      const col = columns.find(c => c.key === currentSortField);
-
-      if (col?.isDate) {
-        A = new Date(A);
-        B = new Date(B);
-      } else {
-        A = (A || "").toString().toLowerCase();
-        B = (B || "").toString().toLowerCase();
-      }
-
-      if (A < B) return currentSortDirection === "asc" ? -1 : 1;
-      if (A > B) return currentSortDirection === "asc" ? 1 : -1;
-      return 0;
-    });
-  }
-
-  /* ---------------------------------------------------------
-     Render table
-  --------------------------------------------------------- */
-  function renderTable() {
-    sortLeads();
-
-    /* ---------- HEADER ---------- */
-    const headerHtml = columns
-      .map(col => {
-        const isSorted = currentSortField === col.key;
-        const upArrow = isSorted && currentSortDirection === "asc" ? "▲" : "△";
-        const downArrow = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
-
-        return `
-          <th class="${col.key !== 'actions' ? 'sortable' : ''}" data-field="${col.key}">
-            ${escapeHtml(col.label)}
-            ${col.key !== 'actions' ? `
-              <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
-                <span class="sort-up">${upArrow}</span>
-                <span class="sort-down">${downArrow}</span>
-              </span>` : ""}
-          </th>
-        `;
-      })
-      .join("");
-
-    /* ---------- ROWS ---------- */
-    const rowsHtml = leads
-      .map(
-        l => `
-      <tr data-id="${l.lead_id}">
-        <td>${escapeHtml(l.lead_name)}</td>
-        <td>${escapeHtml(l.contact_name)}</td>
-        <td>${escapeHtml(l.stage_name || "")}</td>
-        <td>${escapeHtml(l.status || "")}</td>
-        <td>${escapeHtml(formatDateTime(l.created_at))}</td>
-        <td>
-          <button class="btn-primary btn-select" data-id="${l.lead_id}">Select</button>
-        </td>
-      </tr>
-    `
-      )
-      .join("");
-
-    /* ---------- FINAL HTML ---------- */
+    /* -------------------------------------------------------
+       RENDER FILTER BAR + TABLE SHELL (MATCHES CONTACTS)
+    ------------------------------------------------------- */
     container.innerHTML = `
       <section class="card">
-        <h3>Leads List</h3>
-        <table class="notes-table">
-          <thead><tr>${headerHtml}</tr></thead>
-          <tbody>
-            ${rowsHtml || `<tr><td colspan="6">(no leads found)</td></tr>`}
-          </tbody>
-        </table>
+        <h2>Leads</h2>
+
+        <!-- ROW 1: SEARCH INPUT -->
+        <div style="display:flex; align-items:flex-start; gap:20px; flex-wrap:wrap; margin-bottom:6px;">
+          <label style="display:flex; flex-direction:column;">
+            <span>Search Lead / Client / Status</span>
+            <input type="text" id="leadSearchInput" style="min-width:240px;">
+            <div style="font-size:0.75em; color:#666; margin-top:2px;">
+              Tip: Leave blank for full list.
+            </div>
+          </label>
+        </div>
+
+        <!-- ROW 2: BUTTONS -->
+        <div style="display:flex; gap:10px; margin-bottom:12px;">
+          <button id="btnApplyLeadFilter" class="secondary">Apply Filter</button>
+          <button id="btnClearLeadFilter" class="secondary">Clear Filter</button>
+          <button id="btnAddLead" class="btn-primary">Add Lead</button>
+        </div>
+
+        <div id="leadTable">(loading…)</div>
       </section>
     `;
 
-    /* ---------- SORT EVENTS ---------- */
-    container.querySelectorAll("th.sortable").forEach(th => {
-      th.addEventListener("click", () => {
-        const field = th.dataset.field;
+    const tableDiv = document.getElementById("leadTable");
+    const searchInput = document.getElementById("leadSearchInput");
 
-        currentSortDirection =
-          currentSortField === field
-            ? currentSortDirection === "asc"
-              ? "desc"
-              : "asc"
-            : "asc";
-
-        currentSortField = field;
-        renderTable();
-      });
+    // ENTER triggers filter
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        document.getElementById("btnApplyLeadFilter").click();
+      }
     });
-/* ---------- SELECT EVENTS ---------- */
-container.querySelectorAll(".btn-select").forEach(btn => {
-  btn.addEventListener("click", () => {
-    const id = btn.dataset.id;
-    const lead = leads.find(l => l.lead_id === id);
-    if (!lead) return;
 
-    // 1. Set global lead variables
-    portalState.activeLeadId = lead.lead_id;
-    portalState.activeLeadName = lead.lead_name;
-    portalState.activeLeadContactId = lead.contact_id;
-    portalState.activeLeadContactName = lead.contact_name;
+    /* -------------------------------------------------------
+       INTERNAL STATE
+    ------------------------------------------------------- */
+    let leads = [];
+    let currentSortField = null;
+    let currentSortDirection = "asc";
 
-    // 2. Persist
-    localStorage.setItem("activeLeadId", lead.lead_id);
-    localStorage.setItem("activeLeadName", lead.lead_name);
-    localStorage.setItem("activeLeadContactId", lead.contact_id);
-    localStorage.setItem("activeLeadContactName", lead.contact_name);
+    /* -------------------------------------------------------
+       FETCH LEADS (WITH CONTACT JOIN)
+    ------------------------------------------------------- */
+    async function fetchLeads() {
+      const url = `
+        https://leads-module.dennis-e64.workers.dev/leads/list?
+        project=${encodeURIComponent(portalState.project)}
+      `.replace(/\s+/g, "");
 
-    // 3. Update blue bar
-    const bar = document.querySelector("#active-lead-bar");
-    if (bar) {
-      bar.innerHTML = `
-        <strong>Lead:</strong> ${escapeHtml(lead.lead_name)}
-        <span style="margin-left:1rem;">
-          <strong>Client:</strong> ${escapeHtml(lead.contact_name)}
-        </span>
+      const res = await fetch(url, { cache: "no-cache" });
+      const data = await res.json();
+      const arr = Array.isArray(data) ? data : [];
+
+      // Normalize client name
+      arr.forEach(l => {
+        l.contact_name =
+          l.contact?.search_name ||
+          `${l.contact?.first_name || ""} ${l.contact?.last_name || ""}`.trim();
+      });
+
+      return arr;
+    }
+
+    /* -------------------------------------------------------
+       LOAD DEFAULT (LAST UPDATED)
+    ------------------------------------------------------- */
+    async function loadDefault() {
+      leads = await fetchLeads();
+
+      leads.sort((a, b) => {
+        const da = a.updated_at ? new Date(a.updated_at) : new Date(0);
+        const db = b.updated_at ? new Date(b.updated_at) : new Date(0);
+        return db - da;
+      });
+
+      currentSortField = "updated_at";
+      currentSortDirection = "desc";
+
+      renderTable();
+    }
+
+    /* -------------------------------------------------------
+       APPLY FILTER
+    ------------------------------------------------------- */
+    async function applyFilter() {
+      const term = searchInput.value.trim().toLowerCase();
+
+      leads = await fetchLeads();
+
+      if (term !== "") {
+        leads = leads.filter(l =>
+          (l.lead_name || "").toLowerCase().includes(term) ||
+          (l.contact_name || "").toLowerCase().includes(term) ||
+          (l.status || "").toLowerCase().includes(term)
+        );
+      }
+
+      leads.sort((a, b) => a.lead_name.localeCompare(b.lead_name));
+
+      currentSortField = "lead_name";
+      currentSortDirection = "asc";
+
+      renderTable();
+    }
+
+    /* -------------------------------------------------------
+       RENDER TABLE (MATCHES CONTACTS)
+    ------------------------------------------------------- */
+    function renderTable() {
+      const sorted = [...leads];
+
+      if (currentSortField) {
+        sorted.sort((a, b) => {
+          if (currentSortField === "updated_at") {
+            const da = a.updated_at ? new Date(a.updated_at) : new Date(0);
+            const db = b.updated_at ? new Date(b.updated_at) : new Date(0);
+            return currentSortDirection === "asc" ? da - db : db - da;
+          }
+
+          const A = (a[currentSortField] || "").toLowerCase();
+          const B = (b[currentSortField] || "").toLowerCase();
+          return currentSortDirection === "asc"
+            ? A.localeCompare(B)
+            : B.localeCompare(A);
+        });
+      }
+
+      const headerText = `
+        <h4>Showing ${sorted.length} leads</h4>
+      `;
+
+      tableDiv.innerHTML = `
+        ${headerText}
+        <table class="notes-table">
+          <thead>
+            <tr>
+              ${sortableHeader("lead_name", "Lead Name")}
+              ${sortableHeader("contact_name", "Client")}
+              ${sortableHeader("stage_name", "Stage")}
+              ${sortableHeader("status", "Status")}
+              ${sortableHeader("created_at", "Created")}
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${
+              sorted.length
+                ? sorted.map(renderRow).join("")
+                : `<tr><td colspan="6">(no leads found)</td></tr>`
+            }
+          </tbody>
+        </table>
+      `;
+
+      // Sorting handlers
+      tableDiv.querySelectorAll("th.sortable").forEach(th => {
+        th.addEventListener("click", () => {
+          const field = th.dataset.field;
+
+          if (currentSortField === field) {
+            currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+          } else {
+            currentSortField = field;
+            currentSortDirection = "asc";
+          }
+
+          renderTable();
+        });
+      });
+
+      // Row select → go to Details tab
+      tableDiv.querySelectorAll(".btn-select-lead").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.id;
+          const name = btn.dataset.name;
+          const client = btn.dataset.client;
+
+          portalState.activeLeadId = id;
+          portalState.activeLeadName = name;
+          portalState.activeLeadContactName = client;
+
+          localStorage.setItem("activeLeadId", id);
+          localStorage.setItem("activeLeadName", name);
+          localStorage.setItem("activeLeadContactName", client);
+
+          const bar = document.getElementById("lead-context-bar");
+          if (bar) {
+            bar.textContent = `${name} (${client})`;
+            bar.style.display = "block";
+          }
+
+          const detailsBtn = document.querySelector(
+            '#leads-subtabs button[data-subtab="details"]'
+          );
+          if (detailsBtn) detailsBtn.click();
+        });
+      });
+    }
+
+    /* -------------------------------------------------------
+       HELPERS
+    ------------------------------------------------------- */
+    function sortableHeader(field, label) {
+      const isSorted = currentSortField === field;
+      const up = isSorted && currentSortDirection === "asc" ? "▲" : "△";
+      const down = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+
+      return `
+        <th class="sortable" data-field="${field}">
+          ${label}
+          <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+            <span>${up}</span>
+            <span>${down}</span>
+          </span>
+        </th>
       `;
     }
 
-    // 4. Render details directly
-    const detailsContainer = document.querySelector("#details-container");
-    if (detailsContainer && window.renderLeadDetails) {
-      window.renderLeadDetails(detailsContainer, portalState);
-    }
-  });
-});
+    function renderRow(l) {
+  return `
+    <tr>
+      <td>${escapeHtml(l.lead_name || "")}</td>
+      <td>${escapeHtml(l.contact_name || "")}</td>
+      <td>${escapeHtml(l.stage_name || "")}</td>
+      <td>${escapeHtml(l.status || "")}</td>
+      <td>${formatDateTime(l.created_at)}</td>
+      <td>
+        <button class="btn-primary btn-select-lead"
+          data-id="${l.lead_id}"
+          data-name="${escapeHtml(l.lead_name)}"
+          data-client="${escapeHtml(l.contact_name)}">
+          Select
+        </button>
+      </td>
+    </tr>
+  `;
+}
 
 
+    /* -------------------------------------------------------
+       BUTTONS
+    ------------------------------------------------------- */
+    document.getElementById("btnApplyLeadFilter").addEventListener("click", applyFilter);
+
+    document.getElementById("btnClearLeadFilter").addEventListener("click", async () => {
+      searchInput.value = "";
+      await loadDefault();
+    });
+
+    document.getElementById("btnAddLead").addEventListener("click", () => {
+      const clientBtn = document.querySelector(
+        '#leads-subtabs button[data-subtab="client"]'
+      );
+      if (clientBtn) clientBtn.click();
+    });
+
+    /* -------------------------------------------------------
+       INITIAL LOAD
+    ------------------------------------------------------- */
+    await loadDefault();
+
+  } catch (err) {
+    tableDiv.innerHTML = `<p class="error">Error loading leads.</p>`;
+    console.error("[Leads] Error:", err);
   }
-
-  renderTable();
 }
