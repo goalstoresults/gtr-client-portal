@@ -25,7 +25,7 @@ export async function renderLeadsList(container, portalState) {
   }
 
   /* ---------------------------------------------------------
-     2) Fetch contacts for name lookup (same as Financials)
+     2) Fetch contacts for name lookup (same pattern as Financials)
   --------------------------------------------------------- */
   const contactsRes = await fetch(
     `https://contacts-module.dennis-e64.workers.dev/contacts/list?project=${portalState.project}&limit=2000`,
@@ -170,11 +170,39 @@ export async function renderLeadsList(container, portalState) {
         const lead = leads.find(l => l.lead_id === id);
         if (!lead) return;
 
-        portalState.activeLeadId = id;
+        // ⭐ 1. Set global lead variables
+        portalState.activeLeadId = lead.lead_id;
         portalState.activeLeadName = lead.lead_name;
+        portalState.activeLeadContactId = lead.contact_id;
         portalState.activeLeadContactName = lead.contact_name;
 
-        alert(`Selected lead: ${lead.lead_name}`);
+        // ⭐ 2. Persist to localStorage
+        localStorage.setItem("activeLeadId", lead.lead_id);
+        localStorage.setItem("activeLeadName", lead.lead_name);
+        localStorage.setItem("activeLeadContactId", lead.contact_id);
+        localStorage.setItem("activeLeadContactName", lead.contact_name);
+
+        // ⭐ 3. Update the blue bar
+        const bar = document.querySelector("#active-lead-bar");
+        if (bar) {
+          bar.innerHTML = `
+            <strong>Lead:</strong> ${escapeHtml(lead.lead_name)} 
+            <span style="margin-left:1rem;">
+              <strong>Client:</strong> ${escapeHtml(lead.contact_name)}
+            </span>
+          `;
+        }
+
+        // ⭐ 4. Switch to Details tab
+        document.querySelector(`#tab-details`).click();
+
+        // ⭐ 5. Trigger Details renderer
+        if (window.renderLeadDetails) {
+          window.renderLeadDetails(
+            document.querySelector("#details-container"),
+            portalState
+          );
+        }
       });
     });
   }
