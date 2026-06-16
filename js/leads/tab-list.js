@@ -54,7 +54,7 @@ export async function renderLeadsList(container, portalState) {
     let currentSortDirection = "asc";
 
     /* -------------------------------------------------------
-       FETCH LEADS (WITH CONTACT JOIN)
+       FETCH LEADS
     ------------------------------------------------------- */
     async function fetchLeads() {
       const url = `
@@ -64,23 +64,53 @@ export async function renderLeadsList(container, portalState) {
 
       const res = await fetch(url, { cache: "no-cache" });
       const data = await res.json();
-      const arr = Array.isArray(data) ? data : [];
+      return Array.isArray(data) ? data : [];
+    }
 
-      // Normalize client name
-      arr.forEach(l => {
-        l.contact_name =
-          l.contact?.search_name ||
-          `${l.contact?.first_name || ""} ${l.contact?.last_name || ""}`.trim();
+    /* -------------------------------------------------------
+       ⭐ NEW: FETCH CONTACTS FOR NAME LOOKUP
+    ------------------------------------------------------- */
+    async function fetchContacts() {
+      const url = `
+        https://contacts-module.dennis-e64.workers.dev/contacts/list?
+        project=${encodeURIComponent(portalState.project)}&limit=2000
+      `.replace(/\s+/g, "");
+
+      const res = await fetch(url, { cache: "no-cache" });
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    }
+
+    /* -------------------------------------------------------
+       ⭐ NEW: MERGE CONTACT NAMES INTO LEADS
+    ------------------------------------------------------- */
+    function mergeContactNames(leadRows, contactRows) {
+      const nameById = new Map();
+
+      contactRows.forEach(c => {
+        nameById.set(
+          c.contact_id,
+          c.search_name ||
+          `${c.first_name || ""} ${c.last_name || ""}`.trim()
+        );
       });
 
-      return arr;
+      return leadRows.map(l => ({
+        ...l,
+        contact_name: nameById.get(l.contact_id) || ""
+      }));
     }
 
     /* -------------------------------------------------------
        LOAD DEFAULT (LAST UPDATED)
     ------------------------------------------------------- */
     async function loadDefault() {
-      leads = await fetchLeads();
+      const [leadRows, contactRows] = await Promise.all([
+        fetchLeads(),
+        fetchContacts()
+      ]);
+
+      leads = mergeContactNames(leadRows, contactRows);
 
       leads.sort((a, b) => {
         const da = a.updated_at ? new Date(a.updated_at) : new Date(0);
@@ -100,7 +130,12 @@ export async function renderLeadsList(container, portalState) {
     async function applyFilter() {
       const term = searchInput.value.trim().toLowerCase();
 
-      leads = await fetchLeads();
+      const [leadRows, contactRows] = await Promise.all([
+        fetchLeads(),
+        fetchContacts()
+      ]);
+
+      leads = mergeContactNames(leadRows, contactRows);
 
       if (term !== "") {
         leads = leads.filter(l =>
@@ -119,7 +154,7 @@ export async function renderLeadsList(container, portalState) {
     }
 
     /* -------------------------------------------------------
-       RENDER TABLE (MATCHES CONTACTS)
+       RENDER TABLE (UNCHANGED)
     ------------------------------------------------------- */
     function renderTable() {
       const sorted = [...leads];
@@ -213,7 +248,7 @@ export async function renderLeadsList(container, portalState) {
     }
 
     /* -------------------------------------------------------
-       HELPERS
+       HELPERS (UNCHANGED)
     ------------------------------------------------------- */
     function sortableHeader(field, label) {
       const isSorted = currentSortField === field;
@@ -232,28 +267,27 @@ export async function renderLeadsList(container, portalState) {
     }
 
     function renderRow(l) {
-  return `
-    <tr>
-      <td>${escapeHtml(l.lead_name || "")}</td>
-      <td>${escapeHtml(l.contact_name || "")}</td>
-      <td>${escapeHtml(l.stage_name || "")}</td>
-      <td>${escapeHtml(l.status || "")}</td>
-      <td>${formatDateTime(l.created_at)}</td>
-      <td>
-        <button class="btn-primary btn-select-lead"
-          data-id="${l.lead_id}"
-          data-name="${escapeHtml(l.lead_name)}"
-          data-client="${escapeHtml(l.contact_name)}">
-          Select
-        </button>
-      </td>
-    </tr>
-  `;
-}
-
+      return `
+        <tr>
+          <td>${escapeHtml(l.lead_name || "")}</td>
+          <td>${escapeHtml(l.contact_name || "")}</td>
+          <td>${escapeHtml(l.stage_name || "")}</td>
+          <td>${escapeHtml(l.status || "")}</td>
+          <td>${formatDateTime(l.created_at)}</td>
+          <td>
+            <button class="btn-primary btn-select-lead"
+              data-id="${l.lead_id}"
+              data-name="${escapeHtml(l.lead_name)}"
+              data-client="${escapeHtml(l.contact_name)}">
+              Select
+            </button>
+          </td>
+        </tr>
+      `;
+    }
 
     /* -------------------------------------------------------
-       BUTTONS
+       BUTTONS (UNCHANGED)
     ------------------------------------------------------- */
     document.getElementById("btnApplyLeadFilter").addEventListener("click", applyFilter);
 
