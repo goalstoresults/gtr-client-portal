@@ -1,97 +1,197 @@
 // js/leads/tab-list.js
-import { escapeHtml } from "../utilities.js";
+// Lead List Tab — Fully aligned with Contacts List UX + behavior
+
+import { escapeHtml, formatDateTime } from "../utilities.js";
 
 export async function renderLeadsList(container, portalState) {
+  try {
 
-  container.innerHTML = `
-    <section class="card">
-      <h2>Leads</h2>
+    /* -------------------------------------------------------
+       RENDER FILTER BAR + TABLE SHELL (MATCHES CONTACTS)
+    ------------------------------------------------------- */
+    container.innerHTML = `
+      <section class="card">
+        <h2>Leads</h2>
 
-      <div class="row" style="gap:12px; margin-bottom:16px;">
-        <input id="leadFilterInput" placeholder="Filter by name, client, or status" style="flex:1;">
-        <button id="btnFilterLeads" class="btn-secondary">Filter</button>
-        <button id="btnAddLead" class="btn-primary">Add Lead</button>
-      </div>
+        <!-- ROW 1: SEARCH INPUT -->
+        <div style="display:flex; align-items:flex-start; gap:20px; flex-wrap:wrap; margin-bottom:6px;">
+          <label style="display:flex; flex-direction:column;">
+            <span>Search Lead / Client / Status</span>
+            <input type="text" id="leadSearchInput" style="min-width:240px;">
+            <div style="font-size:0.75em; color:#666; margin-top:2px;">
+              Tip: Leave blank for full list.
+            </div>
+          </label>
+        </div>
 
-      <div id="leadListArea">Loading leads…</div>
-    </section>
-  `;
+        <!-- ROW 2: BUTTONS -->
+        <div style="display:flex; gap:10px; margin-bottom:12px;">
+          <button id="btnApplyLeadFilter" class="secondary">Apply Filter</button>
+          <button id="btnClearLeadFilter" class="secondary">Clear Filter</button>
+          <button id="btnAddLead" class="btn-primary">Add Lead</button>
+        </div>
 
-  const listArea = document.getElementById("leadListArea");
+        <div id="leadTable">(loading…)</div>
+      </section>
+    `;
 
-  async function loadLeads(filter = "") {
-    listArea.textContent = "Loading…";
+    const tableDiv = document.getElementById("leadTable");
+    const searchInput = document.getElementById("leadSearchInput");
 
-    const url = `
-      https://leads-module.dennis-e64.workers.dev/leads/list?
-      project=${encodeURIComponent(portalState.project)}
-    `.replace(/\s+/g, "");
+    // ENTER triggers filter
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        document.getElementById("btnApplyLeadFilter").click();
+      }
+    });
 
-    try {
-      const res = await fetch(url);
-      let leads = await res.json();
+    /* -------------------------------------------------------
+       INTERNAL STATE
+    ------------------------------------------------------- */
+    let leads = [];
+    let currentSortField = null;
+    let currentSortDirection = "asc";
 
-      if (!Array.isArray(leads)) leads = [];
+    /* -------------------------------------------------------
+       FETCH LEADS
+    ------------------------------------------------------- */
+    async function fetchLeads() {
+      const url = `
+        https://leads-module.dennis-e64.workers.dev/leads/list?
+        project=${encodeURIComponent(portalState.project)}
+      `.replace(/\s+/g, "");
 
-      if (filter) {
-        const f = filter.toLowerCase();
+      const res = await fetch(url, { cache: "no-cache" });
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    }
+
+    /* -------------------------------------------------------
+       LOAD DEFAULT (LAST UPDATED)
+    ------------------------------------------------------- */
+    async function loadDefault() {
+      leads = await fetchLeads();
+
+      leads.sort((a, b) => {
+        const da = a.updated_at ? new Date(a.updated_at) : new Date(0);
+        const db = b.updated_at ? new Date(b.updated_at) : new Date(0);
+        return db - da;
+      });
+
+      currentSortField = "updated_at";
+      currentSortDirection = "desc";
+
+      renderTable();
+    }
+
+    /* -------------------------------------------------------
+       APPLY FILTER
+    ------------------------------------------------------- */
+    async function applyFilter() {
+      const term = searchInput.value.trim().toLowerCase();
+
+      leads = await fetchLeads();
+
+      if (term !== "") {
         leads = leads.filter(l =>
-          (l.lead_name || "").toLowerCase().includes(f) ||
-          (l.contact_name || "").toLowerCase().includes(f) ||
-          (l.status || "").toLowerCase().includes(f)
+          (l.lead_name || "").toLowerCase().includes(term) ||
+          (l.contact_name || "").toLowerCase().includes(term) ||
+          (l.status || "").toLowerCase().includes(term)
         );
       }
 
-      if (leads.length === 0) {
-        listArea.innerHTML = `<p class="muted">No leads found.</p>`;
-        return;
+      leads.sort((a, b) => a.lead_name.localeCompare(b.lead_name));
+
+      currentSortField = "lead_name";
+      currentSortDirection = "asc";
+
+      renderTable();
+    }
+
+    /* -------------------------------------------------------
+       RENDER TABLE (MATCHES CONTACTS)
+    ------------------------------------------------------- */
+    function renderTable() {
+      const sorted = [...leads];
+
+      if (currentSortField) {
+        sorted.sort((a, b) => {
+          if (currentSortField === "updated_at") {
+            const da = a.updated_at ? new Date(a.updated_at) : new Date(0);
+            const db = b.updated_at ? new Date(b.updated_at) : new Date(0);
+            return currentSortDirection === "asc" ? da - db : db - da;
+          }
+
+          const A = (a[currentSortField] || "").toLowerCase();
+          const B = (b[currentSortField] || "").toLowerCase();
+          return currentSortDirection === "asc"
+            ? A.localeCompare(B)
+            : B.localeCompare(A);
+        });
       }
 
-      listArea.innerHTML = `
-        <table class="table">
+      const headerText = `
+        <h4>Showing ${sorted.length} leads</h4>
+      `;
+
+      tableDiv.innerHTML = `
+        ${headerText}
+        <table class="notes-table">
           <thead>
             <tr>
-              <th>Lead Name</th>
-              <th>Client</th>
-              <th>Stage</th>
-              <th>Status</th>
-              <th>Created</th>
+              ${sortableHeader("lead_name", "Lead Name")}
+              ${sortableHeader("contact_name", "Client")}
+              ${sortableHeader("stage_name", "Stage")}
+              ${sortableHeader("status", "Status")}
+              ${sortableHeader("created_at", "Created")}
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            ${leads
-              .map(
-                (l) => `
-              <tr class="lead-row"
-                  data-json='${escapeHtml(JSON.stringify(l))}'>
-                <td>${escapeHtml(l.lead_name || "")}</td>
-                <td>${escapeHtml(l.contact_name || "")}</td>
-                <td>${escapeHtml(l.stage_name || "")}</td>
-                <td>${escapeHtml(l.status || "")}</td>
-                <td>${escapeHtml(formatDate(l.created_at))}</td>
-              </tr>
-            `
-              )
-              .join("")}
+            ${
+              sorted.length
+                ? sorted.map(renderRow).join("")
+                : `<tr><td colspan="6">(no leads found)</td></tr>`
+            }
           </tbody>
         </table>
       `;
 
-      listArea.querySelectorAll(".lead-row").forEach((row) => {
-        row.addEventListener("click", () => {
-          const lead = JSON.parse(row.dataset.json);
+      // Sorting handlers
+      tableDiv.querySelectorAll("th.sortable").forEach(th => {
+        th.addEventListener("click", () => {
+          const field = th.dataset.field;
 
-          portalState.activeLeadId = lead.lead_id;
-          portalState.activeLeadName = lead.lead_name;
-          portalState.activeLeadContactName = lead.contact_name;
+          if (currentSortField === field) {
+            currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+          } else {
+            currentSortField = field;
+            currentSortDirection = "asc";
+          }
 
-          localStorage.setItem("activeLeadId", lead.lead_id);
-          localStorage.setItem("activeLeadName", lead.lead_name);
-          localStorage.setItem("activeLeadContactName", lead.contact_name);
+          renderTable();
+        });
+      });
+
+      // Row select → go to Details tab
+      tableDiv.querySelectorAll(".btn-select-lead").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.id;
+          const name = btn.dataset.name;
+          const client = btn.dataset.client;
+
+          portalState.activeLeadId = id;
+          portalState.activeLeadName = name;
+          portalState.activeLeadContactName = client;
+
+          localStorage.setItem("activeLeadId", id);
+          localStorage.setItem("activeLeadName", name);
+          localStorage.setItem("activeLeadContactName", client);
 
           const bar = document.getElementById("lead-context-bar");
           if (bar) {
-            bar.textContent = `${lead.lead_name} (${lead.contact_name})`;
+            bar.textContent = `${name} (${client})`;
             bar.style.display = "block";
           }
 
@@ -101,30 +201,71 @@ export async function renderLeadsList(container, portalState) {
           if (detailsBtn) detailsBtn.click();
         });
       });
-
-    } catch (err) {
-      console.error(err);
-      listArea.innerHTML = `<p class="error">Error loading leads.</p>`;
     }
+
+    /* -------------------------------------------------------
+       HELPERS
+    ------------------------------------------------------- */
+    function sortableHeader(field, label) {
+      const isSorted = currentSortField === field;
+      const up = isSorted && currentSortDirection === "asc" ? "▲" : "△";
+      const down = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
+
+      return `
+        <th class="sortable" data-field="${field}">
+          ${label}
+          <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+            <span>${up}</span>
+            <span>${down}</span>
+          </span>
+        </th>
+      `;
+    }
+
+    function renderRow(l) {
+      return `
+        <tr>
+          <td>${escapeHtml(l.lead_name || "")}</td>
+          <td>${escapeHtml(l.contact_name || "")}</td>
+          <td>${escapeHtml(l.stage_name || "")}</td>
+          <td>${escapeHtml(l.status || "")}</td>
+          <td>${formatDateTime(l.created_at)}</td>
+          <td>
+            <button class="btn-primary btn-select-lead"
+              data-id="${l.lead_id}"
+              data-name="${escapeHtml(l.lead_name)}"
+              data-client="${escapeHtml(l.contact_name)}">
+              Select
+            </button>
+          </td>
+        </tr>
+      `;
+    }
+
+    /* -------------------------------------------------------
+       BUTTONS
+    ------------------------------------------------------- */
+    document.getElementById("btnApplyLeadFilter").addEventListener("click", applyFilter);
+
+    document.getElementById("btnClearLeadFilter").addEventListener("click", async () => {
+      searchInput.value = "";
+      await loadDefault();
+    });
+
+    document.getElementById("btnAddLead").addEventListener("click", () => {
+      const clientBtn = document.querySelector(
+        '#leads-subtabs button[data-subtab="client"]'
+      );
+      if (clientBtn) clientBtn.click();
+    });
+
+    /* -------------------------------------------------------
+       INITIAL LOAD
+    ------------------------------------------------------- */
+    await loadDefault();
+
+  } catch (err) {
+    tableDiv.innerHTML = `<p class="error">Error loading leads.</p>`;
+    console.error("[Leads] Error:", err);
   }
-
-  loadLeads();
-
-  document.getElementById("btnFilterLeads").addEventListener("click", () => {
-    const term = document.getElementById("leadFilterInput").value.trim();
-    loadLeads(term);
-  });
-
-  document.getElementById("btnAddLead").addEventListener("click", () => {
-    const clientBtn = document.querySelector(
-      '#leads-subtabs button[data-subtab="client"]'
-    );
-    if (clientBtn) clientBtn.click();
-  });
-}
-
-function formatDate(dt) {
-  if (!dt) return "";
-  const d = new Date(dt);
-  return d.toLocaleDateString();
 }
