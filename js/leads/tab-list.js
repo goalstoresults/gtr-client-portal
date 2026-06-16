@@ -232,24 +232,25 @@ export async function renderLeadsList(container, portalState) {
     }
 
     function renderRow(l) {
-      return `
-        <tr>
-          <td>${escapeHtml(l.lead_name || "")}</td>
-          <td>${escapeHtml(l.contact_name || "")}</td>
-          <td>${escapeHtml(l.stage_name || "")}</td>
-          <td>${escapeHtml(l.status || "")}</td>
-          <td>${formatDateTime(l.created_at)}</td>
-          <td>
-            <button class="btn-primary btn-select-lead"
-              data-id="${l.lead_id}"
-              data-name="${escapeHtml(l.lead_name)}"
-              data-client="${escapeHtml(l.contact_name)}">
-              Select
-            </button>
-          </td>
-        </tr>
-      `;
-    }
+  return `
+    <tr>
+      <td>${escapeHtml(l.lead_name || "")}</td>
+      <td>${escapeHtml(l.contact_name || "")}</td>
+      <td>${escapeHtml(l.stage_name || "")}</td>
+      <td>${escapeHtml(l.status || "")}</td>
+      <td>${formatDateTime(l.created_at)}</td>
+      <td>
+        <button class="btn-primary btn-select-lead"
+          data-id="${l.lead_id}"
+          data-name="${escapeHtml(l.lead_name)}"
+          data-client="${escapeHtml(l.contact_name)}">
+          Select
+        </button>
+      </td>
+    </tr>
+  `;
+}
+
 
     /* -------------------------------------------------------
        BUTTONS
