@@ -296,12 +296,30 @@ export async function renderLeadsList(container, portalState) {
       await loadDefault();
     });
 
-    document.getElementById("btnAddLead").addEventListener("click", () => {
-      const clientBtn = document.querySelector(
-        '#leads-subtabs button[data-subtab="client"]'
-      );
-      if (clientBtn) clientBtn.click();
-    });
+document.getElementById("btnAddLead").addEventListener("click", () => {
+  // ⭐ 1. Clear global lead variables
+  portalState.activeLeadId = null;
+  portalState.activeLeadName = "";
+  portalState.activeLeadContactName = "";
+
+  // ⭐ 2. Clear persisted values
+  localStorage.removeItem("activeLeadId");
+  localStorage.removeItem("activeLeadName");
+  localStorage.removeItem("activeLeadContactName");
+
+  // ⭐ 3. Clear blue bar
+  const bar = document.getElementById("lead-context-bar");
+  if (bar) {
+    bar.textContent = "";
+    bar.style.display = "none";
+  }
+
+  // ⭐ 4. Switch to Client tab (existing behavior)
+  const clientBtn = document.querySelector(
+    '#leads-subtabs button[data-subtab="client"]'
+  );
+  if (clientBtn) clientBtn.click();
+});
 
     /* -------------------------------------------------------
        INITIAL LOAD
