@@ -59,31 +59,7 @@ export function getEasternDateOnly(value) {
 export function formatDateTime(value) {
   if (!value) return "";
 
-  // Convert "2026-06-16 01:41:44.127+00" → "2026-06-16T01:41:44.127+00"
-  const iso = value.replace(" ", "T");
-
-  const d = new Date(iso);
-
-  return d.toLocaleString("en-US", {
-    timeZone: "America/New_York",
-    month: "2-digit",
-    day: "2-digit",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true
-  });
-}
-
-export function formatDateTime2(value) {
-  if (!value) return "";
-
-  // Convert Supabase format → real ISO UTC
-  let iso = value
-    .replace(" ", "T")   // space → T
-    .replace("+00", "Z"); // +00 → Z
-
-  const d = new Date(iso);
+  const d = new Date(value);
 
   return d.toLocaleString("en-US", {
     timeZone: "America/New_York",
