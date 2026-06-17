@@ -87,7 +87,7 @@ export function formatDateTime2(value) {
 
   return d.toLocaleString("en-US", {
     timeZone: "America/New_York",
-    month: "2-digit",
+    month: "1-digit",
     day: "2-digit",
     year: "numeric",
     hour: "numeric",
