@@ -274,6 +274,8 @@ function renderRow(l) {
   // Escape double quotes for safe HTML attributes
   const safeName = (l.lead_name || "").replace(/"/g, '&quot;');
   const safeClient = (l.contact_name || "").replace(/"/g, '&quot;');
+  console.log("RAW:", l.created_at, typeof l.created_at);
+
 
   return `
     <tr>
