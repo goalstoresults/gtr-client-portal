@@ -156,106 +156,96 @@ export async function renderLeadsList(container, portalState) {
     /* -------------------------------------------------------
        RENDER TABLE
     ------------------------------------------------------- */
-function renderTable() {
-  const sorted = [...leads];
+    function renderTable() {
+      const sorted = [...leads];
 
-  if (currentSortField) {
-    sorted.sort((a, b) => {
+      if (currentSortField) {
+        sorted.sort((a, b) => {
+          if (currentSortField === "updated_at") {
+            const da = a.updated_at ? new Date(a.updated_at) : new Date(0);
+            const db = b.updated_at ? new Date(b.updated_at) : new Date(0);
+            return currentSortDirection === "asc" ? da - db : db - da;
+          }
 
-      // ⭐ SPECIAL CASE: created_at / updated_at (timestamp sorting)
-      if (currentSortField === "created_at" || currentSortField === "updated_at") {
-
-        // ⭐ Force UTC interpretation by appending "Z" if missing
-        const aRaw = a[currentSortField] || "";
-        const bRaw = b[currentSortField] || "";
-
-        const aUTC = aRaw ? Date.parse(aRaw.endsWith("Z") ? aRaw : aRaw + "Z") : 0;
-        const bUTC = bRaw ? Date.parse(bRaw.endsWith("Z") ? bRaw : bRaw + "Z") : 0;
-
-        return currentSortDirection === "asc" ? aUTC - bUTC : bUTC - aUTC;
+          const A = (a[currentSortField] || "").toLowerCase();
+          const B = (b[currentSortField] || "").toLowerCase();
+          return currentSortDirection === "asc"
+            ? A.localeCompare(B)
+            : B.localeCompare(A);
+        });
       }
 
-      // ⭐ Normal string sorting for other fields
-      const A = (a[currentSortField] || "").toLowerCase();
-      const B = (b[currentSortField] || "").toLowerCase();
-      return currentSortDirection === "asc"
-        ? A.localeCompare(B)
-        : B.localeCompare(A);
-    });
-  }
+      const headerText = `
+        <h4>Showing ${sorted.length} leads</h4>
+      `;
 
-  const headerText = `
-    <h4>Showing ${sorted.length} leads</h4>
-  `;
+      tableDiv.innerHTML = `
+        ${headerText}
+        <table class="notes-table">
+          <thead>
+            <tr>
+              ${sortableHeader("lead_name", "Lead Name")}
+              ${sortableHeader("contact_name", "Client")}
+              ${sortableHeader("stage_name", "Stage")}
+              ${sortableHeader("status", "Status")}
+              ${sortableHeader("created_at", "Created")}
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${
+              sorted.length
+                ? sorted.map(renderRow).join("")
+                : `<tr><td colspan="6">(no leads found)</td></tr>`
+            }
+          </tbody>
+        </table>
+      `;
 
-  tableDiv.innerHTML = `
-    ${headerText}
-    <table class="notes-table">
-      <thead>
-        <tr>
-          ${sortableHeader("lead_name", "Lead Name")}
-          ${sortableHeader("contact_name", "Client")}
-          ${sortableHeader("stage_name", "Stage")}
-          ${sortableHeader("status", "Status")}
-          ${sortableHeader("created_at", "Created")}
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${
-          sorted.length
-            ? sorted.map(renderRow).join("")
-            : `<tr><td colspan="6">(no leads found)</td></tr>`
-        }
-      </tbody>
-    </table>
-  `;
+      // Sorting handlers
+      tableDiv.querySelectorAll("th.sortable").forEach(th => {
+        th.addEventListener("click", () => {
+          const field = th.dataset.field;
 
-  // Sorting handlers
-  tableDiv.querySelectorAll("th.sortable").forEach(th => {
-    th.addEventListener("click", () => {
-      const field = th.dataset.field;
+          if (currentSortField === field) {
+            currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+          } else {
+            currentSortField = field;
+            currentSortDirection = "asc";
+          }
 
-      if (currentSortField === field) {
-        currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
-      } else {
-        currentSortField = field;
-        currentSortDirection = "asc";
-      }
+          renderTable();
+        });
+      });
 
-      renderTable();
-    });
-  });
+      // Row select → go to Details tab
+      tableDiv.querySelectorAll(".btn-select-lead").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.id;
+          const name = btn.dataset.name;
+          const client = btn.dataset.client;
 
-  // Row select → go to Details tab
-  tableDiv.querySelectorAll(".btn-select-lead").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const id = btn.dataset.id;
-      const name = btn.dataset.name;
-      const client = btn.dataset.client;
+          portalState.activeLeadId = id;
+          portalState.activeLeadName = name;
+          portalState.activeLeadContactName = client;
 
-      portalState.activeLeadId = id;
-      portalState.activeLeadName = name;
-      portalState.activeLeadContactName = client;
+          localStorage.setItem("activeLeadId", id);
+          localStorage.setItem("activeLeadName", name);
+          localStorage.setItem("activeLeadContactName", client);
 
-      localStorage.setItem("activeLeadId", id);
-      localStorage.setItem("activeLeadName", name);
-      localStorage.setItem("activeLeadContactName", client);
+          const bar = document.getElementById("lead-context-bar");
+          if (bar) {
+            bar.textContent = `${name} (${client})`;
+            bar.style.display = "block";
+          }
 
-      const bar = document.getElementById("lead-context-bar");
-      if (bar) {
-        bar.textContent = `${name} (${client})`;
-        bar.style.display = "block";
-      }
-
-      const detailsBtn = document.querySelector(
-        '#leads-subtabs button[data-subtab="details"]'
-      );
-      if (detailsBtn) detailsBtn.click();
-    });
-  });
-}
-
+          const detailsBtn = document.querySelector(
+            '#leads-subtabs button[data-subtab="details"]'
+          );
+          if (detailsBtn) detailsBtn.click();
+        });
+      });
+    }
 
     /* -------------------------------------------------------
        HELPERS
@@ -279,36 +269,30 @@ function renderTable() {
     /* -------------------------------------------------------
        ⭐ PATCHED renderRow — FIXES APOSTROPHES
     ------------------------------------------------------- */
-function renderRow(l) {
+    function renderRow(l) {
 
-  // Escape double quotes for safe HTML attributes
-  const safeName = (l.lead_name || "").replace(/"/g, '&quot;');
-  const safeClient = (l.contact_name || "").replace(/"/g, '&quot;');
-  console.log("RAW:", l.created_at, typeof l.created_at);
+      // Escape double quotes for safe HTML attributes
+      const safeName = (l.lead_name || "").replace(/"/g, '&quot;');
+      const safeClient = (l.contact_name || "").replace(/"/g, '&quot;');
 
-
-  return `
-    <tr>
-      <td>${escapeHtml(l.lead_name || "")}</td>
-      <td>${escapeHtml(l.contact_name || "")}</td>
-      <td>${escapeHtml(l.stage_name || "")}</td>
-      <td>${escapeHtml(l.status || "")}</td>
-
-      <!-- ⭐ ALWAYS SHOW NEW YORK TIME -->
-      <td>${formatDateTime(l.created_at)}</td>
-
-      <td>
-        <button class="btn-primary btn-select-lead"
-          data-id="${l.lead_id}"
-          data-name="${safeName}"
-          data-client="${safeClient}">
-          Select
-        </button>
-      </td>
-    </tr>
-  `;
-}
-
+      return `
+        <tr>
+          <td>${escapeHtml(l.lead_name || "")}</td>
+          <td>${escapeHtml(l.contact_name || "")}</td>
+          <td>${escapeHtml(l.stage_name || "")}</td>
+          <td>${escapeHtml(l.status || "")}</td>
+          <td>${formatDateTime(l.created_at)}</td>
+          <td>
+            <button class="btn-primary btn-select-lead"
+              data-id="${l.lead_id}"
+              data-name="${safeName}"
+              data-client="${safeClient}">
+              Select
+            </button>
+          </td>
+        </tr>
+      `;
+    }
 
     /* -------------------------------------------------------
        BUTTONS
