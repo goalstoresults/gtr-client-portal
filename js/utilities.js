@@ -59,7 +59,10 @@ export function getEasternDateOnly(value) {
 export function formatDateTime(value) {
   if (!value) return "";
 
-  const d = new Date(value);
+  // Convert "2026-06-16 01:41:44.127+00" → "2026-06-16T01:41:44.127+00"
+  const iso = value.replace(" ", "T");
+
+  const d = new Date(iso);
 
   return d.toLocaleString("en-US", {
     timeZone: "America/New_York",
@@ -71,6 +74,7 @@ export function formatDateTime(value) {
     hour12: true
   });
 }
+
 
 export function formatDateTimeStored(value) {
   if (!value) return "";
