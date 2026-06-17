@@ -1,5 +1,5 @@
 // js/leads/tab-list.js
-// Lead List Tab — Fully aligned with Contacts List UX + behavior
+// Lead List Tab — Clean version using project_pipeline_leads_view
 
 import { escapeHtml, formatDateTime } from "../utilities.js";
 
@@ -7,7 +7,7 @@ export async function renderLeadsList(container, portalState) {
   try {
 
     /* -------------------------------------------------------
-       RENDER FILTER BAR + TABLE SHELL (MATCHES CONTACTS)
+       RENDER FILTER BAR + TABLE SHELL
     ------------------------------------------------------- */
     container.innerHTML = `
       <section class="card">
@@ -38,7 +38,6 @@ export async function renderLeadsList(container, portalState) {
     const tableDiv = document.getElementById("leadTable");
     const searchInput = document.getElementById("leadSearchInput");
 
-    // ENTER triggers filter
     searchInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
@@ -54,7 +53,7 @@ export async function renderLeadsList(container, portalState) {
     let currentSortDirection = "asc";
 
     /* -------------------------------------------------------
-       FETCH LEADS
+       FETCH LEADS (FROM VIEW)
     ------------------------------------------------------- */
     async function fetchLeads() {
       const url = `
@@ -68,49 +67,10 @@ export async function renderLeadsList(container, portalState) {
     }
 
     /* -------------------------------------------------------
-       FETCH CONTACTS FOR NAME LOOKUP
-    ------------------------------------------------------- */
-    async function fetchContacts() {
-      const url = `
-        https://contacts-module.dennis-e64.workers.dev/contacts/list?
-        project=${encodeURIComponent(portalState.project)}&limit=2000
-      `.replace(/\s+/g, "");
-
-      const res = await fetch(url, { cache: "no-cache" });
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
-    }
-
-    /* -------------------------------------------------------
-       MERGE CONTACT NAMES INTO LEADS
-    ------------------------------------------------------- */
-    function mergeContactNames(leadRows, contactRows) {
-      const nameById = new Map();
-
-      contactRows.forEach(c => {
-        nameById.set(
-          c.contact_id,
-          c.search_name ||
-          `${c.first_name || ""} ${c.last_name || ""}`.trim()
-        );
-      });
-
-      return leadRows.map(l => ({
-        ...l,
-        contact_name: nameById.get(l.contact_id) || ""
-      }));
-    }
-
-    /* -------------------------------------------------------
-       LOAD DEFAULT (LAST UPDATED)
+       LOAD DEFAULT (SORT BY UPDATED DESC)
     ------------------------------------------------------- */
     async function loadDefault() {
-      const [leadRows, contactRows] = await Promise.all([
-        fetchLeads(),
-        fetchContacts()
-      ]);
-
-      leads = mergeContactNames(leadRows, contactRows);
+      leads = await fetchLeads();
 
       leads.sort((a, b) => {
         const da = a.updated_at ? new Date(a.updated_at) : new Date(0);
@@ -130,17 +90,12 @@ export async function renderLeadsList(container, portalState) {
     async function applyFilter() {
       const term = searchInput.value.trim().toLowerCase();
 
-      const [leadRows, contactRows] = await Promise.all([
-        fetchLeads(),
-        fetchContacts()
-      ]);
-
-      leads = mergeContactNames(leadRows, contactRows);
+      leads = await fetchLeads();
 
       if (term !== "") {
         leads = leads.filter(l =>
           (l.lead_name || "").toLowerCase().includes(term) ||
-          (l.contact_name || "").toLowerCase().includes(term) ||
+          (l.client_search_name || "").toLowerCase().includes(term) ||
           (l.status || "").toLowerCase().includes(term)
         );
       }
@@ -161,12 +116,19 @@ export async function renderLeadsList(container, portalState) {
 
       if (currentSortField) {
         sorted.sort((a, b) => {
-          if (currentSortField === "updated_at") {
-            const da = a.updated_at ? new Date(a.updated_at) : new Date(0);
-            const db = b.updated_at ? new Date(b.updated_at) : new Date(0);
-            return currentSortDirection === "asc" ? da - db : db - da;
+
+          // ⭐ Timestamp sorting
+          if (currentSortField === "created_at" || currentSortField === "updated_at") {
+            const aRaw = a[currentSortField] || "";
+            const bRaw = b[currentSortField] || "";
+
+            const aUTC = aRaw ? Date.parse(aRaw.endsWith("Z") ? aRaw : aRaw + "Z") : 0;
+            const bUTC = bRaw ? Date.parse(bRaw.endsWith("Z") ? bRaw : bRaw + "Z") : 0;
+
+            return currentSortDirection === "asc" ? aUTC - bUTC : bUTC - aUTC;
           }
 
+          // ⭐ Normal string sorting
           const A = (a[currentSortField] || "").toLowerCase();
           const B = (b[currentSortField] || "").toLowerCase();
           return currentSortDirection === "asc"
@@ -175,9 +137,7 @@ export async function renderLeadsList(container, portalState) {
         });
       }
 
-      const headerText = `
-        <h4>Showing ${sorted.length} leads</h4>
-      `;
+      const headerText = `<h4>Showing ${sorted.length} leads</h4>`;
 
       tableDiv.innerHTML = `
         ${headerText}
@@ -185,7 +145,7 @@ export async function renderLeadsList(container, portalState) {
           <thead>
             <tr>
               ${sortableHeader("lead_name", "Lead Name")}
-              ${sortableHeader("contact_name", "Client")}
+              ${sortableHeader("client_search_name", "Client")}
               ${sortableHeader("stage_name", "Stage")}
               ${sortableHeader("status", "Status")}
               ${sortableHeader("created_at", "Created")}
@@ -267,21 +227,20 @@ export async function renderLeadsList(container, portalState) {
     }
 
     /* -------------------------------------------------------
-       ⭐ PATCHED renderRow — FIXES APOSTROPHES
+       RENDER ROW
     ------------------------------------------------------- */
     function renderRow(l) {
-
-      // Escape double quotes for safe HTML attributes
       const safeName = (l.lead_name || "").replace(/"/g, '&quot;');
-      const safeClient = (l.contact_name || "").replace(/"/g, '&quot;');
+      const safeClient = (l.client_search_name || "").replace(/"/g, '&quot;');
 
       return `
         <tr>
           <td>${escapeHtml(l.lead_name || "")}</td>
-          <td>${escapeHtml(l.contact_name || "")}</td>
+          <td>${escapeHtml(l.client_search_name || "")}</td>
           <td>${escapeHtml(l.stage_name || "")}</td>
           <td>${escapeHtml(l.status || "")}</td>
           <td>${formatDateTime(l.created_at)}</td>
+
           <td>
             <button class="btn-primary btn-select-lead"
               data-id="${l.lead_id}"
