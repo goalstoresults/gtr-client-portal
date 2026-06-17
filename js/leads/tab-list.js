@@ -1,7 +1,7 @@
 // js/leads/tab-list.js
 // Lead List Tab — Fully aligned with Contacts List UX + behavior
 
-import { escapeHtml, formatDateTime2 } from "../utilities.js";
+import { escapeHtml, formatDateTime } from "../utilities.js";
 
 export async function renderLeadsList(container, portalState) {
   try {
@@ -295,7 +295,7 @@ function renderRow(l) {
       <td>${escapeHtml(l.status || "")}</td>
 
       <!-- ⭐ ALWAYS SHOW NEW YORK TIME -->
-      <td>${formatDateTime2(l.created_at)}</td>
+      <td>${formatDateTime(l.created_at)}</td>
 
       <td>
         <button class="btn-primary btn-select-lead"
