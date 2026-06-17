@@ -269,30 +269,34 @@ export async function renderLeadsList(container, portalState) {
     /* -------------------------------------------------------
        ⭐ PATCHED renderRow — FIXES APOSTROPHES
     ------------------------------------------------------- */
-    function renderRow(l) {
+function renderRow(l) {
 
-      // Escape double quotes for safe HTML attributes
-      const safeName = (l.lead_name || "").replace(/"/g, '&quot;');
-      const safeClient = (l.contact_name || "").replace(/"/g, '&quot;');
+  // Escape double quotes for safe HTML attributes
+  const safeName = (l.lead_name || "").replace(/"/g, '&quot;');
+  const safeClient = (l.contact_name || "").replace(/"/g, '&quot;');
 
-      return `
-        <tr>
-          <td>${escapeHtml(l.lead_name || "")}</td>
-          <td>${escapeHtml(l.contact_name || "")}</td>
-          <td>${escapeHtml(l.stage_name || "")}</td>
-          <td>${escapeHtml(l.status || "")}</td>
-          <td>${formatDateTime(l.created_at)}</td>
-          <td>
-            <button class="btn-primary btn-select-lead"
-              data-id="${l.lead_id}"
-              data-name="${safeName}"
-              data-client="${safeClient}">
-              Select
-            </button>
-          </td>
-        </tr>
-      `;
-    }
+  return `
+    <tr>
+      <td>${escapeHtml(l.lead_name || "")}</td>
+      <td>${escapeHtml(l.contact_name || "")}</td>
+      <td>${escapeHtml(l.stage_name || "")}</td>
+      <td>${escapeHtml(l.status || "")}</td>
+
+      <!-- ⭐ ALWAYS SHOW NEW YORK TIME -->
+      <td>${formatDateTime(l.created_at)}</td>
+
+      <td>
+        <button class="btn-primary btn-select-lead"
+          data-id="${l.lead_id}"
+          data-name="${safeName}"
+          data-client="${safeClient}">
+          Select
+        </button>
+      </td>
+    </tr>
+  `;
+}
+
 
     /* -------------------------------------------------------
        BUTTONS
