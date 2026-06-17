@@ -1,5 +1,5 @@
 // js/leads/tab-details.js
-// Dynamic Lead Details — mirrors Contact Details architecture
+// Dynamic Lead Details — wired to backend /leads/get and /leads/update
 
 import { escapeHtml } from "../utilities.js";
 
@@ -58,7 +58,7 @@ export async function renderLeadDetails(container, portalState) {
     : [];
 
   /* -------------------------------------------------------
-     FETCH LEAD RECORD
+     FETCH LEAD RECORD (NEW BACKEND ENDPOINT)
   ------------------------------------------------------- */
   const leadUrl = `
     https://leads-module.dennis-e64.workers.dev/leads/get?
@@ -143,7 +143,7 @@ export async function renderLeadDetails(container, portalState) {
     .join("");
 
   /* -------------------------------------------------------
-     SAVE LOGIC
+     SAVE LOGIC (NEW BACKEND ENDPOINT)
   ------------------------------------------------------- */
   container.querySelector("#btnSaveLeadDetails").addEventListener("click", async () => {
     const updates = {};
@@ -176,3 +176,4 @@ export async function renderLeadDetails(container, portalState) {
     alert("Lead details saved.");
   });
 }
+
