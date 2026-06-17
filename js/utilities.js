@@ -75,6 +75,28 @@ export function formatDateTime(value) {
   });
 }
 
+export function formatDateTime2(value) {
+  if (!value) return "";
+
+  // Convert Supabase format → real ISO UTC
+  let iso = value
+    .replace(" ", "T")   // space → T
+    .replace("+00", "Z"); // +00 → Z
+
+  const d = new Date(iso);
+
+  return d.toLocaleString("en-US", {
+    timeZone: "America/New_York",
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  });
+}
+
+
 
 export function formatDateTimeStored(value) {
   if (!value) return "";
