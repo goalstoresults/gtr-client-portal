@@ -6,7 +6,7 @@ import { escapeHtml } from "../utilities.js";
 const LEAD_FIELD_OPTIONS = [
   "lead_id",
   "ghl_opportunity_id",
-  "opportunity_name",
+  "lead_name",
   "contact_id",
   "crm_id",
   "project",
@@ -187,7 +187,7 @@ export async function renderLeadAddSetup(container, portalState) {
 
     defaultBtn.addEventListener("click", () => {
       const defaults = [
-        { field_key: "opportunity_name", label: "Lead Name", sort_order: 10, section: "General" },
+        { field_key: "lead_name", label: "Lead Name", sort_order: 10, section: "General" },
         { field_key: "stage_name", label: "Stage", sort_order: 20, section: "General" },
         { field_key: "status", label: "Status", sort_order: 30, section: "General" },
         { field_key: "amount", label: "Amount", sort_order: 40, section: "General" },
