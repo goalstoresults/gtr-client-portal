@@ -1,5 +1,5 @@
 // js/setup/tab-lead-add.js
-// v1.0 — Lead Add Setup Subtab (parallel to Contact Add Setup)
+// v2.0 — Lead Field Setup (supports multiple lead tabs via dropdown)
 
 import { escapeHtml } from "../utilities.js";
 
@@ -64,8 +64,7 @@ const LEAD_FIELD_OPTIONS = [
   "sellers_agent_last_name"
 ];
 
-
-// Save helper (parallel to saveContactSetup)
+// Save helper
 async function saveLeadSetup(portalState, tab, gridBody) {
   const rows = [];
 
@@ -106,20 +105,20 @@ async function saveLeadSetup(portalState, tab, gridBody) {
     }
   );
 
-  alert("Lead Add configuration saved.");
+  alert(`Lead Field configuration saved for tab: ${tab}`);
 }
 
 export async function renderLeadAddSetup(container, portalState) {
   if (!portalState.setup_project_id) {
     container.innerHTML = `
       <section class="card">
-        <p>Please select a project in the Client tab before configuring Lead Add fields.</p>
+        <p>Please select a project in the Client tab before configuring Lead Fields.</p>
       </section>
     `;
     return;
   }
 
-  // Load lookup groups + lead sections
+  // Load lookup groups + lead sections + lead tabs
   const resLookups = await fetch(
     `https://lookups-module.dennis-e64.workers.dev/lookups/list?project=${portalState.setup_project_id}`,
     { cache: "no-cache" }
@@ -130,27 +129,35 @@ export async function renderLeadAddSetup(container, portalState) {
     ? [...new Set(lookupsData.lookups.map(l => l.lookup_type))].sort()
     : [];
 
-  const sectionValues = Array.isArray(lookupsData.lookups)
-    ? lookupsData.lookups
-        .filter(l => l.lookup_type === "lead_section")
-        .map(l => l.value)
-    : [];
+  const sectionValues = lookupsData.lookups
+    .filter(l => l.lookup_type === "lead_section")
+    .map(l => l.value);
+
+  const leadTabs = lookupsData.lookups
+    .filter(l => l.lookup_type === "lead_tab")
+    .map(l => l.value);
+
+  const selectedTab = leadTabs[0] || "add";
 
   // Render shell
   container.innerHTML = `
     <section class="card">
       <div style="display:flex; align-items:center; justify-content:space-between;">
-        <h2>Lead Add Setup for ${escapeHtml(portalState.display_name || portalState.setup_project_id)}</h2>
+        <h2>Lead Field Setup for ${escapeHtml(portalState.display_name || portalState.setup_project_id)}</h2>
         <div>
+          <label style="margin-right:10px;">Lead Tab:</label>
+          <select id="leadTabSelect" class="btn-secondary" style="margin-right:20px;">
+            ${leadTabs.map(t => `<option value="${t}">${t}</option>`).join("")}
+          </select>
+
           <button id="btnAddLeadField" class="btn-secondary" style="margin-right:8px;">+ Add Field</button>
-          <button id="btnDefaultLeadMode" class="btn-secondary" style="margin-right:8px;">Default Mode</button>
           <button id="btnSaveLeadConfig" class="btn-primary">Save Config</button>
         </div>
       </div>
 
-      <p>Enable fields for the Add form, customize labels, set order, bind lookup groups, and assign lead sections.</p>
+      <p>Enable fields, customize labels, set order, bind lookup groups, and assign lead sections.</p>
 
-      <table id="leadAddFieldsGrid" class="notes-table" style="width:100%; margin-top:12px;">
+      <table id="leadFieldsGrid" class="notes-table" style="width:100%; margin-top:12px;">
         <thead>
           <tr>
             <th style="width:60px;">Enabled</th>
@@ -166,116 +173,56 @@ export async function renderLeadAddSetup(container, portalState) {
     </section>
   `;
 
-  const gridBody = container.querySelector("#leadAddFieldsGrid tbody");
+  const gridBody = container.querySelector("#leadFieldsGrid tbody");
+  const tabSelect = container.querySelector("#leadTabSelect");
 
-  // Load existing config
-  const url = `https://lookups-module.dennis-e64.workers.dev/lead_fields?project=${portalState.setup_project_id}`;
-  const res = await fetch(url, { cache: "no-cache" });
-  const data = await res.json();
+  async function loadTab(tab) {
+    const url = `https://lookups-module.dennis-e64.workers.dev/lead_fields?project=${portalState.setup_project_id}`;
+    const res = await fetch(url, { cache: "no-cache" });
+    const data = await res.json();
 
-  const configured = Array.isArray(data.rows)
-    ? data.rows.filter(r => r.lead_tab === "add")
-    : [];
+    const configured = Array.isArray(data.rows)
+      ? data.rows.filter(r => r.lead_tab === tab)
+      : [];
 
-  const defaultBtn = container.querySelector("#btnDefaultLeadMode");
+    gridBody.innerHTML = configured
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map(row => {
+        const lookupOptions = [`<option value="">-- none --</option>`]
+          .concat(lookupGroups.map(g => `<option value="${g}" ${row.lookup_type === g ? "selected" : ""}>${g}</option>`))
+          .join("");
 
-  // Default Mode only appears when there are NO rows
-  if (configured.length > 0) {
-    defaultBtn.style.display = "none";
-  } else {
-    defaultBtn.style.display = "inline-block";
+        const sectionOptions = [`<option value="">-- none --</option>`]
+          .concat(sectionValues.map(s => `<option value="${s}" ${row.section === s ? "selected" : ""}>${s}</option>`))
+          .join("");
 
-    defaultBtn.addEventListener("click", () => {
-      const defaults = [
-        { field_key: "lead_name", label: "Lead Name", sort_order: 10, section: "General" },
-        { field_key: "stage_name", label: "Stage", sort_order: 20, section: "General" },
-        { field_key: "status", label: "Status", sort_order: 30, section: "General" },
-        { field_key: "amount", label: "Amount", sort_order: 40, section: "General" },
-        { field_key: "primary_referral", label: "Primary Referral", sort_order: 50, section: "General" },
-        { field_key: "inspection_type", label: "Inspection Type", sort_order: 60, section: "General" }
-      ];
-
-      gridBody.innerHTML = defaults
-        .map(row => {
-          const lookupOptions = [`<option value="">-- none --</option>`]
-            .concat(lookupGroups.map(g => `<option value="${g}">${g}</option>`))
-            .join("");
-
-          const sectionOptions = [`<option value="">-- none --</option>`]
-            .concat(sectionValues.map(s => `<option value="${s}" ${s === row.section ? "selected" : ""}>${s}</option>`))
-            .join("");
-
-          const systemFieldOptions = [`<option value="">-- select field --</option>`]
-            .concat(LEAD_FIELD_OPTIONS.map(
-              f => `<option value="${f}" ${f === row.field_key ? "selected" : ""}>${f}</option>`
-            ))
-            .join("");
-
-          return `
-            <tr data-field="${row.field_key}">
-              <td style="text-align:center;"><input type="checkbox" class="enableCheckbox" checked></td>
-              <td><select class="systemFieldSelect" style="width:100%;">${systemFieldOptions}</select></td>
-              <td><input type="text" class="labelInput" value="${escapeHtml(row.label)}" style="width:100%;"></td>
-              <td><input type="number" class="orderInput" value="${row.sort_order}" style="width:70px;"></td>
-              <td><select class="lookupTypeSelect" style="width:100%;">${lookupOptions}</select></td>
-              <td><select class="sectionSelect" style="width:100%;">${sectionOptions}</select></td>
-            </tr>
-          `;
-        })
-        .join("");
-    });
-  }
-
-  // Render existing rows
-  const sortedRows = configured.sort((a, b) => a.sort_order - b.sort_order);
-
-  function toTitleCase(field) {
-    return field
-      .split("_")
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(" ");
-  }
-
-  gridBody.innerHTML = sortedRows
-    .map(row => {
-      const placeholder = toTitleCase(row.field_key);
-
-      const lookupOptions = [`<option value="">-- none --</option>`]
-        .concat(
-          lookupGroups.map(
-            g => `<option value="${g}" ${row.lookup_type === g ? "selected" : ""}>${g}</option>`
-          )
-        )
-        .join("");
-
-      const sectionOptions = [`<option value="">-- none --</option>`]
-        .concat(
-          sectionValues.map(
-            s => `<option value="${s}" ${row.section === s ? "selected" : ""}>${s}</option>`
-          )
-        )
-        .join("");
-
-      const systemFieldOptions = [`<option value="">-- select field --</option>`]
-        .concat(
-          LEAD_FIELD_OPTIONS.map(
+        const systemFieldOptions = [`<option value="">-- select field --</option>`]
+          .concat(LEAD_FIELD_OPTIONS.map(
             f => `<option value="${f}" ${f === row.field_key ? "selected" : ""}>${f}</option>`
-          )
-        )
-        .join("");
+          ))
+          .join("");
 
-      return `
-        <tr data-field="${row.field_key}">
-          <td style="text-align:center;"><input type="checkbox" class="enableCheckbox" checked></td>
-          <td><select class="systemFieldSelect" style="width:100%;">${systemFieldOptions}</select></td>
-          <td><input type="text" class="labelInput" value="${escapeHtml(row.label)}" placeholder="${escapeHtml(placeholder)}" style="width:100%;"></td>
-          <td><input type="number" class="orderInput" value="${row.sort_order}" style="width:70px;"></td>
-          <td><select class="lookupTypeSelect" style="width:100%;">${lookupOptions}</select></td>
-          <td><select class="sectionSelect" style="width:100%;">${sectionOptions}</select></td>
-        </tr>
-      `;
-    })
-    .join("");
+        return `
+          <tr data-field="${row.field_key}">
+            <td style="text-align:center;"><input type="checkbox" class="enableCheckbox" checked></td>
+            <td><select class="systemFieldSelect" style="width:100%;">${systemFieldOptions}</select></td>
+            <td><input type="text" class="labelInput" value="${escapeHtml(row.label)}" style="width:100%;"></td>
+            <td><input type="number" class="orderInput" value="${row.sort_order}" style="width:70px;"></td>
+            <td><select class="lookupTypeSelect" style="width:100%;">${lookupOptions}</select></td>
+            <td><select class="sectionSelect" style="width:100%;">${sectionOptions}</select></td>
+          </tr>
+        `;
+      })
+      .join("");
+  }
+
+  // Load initial tab
+  await loadTab(selectedTab);
+
+  // Change tab
+  tabSelect.addEventListener("change", async () => {
+    await loadTab(tabSelect.value);
+  });
 
   // Add Field
   container.querySelector("#btnAddLeadField").addEventListener("click", () => {
@@ -323,6 +270,6 @@ export async function renderLeadAddSetup(container, portalState) {
 
   // Save
   container.querySelector("#btnSaveLeadConfig").addEventListener("click", async () => {
-    await saveLeadSetup(portalState, "add", gridBody);
+    await saveLeadSetup(portalState, tabSelect.value, gridBody);
   });
 }
