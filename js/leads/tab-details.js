@@ -163,6 +163,8 @@ export async function renderLeadDetails(container, portalState) {
       })
     });
 
+
+/* --------
     // Webhook to GHL
     await fetch("https://hooks.zapier.com/hooks/catch/xxxxxxx/yyyyyyy", {
       method: "POST",
@@ -172,7 +174,7 @@ export async function renderLeadDetails(container, portalState) {
         ...updates
       })
     });
-
+---------- */
     alert("Lead details saved.");
   });
 }
