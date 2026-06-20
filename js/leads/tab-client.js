@@ -18,10 +18,7 @@ Enter search text and click Find.
 <div id="clientFormArea" style="display:none;"></div>
 <div id="leadCreationArea" style="display:none; margin-top:20px;">
 <h3 id="leadAreaTitle">Create Lead</h3>
-<div class="form-grid-2col">
-<label>Lead Name</label>
-<input id="leadNameInput" placeholder="Enter lead name">
-</div>
+<div id="leadFieldsForm"></div>
 <button id="btnCreateLead" class="btn-primary" style="margin-top:16px;">
 Create Lead
 </button>
@@ -32,17 +29,75 @@ Create Lead
 const resultsDiv = document.getElementById("clientSearchResults");
 const formArea = document.getElementById("clientFormArea");
 const leadArea = document.getElementById("leadCreationArea");
-const leadNameInput = document.getElementById("leadNameInput");
 const leadAreaTitle = document.getElementById("leadAreaTitle");
+const leadFieldsForm = document.getElementById("leadFieldsForm");
 const createLeadBtn = document.getElementById("btnCreateLead");
 
 formArea.style.display = "none";
 leadArea.style.display = "none";
 
 let isEditingExistingLead = false;
+let lead = {};
 
 /* ============================================================
-   ⭐ NEW — IF AN EXISTING LEAD IS ACTIVE, LOAD ITS CLIENT
+   ⭐ NEW — LOAD "client" TAB FIELD CONFIG (same source as Details)
+============================================================ */
+const configUrl = `
+  https://lookups-module.dennis-e64.workers.dev/lead_fields?
+  project=${encodeURIComponent(portalState.project)}
+`.replace(/\s+/g, "");
+const configRes = await fetch(configUrl, { cache: "no-cache" });
+const configData = await configRes.json();
+const configured = Array.isArray(configData.rows)
+  ? configData.rows.filter(r => r.lead_tab === "client")
+  : [];
+
+const lookupsUrl = `
+  https://lookups-module.dennis-e64.workers.dev/lookups/list?
+  project=${encodeURIComponent(portalState.project)}
+`.replace(/\s+/g, "");
+const lookupsRes = await fetch(lookupsUrl, { cache: "no-cache" });
+const lookupsData = await lookupsRes.json();
+const lookupGroups = Array.isArray(lookupsData.lookups) ? lookupsData.lookups : [];
+
+function renderLeadFields(leadValues) {
+  if (!configured.length) {
+    leadFieldsForm.innerHTML = `<p class="muted">No client-tab fields configured in Setup → Lead Fields.</p>`;
+    return;
+  }
+  const fields = [...configured].sort((a, b) => a.sort_order - b.sort_order);
+  leadFieldsForm.innerHTML = fields
+    .map(f => {
+      const value = leadValues[f.field_key] || "";
+      if (f.lookup_type) {
+        const options = lookupGroups
+          .filter(l => l.lookup_type === f.lookup_type)
+          .map(l => `<option value="${l.value}" ${l.value === value ? "selected" : ""}>${escapeHtml(l.value)}</option>`)
+          .join("");
+        return `
+          <label style="display:block; margin-bottom:10px;">
+            <span>${escapeHtml(f.label)}</span>
+            <select data-field="${f.field_key}" style="width:100%;">
+              <option value="">-- select --</option>
+              ${options}
+            </select>
+          </label>
+        `;
+      }
+      return `
+        <label style="display:block; margin-bottom:10px;">
+          <span>${escapeHtml(f.label)}</span>
+          <input type="text" data-field="${f.field_key}" value="${escapeHtml(value)}" style="width:100%;">
+        </label>
+      `;
+    })
+    .join("");
+}
+
+renderLeadFields({}); // default blank state, covers the "new lead" case
+
+/* ============================================================
+   IF AN EXISTING LEAD IS ACTIVE, LOAD ITS CLIENT + FIELD VALUES
 ============================================================ */
 if (portalState.activeLeadId) {
   isEditingExistingLead = true;
@@ -52,29 +107,27 @@ if (portalState.activeLeadId) {
       `https://leads-module.dennis-e64.workers.dev/leads/get?id=${encodeURIComponent(portalState.activeLeadId)}`,
       { cache: "no-cache" }
     );
-    const lead = await leadRes.json();
+    lead = await leadRes.json();
 
-    leadNameInput.value = lead.lead_name || "";
-    leadAreaTitle.textContent = "Lead Name";
+    leadAreaTitle.textContent = "Lead Info";
     createLeadBtn.textContent = "Update Lead";
     leadArea.style.display = "block";
-
+    renderLeadFields(lead);
 
     if (lead.contact_id) {
-        const contactRes = await fetch(
-          `https://contacts-module.dennis-e64.workers.dev/contacts/details/${encodeURIComponent(lead.contact_id)}`
-        );
-        const contacts = await contactRes.json();
-        const contact = Array.isArray(contacts) && contacts[0] ? contacts[0] : null;
-      
-        if (contact) {
-          portalState.pendingContactId = contact.contact_id;
-          portalState.pendingContactName = `${contact.first_name || ""} ${contact.last_name || ""}`.trim();
-          renderClientForm(formArea, contact, portalState);
-          formArea.style.display = "block";
-        }
-      }  
+      const contactRes = await fetch(
+        `https://contacts-module.dennis-e64.workers.dev/contacts/details/${encodeURIComponent(lead.contact_id)}`
+      );
+      const contacts = await contactRes.json();
+      const contact = Array.isArray(contacts) && contacts[0] ? contacts[0] : null;
 
+      if (contact) {
+        portalState.pendingContactId = contact.contact_id;
+        portalState.pendingContactName = `${contact.first_name || ""} ${contact.last_name || ""}`.trim();
+        renderClientForm(formArea, contact, portalState);
+        formArea.style.display = "block";
+      }
+    }
   } catch (err) {
     console.error("[Client Tab] Error loading existing lead/client:", err);
   }
@@ -155,16 +208,19 @@ document.getElementById("btnAddClient").addEventListener("click", () => {
 });
 
 /* ============================================================
-   CREATE / UPDATE LEAD
+   CREATE / UPDATE LEAD  (now collects dynamic fields)
 ============================================================ */
 createLeadBtn.addEventListener("click", async () => {
-  const leadName = leadNameInput.value.trim();
+  const updates = {};
+  leadFieldsForm.querySelectorAll("[data-field]").forEach(el => {
+    updates[el.dataset.field] = el.value;
+  });
 
   if (!portalState.pendingContactId) {
     alert("Select or create a client first.");
     return;
   }
-  if (!leadName) {
+  if (!updates.lead_name || !updates.lead_name.trim()) {
     alert("Enter a lead name.");
     return;
   }
@@ -173,16 +229,12 @@ createLeadBtn.addEventListener("click", async () => {
     let res, data, leadId;
 
     if (isEditingExistingLead) {
-      // ⭐ UPDATE existing lead's name + contact
       res = await fetch("https://leads-module.dennis-e64.workers.dev/leads/update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: portalState.activeLeadId,
-          updates: {
-            lead_name: leadName,
-            contact_id: portalState.pendingContactId
-          }
+          updates: { ...updates, contact_id: portalState.pendingContactId }
         })
       });
       data = await res.json();
@@ -193,16 +245,15 @@ createLeadBtn.addEventListener("click", async () => {
       }
       leadId = portalState.activeLeadId;
     } else {
-      // Existing CREATE flow
       res = await fetch("https://leads-module.dennis-e64.workers.dev/leads/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           project: portalState.project,
-          lead_name: leadName,
           contact_id: portalState.pendingContactId,
           stage_name: "New",
-          status: "Open"
+          status: "Open",
+          ...updates
         })
       });
       data = await res.json();
@@ -215,20 +266,20 @@ createLeadBtn.addEventListener("click", async () => {
     }
 
     portalState.activeLeadId = leadId;
-    portalState.activeLeadName = leadName;
+    portalState.activeLeadName = updates.lead_name;
     portalState.activeLeadContactName = portalState.pendingContactName;
     localStorage.setItem("activeLeadId", leadId);
-    localStorage.setItem("activeLeadName", leadName);
+    localStorage.setItem("activeLeadName", updates.lead_name);
     localStorage.setItem("activeLeadContactName", portalState.pendingContactName);
 
     const bar = document.getElementById("lead-context-bar");
     if (bar) {
-      bar.textContent = `${leadName} (${portalState.pendingContactName})`;
+      bar.textContent = `${updates.lead_name} (${portalState.pendingContactName})`;
       bar.style.display = "block";
     }
 
     window.dispatchEvent(new CustomEvent("lead-created", {
-      detail: { lead_id: leadId, lead_name: leadName, contact_name: portalState.pendingContactName }
+      detail: { lead_id: leadId, lead_name: updates.lead_name, contact_name: portalState.pendingContactName }
     }));
 
     alert(isEditingExistingLead ? "✅ Lead updated." : "✅ Lead created.");
@@ -338,4 +389,3 @@ async function saveClient(existing, portalState) {
     console.error(err);
   }
 }
-
