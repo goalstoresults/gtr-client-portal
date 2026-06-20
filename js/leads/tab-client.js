@@ -44,6 +44,18 @@ let isEditingExistingLead = false;
 let lead = {};
 
 /* ============================================================
+   ⭐ NEW — UNSAVED CHANGES GUARD
+============================================================ */
+portalState._clientTabDirty = false;
+
+function markDirty() {
+  portalState._clientTabDirty = true;
+}
+
+attachUnsavedGuard(portalState);
+attachBeforeUnloadGuard(portalState);
+
+/* ============================================================
    LOAD "client" TAB FIELD CONFIG (same source as Details)
 ============================================================ */
 const configUrl = `
@@ -100,6 +112,10 @@ function renderLeadFields(leadValues) {
 
 renderLeadFields({}); // default blank state, covers the "new lead" case
 
+// ⭐ NEW — mark dirty on any edit to a dynamic lead field
+leadFieldsForm.addEventListener("input", markDirty);
+leadFieldsForm.addEventListener("change", markDirty);
+
 /* ============================================================
    IF AN EXISTING LEAD IS ACTIVE, LOAD ITS CLIENT + FIELD VALUES
 ============================================================ */
@@ -138,7 +154,7 @@ if (portalState.activeLeadId) {
 }
 
 /* ============================================================
-   ⭐ NEW — BUYER'S / SELLER'S AGENT PICKERS
+   BUYER'S / SELLER'S AGENT PICKERS
 ============================================================ */
 portalState.pendingBuyersAgent = lead.buyers_agent_id
   ? { id: lead.buyers_agent_id, first_name: lead.buyers_agent_first_name, last_name: lead.buyers_agent_last_name }
@@ -153,7 +169,7 @@ renderAgentPicker({
   project: portalState.project,
   label: "Buyer's Agent",
   agent: portalState.pendingBuyersAgent,
-  onChange: a => { portalState.pendingBuyersAgent = a; }
+  onChange: a => { portalState.pendingBuyersAgent = a; markDirty(); }
 });
 
 renderAgentPicker({
@@ -161,7 +177,7 @@ renderAgentPicker({
   project: portalState.project,
   label: "Seller's Agent",
   agent: portalState.pendingSellersAgent,
-  onChange: a => { portalState.pendingSellersAgent = a; }
+  onChange: a => { portalState.pendingSellersAgent = a; markDirty(); }
 });
 
 /* ============================================================
@@ -214,6 +230,7 @@ document.getElementById("btnFindClient").addEventListener("click", async () => {
         const data = JSON.parse(el.dataset.json);
         portalState.pendingContactId = data.contact_id;
         portalState.pendingContactName = `${data.first_name} ${data.last_name}`;
+        markDirty(); // ⭐ NEW
         resultsDiv.innerHTML = "";
         renderClientForm(formArea, data, portalState);
         formArea.style.display = "block";
@@ -239,7 +256,7 @@ document.getElementById("btnAddClient").addEventListener("click", () => {
 });
 
 /* ============================================================
-   CREATE / UPDATE LEAD  (now includes agent fields)
+   CREATE / UPDATE LEAD
 ============================================================ */
 createLeadBtn.addEventListener("click", async () => {
   const updates = {};
@@ -323,6 +340,8 @@ createLeadBtn.addEventListener("click", async () => {
       detail: { lead_id: leadId, lead_name: updates.lead_name, contact_name: portalState.pendingContactName }
     }));
 
+    portalState._clientTabDirty = false; // ⭐ NEW — clear before navigating away
+
     alert(isEditingExistingLead ? "✅ Lead updated." : "✅ Lead created.");
 
     const detailsBtn = document.querySelector('#leads-subtabs button[data-subtab="details"]');
@@ -336,10 +355,52 @@ createLeadBtn.addEventListener("click", async () => {
 }
 
 /* ============================================================
-   ⭐ NEW — REUSABLE AGENT PICKER (Buyer's / Seller's Agent)
-   Searches contacts-module's /contacts/search, filtered to
-   contact_type = "Agent". Same select/add pattern as Client,
-   just typed and self-contained per picker instance.
+   ⭐ NEW — UNSAVED CHANGES GUARDS
+   Intercepts Leads-subtab navigation (capture phase, runs before
+   the framework's own click handler) and browser tab close/refresh.
+   Attached once per page load — flags on the DOM node / window
+   prevent stacking duplicate listeners on repeat tab visits.
+============================================================ */
+function attachUnsavedGuard(portalState) {
+  const subtabsContainer = document.getElementById("leads-subtabs");
+  if (!subtabsContainer || subtabsContainer._unsavedGuardAttached) return;
+  subtabsContainer._unsavedGuardAttached = true;
+
+  subtabsContainer.addEventListener(
+    "click",
+    e => {
+      if (!portalState._clientTabDirty) return;
+      const btn = e.target.closest("button[data-subtab]");
+      if (!btn || btn.dataset.subtab === "client") return;
+
+      const proceed = confirm(
+        "You have unsaved changes on the Client tab. Leave without saving?"
+      );
+      if (!proceed) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+      } else {
+        portalState._clientTabDirty = false;
+      }
+    },
+    true // capture phase — runs before the tab-switch handler
+  );
+}
+
+function attachBeforeUnloadGuard(portalState) {
+  if (window._clientTabUnloadGuardAttached) return;
+  window._clientTabUnloadGuardAttached = true;
+
+  window.addEventListener("beforeunload", e => {
+    if (!portalState._clientTabDirty) return;
+    e.preventDefault();
+    e.returnValue = "";
+  });
+}
+
+/* ============================================================
+   REUSABLE AGENT PICKER (Buyer's / Seller's Agent)
 ============================================================ */
 function renderAgentPicker({ container, project, label, agent, onChange }) {
 
@@ -497,7 +558,7 @@ function renderAgentPicker({ container, project, label, agent, onChange }) {
 }
 
 /* ============================================================
-   RENDER CLIENT FORM  (unchanged)
+   RENDER CLIENT FORM
 ============================================================ */
 function renderClientForm(container, contact, portalState) {
   const isNew = !contact;
@@ -538,7 +599,7 @@ function renderClientForm(container, contact, portalState) {
 }
 
 /* ============================================================
-   SAVE CLIENT  (unchanged)
+   SAVE CLIENT
 ============================================================ */
 async function saveClient(existing, portalState) {
   const payload = {
@@ -585,6 +646,7 @@ async function saveClient(existing, portalState) {
     const contactId = existing ? existing.contact_id : data.contact_id;
     portalState.pendingContactId = contactId;
     portalState.pendingContactName = `${payload.first_name} ${payload.last_name}`;
+    portalState._clientTabDirty = true; // ⭐ NEW — pending until lead-level Save
     alert("✅ Client saved.");
   } catch (err) {
     alert("Error saving client: " + err.message);
