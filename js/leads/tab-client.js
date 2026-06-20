@@ -7,6 +7,9 @@ export async function renderLeadClient(container, portalState) {
 container.innerHTML = `
 <section class="card">
 <h2>Client</h2>
+<div style="margin-bottom:16px;">
+<button id="btnCreateLeadTop" class="btn-primary">Create Lead</button>
+</div>
 <div class="row" style="gap:12px; margin-bottom:16px;">
 <input id="clientSearchInput" placeholder="Search name, business, or email" style="flex:1;">
 <button id="btnFindClient" class="btn-secondary">Find</button>
@@ -34,6 +37,7 @@ const leadArea = document.getElementById("leadCreationArea");
 const leadAreaTitle = document.getElementById("leadAreaTitle");
 const leadFieldsForm = document.getElementById("leadFieldsForm");
 const createLeadBtn = document.getElementById("btnCreateLead");
+const createLeadBtnTop = document.getElementById("btnCreateLeadTop");
 const buyersAgentContainer = document.getElementById("buyersAgentArea");
 const sellersAgentContainer = document.getElementById("sellersAgentArea");
 
@@ -44,7 +48,7 @@ let isEditingExistingLead = false;
 let lead = {};
 
 /* ============================================================
-   ⭐ NEW — UNSAVED CHANGES GUARD
+   UNSAVED CHANGES GUARD
 ============================================================ */
 portalState._clientTabDirty = false;
 
@@ -112,7 +116,7 @@ function renderLeadFields(leadValues) {
 
 renderLeadFields({}); // default blank state, covers the "new lead" case
 
-// ⭐ NEW — mark dirty on any edit to a dynamic lead field
+// mark dirty on any edit to a dynamic lead field
 leadFieldsForm.addEventListener("input", markDirty);
 leadFieldsForm.addEventListener("change", markDirty);
 
@@ -131,6 +135,7 @@ if (portalState.activeLeadId) {
 
     leadAreaTitle.textContent = "Lead Info";
     createLeadBtn.textContent = "Update Lead";
+    createLeadBtnTop.textContent = "Update Lead";
     leadArea.style.display = "block";
     renderLeadFields(lead);
 
@@ -230,7 +235,7 @@ document.getElementById("btnFindClient").addEventListener("click", async () => {
         const data = JSON.parse(el.dataset.json);
         portalState.pendingContactId = data.contact_id;
         portalState.pendingContactName = `${data.first_name} ${data.last_name}`;
-        markDirty(); // ⭐ NEW
+        markDirty();
         resultsDiv.innerHTML = "";
         renderClientForm(formArea, data, portalState);
         formArea.style.display = "block";
@@ -257,8 +262,9 @@ document.getElementById("btnAddClient").addEventListener("click", () => {
 
 /* ============================================================
    CREATE / UPDATE LEAD
+   Shared by both the top button and the bottom button.
 ============================================================ */
-createLeadBtn.addEventListener("click", async () => {
+async function saveLead() {
   const updates = {};
   leadFieldsForm.querySelectorAll("[data-field]").forEach(el => {
     updates[el.dataset.field] = el.value;
@@ -340,7 +346,7 @@ createLeadBtn.addEventListener("click", async () => {
       detail: { lead_id: leadId, lead_name: updates.lead_name, contact_name: portalState.pendingContactName }
     }));
 
-    portalState._clientTabDirty = false; // ⭐ NEW — clear before navigating away
+    portalState._clientTabDirty = false; // clear before navigating away
 
     alert(isEditingExistingLead ? "✅ Lead updated." : "✅ Lead created.");
 
@@ -350,16 +356,15 @@ createLeadBtn.addEventListener("click", async () => {
     alert("Error saving lead: " + err.message);
     console.error(err);
   }
-});
+}
+
+createLeadBtn.addEventListener("click", saveLead);
+createLeadBtnTop.addEventListener("click", saveLead);
 
 }
 
 /* ============================================================
-   ⭐ NEW — UNSAVED CHANGES GUARDS
-   Intercepts Leads-subtab navigation (capture phase, runs before
-   the framework's own click handler) and browser tab close/refresh.
-   Attached once per page load — flags on the DOM node / window
-   prevent stacking duplicate listeners on repeat tab visits.
+   UNSAVED CHANGES GUARDS
 ============================================================ */
 function attachUnsavedGuard(portalState) {
   const subtabsContainer = document.getElementById("leads-subtabs");
@@ -646,7 +651,7 @@ async function saveClient(existing, portalState) {
     const contactId = existing ? existing.contact_id : data.contact_id;
     portalState.pendingContactId = contactId;
     portalState.pendingContactName = `${payload.first_name} ${payload.last_name}`;
-    portalState._clientTabDirty = true; // ⭐ NEW — pending until lead-level Save
+    portalState._clientTabDirty = true; // pending until lead-level Save
     alert("✅ Client saved.");
   } catch (err) {
     alert("Error saving client: " + err.message);
