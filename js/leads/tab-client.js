@@ -59,26 +59,22 @@ if (portalState.activeLeadId) {
     createLeadBtn.textContent = "Update Lead";
     leadArea.style.display = "block";
 
+
     if (lead.contact_id) {
-      const contactUrl = `
-        https://client-portal-api.dennis-e64.workers.dev/api/contacts?
-        contact_id=eq.${encodeURIComponent(lead.contact_id)}
-        &select=contact_id,first_name,last_name,email,contact_type,
-        street_address,address2,city,postal_code,
-        work_phone,home_phone,mobile_phone
-      `.replace(/\s+/g, "");
+        const contactRes = await fetch(
+          `https://contacts-module.dennis-e64.workers.dev/contacts/details/${encodeURIComponent(lead.contact_id)}`
+        );
+        const contacts = await contactRes.json();
+        const contact = Array.isArray(contacts) && contacts[0] ? contacts[0] : null;
+      
+        if (contact) {
+          portalState.pendingContactId = contact.contact_id;
+          portalState.pendingContactName = `${contact.first_name || ""} ${contact.last_name || ""}`.trim();
+          renderClientForm(formArea, contact, portalState);
+          formArea.style.display = "block";
+        }
+      }  
 
-      const contactRes = await fetch(contactUrl);
-      const contacts = await contactRes.json();
-      const contact = Array.isArray(contacts) ? contacts[0] : null;
-
-      if (contact) {
-        portalState.pendingContactId = contact.contact_id;
-        portalState.pendingContactName = `${contact.first_name || ""} ${contact.last_name || ""}`.trim();
-        renderClientForm(formArea, contact, portalState);
-        formArea.style.display = "block";
-      }
-    }
   } catch (err) {
     console.error("[Client Tab] Error loading existing lead/client:", err);
   }
