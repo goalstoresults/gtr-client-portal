@@ -23,6 +23,8 @@ Enter search text and click Find.
 Create Lead
 </button>
 </div>
+<div id="buyersAgentArea" style="margin-top:30px;"></div>
+<div id="sellersAgentArea" style="margin-top:16px;"></div>
 </section>
 `;
 
@@ -32,6 +34,8 @@ const leadArea = document.getElementById("leadCreationArea");
 const leadAreaTitle = document.getElementById("leadAreaTitle");
 const leadFieldsForm = document.getElementById("leadFieldsForm");
 const createLeadBtn = document.getElementById("btnCreateLead");
+const buyersAgentContainer = document.getElementById("buyersAgentArea");
+const sellersAgentContainer = document.getElementById("sellersAgentArea");
 
 formArea.style.display = "none";
 leadArea.style.display = "none";
@@ -40,7 +44,7 @@ let isEditingExistingLead = false;
 let lead = {};
 
 /* ============================================================
-   ⭐ NEW — LOAD "client" TAB FIELD CONFIG (same source as Details)
+   LOAD "client" TAB FIELD CONFIG (same source as Details)
 ============================================================ */
 const configUrl = `
   https://lookups-module.dennis-e64.workers.dev/lead_fields?
@@ -134,6 +138,33 @@ if (portalState.activeLeadId) {
 }
 
 /* ============================================================
+   ⭐ NEW — BUYER'S / SELLER'S AGENT PICKERS
+============================================================ */
+portalState.pendingBuyersAgent = lead.buyers_agent_id
+  ? { id: lead.buyers_agent_id, first_name: lead.buyers_agent_first_name, last_name: lead.buyers_agent_last_name }
+  : null;
+
+portalState.pendingSellersAgent = lead.sellers_agent_id
+  ? { id: lead.sellers_agent_id, first_name: lead.sellers_agent_first_name, last_name: lead.sellers_agent_last_name }
+  : null;
+
+renderAgentPicker({
+  container: buyersAgentContainer,
+  project: portalState.project,
+  label: "Buyer's Agent",
+  agent: portalState.pendingBuyersAgent,
+  onChange: a => { portalState.pendingBuyersAgent = a; }
+});
+
+renderAgentPicker({
+  container: sellersAgentContainer,
+  project: portalState.project,
+  label: "Seller's Agent",
+  agent: portalState.pendingSellersAgent,
+  onChange: a => { portalState.pendingSellersAgent = a; }
+});
+
+/* ============================================================
    FIND CLIENT
 ============================================================ */
 document.getElementById("btnFindClient").addEventListener("click", async () => {
@@ -208,7 +239,7 @@ document.getElementById("btnAddClient").addEventListener("click", () => {
 });
 
 /* ============================================================
-   CREATE / UPDATE LEAD  (now collects dynamic fields)
+   CREATE / UPDATE LEAD  (now includes agent fields)
 ============================================================ */
 createLeadBtn.addEventListener("click", async () => {
   const updates = {};
@@ -225,6 +256,15 @@ createLeadBtn.addEventListener("click", async () => {
     return;
   }
 
+  const agentFields = {
+    buyers_agent_id: portalState.pendingBuyersAgent?.id || null,
+    buyers_agent_first_name: portalState.pendingBuyersAgent?.first_name || null,
+    buyers_agent_last_name: portalState.pendingBuyersAgent?.last_name || null,
+    sellers_agent_id: portalState.pendingSellersAgent?.id || null,
+    sellers_agent_first_name: portalState.pendingSellersAgent?.first_name || null,
+    sellers_agent_last_name: portalState.pendingSellersAgent?.last_name || null
+  };
+
   try {
     let res, data, leadId;
 
@@ -234,7 +274,7 @@ createLeadBtn.addEventListener("click", async () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: portalState.activeLeadId,
-          updates: { ...updates, contact_id: portalState.pendingContactId }
+          updates: { ...updates, contact_id: portalState.pendingContactId, ...agentFields }
         })
       });
       data = await res.json();
@@ -253,6 +293,7 @@ createLeadBtn.addEventListener("click", async () => {
           contact_id: portalState.pendingContactId,
           stage_name: "New",
           status: "Open",
+          ...agentFields,
           ...updates
         })
       });
@@ -292,6 +333,167 @@ createLeadBtn.addEventListener("click", async () => {
   }
 });
 
+}
+
+/* ============================================================
+   ⭐ NEW — REUSABLE AGENT PICKER (Buyer's / Seller's Agent)
+   Searches contacts-module's /contacts/search, filtered to
+   contact_type = "Agent". Same select/add pattern as Client,
+   just typed and self-contained per picker instance.
+============================================================ */
+function renderAgentPicker({ container, project, label, agent, onChange }) {
+
+  function renderSelected() {
+    container.innerHTML = `
+      <div class="card" style="padding:16px;">
+        <h4 style="margin:0 0 10px 0;">${escapeHtml(label)}</h4>
+        ${
+          agent && agent.id
+            ? `
+              <div style="display:flex; align-items:center; gap:12px;">
+                <span><strong>${escapeHtml(agent.first_name || "")} ${escapeHtml(agent.last_name || "")}</strong></span>
+                <button type="button" class="btn-secondary btn-change-agent">Change</button>
+              </div>
+            `
+            : `
+              <p class="muted" style="margin:0 0 8px 0;">No ${escapeHtml(label)} attached.</p>
+              <button type="button" class="btn-secondary btn-change-agent">Find ${escapeHtml(label)}</button>
+            `
+        }
+      </div>
+    `;
+    container.querySelector(".btn-change-agent").addEventListener("click", renderSearch);
+  }
+
+  function renderSearch() {
+    container.innerHTML = `
+      <div class="card" style="padding:16px;">
+        <h4 style="margin:0 0 10px 0;">${escapeHtml(label)}</h4>
+        <div class="row" style="gap:12px; margin-bottom:10px;">
+          <input type="text" class="agent-search-input" placeholder="Search by name" style="flex:1;">
+          <button type="button" class="btn-secondary btn-agent-find">Find</button>
+          <button type="button" class="btn-primary btn-agent-add">Add New</button>
+        </div>
+        <div class="agent-search-results muted">Enter a name and click Find.</div>
+      </div>
+    `;
+
+    const input = container.querySelector(".agent-search-input");
+    const resultsDiv = container.querySelector(".agent-search-results");
+
+    container.querySelector(".btn-agent-find").addEventListener("click", async () => {
+      const term = input.value.trim();
+      if (!term) {
+        resultsDiv.textContent = "Enter something to search.";
+        return;
+      }
+      resultsDiv.textContent = "Searching…";
+
+      const url = `
+        https://contacts-module.dennis-e64.workers.dev/contacts/search?
+        project=${encodeURIComponent(project)}&
+        search=${encodeURIComponent(term)}&
+        contact_type=Agent
+      `.replace(/\s+/g, "");
+
+      try {
+        const res = await fetch(url);
+        const contacts = await res.json();
+        if (!Array.isArray(contacts) || contacts.length === 0) {
+          resultsDiv.innerHTML = "<div class='muted'>No agents found.</div>";
+          return;
+        }
+        resultsDiv.innerHTML = contacts
+          .map(
+            c => `
+              <div class="contact-result" data-json='${escapeHtml(JSON.stringify(c))}'>
+                <strong>${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}</strong>
+                ${c.business_name ? ` — ${escapeHtml(c.business_name)}` : ""}<br/>
+                <small>${escapeHtml(c.email || "No email")}</small>
+              </div>
+            `
+          )
+          .join("");
+
+        resultsDiv.querySelectorAll(".contact-result").forEach(el => {
+          el.addEventListener("click", () => {
+            const data = JSON.parse(el.dataset.json);
+            agent = { id: data.contact_id, first_name: data.first_name, last_name: data.last_name };
+            onChange(agent);
+            renderSelected();
+          });
+        });
+      } catch (err) {
+        resultsDiv.textContent = "❌ Error searching agents.";
+        console.error(err);
+      }
+    });
+
+    container.querySelector(".btn-agent-add").addEventListener("click", renderAddForm);
+  }
+
+  function renderAddForm() {
+    container.innerHTML = `
+      <div class="card" style="padding:16px;">
+        <h4 style="margin:0 0 10px 0;">Add New ${escapeHtml(label)}</h4>
+        <div class="form-grid-2col">
+          <label>First Name</label>
+          <input type="text" class="agent-first">
+          <label>Last Name</label>
+          <input type="text" class="agent-last">
+          <label>Email</label>
+          <input type="text" class="agent-email">
+          <label>Agency / Business</label>
+          <input type="text" class="agent-business">
+        </div>
+        <div style="margin-top:12px; display:flex; gap:10px;">
+          <button type="button" class="btn-primary btn-agent-save">Save ${escapeHtml(label)}</button>
+          <button type="button" class="btn-secondary btn-agent-cancel">Cancel</button>
+        </div>
+      </div>
+    `;
+
+    container.querySelector(".btn-agent-cancel").addEventListener("click", renderSearch);
+
+    container.querySelector(".btn-agent-save").addEventListener("click", async () => {
+      const payload = {
+        project,
+        first_name: container.querySelector(".agent-first").value.trim(),
+        last_name: container.querySelector(".agent-last").value.trim(),
+        email: container.querySelector(".agent-email").value.trim(),
+        business_name: container.querySelector(".agent-business").value.trim(),
+        contact_type: "Agent"
+      };
+
+      if (!payload.first_name && !payload.last_name) {
+        alert("Enter at least a first or last name.");
+        return;
+      }
+
+      try {
+        const res = await fetch("https://contacts-module.dennis-e64.workers.dev/contacts/add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(`❌ Failed to save ${label}.`);
+          console.error(data);
+          return;
+        }
+        const saved = Array.isArray(data) ? data[0] : data;
+        agent = { id: saved.contact_id, first_name: saved.first_name, last_name: saved.last_name };
+        onChange(agent);
+        renderSelected();
+      } catch (err) {
+        alert(`Error saving ${label}: ` + err.message);
+        console.error(err);
+      }
+    });
+  }
+
+  renderSelected();
 }
 
 /* ============================================================
