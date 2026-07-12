@@ -380,7 +380,7 @@ export async function renderReview(container, portalState, noteId) {
         const payload = {
           note_title: note.subject || "(no subject)",
           note_body: note.summary || "",
-          staff_id: portalState.staffId,
+          staff_id: portalState.user_id,
           contact_id: portalState.clientId,
           project: portalState.project   // ⭐ REQUIRED
         };
