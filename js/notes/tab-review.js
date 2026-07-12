@@ -523,4 +523,9 @@ async function attachClientToNote(contactId, contactName, contactType, contactEm
       await renderReview(container, portalState, portalState.selectedNoteId);
     }
 
-  } catch
+  } catch (err) {
+    alert("Error attaching client: " + err.message);
+    console.error(err);
+  }
+}
+
