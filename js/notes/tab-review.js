@@ -359,7 +359,7 @@ export async function renderReview(container, portalState, noteId) {
     }
 
     // ------------------------------------------------------------
-    // ⭐⭐ NEW: SEND TO TODOIST BUTTON ⭐⭐
+    // ⭐⭐ SEND TO TODOIST BUTTON ⭐⭐
     // ------------------------------------------------------------
     const todoBtn = document.getElementById("btnSendTodoist");
 
@@ -371,14 +371,17 @@ export async function renderReview(container, portalState, noteId) {
           return;
         }
 
+        // ⭐ FIXED: pull title/body from the note itself, not portalState
+        // (portalState.noteTitle / noteBody were never set — Todoist v1
+        // rejects tasks with empty content)
         const payload = {
-          note_title: portalState.noteTitle,
-          note_body: portalState.noteBody,
-          staff_id: portalState.user_id,   // ⭐ FIXED
+          note_title: note.subject || "(no subject)",
+          note_body: note.summary || "",
+          staff_id: portalState.staffId,
           contact_id: portalState.clientId,
-          project: portalState.project
+          project: portalState.project   // ⭐ REQUIRED
         };
-        
+
         try {
           const res = await fetch(
             "https://todoist-nyfo-webhook.dennis-e64.workers.dev/send",
@@ -553,4 +556,3 @@ async function attachClientToNote(contactId, contactName, contactType, contactEm
     console.error(err);
   }
 }
-
