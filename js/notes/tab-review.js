@@ -14,6 +14,9 @@ if (!window._todoistListenerAdded) {
   window._todoistListenerAdded = true;
 
   window.addEventListener("message", (event) => {
+    // ⭐ SECURITY: only accept messages from our Todoist OAuth worker
+    if (event.origin !== "https://todoist-nyfo-webhook.dennis-e64.workers.dev") return;
+
     if (event.data && event.data.todoist === "connected") {
       console.log("[Todoist] OAuth complete, sending task now…");
       const btn = document.getElementById("btnSendTodoist");
@@ -377,7 +380,7 @@ export async function renderReview(container, portalState, noteId) {
         const payload = {
           note_title: note.subject || "(no subject)",
           note_body: note.summary || "",
-          staff_id: portalState.user_id,
+          staff_id: portalState.staffId,
           contact_id: portalState.clientId,
           project: portalState.project   // ⭐ REQUIRED
         };
@@ -395,11 +398,13 @@ export async function renderReview(container, portalState, noteId) {
           const data = await res.json().catch(() => null);
 
           if (data?.status === "no_token") {
-            // Open Todoist OAuth in a popup, keep portal tab intact
+            // Open Todoist OAuth in a popup, keep portal tab intact.
+            // ⭐ FIXED: no "noopener" here — the popup needs window.opener
+            // to postMessage back and trigger the automatic re-send.
             window.open(
               data.auth_url,
               "todoistAuth",
-              "width=600,height=700,noopener,noreferrer"
+              "width=600,height=700"
             );
             return;
           }
