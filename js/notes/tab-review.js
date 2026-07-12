@@ -1,4 +1,5 @@
 // /notes/tab-review.js
+
 // Handles: Note review, metadata editing, client assignment, deletion, relationships navigation
 
 import { escapeHtml, formatDateTime, getEasternDateOnly } from "../utilities.js";
@@ -9,6 +10,7 @@ import { renderHistory } from "./tab-history.js";
 // Main Renderer
 // ------------------------------------------------------------
 export async function renderReview(container, portalState, noteId) {
+
   console.log("[Review] Called with noteId:", noteId);
 
   // ⭐ FIX #1 — If noteId wasn't passed but exists in portalState, use it.
@@ -62,17 +64,14 @@ export async function renderReview(container, portalState, noteId) {
 
   <div class="row" style="gap:12px; margin-bottom:12px;">
     <h2 style="margin:0;">Notes Review: ${escapeHtml(note.subject || "(no subject)")}</h2>
-
     <button id="btnSetClient" class="btn-secondary btn-edit">Set Contact</button>
 
-    ${
-      portalState.deleteAllowed
-        ? `<button id="btnDeleteNote" class="btn-danger btn-delete">Delete</button>`
-        : ``
-    }
+    ${ portalState.deleteAllowed ? `<button id="btnDeleteNote" class="btn-danger btn-delete">Delete</button>` : `` }
 
-    <!-- ⭐ NEW BUTTON -->
-    <button id="btnCheckRouting" class="btn-secondary">Check Contact Relationship</button>
+    <!-- ⭐ NEW: Send to Todoist (NYFO only) -->
+    ${ portalState.project === "nyfo"
+        ? `<button id="btnSendTodoist" class="btn-secondary">Send to Todoist</button>`
+        : `` }
   </div>
 
   <!-- ⭐ UPDATED: Unified Search Box -->
@@ -129,21 +128,21 @@ export async function renderReview(container, portalState, noteId) {
     ${
       Array.isArray(note.followups_raw) && note.followups_raw.length > 0
         ? `
-      <ul style="margin-top:12px; padding-left:20px;">
-        ${note.followups_raw
-          .map(
-            f => `
-          <li style="margin-bottom:8px;">
-            <strong>${escapeHtml(f.text || "")}</strong><br/>
-            <span class="muted" style="font-size:0.9em;">
-              Source: ${escapeHtml(f.source_text || "")}
-            </span>
-          </li>
+          <ul style="margin-top:12px; padding-left:20px;">
+            ${note.followups_raw
+              .map(
+                f => `
+                  <li style="margin-bottom:8px;">
+                    <strong>${escapeHtml(f.text || "")}</strong><br/>
+                    <span class="muted" style="font-size:0.9em;">
+                      Source: ${escapeHtml(f.source_text || "")}
+                    </span>
+                  </li>
+                `
+              )
+              .join("")}
+          </ul>
         `
-          )
-          .join("")}
-      </ul>
-    `
         : `<p class="muted" style="margin-top:12px;">(none detected)</p>`
     }
   </details>
@@ -151,57 +150,57 @@ export async function renderReview(container, portalState, noteId) {
   ${
     note.raw_text
       ? `
-    <details style="margin-top:12px;">
-      <summary>Raw Text (click to expand)</summary>
-      ${
-        /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(note.raw_text)
-          ? `<div class="html-note-block">${note.raw_text}</div>`
-          : `<div class="raw-text-block">${note.raw_text}</div>`
-      }
-    </details>
-  `
+        <details style="margin-top:12px;">
+          <summary>Raw Text (click to expand)</summary>
+          ${
+            /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(note.raw_text)
+              ? `<div class="html-note-block">${note.raw_text}</div>`
+              : `<div class="raw-text-block">${note.raw_text}</div>`
+          }
+        </details>
+      `
       : ""
   }
 
   ${
     Array.isArray(relationships) && relationships.length > 0
       ? `
-    <div class="row" style="gap:12px; margin-top:20px;">
-      <h3 style="margin:0;">Relationships Detected in Note</h3>
-      ${
-        note.contact_id
-          ? `<button id="btnRelationships" class="btn-primary">Notes Relationships</button>`
-          : `<span class="muted">(need to set client to continue)</span>`
-      }
-    </div>
+        <div class="row" style="gap:12px; margin-top:20px;">
+          <h3 style="margin:0;">Relationships Detected in Note</h3>
+          ${
+            note.contact_id
+              ? `<button id="btnRelationships" class="btn-primary">Notes Relationships</button>`
+              : `<span class="muted">(need to set client to continue)</span>`
+          }
+        </div>
 
-    <table class="notes-table" style="margin-top:12px;">
-      <thead>
-        <tr>
-          <th>Raw Name</th>
-          <th>AI First</th>
-          <th>AI Last</th>
-          <th>Role/Type</th>
-          <th>Context</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${relationships
-          .map(
-            r => `
-          <tr>
-            <td>${escapeHtml(r.raw_name || "")}</td>
-            <td>${escapeHtml(r.first_name_ai || "")}</td>
-            <td>${escapeHtml(r.last_name_ai || "")}</td>
-            <td>${escapeHtml(r.role_label_ai || "")}</td>
-            <td>${escapeHtml(r.context_description_ai || "")}</td>
-          </tr>
-        `
-          )
-          .join("")}
-      </tbody>
-    </table>
-  `
+        <table class="notes-table" style="margin-top:12px;">
+          <thead>
+            <tr>
+              <th>Raw Name</th>
+              <th>AI First</th>
+              <th>AI Last</th>
+              <th>Role/Type</th>
+              <th>Context</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${relationships
+              .map(
+                r => `
+                  <tr>
+                    <td>${escapeHtml(r.raw_name || "")}</td>
+                    <td>${escapeHtml(r.first_name_ai || "")}</td>
+                    <td>${escapeHtml(r.last_name_ai || "")}</td>
+                    <td>${escapeHtml(r.role_label_ai || "")}</td>
+                    <td>${escapeHtml(r.context_description_ai || "")}</td>
+                  </tr>
+                `
+              )
+              .join("")}
+          </tbody>
+        </table>
+      `
       : ""
   }
 
@@ -271,6 +270,7 @@ export async function renderReview(container, portalState, noteId) {
         }
 
         alert("✅ Note metadata saved.");
+
       } catch (err) {
         alert("Error saving note metadata: " + err.message);
         console.error(err);
@@ -286,7 +286,7 @@ export async function renderReview(container, portalState, noteId) {
     });
 
     // ------------------------------------------------------------
-    // RELATIONSHIPS BUTTON — FIXED
+    // RELATIONSHIPS BUTTON
     // ------------------------------------------------------------
     const relBtn = document.getElementById("btnRelationships");
     if (relBtn) {
@@ -306,7 +306,7 @@ export async function renderReview(container, portalState, noteId) {
     }
 
     // ------------------------------------------------------------
-    // DELETE NOTE — SAFE VERSION
+    // DELETE NOTE
     // ------------------------------------------------------------
     const deleteBtn = document.getElementById("btnDeleteNote");
     if (deleteBtn) {
@@ -331,6 +331,7 @@ export async function renderReview(container, portalState, noteId) {
           document
             .querySelector('#notes-subtabs button[data-subtab="history"]')
             ?.classList.add("active");
+
         } catch (err) {
           alert("Error deleting note: " + err.message);
           console.error(err);
@@ -339,19 +340,28 @@ export async function renderReview(container, portalState, noteId) {
     }
 
     // ------------------------------------------------------------
-    // ⭐⭐ NEW: CHECK CONTACT RELATIONSHIP BUTTON ⭐⭐
+    // ⭐⭐ NEW: SEND TO TODOIST BUTTON ⭐⭐
     // ------------------------------------------------------------
-    const checkBtn = document.getElementById("btnCheckRouting");
-    if (checkBtn) {
-      checkBtn.addEventListener("click", async () => {
-        try {
-          const payload = {
-            note_id: note.id,
-            project: portalState.project
-          };
+    const todoBtn = document.getElementById("btnSendTodoist");
 
+    if (todoBtn) {
+      todoBtn.addEventListener("click", async () => {
+
+        if (!portalState.clientId) {
+          alert("❌ This note has no contact attached. Attach a contact first.");
+          return;
+        }
+
+        const payload = {
+          note_title: note.subject || "(no subject)",
+          note_body: note.summary || note.raw_text || "",
+          staff_id: portalState.staffId,
+          contact_id: portalState.clientId
+        };
+
+        try {
           const res = await fetch(
-            "https://notes-relationship-module.dennis-e64.workers.dev/route-one",
+            "https://todoist-nyfo-webhook.dennis-e64.workers.dev/send",
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -361,18 +371,21 @@ export async function renderReview(container, portalState, noteId) {
 
           const data = await res.json().catch(() => null);
 
-          if (!res.ok) {
-            alert(`❌ Routing failed: ${data?.error || "Unknown error"}`);
+          if (data?.status === "no_token") {
+            window.location.href = data.auth_url;
             return;
           }
 
-          alert(`Routing Result: ${data.result?.status || "unknown"}`);
+          if (!res.ok) {
+            alert("❌ Failed to send to Todoist.");
+            console.error(data);
+            return;
+          }
 
-          // Refresh the screen to show updated contact
-          await renderReview(container, portalState, note.id);
+          alert("✅ Sent to Todoist!");
 
         } catch (err) {
-          alert("Error calling routing worker: " + err.message);
+          alert("❌ Error sending to Todoist: " + err.message);
           console.error(err);
         }
       });
@@ -395,17 +408,17 @@ export async function renderReview(container, portalState, noteId) {
       const encoded = encodeURIComponent(`*${term}*`);
 
       const url = `
-https://client-portal-api.dennis-e64.workers.dev/api/contacts?
-project=${portalState.project}&
-or=(
-  first_name.ilike.${encoded},
-  last_name.ilike.${encoded},
-  business_name.ilike.${encoded},
-  search_name.ilike.${encoded},
-  email.ilike.${encoded}
-)
-&select=contact_id,first_name,last_name,email,contact_type
-`.replace(/\s+/g, "");
+        https://client-portal-api.dennis-e64.workers.dev/api/contacts?
+        project=${portalState.project}&
+        or=(
+          first_name.ilike.${encoded},
+          last_name.ilike.${encoded},
+          business_name.ilike.${encoded},
+          search_name.ilike.${encoded},
+          email.ilike.${encoded}
+        )
+        &select=contact_id,first_name,last_name,email,contact_type
+      `.replace(/\s+/g, "");
 
       try {
         const res = await fetch(url);
@@ -426,16 +439,16 @@ or=(
         resultsDiv.innerHTML = contacts
           .map(
             c => `
-<div class="contact-result"
-  data-id="${c.contact_id}"
-  data-name="${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}"
-  data-type="${escapeHtml(c.contact_type || "")}"
-  data-email="${escapeHtml(c.email || "")}">
-  <strong>${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}</strong>
-  (${escapeHtml(c.contact_type || "No type")})<br/>
-  <small>${escapeHtml(c.email || "No email")}</small>
-</div>
-`
+              <div class="contact-result"
+                data-id="${c.contact_id}"
+                data-name="${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}"
+                data-type="${escapeHtml(c.contact_type || "")}"
+                data-email="${escapeHtml(c.email || "")}">
+                <strong>${escapeHtml(c.first_name || "")} ${escapeHtml(c.last_name || "")}</strong>
+                (${escapeHtml(c.contact_type || "No type")})<br/>
+                <small>${escapeHtml(c.email || "No email")}</small>
+              </div>
+            `
           )
           .join("");
 
@@ -455,6 +468,7 @@ or=(
             );
           });
         });
+
       } catch (err) {
         resultsDiv.textContent = "❌ Network error searching contacts.";
         console.error(err);
@@ -509,8 +523,4 @@ async function attachClientToNote(contactId, contactName, contactType, contactEm
       await renderReview(container, portalState, portalState.selectedNoteId);
     }
 
-  } catch (err) {
-    alert("Error attaching client: " + err.message);
-    console.error(err);
-  }
-}
+  } catch
