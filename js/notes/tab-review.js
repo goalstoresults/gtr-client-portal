@@ -373,7 +373,12 @@ export async function renderReview(container, portalState, noteId) {
           const data = await res.json().catch(() => null);
 
           if (data?.status === "no_token") {
-            window.location.href = data.auth_url;
+            // Open Todoist OAuth in a popup, keep portal tab intact
+            window.open(
+              data.auth_url,
+              "todoistAuth",
+              "width=600,height=700,noopener,noreferrer"
+            );
             return;
           }
 
