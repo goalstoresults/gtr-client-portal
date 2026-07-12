@@ -7,6 +7,25 @@ import { renderRelationships } from "./tab-relationships.js";
 import { renderHistory } from "./tab-history.js";
 
 // ------------------------------------------------------------
+// Used when calling ToDoist - when using nyfo notes
+// ------------------------------------------------------------
+
+if (!window._todoistListenerAdded) {
+  window._todoistListenerAdded = true;
+
+  window.addEventListener("message", (event) => {
+    if (event.data && event.data.todoist === "connected") {
+      console.log("[Todoist] OAuth complete, sending task now…");
+      const btn = document.getElementById("btnSendTodoist");
+      if (btn) {
+        btn.click(); // re‑use the same handler; now token exists, so it just sends
+      }
+    }
+  });
+}
+
+
+// ------------------------------------------------------------
 // Main Renderer
 // ------------------------------------------------------------
 export async function renderReview(container, portalState, noteId) {
