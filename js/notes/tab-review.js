@@ -355,9 +355,10 @@ export async function renderReview(container, portalState, noteId) {
         const payload = {
           note_title: note.subject || "(no subject)",
           note_body: note.summary || note.raw_text || "",
-          staff_id: portalState.staffId,
+          staff_id: portalState.user_id,   // ⭐ FIXED
           contact_id: portalState.clientId
         };
+
 
         try {
           const res = await fetch(
