@@ -372,12 +372,12 @@ export async function renderReview(container, portalState, noteId) {
         }
 
         const payload = {
-          note_title: note.subject || "(no subject)",
-          note_body: note.summary || note.raw_text || "",
-          staff_id: portalState.user_id,   // ⭐ FIXED
-          contact_id: portalState.clientId
+          note_title: portalState.noteTitle,
+          note_body: portalState.noteBody,
+          staff_id: portalState.staffId,
+          contact_id: portalState.clientId,
+          project: portalState.project   // ⭐ REQUIRED
         };
-
 
         try {
           const res = await fetch(
