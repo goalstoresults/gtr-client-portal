@@ -3,7 +3,7 @@
 
 import { escapeHtml, formatDateTime } from "../utilities.js";
 
-const CSI_ISN_GATEWAY_URL = "https://csi-isn-gateway.<your-subdomain>.workers.dev";
+const CSI_ISN_GATEWAY_URL = "https://csi-isn-gateway.dennis-e64.workers.dev";
 
 export async function renderLeadsList(container, portalState) {
   try {
