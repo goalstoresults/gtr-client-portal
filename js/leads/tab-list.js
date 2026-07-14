@@ -3,6 +3,8 @@
 
 import { escapeHtml, formatDateTime } from "../utilities.js";
 
+const CSI_ISN_GATEWAY_URL = "https://csi-isn-gateway.<your-subdomain>.workers.dev";
+
 export async function renderLeadsList(container, portalState) {
   try {
 
@@ -205,6 +207,57 @@ export async function renderLeadsList(container, portalState) {
           if (detailsBtn) detailsBtn.click();
         });
       });
+
+      // "To ISN" transfer buttons
+      tableDiv.querySelectorAll(".btn-to-isn").forEach(btn => {
+        btn.addEventListener("click", () => handleTransferToIsn(btn));
+      });
+    }
+
+    /* -------------------------------------------------------
+       TRANSFER TO ISN
+       Step 1: Worker looks up the lead's contact_id
+       Step 2: If contact has no isn_client_id yet, create it in ISN
+       Step 3: Worker writes isn_client_id back onto the contact row
+    ------------------------------------------------------- */
+    async function handleTransferToIsn(btn) {
+      const leadId = btn.dataset.leadId;
+      const originalText = btn.textContent;
+
+      btn.disabled = true;
+      btn.textContent = "Sending…";
+
+      try {
+        const res = await fetch(`${CSI_ISN_GATEWAY_URL}/lead/transfer-client`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lead_id: leadId,
+            project: portalState.project,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          console.error("[To ISN] Transfer failed:", data);
+          alert(`Transfer to ISN failed: ${data.error || "Unknown error"}`);
+          btn.disabled = false;
+          btn.textContent = originalText;
+          return;
+        }
+
+        // Success -- reflect the new state. isnCreated tells you whether a
+        // new client was created just now, vs an existing isn_client_id
+        // that was already there (idempotency case).
+        btn.textContent = data.isnCreated ? "Sent to ISN" : "Already in ISN";
+        btn.classList.add("btn-to-isn-done");
+      } catch (err) {
+        console.error("[To ISN] Network error:", err);
+        alert("Transfer to ISN failed — network error. Check console.");
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
     }
 
     /* -------------------------------------------------------
@@ -233,6 +286,13 @@ export async function renderLeadsList(container, portalState) {
       const safeName = (l.lead_name || "").replace(/"/g, '&quot;');
       const safeClient = (l.client_search_name || "").replace(/"/g, '&quot;');
 
+      const showToIsn =
+        l.stage_name === "Ready to Transfer" && portalState.project === "csi";
+
+      const toIsnButton = showToIsn
+        ? `<button class="secondary btn-to-isn" data-lead-id="${l.lead_id}">To ISN</button>`
+        : "";
+
       return `
         <tr>
           <td>${escapeHtml(l.lead_name || "")}</td>
@@ -248,6 +308,7 @@ export async function renderLeadsList(container, portalState) {
               data-client="${safeClient}">
               Select
             </button>
+            ${toIsnButton}
           </td>
         </tr>
       `;
