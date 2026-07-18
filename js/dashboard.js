@@ -9,7 +9,7 @@ export async function loadDashboardTab({ portalState, tabContent }) {
   const res = await fetch("./components/dashboard.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
 
-  // Context bar
+  // Context bar (same pattern as Contacts)
   let contextBar = document.getElementById("dashboard-context-bar");
   if (!contextBar) {
     contextBar = document.createElement("div");
@@ -24,7 +24,7 @@ export async function loadDashboardTab({ portalState, tabContent }) {
 
   const fullAdmin = portalState.full_admin === true;
 
-  // Hide admin-only subtabs
+  // Hide Defaults + Staff if not admin
   buttons.forEach(btn => {
     const subtab = btn.dataset.subtab;
     if ((subtab === "defaults" || subtab === "staff") && !fullAdmin) {
@@ -32,10 +32,10 @@ export async function loadDashboardTab({ portalState, tabContent }) {
     }
   });
 
-  // Re-select buttons after removals
+  // Re‑query after removals
   const wiredButtons = tabContent.querySelectorAll("#dashboard-subtabs button");
 
-  // Wire subtab clicks
+  // Subtab router (same style as Contacts.js)
   wiredButtons.forEach(btn => {
     btn.addEventListener("click", async () => {
       wiredButtons.forEach(b => b.classList.remove("active"));
@@ -66,13 +66,12 @@ export async function loadDashboardTab({ portalState, tabContent }) {
     });
   });
 
-  // ⭐ ALWAYS ACTIVATE STATS WHEN TOP MENU "Dashboard" IS CLICKED
-  const statsBtn = tabContent.querySelector(
+  // Default to Stats when Dashboard top tab is clicked
+  const defaultBtn = tabContent.querySelector(
     '#dashboard-subtabs button[data-subtab="stats"]'
   );
-
-  if (statsBtn) {
-    statsBtn.classList.add("active");
+  if (defaultBtn) {
+    defaultBtn.classList.add("active");
     await renderDashboardStats(content, portalState);
   }
 }
