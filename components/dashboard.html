@@ -1,25 +1,11 @@
-<!-- Dashboard partial -->
-<section class="card">
-  <h2>Dashboard</h2>
+<div id="dashboardContentWrapper">
 
-  <!-- Summary row -->
-  <div class="row" style="gap:12px; margin-bottom:12px;">
-    <div class="card stat">
-      <h3 id="statContacts">0</h3>
-      <p class="muted">Contacts</p>
-    </div>
-    <div class="card stat">
-      <h3 id="statNotes">0</h3>
-      <p class="muted">Notes</p>
-    </div>
-    <div class="card stat">
-      <h3 id="statTasks">0</h3>
-      <p class="muted">Tasks</p>
-    </div>
+  <div id="dashboard-subtabs" class="subtabs">
+    <button data-subtab="stats">Stats</button>
+    <button data-subtab="defaults">Defaults</button>
+    <button data-subtab="staff">Staff</button>
   </div>
 
-  <!-- Chart area -->
-  <div id="dashboardChart" class="card muted">
-    Charts will load here.
-  </div>
-</section>
+  <div id="dashboardContent"></div>
+
+</div>
