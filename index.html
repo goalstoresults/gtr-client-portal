@@ -192,6 +192,7 @@ import { loadRelationshipsTab } from "./js/relationships.js";
 import { loadHelpTab } from "./js/help.js";
 import { loadInspectionsTab } from "./js/inspections.js";
 import { loadLeadsTab } from "./js/leads.js";
+import { loadDashboardTab } from "./js/dashboard.js";
 
 
 /* ============================================================
@@ -241,6 +242,7 @@ TAB MAP
 ============================================================ */
 
 const tabMap = {
+"0": { label: "Dashboard", loader: loadDashboardTab },    
 "1": { label: "Contacts", loader: loadContactsTab },
 "2": { label: "Financials", loader: loadFinancialsTab },
 "3": { label: "Notes", loader: loadNotesTab },
