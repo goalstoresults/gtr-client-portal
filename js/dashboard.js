@@ -1,18 +1,16 @@
-/* =========================================================
-   Dashboard Module (Tab 0)
-   - Stats
-   - Defaults (admin only)
-   - Staff (admin only)
-========================================================= */
+// js/dashboard.js
+// Main controller for the Dashboard module
+
+import { renderDashboardStats } from "./dashboard/stats.js";
+import { renderDashboardDefaults } from "./dashboard/defaults.js";
+import { renderDashboardStaff } from "./dashboard/staff.js";
 
 export async function loadDashboardTab({ portalState, tabContent }) {
   // Load base HTML template
   const res = await fetch("./components/dashboard.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
 
-  /* ---------------------------------------------------------
-     Inject context bar (same pattern as Financials)
-  --------------------------------------------------------- */
+  // Context bar
   let contextBar = document.getElementById("dashboard-context-bar");
   if (!contextBar) {
     contextBar = document.createElement("div");
@@ -23,13 +21,9 @@ export async function loadDashboardTab({ portalState, tabContent }) {
 
   contextBar.textContent = "Dashboard Overview";
 
-  /* ---------------------------------------------------------
-     Submenu buttons
-  --------------------------------------------------------- */
   const content = tabContent.querySelector("#dashboardContent");
   const buttons = tabContent.querySelectorAll("#dashboard-subtabs button");
 
-  // Determine which submenus to show
   const fullAdmin = portalState.full_admin === true;
 
   buttons.forEach(btn => {
@@ -41,45 +35,25 @@ export async function loadDashboardTab({ portalState, tabContent }) {
       return;
     }
 
-    // Wire click handler
     btn.addEventListener("click", async () => {
       buttons.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
-      /* -----------------------------------------------------
-         Subtab Routing
-      ----------------------------------------------------- */
       if (subtab === "stats") {
-        content.innerHTML = `
-          <section class="card">
-            <h3>Dashboard Stats</h3>
-            <p>Coming soon…</p>
-          </section>
-        `;
+        await renderDashboardStats(content, portalState);
         return;
       }
 
       if (subtab === "defaults") {
-        content.innerHTML = `
-          <section class="card">
-            <h3>Dashboard Defaults</h3>
-            <p>Coming soon…</p>
-          </section>
-        `;
+        await renderDashboardDefaults(content, portalState);
         return;
       }
 
       if (subtab === "staff") {
-        content.innerHTML = `
-          <section class="card">
-            <h3>Dashboard Staff Settings</h3>
-            <p>Coming soon…</p>
-          </section>
-        `;
+        await renderDashboardStaff(content, portalState);
         return;
       }
 
-      // Fallback
       content.innerHTML = `
         <section class="card">
           <p>Select a subtab to begin.</p>
@@ -88,20 +62,13 @@ export async function loadDashboardTab({ portalState, tabContent }) {
     });
   });
 
-  /* ---------------------------------------------------------
-     Default view = Stats
-  --------------------------------------------------------- */
+  // Default = Stats
   const defaultBtn = tabContent.querySelector(
     '#dashboard-subtabs button[data-subtab="stats"]'
   );
 
   if (defaultBtn) {
     defaultBtn.classList.add("active");
-    content.innerHTML = `
-      <section class="card">
-        <h3>Dashboard Stats</h3>
-        <p>Coming soon…</p>
-      </section>
-    `;
+    await renderDashboardStats(content, portalState);
   }
 }
