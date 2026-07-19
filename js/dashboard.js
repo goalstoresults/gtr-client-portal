@@ -1,6 +1,8 @@
 // js/dashboard.js
-
-import { renderDashboardStats } from "./dashboard/stats.js";
+import { renderDashboardOverview } from "./dashboard/overview.js";
+import { renderDashboardRevenue } from "./dashboard/revenue.js";
+import { renderDashboardClients } from "./dashboard/clients.js";
+import { renderDashboardPipeline } from "./dashboard/pipeline.js";
 import { renderDashboardDefaults } from "./dashboard/defaults.js";
 import { renderDashboardStaff } from "./dashboard/staff.js";
 
@@ -20,58 +22,62 @@ export async function loadDashboardTab({ portalState, tabContent }) {
   contextBar.textContent = "Dashboard Overview";
 
   const content = tabContent.querySelector("#dashboardContent");
-  const buttons = tabContent.querySelectorAll("#dashboard-subtabs button");
-
+  const subtabBar = tabContent.querySelector("#dashboard-subtabs");
   const fullAdmin = portalState.full_admin === true;
 
-  // Hide Defaults + Staff if not admin
-  buttons.forEach(btn => {
-    const subtab = btn.dataset.subtab;
-    if ((subtab === "defaults" || subtab === "staff") && !fullAdmin) {
-      btn.remove();
-    }
-  });
+  // ----------------------------------------------------------
+  // Which sections may this user see?
+  // portalState.dashboard_allowed_widgets should be the array from
+  // projects_staff (e.g. ["pulse","revenue","clients","pipeline"]).
+  // If it's missing from portalState (not yet loaded at login),
+  // we show all sections — the Worker still refuses data server-side,
+  // so nothing leaks; the tab just shows "couldn't load".
+  // TODO: populate portalState.dashboard_allowed_widgets at login.
+  // ----------------------------------------------------------
+  const allowed = Array.isArray(portalState.dashboard_allowed_widgets)
+    ? portalState.dashboard_allowed_widgets
+    : null; // null = unknown -> show all, server enforces
 
-  // Re‑query after removals
-  const wiredButtons = tabContent.querySelectorAll("#dashboard-subtabs button");
+  const canSee = (key) =>
+    fullAdmin || allowed === null || allowed.includes(key);
 
-  // Subtab router (same style as Contacts.js)
-  wiredButtons.forEach(btn => {
-    btn.addEventListener("click", async () => {
-      wiredButtons.forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
+  // ----------------------------------------------------------
+  // Build the sub-tab bar dynamically (replaces whatever the
+  // template has in #dashboard-subtabs, so the HTML file needs
+  // no button edits).
+  // ----------------------------------------------------------
+  const SECTIONS = [
+    { key: "overview", label: "Overview", render: renderDashboardOverview, show: true },
+    { key: "revenue",  label: "Revenue",  render: renderDashboardRevenue,  show: canSee("revenue") },
+    { key: "clients",  label: "Clients",  render: renderDashboardClients,  show: canSee("clients") },
+    { key: "pipeline", label: "Pipeline", render: renderDashboardPipeline, show: canSee("pipeline") },
+    { key: "defaults", label: "Defaults", render: renderDashboardDefaults, show: fullAdmin },
+    { key: "staff",    label: "Staff",    render: renderDashboardStaff,    show: fullAdmin }
+  ];
 
-      const subtab = btn.dataset.subtab;
+  subtabBar.innerHTML = SECTIONS
+    .filter((s) => s.show)
+    .map((s) => `<button data-subtab="${s.key}">${s.label}</button>`)
+    .join("");
 
-      switch (subtab) {
-        case "stats":
-          await renderDashboardStats(content, portalState);
-          break;
+  const wiredButtons = subtabBar.querySelectorAll("button");
 
-        case "defaults":
-          await renderDashboardDefaults(content, portalState);
-          break;
+  // Overview headline tiles call ctx.navigate("revenue") etc.
+  const ctx = { navigate: (key) => showSubTab(key) };
 
-        case "staff":
-          await renderDashboardStaff(content, portalState);
-          break;
-
-        default:
-          content.innerHTML = `
-            <section class="card">
-              <p>Select a subtab to begin.</p>
-            </section>
-          `;
-      }
-    });
-  });
-
-  // Default to Stats when Dashboard top tab is clicked
-  const defaultBtn = tabContent.querySelector(
-    '#dashboard-subtabs button[data-subtab="stats"]'
-  );
-  if (defaultBtn) {
-    defaultBtn.classList.add("active");
-    await renderDashboardStats(content, portalState);
+  async function showSubTab(key) {
+    const section = SECTIONS.find((s) => s.key === key && s.show);
+    if (!section) return;
+    wiredButtons.forEach((b) =>
+      b.classList.toggle("active", b.dataset.subtab === key)
+    );
+    await section.render(content, portalState, ctx);
   }
+
+  wiredButtons.forEach((btn) => {
+    btn.addEventListener("click", () => showSubTab(btn.dataset.subtab));
+  });
+
+  // Default to Overview when the Dashboard top tab is clicked
+  await showSubTab("overview");
 }
