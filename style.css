@@ -618,64 +618,148 @@ th.sortable:hover .sort-arrows {
   }
 }
 
+/* ============================================================
+   Dashboard — replace the existing .dashboard-* block in style.css
+   (from .dashboard-card through .dashboard-chart-title) with this.
+   Mockup look & feel: gold accents, bordered tiles, delta pills,
+   tiles left / chart right.
+   ============================================================ */
+
 .dashboard-card {
-  padding: 20px;
   background: #fff;
-  border-radius: 8px;
+  border: 1px solid #e6e4de;
+  border-radius: 10px;
+  padding: 22px 22px 18px;
   margin-top: 20px;
 }
 
+.dashboard-cat-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
 .dashboard-title {
-  font-size: 22px;
-  font-weight: 600;
-  margin-bottom: 20px;
+  font-size: 16px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #1c1b18;
+}
+.dashboard-title::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: #b8860b;
+  margin-right: 10px;
+}
+
+.dashboard-period-note {
+  font-size: 12.5px;
+  color: #6b6a63;
+}
+
+/* tiles left, chart right — stacks on narrow screens */
+.dashboard-cat-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .dashboard-cat-body { grid-template-columns: 1fr; }
 }
 
 .dashboard-metric-row {
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 520px) {
+  .dashboard-metric-row { grid-template-columns: 1fr; }
 }
 
 .dashboard-metric-box {
-  flex: 1;
-  min-width: 240px;
+  border: 1px solid #e6e4de;
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #fff;
 }
 
 .dashboard-metric-label {
-  font-size: 14px;
-  color: #666;
-  margin-bottom: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #6b6a63;
+  margin-bottom: 6px;
 }
 
 .dashboard-metric-value {
-  font-size: 28px;
-  font-weight: 600;
-}
-
-.metric-up {
-  color: #2ecc71;
-  font-size: 16px;
-  margin-left: 6px;
-}
-
-.metric-down {
-  color: #e74c3c;
-  font-size: 16px;
-  margin-left: 6px;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #1c1b18;
+  font-feature-settings: "tnum" 1, "lnum" 1;
 }
 
 .dashboard-metric-sub {
-  font-size: 13px;
-  color: #888;
-  margin-top: 4px;
+  font-size: 12px;
+  color: #6b6a63;
+  margin-top: 5px;
 }
 
-.dashboard-chart-area {
-  margin-top: 30px;
+/* delta pills (replaces bare-text .metric-up / .metric-down) */
+.delta {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  margin-left: 8px;
+  vertical-align: 3px;
+  font-feature-settings: "tnum" 1;
+}
+.delta-up   { color: #1e7a46; background: #e4f2ea; }
+.delta-down { color: #b02a24; background: #f9e8e7; }
+.delta-flat { color: #6b6a63; background: #f7f6f3; }
+
+/* keep old classes working anywhere else they're used */
+.metric-up   { color: #1e7a46; font-size: 14px; margin-left: 6px; }
+.metric-down { color: #b02a24; font-size: 14px; margin-left: 6px; }
+
+/* chart card */
+.dashboard-hero {
+  border: 1px solid #e6e4de;
+  border-radius: 8px;
+  padding: 14px 16px 10px;
+  background: #fff;
 }
 
 .dashboard-chart-title {
-  font-size: 18px;
-  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1c1b18;
+  margin-bottom: 2px;
 }
+
+.dashboard-chart-sub {
+  font-size: 12px;
+  color: #6b6a63;
+  margin-bottom: 8px;
+}
+
+.dashboard-legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #6b6a63;
+  margin-top: 8px;
+}
+.dashboard-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.swatch-solid { background: #b8860b; }
+.swatch-pace  { background: none; border: 2px dashed #b8860b; }
