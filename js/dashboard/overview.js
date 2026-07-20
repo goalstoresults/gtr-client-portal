@@ -87,7 +87,7 @@ export async function renderDashboardOverview(container, portalState, ctx) {
           `$${Number(hl.revenue.amount).toLocaleString()}`,
           pctBadge(hl.revenue.change_pct),
           hl.revenue.projection && isCurrentPeriod(dashboardState.period)
-            ? `Projects to $${Number(hl.revenue.projection).toLocaleString()}`
+            ? `Projects to $${Number(hl.revenue.projection).toLocaleString()} · View revenue →`
             : "View revenue →")
       : pendingTile("Revenue"));
   }
