@@ -97,14 +97,15 @@ export async function renderDashboardRevenue(container, portalState) {
     }
     const rev = data.revenue;
 
-    const paceChange = rev.avg_per_day ? rev.avg_per_day.change_pct : null;
     const projLine = isCurrent && rev.mtd.pace_projection
       ? ` · projects to $${rev.mtd.pace_projection.toLocaleString()}`
       : "";
 
     document.getElementById("rev-mtd").innerHTML =
-      `$${rev.mtd.amount.toLocaleString()} ${pctBadge(paceChange)}`;
-    document.getElementById("rev-mtd-sub").innerHTML = `Pace vs prior month${projLine}`;
+      `$${rev.mtd.amount.toLocaleString()} ${pctBadge(rev.mtd.change_pct)}`;
+    document.getElementById("rev-mtd-sub").innerHTML = isCurrent
+      ? `At this point last month: $${(rev.mtd.same_point_last_month ?? 0).toLocaleString()}${projLine}`
+      : `Prior month: $${(rev.mtd.same_point_last_month ?? 0).toLocaleString()}`;
 
     document.getElementById("rev-avg").innerHTML =
       `$${rev.avg_per_day.current.toLocaleString()} ${pctBadge(rev.avg_per_day.change_pct)}`;
