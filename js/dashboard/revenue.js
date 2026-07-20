@@ -97,9 +97,10 @@ export async function renderDashboardRevenue(container, portalState) {
     }
     const rev = data.revenue;
 
-    const projLine = isCurrent && rev.mtd.pace_projection
-      ? ` · projects to $${rev.mtd.pace_projection.toLocaleString()}`
-      : "";
+    const projLine = !isCurrent || !rev.mtd.pace_projection ? ""
+      : rev.mtd.pace_projection === rev.mtd.amount
+        ? " · on last month's pattern, the month is complete"
+        : ` · projects to $${rev.mtd.pace_projection.toLocaleString()}`;
 
     document.getElementById("rev-mtd").innerHTML =
       `$${rev.mtd.amount.toLocaleString()} ${pctBadge(rev.mtd.change_pct)}`;
@@ -115,14 +116,18 @@ export async function renderDashboardRevenue(container, portalState) {
     const refRevBadge = pctBadge(rev.referrals.revenue_change_pct);
     document.getElementById("ref-mtd").innerHTML =
       `$${rev.referrals.revenue_mtd.toLocaleString()} ${refRevBadge}`;
-    document.getElementById("ref-mtd-sub").innerHTML = refRevBadge
-      ? "Pace vs prior month"
+    document.getElementById("ref-mtd-sub").innerHTML = isCurrent
+      ? `At this point last month: $${(rev.referrals.revenue_same_point_last_month ?? 0).toLocaleString()}`
       : `Prior month: $${(rev.referrals.revenue_last_month ?? 0).toLocaleString()}`;
 
+    const refCountPrior = isCurrent
+      ? (rev.referrals.count_same_point_last_month ?? rev.referrals.count_last_month)
+      : rev.referrals.count_last_month;
     document.getElementById("ref-count").innerHTML =
-      `${rev.referrals.count_mtd} ${countBadge(rev.referrals.count_mtd, rev.referrals.count_last_month)}`;
-    document.getElementById("ref-count-sub").innerHTML =
-      `Prior month: ${rev.referrals.count_last_month}`;
+      `${rev.referrals.count_mtd} ${countBadge(rev.referrals.count_mtd, refCountPrior)}`;
+    document.getElementById("ref-count-sub").innerHTML = isCurrent
+      ? `At this point last month: ${refCountPrior}`
+      : `Prior month: ${rev.referrals.count_last_month}`;
 
     document.getElementById("dashboardRevenueChart").innerHTML = revenueBarChart(
       rev.monthly.labels,
