@@ -12,26 +12,28 @@ import { escapeHtml } from "../utilities.js";
 */
 
 function renderAgentPicker({ container, project, label, agent, onChange }) {
+  const safeLabel = label.replace(/[^a-zA-Z0-9]/g, '');
+
   container.innerHTML = `
     <section class="card" style="margin-top:20px;">
       <h3>${label}</h3>
 
       <div class="row" style="gap:12px; margin-bottom:16px;">
-        <input id="${label.replace(/\s+/g, '')}SearchInput"
+        <input id="${safeLabel}SearchInput"
                placeholder="Search name, business, or email"
                style="flex:1;">
-        <button id="${label.replace(/\s+/g, '')}FindBtn" class="btn-secondary">Find</button>
+        <button id="${safeLabel}FindBtn" class="btn-secondary">Find</button>
       </div>
 
-      <div id="${label.replace(/\s+/g, '')}Results" class="muted" style="margin-bottom:20px;">
+      <div id="${safeLabel}Results" class="muted" style="margin-bottom:20px;">
         Enter search text and click Find.
       </div>
     </section>
   `;
 
-  const searchInput = container.querySelector(`#${label.replace(/\s+/g, '')}SearchInput`);
-  const findBtn = container.querySelector(`#${label.replace(/\s+/g, '')}FindBtn`);
-  const resultsDiv = container.querySelector(`#${label.replace(/\s+/g, '')}Results`);
+  const searchInput = container.querySelector(`#${safeLabel}SearchInput`);
+  const findBtn = container.querySelector(`#${safeLabel}FindBtn`);
+  const resultsDiv = container.querySelector(`#${safeLabel}Results`);
 
   findBtn.addEventListener("click", async () => {
     const term = searchInput.value.trim();
