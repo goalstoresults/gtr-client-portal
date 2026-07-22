@@ -18,7 +18,7 @@ export async function renderLeadsList(container, portalState) {
         <!-- ROW 1: SEARCH INPUT -->
         <div style="display:flex; align-items:flex-start; gap:20px; flex-wrap:wrap; margin-bottom:6px;">
           <label style="display:flex; flex-direction:column;">
-            <span>Search Lead / Client / Status</span>
+            <span>Search Lead / ${escapeHtml(portalState.contactLabel || "Contact")} / Status</span>
             <input type="text" id="leadSearchInput" style="min-width:240px;">
             <div style="font-size:0.75em; color:#666; margin-top:2px;">
               Tip: Leave blank for full list.
@@ -97,7 +97,7 @@ export async function renderLeadsList(container, portalState) {
       if (term !== "") {
         leads = leads.filter(l =>
           (l.lead_name || "").toLowerCase().includes(term) ||
-          (l.client_search_name || "").toLowerCase().includes(term) ||
+          (l.contact_search_name || "").toLowerCase().includes(term) ||
           (l.status || "").toLowerCase().includes(term)
         );
       }
@@ -147,7 +147,7 @@ export async function renderLeadsList(container, portalState) {
           <thead>
             <tr>
               ${sortableHeader("lead_name", "Lead Name")}
-              ${sortableHeader("client_search_name", "Client")}
+              ${sortableHeader("contact_search_name", portalState.contactLabel || "Contact")}
               ${sortableHeader("stage_name", "Stage")}
               ${sortableHeader("status", "Status")}
               ${sortableHeader("created_at", "Created")}
@@ -185,19 +185,19 @@ export async function renderLeadsList(container, portalState) {
         btn.addEventListener("click", () => {
           const id = btn.dataset.id;
           const name = btn.dataset.name;
-          const client = btn.dataset.client;
+          const contact = btn.dataset.contact;
 
           portalState.activeLeadId = id;
           portalState.activeLeadName = name;
-          portalState.activeLeadContactName = client;
+          portalState.activeLeadContactName = contact;
 
           localStorage.setItem("activeLeadId", id);
           localStorage.setItem("activeLeadName", name);
-          localStorage.setItem("activeLeadContactName", client);
+          localStorage.setItem("activeLeadContactName", contact);
 
           const bar = document.getElementById("lead-context-bar");
           if (bar) {
-            bar.textContent = `${name} (${client})`;
+            bar.textContent = `${name} (${contact})`;
             bar.style.display = "block";
           }
 
@@ -215,10 +215,7 @@ export async function renderLeadsList(container, portalState) {
     }
 
     /* -------------------------------------------------------
-       TRANSFER TO ISN
-       Step 1: Worker looks up the lead's contact_id
-       Step 2: If contact has no isn_client_id yet, create it in ISN
-       Step 3: Worker writes isn_client_id back onto the contact row
+       TRANSFER TO ISN (CSI only)
     ------------------------------------------------------- */
     async function handleTransferToIsn(btn) {
       const leadId = btn.dataset.leadId;
@@ -247,9 +244,6 @@ export async function renderLeadsList(container, portalState) {
           return;
         }
 
-        // Success -- reflect the new state. isnCreated tells you whether a
-        // new client was created just now, vs an existing isn_client_id
-        // that was already there (idempotency case).
         btn.textContent = data.isnCreated ? "Sent to ISN" : "Already in ISN";
         btn.classList.add("btn-to-isn-done");
       } catch (err) {
@@ -284,7 +278,7 @@ export async function renderLeadsList(container, portalState) {
     ------------------------------------------------------- */
     function renderRow(l) {
       const safeName = (l.lead_name || "").replace(/"/g, '&quot;');
-      const safeClient = (l.client_search_name || "").replace(/"/g, '&quot;');
+      const safeContact = (l.contact_search_name || "").replace(/"/g, '&quot;');
 
       const showToIsn =
         l.stage_name === "Ready to Transfer" && portalState.project === "csi";
@@ -296,7 +290,7 @@ export async function renderLeadsList(container, portalState) {
       return `
         <tr>
           <td>${escapeHtml(l.lead_name || "")}</td>
-          <td>${escapeHtml(l.client_search_name || "")}</td>
+          <td>${escapeHtml(l.contact_search_name || "")}</td>
           <td>${escapeHtml(l.stage_name || "")}</td>
           <td>${escapeHtml(l.status || "")}</td>
           <td>${formatDateTime(l.created_at)}</td>
@@ -305,7 +299,7 @@ export async function renderLeadsList(container, portalState) {
             <button class="btn-primary btn-select-lead"
               data-id="${l.lead_id}"
               data-name="${safeName}"
-              data-client="${safeClient}">
+              data-contact="${safeContact}">
               Select
             </button>
             ${toIsnButton}
@@ -339,10 +333,10 @@ export async function renderLeadsList(container, portalState) {
         bar.style.display = "block";
       }
 
-      const clientBtn = document.querySelector(
-        '#leads-subtabs button[data-subtab="client"]'
+      const contactBtn = document.querySelector(
+        '#leads-subtabs button[data-subtab="contact"]'
       );
-      if (clientBtn) clientBtn.click();
+      if (contactBtn) contactBtn.click();
     });
 
     /* -------------------------------------------------------
@@ -355,3 +349,4 @@ export async function renderLeadsList(container, portalState) {
     console.error("[Leads] Error:", err);
   }
 }
+
