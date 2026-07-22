@@ -44,7 +44,8 @@ export async function loadLeadsTab({ portalState, tabContent }) {
 
   const leadConfig = await configRes.json();
 
-  const tabs = (leadConfig.tabs || []).filter(t => t.enabled);
+  const tabs = ((leadConfig[0]?.tabs) || []).filter(t => t.enabled);
+
 
   /* ============================================================
      3. RENDER SUBTABS DYNAMICALLY
