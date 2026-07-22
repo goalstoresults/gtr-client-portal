@@ -252,20 +252,34 @@ export async function renderLeadContact(container, portalState, { tabLabel }) {
      BUYER / SELLER AGENT PICKERS
   ============================================================ */
 
+if (portalState.project === "csi") {
+  // Load agent values from lead (if editing)
   portalState.pendingBuyersAgent = lead.buyers_agent_id
-    ? { id: lead.buyers_agent_id, first_name: lead.buyers_agent_first_name, last_name: lead.buyers_agent_last_name }
+    ? {
+        id: lead.buyers_agent_id,
+        first_name: lead.buyers_agent_first_name,
+        last_name: lead.buyers_agent_last_name
+      }
     : null;
 
   portalState.pendingSellersAgent = lead.sellers_agent_id
-    ? { id: lead.sellers_agent_id, first_name: lead.sellers_agent_first_name, last_name: lead.sellers_agent_last_name }
+    ? {
+        id: lead.sellers_agent_id,
+        first_name: lead.sellers_agent_first_name,
+        last_name: lead.sellers_agent_last_name
+      }
     : null;
 
+  // Render CSI agent pickers
   renderAgentPicker({
     container: buyersAgentContainer,
     project: portalState.project,
     label: "Buyer's Agent",
     agent: portalState.pendingBuyersAgent,
-    onChange: a => { portalState.pendingBuyersAgent = a; markDirty(); }
+    onChange: a => {
+      portalState.pendingBuyersAgent = a;
+      markDirty();
+    }
   });
 
   renderAgentPicker({
@@ -273,8 +287,20 @@ export async function renderLeadContact(container, portalState, { tabLabel }) {
     project: portalState.project,
     label: "Seller's Agent",
     agent: portalState.pendingSellersAgent,
-    onChange: a => { portalState.pendingSellersAgent = a; markDirty(); }
+    onChange: a => {
+      portalState.pendingSellersAgent = a;
+      markDirty();
+    }
   });
+} else {
+  // Non‑CSI projects: hide agent UI
+  portalState.pendingBuyersAgent = null;
+  portalState.pendingSellersAgent = null;
+
+  buyersAgentContainer.innerHTML = "";
+  sellersAgentContainer.innerHTML = "";
+}
+
 
   /* ============================================================
      FIND CONTACT
