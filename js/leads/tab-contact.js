@@ -50,7 +50,7 @@ function renderAgentPicker({ container, project, label, agent, onChange }) {
 const url = `
   https://client-portal-api.dennis-e64.workers.dev/api/contacts?
   project=${project}&
-  contact_type=Agent&
+  contact_type.eq.Agent&
   or=(
     first_name.ilike.${encoded},
     last_name.ilike.${encoded},
