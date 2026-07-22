@@ -1,16 +1,20 @@
 // js/leads.js
 
 import { renderLeadsList } from "./leads/tab-list.js";
-import { renderLeadClient } from "./leads/tab-client.js";
+import { renderLeadContact } from "./leads/tab-contact.js";   // renamed from tab-client.js
 import { renderLeadDetails } from "./leads/tab-details.js";
 import { renderLeadServices } from "./leads/tab-services.js";
 import { renderLeadPricing } from "./leads/tab-pricing.js";
 import { renderLeadSchedule } from "./leads/tab-schedule.js";
 import { renderLeadTimeline } from "./leads/tab-timeline.js";
 
+/*
+  Map tab keys → renderer functions.
+  These keys MUST match the "key" values in project_lead_config.tabs.
+*/
 const TAB_RENDERERS = {
   list: renderLeadsList,
-  contact: renderLeadClient,      // CSI calls this "Client"
+  contact: renderLeadContact,
   details: renderLeadDetails,
   services: renderLeadServices,
   pricing: renderLeadPricing,
@@ -28,15 +32,15 @@ export async function loadLeadsTab({ portalState, tabContent }) {
   tabContent.innerHTML = await res.text();
 
   /* ============================================================
-     2. LOAD PROJECT LEAD CONFIG
+     2. LOAD PROJECT LEAD CONFIG (dynamic tabs)
   ============================================================ */
 
-  const project = portalState.project;  // "csi", "gtr", etc.
+  const project = portalState.project; // "csi", "gtr", etc.
 
-  const configRes = await fetch(`/api/project-lead-config?project=${project}`);
+  const configRes = await fetch(`/leads/config?project=${project}`);
   const leadConfig = await configRes.json();
 
-  const tabs = leadConfig.tabs.filter(t => t.enabled);
+  const tabs = (leadConfig.tabs || []).filter(t => t.enabled);
 
   /* ============================================================
      3. RENDER SUBTABS DYNAMICALLY
@@ -48,7 +52,7 @@ export async function loadLeadsTab({ portalState, tabContent }) {
   tabs.forEach(tab => {
     const btn = document.createElement("button");
     btn.dataset.subtab = tab.key;
-    btn.textContent = tab.label;
+    btn.textContent = tab.label; // dynamic label (Client, Contact, Applicant, etc.)
     subtabsContainer.appendChild(btn);
   });
 
@@ -69,7 +73,7 @@ export async function loadLeadsTab({ portalState, tabContent }) {
   leadBar.textContent = "No lead selected";
 
   /* ============================================================
-     5. SUBTAB ROUTER (DYNAMIC)
+     5. SUBTAB ROUTER (dynamic)
   ============================================================ */
 
   const content = tabContent.querySelector("#leadsContent");
@@ -77,18 +81,23 @@ export async function loadLeadsTab({ portalState, tabContent }) {
   buttons.forEach(btn => {
     btn.addEventListener("click", async () => {
 
+      // reset active state
       buttons.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
       const subtab = btn.dataset.subtab;
-
       const renderer = TAB_RENDERERS[subtab];
 
       if (!renderer) {
-        content.innerHTML = `<section class="card"><p>Tab not implemented.</p></section>`;
+        content.innerHTML = `
+          <section class="card">
+            <p>Tab not implemented.</p>
+          </section>
+        `;
         return;
       }
 
+      // details tab requires a selected lead
       if (subtab === "details" && !portalState.activeLeadId) {
         content.innerHTML = `
           <section class="card">
@@ -125,4 +134,3 @@ export async function loadLeadsTab({ portalState, tabContent }) {
     await renderLeadsList(content, portalState, updateLeadContextBar);
   }
 }
-
