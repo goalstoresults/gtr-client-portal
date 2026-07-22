@@ -52,6 +52,10 @@ export async function loadLeadsTab({ portalState, tabContent }) {
       const renderer = TAB_RENDERERS[key];
       const tabLabel = btn.textContent;
 
+      // ⭐ FIX: update active tab styling
+      subtabsContainer.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+
       if (renderer) {
         renderer(content, portalState, { tabLabel });
       }
