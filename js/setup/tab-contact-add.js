@@ -36,7 +36,9 @@ const CONTACT_FIELD_OPTIONS = [
   "erm_id",
   "occupation_type",
   "updated_at",
-  "group_id"
+  "group_id",
+  "client_start_date",
+  "client_end_date"
 ];
 
 
