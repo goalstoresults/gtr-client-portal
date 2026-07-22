@@ -13,12 +13,12 @@ import { escapeHtml } from "../utilities.js";
 
 function renderAgentPicker({ container, project, label, agent, onChange }) {
   container.innerHTML = `
-    <section class="card">
+    <section class="card" style="margin-top:20px;">
       <h3>${label}</h3>
 
       <div class="row" style="gap:12px; margin-bottom:16px;">
-        <input id="${label.replace(/\s+/g, '')}SearchInput" 
-               placeholder="Search agents by name or email" 
+        <input id="${label.replace(/\s+/g, '')}SearchInput"
+               placeholder="Search name, business, or email"
                style="flex:1;">
         <button id="${label.replace(/\s+/g, '')}FindBtn" class="btn-secondary">Find</button>
       </div>
@@ -52,6 +52,8 @@ function renderAgentPicker({ container, project, label, agent, onChange }) {
       or=(
         first_name.ilike.${encoded},
         last_name.ilike.${encoded},
+        business_name.ilike.${encoded},
+        search_name.ilike.${encoded},
         email.ilike.${encoded}
       )
       &select=contact_id,first_name,last_name,email
@@ -69,8 +71,8 @@ function renderAgentPicker({ container, project, label, agent, onChange }) {
       resultsDiv.innerHTML = agents
         .map(
           a => `
-            <div class="contact-result" 
-                 data-id="${a.contact_id}" 
+            <div class="contact-result"
+                 data-id="${a.contact_id}"
                  data-json='${JSON.stringify(a)}'>
               <strong>${a.first_name} ${a.last_name}</strong><br/>
               <small>${a.email || "No email"}</small>
@@ -102,6 +104,7 @@ function renderAgentPicker({ container, project, label, agent, onChange }) {
     }
   });
 }
+
 
 
 
