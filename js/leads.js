@@ -8,102 +8,103 @@ import { renderLeadPricing } from "./leads/tab-pricing.js";
 import { renderLeadSchedule } from "./leads/tab-schedule.js";
 import { renderLeadTimeline } from "./leads/tab-timeline.js";
 
+const TAB_RENDERERS = {
+  list: renderLeadsList,
+  contact: renderLeadClient,      // CSI calls this "Client"
+  details: renderLeadDetails,
+  services: renderLeadServices,
+  pricing: renderLeadPricing,
+  calendar: renderLeadSchedule,
+  timeline: renderLeadTimeline
+};
+
 export async function loadLeadsTab({ portalState, tabContent }) {
 
   /* ============================================================
-     1. LOAD BASE HTML TEMPLATE (JUST LIKE CONTACTS)
+     1. LOAD BASE HTML TEMPLATE
   ============================================================ */
 
   const res = await fetch("./components/leads.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
 
   /* ============================================================
-     2. INJECT LEAD CONTEXT BAR (JUST LIKE CONTACTS)
+     2. LOAD PROJECT LEAD CONFIG
+  ============================================================ */
+
+  const project = portalState.project;  // "csi", "gtr", etc.
+
+  const configRes = await fetch(`/api/project-lead-config?project=${project}`);
+  const leadConfig = await configRes.json();
+
+  const tabs = leadConfig.tabs.filter(t => t.enabled);
+
+  /* ============================================================
+     3. RENDER SUBTABS DYNAMICALLY
+  ============================================================ */
+
+  const subtabsContainer = tabContent.querySelector("#leads-subtabs");
+  subtabsContainer.innerHTML = ""; // wipe CSI hardcoded buttons
+
+  tabs.forEach(tab => {
+    const btn = document.createElement("button");
+    btn.dataset.subtab = tab.key;
+    btn.textContent = tab.label;
+    subtabsContainer.appendChild(btn);
+  });
+
+  const buttons = subtabsContainer.querySelectorAll("button");
+
+  /* ============================================================
+     4. CONTEXT BAR
   ============================================================ */
 
   let leadBar = document.getElementById("lead-context-bar");
   if (!leadBar) {
     leadBar = document.createElement("div");
     leadBar.id = "lead-context-bar";
-    leadBar.className = "contact-context-bar";   // same styling as contacts
+    leadBar.className = "contact-context-bar";
     tabContent.prepend(leadBar);
   }
 
-  // Default state
   leadBar.textContent = "No lead selected";
-  leadBar.style.display = "block";
 
   /* ============================================================
-     3. GET CONTENT + SUBTABS
+     5. SUBTAB ROUTER (DYNAMIC)
   ============================================================ */
 
   const content = tabContent.querySelector("#leadsContent");
-  const buttons = tabContent.querySelectorAll("#leads-subtabs button");
-
-  /* ============================================================
-     4. SUBTAB ROUTER (MATCHES CONTACTS PATTERN)
-  ============================================================ */
 
   buttons.forEach(btn => {
     btn.addEventListener("click", async () => {
 
-      // Reset active state
       buttons.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
       const subtab = btn.dataset.subtab;
 
-      switch (subtab) {
+      const renderer = TAB_RENDERERS[subtab];
 
-        case "list":
-          await renderLeadsList(content, portalState, updateLeadContextBar);
-          break;
-
-        case "client":
-          await renderLeadClient(content, portalState);
-          break;
-
-        case "details":
-          if (portalState.activeLeadId) {
-            await renderLeadDetails(content, portalState);
-          } else {
-            content.innerHTML = `
-              <section class="card">
-                <h2>Lead Details</h2>
-                <p>Select a lead from the list to view details.</p>
-              </section>
-            `;
-          }
-          break;
-
-        case "services":
-          await renderLeadServices(content, portalState);
-          break;
-
-        case "pricing":
-          await renderLeadPricing(content, portalState);
-          break;
-
-        case "schedule":
-          await renderLeadSchedule(content, portalState);
-          break;
-
-        case "timeline":
-          await renderLeadTimeline(content, portalState);
-          break;
-
-        default:
-          content.innerHTML = `
-            <section class="card">
-              <p>Select a subtab to begin.</p>
-            </section>
-          `;
+      if (!renderer) {
+        content.innerHTML = `<section class="card"><p>Tab not implemented.</p></section>`;
+        return;
       }
+
+      if (subtab === "details" && !portalState.activeLeadId) {
+        content.innerHTML = `
+          <section class="card">
+            <h2>Lead Details</h2>
+            <p>Select a lead from the list to view details.</p>
+          </section>
+        `;
+        return;
+      }
+
+      await renderer(content, portalState, updateLeadContextBar);
     });
   });
 
   /* ============================================================
-     5. UPDATE CONTEXT BAR WHEN A LEAD IS SELECTED
+     6. UPDATE CONTEXT BAR
   ============================================================ */
 
   function updateLeadContextBar(lead) {
@@ -112,16 +113,16 @@ export async function loadLeadsTab({ portalState, tabContent }) {
     portalState.activeLeadContactName = lead.contact_name;
 
     leadBar.textContent = `${lead.lead_name} (${lead.contact_name})`;
-    leadBar.style.display = "block";
   }
 
   /* ============================================================
-     6. DEFAULT TO LIST VIEW (JUST LIKE CONTACTS)
+     7. DEFAULT TAB = LIST
   ============================================================ */
 
-  const defaultBtn = tabContent.querySelector('#leads-subtabs button[data-subtab="list"]');
-  if (defaultBtn) {
-    defaultBtn.classList.add("active");
+  const listBtn = subtabsContainer.querySelector('button[data-subtab="list"]');
+  if (listBtn) {
+    listBtn.classList.add("active");
     await renderLeadsList(content, portalState, updateLeadContextBar);
   }
 }
+
