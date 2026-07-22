@@ -57,5 +57,9 @@ export async function loadLeadsTab({ portalState, tabContent }) {
       }
     });
   });
+  
+  // ⭐ Always open List first
+  const listBtn = subtabsContainer.querySelector('button[data-subtab="list"]');
+  if (listBtn) listBtn.click();
 }
 
