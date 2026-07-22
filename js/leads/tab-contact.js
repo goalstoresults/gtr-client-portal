@@ -1,4 +1,4 @@
-// js/leads/tab-client.js
+// js/leads/tab-contact.js
 
 import { escapeHtml } from "../utilities.js";
 
