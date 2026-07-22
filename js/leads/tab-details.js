@@ -18,7 +18,7 @@ export async function renderLeadDetails(container, portalState) {
   }
 
   /* -------------------------------------------------------
-     FETCH CONFIGURED LEAD FIELDS
+     FETCH CONFIGURED LEAD FIELDS (lead_tab = "details")
   ------------------------------------------------------- */
   const configUrl = `
     https://lookups-module.dennis-e64.workers.dev/lead_fields?
@@ -58,7 +58,7 @@ export async function renderLeadDetails(container, portalState) {
     : [];
 
   /* -------------------------------------------------------
-     FETCH LEAD RECORD (NEW BACKEND ENDPOINT)
+     FETCH LEAD RECORD
   ------------------------------------------------------- */
   const leadUrl = `
     https://leads-module.dennis-e64.workers.dev/leads/get?
@@ -94,12 +94,11 @@ export async function renderLeadDetails(container, portalState) {
   const formDiv = container.querySelector("#leadDetailsForm");
 
   /* -------------------------------------------------------
-     BUILD FORM
+     BUILD FORM (dynamic sections + fields)
   ------------------------------------------------------- */
   formDiv.innerHTML = Object.keys(sections)
     .map(sectionName => {
-      const fields = sections[sectionName]
-        .sort((a, b) => a.sort_order - b.sort_order);
+      const fields = sections[sectionName].sort((a, b) => a.sort_order - b.sort_order);
 
       const rows = fields
         .map(f => {
@@ -109,7 +108,12 @@ export async function renderLeadDetails(container, portalState) {
           if (f.lookup_type) {
             const options = lookupGroups
               .filter(l => l.lookup_type === f.lookup_type)
-              .map(l => `<option value="${l.value}" ${l.value === value ? "selected" : ""}>${escapeHtml(l.value)}</option>`)
+              .map(
+                l =>
+                  `<option value="${l.value}" ${
+                    l.value === value ? "selected" : ""
+                  }>${escapeHtml(l.value)}</option>`
+              )
               .join("");
 
             return `
@@ -127,7 +131,9 @@ export async function renderLeadDetails(container, portalState) {
           return `
             <label style="display:block; margin-bottom:10px;">
               <span>${escapeHtml(f.label)}</span>
-              <input type="text" data-field="${f.field_key}" value="${escapeHtml(value)}" style="width:100%;">
+              <input type="text" data-field="${f.field_key}" value="${escapeHtml(
+                value
+              )}" style="width:100%;">
             </label>
           `;
         })
@@ -143,39 +149,42 @@ export async function renderLeadDetails(container, portalState) {
     .join("");
 
   /* -------------------------------------------------------
-     SAVE LOGIC (NEW BACKEND ENDPOINT)
+     SAVE LOGIC
   ------------------------------------------------------- */
   container.querySelector("#btnSaveLeadDetails").addEventListener("click", async () => {
     const updates = {};
 
     formDiv.querySelectorAll("[data-field]").forEach(el => {
-      const key = el.dataset.field;
-      updates[key] = el.value;
+      updates[el.dataset.field] = el.value;
     });
 
-    // Save to DB
-    await fetch("https://leads-module.dennis-e64.workers.dev/leads/update", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: leadId,
-        updates
-      })
-    });
+    try {
+      const res = await fetch(
+        "https://leads-module.dennis-e64.workers.dev/leads/update",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: leadId,
+            updates
+          })
+        }
+      );
 
+      const data = await res.json();
 
-/* --------
-    // Webhook to GHL
-    await fetch("https://hooks.zapier.com/hooks/catch/xxxxxxx/yyyyyyy", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        lead_id: leadId,
-        ...updates
-      })
-    });
----------- */
-    alert("Lead details saved.");
+      if (!res.ok) {
+        alert("❌ Failed to save lead details.");
+        console.error(data);
+        return;
+      }
+
+      alert("✅ Lead details saved.");
+    } catch (err) {
+      alert("❌ Error saving lead details: " + err.message);
+      console.error(err);
+    }
   });
 }
+
 
