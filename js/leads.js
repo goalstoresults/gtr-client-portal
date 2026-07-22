@@ -37,7 +37,11 @@ export async function loadLeadsTab({ portalState, tabContent }) {
 
   const project = portalState.project; // "csi", "gtr", etc.
 
-  const configRes = await fetch(`/leads/config?project=${project}`);
+  const configRes = await fetch(
+  `https://leads-module.dennis-e64.workers.dev/leads/config?project=${project}`,
+  { cache: "no-cache" }
+);
+
   const leadConfig = await configRes.json();
 
   const tabs = (leadConfig.tabs || []).filter(t => t.enabled);
