@@ -48,17 +48,10 @@ function renderAgentPicker({ container, project, label, agent, onChange }) {
     const encoded = encodeURIComponent(`*${term}*`);
 
 const url = `
-  https://client-portal-api.dennis-e64.workers.dev/api/contacts?
+  https://contacts-module.dennis-e64.workers.dev/contacts/search?
   project=${project}&
-  contact_type.eq.Agent&
-  or=(
-    first_name.ilike.${encoded},
-    last_name.ilike.${encoded},
-    business_name.ilike.${encoded},
-    search_name.ilike.${encoded},
-    email.ilike.${encoded}
-  )
-  &select=contact_id,first_name,last_name,email
+  contact_type=Agent&
+  search=${encodeURIComponent(term)}
 `.replace(/\s+/g, "");
 
 
