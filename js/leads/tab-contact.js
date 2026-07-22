@@ -71,7 +71,7 @@ const url = `
             <div class="contact-result"
                  data-id="${a.contact_id}"
                  data-json='${JSON.stringify(a)}'>
-              <strong>${a.first_name} ${a.last_name}</strong><br/>
+              <strong>${a.first_name} ${a.last_name} (${a.contact_type || "No type"})</strong>
               <small>${a.email || "No email"}</small>
             </div>
           `
