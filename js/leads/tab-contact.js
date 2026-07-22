@@ -47,19 +47,20 @@ function renderAgentPicker({ container, project, label, agent, onChange }) {
 
     const encoded = encodeURIComponent(`*${term}*`);
 
-    const url = `
-      https://client-portal-api.dennis-e64.workers.dev/api/contacts?
-      project=${project}&
-      contact_type.eq.Agent&
-      or=(
-        first_name.ilike.${encoded},
-        last_name.ilike.${encoded},
-        business_name.ilike.${encoded},
-        search_name.ilike.${encoded},
-        email.ilike.${encoded}
-      )
-      &select=contact_id,first_name,last_name,email
-    `.replace(/\s+/g, "");
+const url = `
+  https://client-portal-api.dennis-e64.workers.dev/api/contacts?
+  project=${project}&
+  or=(
+    contact_type.eq.Agent,
+    first_name.ilike.${encoded},
+    last_name.ilike.${encoded},
+    business_name.ilike.${encoded},
+    search_name.ilike.${encoded},
+    email.ilike.${encoded}
+  )
+  &select=contact_id,first_name,last_name,email
+`.replace(/\s+/g, "");
+
 
     try {
       const res = await fetch(url);
