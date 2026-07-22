@@ -15,45 +15,94 @@ function renderAgentPicker({ container, project, label, agent, onChange }) {
   container.innerHTML = `
     <section class="card">
       <h3>${label}</h3>
-      <div style="margin-bottom:10px;">
-        <select id="${label.replace(/\s+/g, '')}Picker" style="width:100%;">
-          <option value="">-- select agent --</option>
-        </select>
+
+      <div class="row" style="gap:12px; margin-bottom:16px;">
+        <input id="${label.replace(/\s+/g, '')}SearchInput" 
+               placeholder="Search agents by name or email" 
+               style="flex:1;">
+        <button id="${label.replace(/\s+/g, '')}FindBtn" class="btn-secondary">Find</button>
+      </div>
+
+      <div id="${label.replace(/\s+/g, '')}Results" class="muted" style="margin-bottom:20px;">
+        Enter search text and click Find.
       </div>
     </section>
   `;
 
-  const picker = container.querySelector("select");
+  const searchInput = container.querySelector(`#${label.replace(/\s+/g, '')}SearchInput`);
+  const findBtn = container.querySelector(`#${label.replace(/\s+/g, '')}FindBtn`);
+  const resultsDiv = container.querySelector(`#${label.replace(/\s+/g, '')}Results`);
 
-  // Load agents
-  fetch(`https://contacts-module.dennis-e64.workers.dev/contacts/agents?project=${project}`)
-    .then(r => r.json())
-    .then(list => {
-      if (!Array.isArray(list)) return;
+  findBtn.addEventListener("click", async () => {
+    const term = searchInput.value.trim();
 
-      picker.innerHTML += list
-        .map(a => {
-          const selected = agent && agent.id === a.contact_id ? "selected" : "";
-          return `<option value="${a.contact_id}" ${selected}>${a.first_name} ${a.last_name}</option>`;
-        })
-        .join("");
-    });
-
-  picker.addEventListener("change", () => {
-    const id = picker.value;
-    if (!id) {
-      onChange(null);
+    if (!term) {
+      resultsDiv.textContent = "Enter something to search.";
       return;
     }
 
-    const selected = picker.options[picker.selectedIndex].text.split(" ");
-    onChange({
-      id,
-      first_name: selected[0],
-      last_name: selected.slice(1).join(" ")
-    });
+    resultsDiv.textContent = "Searching…";
+
+    const encoded = encodeURIComponent(`*${term}*`);
+
+    const url = `
+      https://client-portal-api.dennis-e64.workers.dev/api/contacts?
+      project=${project}&
+      contact_type.eq.Agent&
+      or=(
+        first_name.ilike.${encoded},
+        last_name.ilike.${encoded},
+        email.ilike.${encoded}
+      )
+      &select=contact_id,first_name,last_name,email
+    `.replace(/\s+/g, "");
+
+    try {
+      const res = await fetch(url);
+      const agents = await res.json();
+
+      if (!Array.isArray(agents) || agents.length === 0) {
+        resultsDiv.innerHTML = "<div class='muted'>No agents found.</div>";
+        return;
+      }
+
+      resultsDiv.innerHTML = agents
+        .map(
+          a => `
+            <div class="contact-result" 
+                 data-id="${a.contact_id}" 
+                 data-json='${JSON.stringify(a)}'>
+              <strong>${a.first_name} ${a.last_name}</strong><br/>
+              <small>${a.email || "No email"}</small>
+            </div>
+          `
+        )
+        .join("");
+
+      resultsDiv.querySelectorAll(".contact-result").forEach(el => {
+        el.addEventListener("click", () => {
+          const data = JSON.parse(el.dataset.json);
+
+          onChange({
+            id: data.contact_id,
+            first_name: data.first_name,
+            last_name: data.last_name
+          });
+
+          resultsDiv.innerHTML = `
+            <div class="muted">
+              Selected: ${data.first_name} ${data.last_name}
+            </div>
+          `;
+        });
+      });
+    } catch (err) {
+      resultsDiv.textContent = "❌ Error searching agents.";
+      console.error(err);
+    }
   });
 }
+
 
 
 export async function renderLeadContact(container, portalState, { tabLabel }) {
