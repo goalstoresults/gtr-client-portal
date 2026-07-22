@@ -11,6 +11,51 @@ import { escapeHtml } from "../utilities.js";
     Future → "Applicant", "Owner", etc.
 */
 
+function renderAgentPicker({ container, project, label, agent, onChange }) {
+  container.innerHTML = `
+    <section class="card">
+      <h3>${label}</h3>
+      <div style="margin-bottom:10px;">
+        <select id="${label.replace(/\s+/g, '')}Picker" style="width:100%;">
+          <option value="">-- select agent --</option>
+        </select>
+      </div>
+    </section>
+  `;
+
+  const picker = container.querySelector("select");
+
+  // Load agents
+  fetch(`https://contacts-module.dennis-e64.workers.dev/contacts/agents?project=${project}`)
+    .then(r => r.json())
+    .then(list => {
+      if (!Array.isArray(list)) return;
+
+      picker.innerHTML += list
+        .map(a => {
+          const selected = agent && agent.id === a.contact_id ? "selected" : "";
+          return `<option value="${a.contact_id}" ${selected}>${a.first_name} ${a.last_name}</option>`;
+        })
+        .join("");
+    });
+
+  picker.addEventListener("change", () => {
+    const id = picker.value;
+    if (!id) {
+      onChange(null);
+      return;
+    }
+
+    const selected = picker.options[picker.selectedIndex].text.split(" ");
+    onChange({
+      id,
+      first_name: selected[0],
+      last_name: selected.slice(1).join(" ")
+    });
+  });
+}
+
+
 export async function renderLeadContact(container, portalState, { tabLabel }) {
 
   /* ============================================================
