@@ -497,6 +497,7 @@ if (portalState.project === "csi") {
           body: JSON.stringify({
             project: portalState.project,
             contact_id: portalState.pendingContactId,
+            pipeline_name: portalState.project,   // use global project, no hardcoding
             stage_name: "New",
             status: "Open",
             ...agentFields,
