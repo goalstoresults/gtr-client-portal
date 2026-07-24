@@ -97,14 +97,20 @@ export async function renderDashboardClients(container, portalState) {
         `$${Number(c.journey_rev.current).toLocaleString()} ${pctBadge(c.journey_rev.change_pct)}`,
         `Prior month: $${Number(c.journey_rev.prior).toLocaleString()}`) +
       tile("Avg Current Journey Length",
-        `${Math.round(c.journey_len.current)} days ${pctBadge(c.journey_len.change_pct)}`,
-        `Prior month: ${Math.round(c.journey_len.prior)} days`);
+        `${daysWithYears(c.journey_len.current)} ${pctBadge(c.journey_len.change_pct)}`,
+        `Prior month: ${daysWithYears(c.journey_len.prior)}`);
 
     tilesEl.innerHTML = tiles;
 
     document.getElementById("dashboardClientsChart").innerHTML =
       lineChart(c.trend.labels, c.trend.values);
   }
+}
+
+function daysWithYears(days) {
+  const d = Math.round(days);
+  const years = (d / 365).toFixed(1);
+  return `${d} days (${years} yrs)`;
 }
 
 function tile(label, valueHtml, sub) {
