@@ -7,8 +7,8 @@
 //     active:      { current, prior, change_pct },
 //     new_clients: { current, prior },
 //     mrr:         { current, prior, change_pct } | null,   // null = not an MRR client
-//     journey_rev: { current, prior, change_pct },
-//     journey_len: { current, prior, change_pct },          // days; down = good
+//     journey_rev: { current, prior, change_pct },          // avg lifetime-to-date revenue, ACTIVE clients only
+//     journey_len: { current, prior, change_pct },          // avg days-as-client, ACTIVE clients only (up = good, longer tenure)
 //     trend:       { labels: ["Feb",...], values: [13,...] } // 6 months, month-end counts
 //   }
 // }
@@ -88,13 +88,17 @@ export async function renderDashboardClients(container, portalState) {
         `Prior month: $${Number(c.mrr.prior).toLocaleString()}`);
     }
 
+    // Both journey tiles reflect CURRENT active clients only (elapsed time /
+    // revenue-to-date as of today), not completed/churned journeys. A rising
+    // average is a good sign (revenue growth, longer retention) for both, so
+    // both use the normal (non-inverted) badge direction.
     tiles +=
-      tile("Avg Client Journey Revenue",
+      tile("Avg Current Client Journey Revenue",
         `$${Number(c.journey_rev.current).toLocaleString()} ${pctBadge(c.journey_rev.change_pct)}`,
         `Prior month: $${Number(c.journey_rev.prior).toLocaleString()}`) +
-      tile("Avg Journey Length",
-        `${Math.round(c.journey_len.current)} days ${pctBadgeInverted(c.journey_len.change_pct)}`,
-        `Shorter is better · prior: ${Math.round(c.journey_len.prior)} days`);
+      tile("Avg Current Journey Length",
+        `${Math.round(c.journey_len.current)} days ${pctBadge(c.journey_len.change_pct)}`,
+        `Prior month: ${Math.round(c.journey_len.prior)} days`);
 
     tilesEl.innerHTML = tiles;
 
