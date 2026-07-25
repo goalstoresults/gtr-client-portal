@@ -708,4 +708,4 @@ async function saveContact(existing, portalState, tabLabel) {
     console.error(err);
   }
 }
-}
+
