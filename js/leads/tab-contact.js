@@ -288,7 +288,8 @@ export async function renderLeadContact(container, portalState, { tabLabel }) {
           portalState.pendingContactId = contact.contact_id;
           portalState.pendingContactName = `${contact.first_name || ""} ${contact.last_name || ""}`.trim();
 
-          renderContactForm(formArea, contact, portalState, tabLabel);
+          // ⭐ Contact already attached — show read-only summary, not the editable form
+          renderContactSummary(formArea, contact, portalState, tabLabel);
           formArea.style.display = "block";
         }
       }
@@ -413,7 +414,8 @@ if (portalState.project === "csi") {
 
           resultsDiv.innerHTML = "";
 
-          renderContactForm(formArea, data, portalState, tabLabel);
+          // ⭐ Show read-only summary, not the editable form
+          renderContactSummary(formArea, data, portalState, tabLabel);
           formArea.style.display = "block";
           leadArea.style.display = "block";
         });
@@ -602,7 +604,7 @@ function attachBeforeUnloadGuard(portalState) {
 }
 
 /* ============================================================
-   CONTACT FORM (dynamic vocabulary)
+   CONTACT FORM (dynamic vocabulary) — ADD ONLY, unchanged
 ============================================================ */
 
 function renderContactForm(container, contact, portalState, tabLabel) {
@@ -656,6 +658,60 @@ function renderContactForm(container, contact, portalState, tabLabel) {
 }
 
 /* ============================================================
+   READ-ONLY CONTACT SUMMARY (post-attach — no editing here)
+============================================================ */
+
+function renderContactSummary(container, contact, portalState, tabLabel) {
+  container.innerHTML = `
+    <section class="card" style="margin-top:20px;">
+      <h3>${escapeHtml(tabLabel)}</h3>
+      <div class="form-grid-2col">
+        <label>Full Name</label>
+        <div>${escapeHtml(`${contact.first_name || ""} ${contact.last_name || ""}`.trim() || "—")}</div>
+
+        <label>Email</label>
+        <div>${escapeHtml(contact.email || "—")}</div>
+
+        <label>Contact Type</label>
+        <div>${escapeHtml(contact.contact_type || "—")}</div>
+
+        <label>Phone</label>
+        <div>${escapeHtml(contact.mobile_phone || contact.work_phone || contact.home_phone || "—")}</div>
+      </div>
+      <div style="margin-top:16px;">
+        <a href="#" id="editContactLink">Edit Contact →</a>
+      </div>
+    </section>
+  `;
+
+  container.querySelector("#editContactLink").addEventListener("click", (e) => {
+    e.preventDefault();
+    navigateToContactDetails(contact.contact_id, portalState);
+  });
+}
+
+/* ============================================================
+   NAVIGATE TO CONTACTS > DETAILS (top-level tab)
+============================================================ */
+
+async function navigateToContactDetails(contactId, portalState) {
+  if (portalState._contactTabDirty) {
+    const proceed = confirm(
+      `You have unsaved changes on this lead. Leave without saving?`
+    );
+    if (!proceed) return;
+    portalState._contactTabDirty = false;
+  }
+
+  portalState.selectedContactId = contactId;   // tab-details.js reads this
+
+  await window.loadTab("1");   // "1" = Contacts tab, per tabMap in index.html
+
+  const detailsBtn = document.querySelector('#contacts-subtabs button[data-subtab="details"]');
+  if (detailsBtn) detailsBtn.click();
+}
+
+/* ============================================================
    SAVE CONTACT (dynamic vocabulary)
 ============================================================ */
 async function saveContact(existing, portalState, tabLabel) {
@@ -706,8 +762,9 @@ async function saveContact(existing, portalState, tabLabel) {
 
     alert(`✅ ${tabLabel} saved.`);
 
+    // ⭐ Switch to read-only summary now that the contact is attached
     const container = document.getElementById("contactFormArea");
-    renderContactForm(container, savedContact, portalState, tabLabel);
+    renderContactSummary(container, savedContact, portalState, tabLabel);
 
     const resultsDiv = document.getElementById("contactSearchResults");
     if (resultsDiv) {
