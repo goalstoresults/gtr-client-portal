@@ -212,6 +212,11 @@ export async function renderLeadsList(container, portalState) {
       tableDiv.querySelectorAll(".btn-to-isn").forEach(btn => {
         btn.addEventListener("click", () => handleTransferToIsn(btn));
       });
+
+      // Delete lead buttons
+      tableDiv.querySelectorAll(".btn-delete-lead").forEach(btn => {
+        btn.addEventListener("click", () => handleDeleteLead(btn));
+      });
     }
 
     /* -------------------------------------------------------
@@ -251,6 +256,57 @@ export async function renderLeadsList(container, portalState) {
         alert("Transfer to ISN failed — network error. Check console.");
         btn.disabled = false;
         btn.textContent = originalText;
+      }
+    }
+
+    /* -------------------------------------------------------
+       DELETE LEAD
+    ------------------------------------------------------- */
+    async function handleDeleteLead(btn) {
+      const leadId = btn.dataset.id;
+      const leadName = btn.dataset.name;
+
+      const confirmed = confirm(`Delete lead "${leadName}"? This cannot be undone.`);
+      if (!confirmed) return;
+
+      btn.disabled = true;
+      btn.textContent = "Deleting…";
+
+      try {
+        const res = await fetch(
+          `https://leads-module.dennis-e64.workers.dev/leads/delete?id=${encodeURIComponent(leadId)}`,
+          { method: "DELETE" }
+        );
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          alert(`❌ Failed to delete lead: ${data.error || "Unknown error"}`);
+          btn.disabled = false;
+          btn.textContent = "Delete";
+          return;
+        }
+
+        // Remove from local state and re-render without a full refetch
+        leads = leads.filter(l => l.lead_id !== leadId);
+        renderTable();
+
+        // If this was the active lead, clear the context bar
+        if (portalState.activeLeadId === leadId) {
+          portalState.activeLeadId = null;
+          portalState.activeLeadName = "";
+          portalState.activeLeadContactName = "";
+          localStorage.removeItem("activeLeadId");
+          localStorage.removeItem("activeLeadName");
+          localStorage.removeItem("activeLeadContactName");
+
+          const bar = document.getElementById("lead-context-bar");
+          if (bar) bar.style.display = "none";
+        }
+      } catch (err) {
+        console.error("[Delete Lead] Network error:", err);
+        alert("Delete failed — network error. Check console.");
+        btn.disabled = false;
+        btn.textContent = "Delete";
       }
     }
 
@@ -303,6 +359,11 @@ export async function renderLeadsList(container, portalState) {
               Select
             </button>
             ${toIsnButton}
+            <button class="btn-danger btn-delete-lead"
+              data-id="${l.lead_id}"
+              data-name="${safeName}">
+              Delete
+            </button>
           </td>
         </tr>
       `;
@@ -349,4 +410,3 @@ export async function renderLeadsList(container, portalState) {
     console.error("[Leads] Error:", err);
   }
 }
-
