@@ -636,6 +636,9 @@ await tab.loader({ portalState, tabContent });
 
 }
 
+window.loadTab = loadTab;   // ⭐ ADD THIS — lets other modules trigger tab switches
+
+    
 /* ============================================================
 INITIALIZE — HANDLE ?project PARAM + IP CHECK
 ============================================================ */
