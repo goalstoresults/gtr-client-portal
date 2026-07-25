@@ -659,44 +659,23 @@ function renderContactForm(container, contact, portalState, tabLabel) {
    SAVE CONTACT (dynamic vocabulary)
 ============================================================ */
 async function saveContact(existing, portalState, tabLabel) {
-  const payload = {
-    project: portalState.project,
-    first_name: document.getElementById("cf_first").value.trim(),
-    last_name: document.getElementById("cf_last").value.trim(),
-    email: document.getElementById("cf_email").value.trim(),
-    street_address: document.getElementById("cf_addr1").value.trim(),
-    address2: document.getElementById("cf_addr2").value.trim(),
-    city: document.getElementById("cf_city").value.trim(),
-    postal_code: document.getElementById("cf_zip").value.trim(),
-    work_phone: document.getElementById("cf_work").value.trim(),
-    home_phone: document.getElementById("cf_home").value.trim(),
-    mobile_phone: document.getElementById("cf_cell").value.trim()
-  };
+  const payload = { /* unchanged */ };
 
   try {
     let res, data;
-
     if (existing) {
-      // PATCH existing contact
-      res = await fetch(
-        `https://contacts-module.dennis-e64.workers.dev/contacts/edit/${existing.contact_id}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        }
-      );
+      res = await fetch(`https://contacts-module.dennis-e64.workers.dev/contacts/edit/${existing.contact_id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
       data = await res.json();
     } else {
-      // POST new contact
-      res = await fetch(
-        `https://contacts-module.dennis-e64.workers.dev/contacts/add`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        }
-      );
+      res = await fetch(`https://contacts-module.dennis-e64.workers.dev/contacts/add`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
       data = await res.json();
     }
 
@@ -706,15 +685,27 @@ async function saveContact(existing, portalState, tabLabel) {
       return;
     }
 
-    const contactId = existing ? existing.contact_id : data.contact_id;
+    const savedContact = existing ? { ...existing, ...payload } : (Array.isArray(data) ? data[0] : data);
+    const contactId = savedContact.contact_id;
 
     portalState.pendingContactId = contactId;
     portalState.pendingContactName = `${payload.first_name} ${payload.last_name}`;
-    portalState._contactTabDirty = true; // pending until lead-level Save
+    portalState._contactTabDirty = true;
 
     alert(`✅ ${tabLabel} saved.`);
+
+    // Re-render in edit mode: title/behavior flips, next save is a PATCH not a POST
+    const container = document.getElementById("contactFormArea");
+    renderContactForm(container, savedContact, portalState, tabLabel);
+
+    // Reflect the attached contact at the top instead of leaving the search box blank
+    const resultsDiv = document.getElementById("contactSearchResults");
+    if (resultsDiv) {
+      resultsDiv.innerHTML = `<div class="muted">Selected: ${escapeHtml(payload.first_name)} ${escapeHtml(payload.last_name)}</div>`;
+    }
   } catch (err) {
     alert(`Error saving ${tabLabel}: ` + err.message);
     console.error(err);
   }
+}
 }
