@@ -1,14 +1,46 @@
 // js/dashboard/pipeline.js
-// Pipeline sub-tab: stage-by-stage lead counts, driven entirely by each
-// project's own `lead_stage` lookup values — no hardcoded won/lost concept.
+// Pipeline sub-tab: stage bar (dynamic per-project lead_stage lookup, Open leads
+// only) + summary tiles computed from status/created_at/end_date — no separate
+// /dashboard/pipeline worker required.
 //
-// Data sources (both already used elsewhere in the app):
+// Data sources:
 //   GET https://leads-module.dennis-e64.workers.dev/leads/list?project=X
+//     -> project_pipeline_leads_view: lead_id, project, lead_name, contact_id,
+//        contact_search_name, stage_name, status, created_at, updated_at,
+//        end_date, amount
+//   GET https://leads-module.dennis-e64.workers.dev/leads/config?project=X
+//     -> project_lead_config row, including revenue_model
+//        ('amount' | 'mmr_setup' | 'both')
 //   GET https://lookups-module.dennis-e64.workers.dev/lookups/list?project=X
+//     -> lead_stage lookup values (ordered by sort_order)
+//
+// Classification (via project's own `lead_status` lookup, no schema change):
+//   Open      -> counted in the stage bar
+//   Won       -> resolved-won; end_date is auto-stamped by the worker on
+//                status -> "Won"
+//   Lost      -> resolved-lost; end_date auto-stamped on status -> "Lost"
+//   Inactive  -> excluded from the dashboard entirely (not shown as "Abandoned")
+//
+// Revenue tiles are driven by project_lead_config.revenue_model rather than
+// inferred from which fields happen to be populated, so a brand-new project
+// with zero Won leads yet still shows the right tile shape:
+//   'amount'    -> single "New Revenue" tile (sum of `amount`)
+//   'mmr_setup' -> "New MRR" + "Setup Revenue" tiles (potential_mmr /
+//                  potential_setup_flat), kept separate since one recurs and
+//                  one doesn't
+//   'both'      -> all three tiles
+//
+// KNOWN LIMITATION: "Leads in Pipeline" prior-period comparison is computed
+// retroactively from created_at/end_date (no snapshot table needed). This is
+// exact for Won/Lost transitions (end_date is stamped), but a lead marked
+// Inactive does NOT get end_date set, so historical as-of counts can't
+// distinguish "was Inactive back then" from "was still Open back then." Only
+// affects the PRIOR comparison number, not the live current count (which
+// reads actual status).
 
 import {
   dashboardState, isCurrentPeriod, mountPeriodSelector,
-  MONTHS_SHORT, MONTHS_LONG
+  pctBadge, countBadge, MONTHS_SHORT, MONTHS_LONG
 } from "./dashboard-state.js";
 
 const STAGE_COLORS = [
@@ -65,12 +97,16 @@ export async function renderDashboardPipeline(container, portalState) {
     tilesEl.innerHTML = `<div class="dashboard-metric-box">
       <div class="dashboard-metric-sub">Loading&hellip;</div></div>`;
 
-    let leads, stages;
+    let leads, stages, revenueModel;
     try {
-      [leads, stages] = await Promise.all([
+      const [leadsRes, stagesRes, configRes] = await Promise.all([
         fetchLeads(portalState.project),
-        fetchStages(portalState.project)
+        fetchStages(portalState.project),
+        fetchLeadConfig(portalState.project)
       ]);
+      leads = leadsRes;
+      stages = stagesRes;
+      revenueModel = configRes?.revenue_model || "amount";
     } catch (err) {
       tilesEl.innerHTML = `<div class="dashboard-metric-box">
         <div class="dashboard-metric-sub">Couldn't load pipeline data. Try again.</div></div>`;
@@ -80,25 +116,21 @@ export async function renderDashboardPipeline(container, portalState) {
       return;
     }
 
-    // Count leads per stage, in the project's configured stage order
+    /* -----------------------------------------------------
+       STAGE BAR — live, Open leads only
+    ----------------------------------------------------- */
+    const openLeads = leads.filter(l => l.status === "Open");
+
     const counts = stages.map(s => ({
       stage: s.value,
-      count: leads.filter(l => l.stage_name === s.value).length
+      count: openLeads.filter(l => l.stage_name === s.value).length
     }));
 
-    // Any leads whose stage_name doesn't match a configured lookup value
-    // (renamed/removed stage, bad data, etc.) — surfaced, not silently dropped
     const knownStageNames = new Set(stages.map(s => s.value));
-    const uncategorized = leads.filter(l => !knownStageNames.has(l.stage_name)).length;
+    const uncategorized = openLeads.filter(l => !knownStageNames.has(l.stage_name)).length;
     if (uncategorized > 0) {
       counts.push({ stage: "Uncategorized", count: uncategorized });
     }
-
-    tilesEl.innerHTML = tile(
-      "Leads in Pipeline",
-      `${leads.length}`,
-      `Across ${counts.filter(c => c.count > 0).length} stage${counts.filter(c => c.count > 0).length === 1 ? "" : "s"}`
-    );
 
     document.getElementById("dashboardPipelineChart").innerHTML = stageBar(counts);
     document.getElementById("pip-legend").innerHTML = counts
@@ -109,8 +141,95 @@ export async function renderDashboardPipeline(container, portalState) {
         </span>
       `)
       .join("");
+
+    /* -----------------------------------------------------
+       PERIOD RANGES (current + prior, apples-to-apples cutoff)
+    ----------------------------------------------------- */
+    const cutoffDay = isCurrent ? now.getUTCDate() : null;
+    const current = monthRange(py, pm, cutoffDay);
+
+    let priorMonth = pm - 1, priorYear = py;
+    if (priorMonth === 0) { priorMonth = 12; priorYear -= 1; }
+    const prior = monthRange(priorYear, priorMonth, cutoffDay);
+
+    /* -----------------------------------------------------
+       WON / LOST — resolved within the period (via end_date)
+    ----------------------------------------------------- */
+    const wonCurrent = leads.filter(l => l.status === "Won" && inRange(l.end_date, current));
+    const wonPrior = leads.filter(l => l.status === "Won" && inRange(l.end_date, prior));
+    const lostCurrent = leads.filter(l => l.status === "Lost" && inRange(l.end_date, current));
+    const lostPrior = leads.filter(l => l.status === "Lost" && inRange(l.end_date, prior));
+
+    const closeRateCurrent = rate(wonCurrent.length, lostCurrent.length);
+    const closeRatePrior = rate(wonPrior.length, lostPrior.length);
+    const closeRateChangePct = closeRatePrior === null
+      ? null
+      : closeRateCurrent - closeRatePrior;
+
+    /* -----------------------------------------------------
+       LEADS IN PIPELINE — live count + retroactive "as of" prior
+    ----------------------------------------------------- */
+    const pipelineCurrent = openLeads.length;
+    const pipelinePrior = leads.filter(l => wasOpenAsOf(l, prior.end)).length;
+
+    const suffix = isCurrent ? "MTD" : MONTHS_SHORT[pm - 1];
+    const resolvedCount = wonCurrent.length + lostCurrent.length;
+
+    const crBadge = resolvedCount >= 10 && closeRateChangePct !== null
+      ? pctBadge(closeRateChangePct)
+      : "";
+
+    /* -----------------------------------------------------
+       REVENUE TILES — shape driven by project_lead_config.revenue_model
+    ----------------------------------------------------- */
+    let revenueTilesHtml = "";
+
+    if (revenueModel === "amount" || revenueModel === "both") {
+      const newRevenue = sumField(wonCurrent, "amount");
+      revenueTilesHtml += tile(
+        `New Revenue &middot; ${suffix}`,
+        `$${newRevenue.toLocaleString()}`,
+        `From ${wonCurrent.length} won lead${wonCurrent.length === 1 ? "" : "s"} this period`
+      );
+    }
+
+    if (revenueModel === "mmr_setup" || revenueModel === "both") {
+      const newMrr = sumField(wonCurrent, "potential_mmr");
+      const newSetup = sumField(wonCurrent, "potential_setup_flat");
+
+      revenueTilesHtml +=
+        tile(
+          `New MRR &middot; ${suffix}`,
+          `$${newMrr.toLocaleString()}`,
+          `From ${wonCurrent.length} won lead${wonCurrent.length === 1 ? "" : "s"} this period`
+        ) +
+        tile(
+          `Setup Revenue &middot; ${suffix}`,
+          `$${newSetup.toLocaleString()}`,
+          `One-time fees, this period`
+        );
+    }
+
+    tilesEl.innerHTML =
+      tile("Leads in Pipeline",
+        `${pipelineCurrent} ${countBadge(pipelineCurrent, pipelinePrior)}`,
+        `Prior month: ${pipelinePrior}`) +
+      tile(`Won &middot; ${suffix}`,
+        `${wonCurrent.length} ${countBadge(wonCurrent.length, wonPrior.length)}`,
+        `Prior month: ${wonPrior.length}`) +
+      tile(`Lost &middot; ${suffix}`,
+        `${lostCurrent.length} ${countBadge(lostCurrent.length, lostPrior.length, true)}`,
+        `Prior month: ${lostPrior.length}`) +
+      tile(`Close Rate &middot; ${suffix}`,
+        `${closeRateCurrent.toFixed(1)}% ${crBadge}`,
+        `Won ÷ (won + lost), resolved this period`) +
+      revenueTilesHtml;
   }
 }
+
+/* ============================================================
+   FETCH
+============================================================ */
 
 async function fetchLeads(project) {
   const url = `
@@ -137,6 +256,74 @@ async function fetchStages(project) {
     .filter(l => l.lookup_type === "lead_stage" && l.is_active !== false)
     .sort((a, b) => a.sort_order - b.sort_order);
 }
+
+async function fetchLeadConfig(project) {
+  const url = `
+    https://leads-module.dennis-e64.workers.dev/leads/config?
+    project=${encodeURIComponent(project)}
+  `.replace(/\s+/g, "");
+
+  const res = await fetch(url, { cache: "no-cache" });
+  const data = await res.json();
+  // /leads/config proxies Supabase's select=* directly through, which
+  // returns an array even for a single matching row.
+  return Array.isArray(data) ? data[0] : data;
+}
+
+/* ============================================================
+   DATE / PERIOD HELPERS
+============================================================ */
+
+function parseDateSafe(raw) {
+  if (!raw) return null;
+  const iso = raw.endsWith("Z") ? raw : raw + "Z";
+  const t = Date.parse(iso);
+  return isNaN(t) ? null : new Date(t);
+}
+
+// month is 1-12. cutoffDay: if set, range ends at that day-of-month
+// (for MTD-style apples-to-apples comparison); if null, full month.
+function monthRange(year, month, cutoffDay) {
+  const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0));
+  const end = cutoffDay
+    ? new Date(Date.UTC(year, month - 1, cutoffDay, 23, 59, 59))
+    : new Date(Date.UTC(year, month, 0, 23, 59, 59)); // last day of month
+  return { start, end };
+}
+
+function inRange(rawDate, range) {
+  const d = parseDateSafe(rawDate);
+  if (!d) return false;
+  return d >= range.start && d <= range.end;
+}
+
+// Was this lead open as of a given point in time?
+// created_at <= asOf AND (end_date is null OR end_date > asOf)
+function wasOpenAsOf(lead, asOf) {
+  const created = parseDateSafe(lead.created_at);
+  if (!created || created > asOf) return false;
+
+  if (!lead.end_date) return true;
+
+  const closed = parseDateSafe(lead.end_date);
+  if (!closed) return true;
+
+  return closed > asOf;
+}
+
+function rate(won, lost) {
+  const total = won + lost;
+  if (total === 0) return 0;
+  return (won / total) * 100;
+}
+
+function sumField(leadsArr, field) {
+  return leadsArr.reduce((sum, l) => sum + (Number(l[field]) || 0), 0);
+}
+
+/* ============================================================
+   RENDER HELPERS
+============================================================ */
 
 function tile(label, valueHtml, sub) {
   return `
