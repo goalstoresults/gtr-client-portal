@@ -56,6 +56,8 @@ const LEAD_FIELD_OPTIONS = [
   "inspection_datetime",
   "additional_services",
   "total_fee",
+  "potential_mmr",            
+  "potential_setup_flat",     
   "buyers_agent_id",
   "buyers_agent_first_name",
   "buyers_agent_last_name",
