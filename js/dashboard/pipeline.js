@@ -1,22 +1,24 @@
 // js/dashboard/pipeline.js
-// Pipeline sub-tab: tiles + pipeline status bar (mockup look & feel).
+// Pipeline sub-tab: stage-by-stage lead counts, driven entirely by each
+// project's own `lead_stage` lookup values — no hardcoded won/lost concept.
 //
-// Worker contract: GET /dashboard/pipeline?project&user_id&period
-// {
-//   pipeline: {
-//     leads:      { current, prior },                       // open leads
-//     won:        { current, prior, new_revenue },          // resolved in period
-//     lost:       { current, prior },                       // down = good
-//     close_rate: { current, prior, change_pct },           // won/(won+lost), resolved in period
-//     no_status:  { current },                              // hygiene
-//     funnel:     { won, working, unknown, lost }           // snapshot for the bar
-//   }
-// }
+// Data sources (both already used elsewhere in the app):
+//   GET https://leads-module.dennis-e64.workers.dev/leads/list?project=X
+//   GET https://lookups-module.dennis-e64.workers.dev/lookups/list?project=X
 
 import {
   dashboardState, isCurrentPeriod, mountPeriodSelector,
-  fetchSection, pctBadge, countBadge, MONTHS_SHORT, MONTHS_LONG
+  MONTHS_SHORT, MONTHS_LONG
 } from "./dashboard-state.js";
+
+const STAGE_COLORS = [
+  "#1e7a46", "#b8860b", "#2f6fb0", "#8e44ad",
+  "#c9622a", "#5a8f29", "#b02a24", "#4b6584",
+  "#a3752e", "#3d8b8b", "#6c5ce7", "#00838f",
+  "#c2185b", "#558b2f", "#5d4037", "#455a64",
+  "#e67e22", "#16a085", "#7f1d1d", "#1a5276",
+  "#6b4226", "#2c3e50", "#8d6e63", "#37474f"
+];
 
 export async function renderDashboardPipeline(container, portalState) {
   container.innerHTML = `
@@ -31,7 +33,7 @@ export async function renderDashboardPipeline(container, portalState) {
           <div class="dashboard-hero-head">
             <div>
               <h3 class="dashboard-chart-title">Where your pipeline stands</h3>
-              <div class="dashboard-chart-sub">Every open and resolved lead this period.</div>
+              <div class="dashboard-chart-sub">Open leads by stage.</div>
             </div>
             <div class="dashboard-period-control" id="pip-period-control"></div>
           </div>
@@ -53,7 +55,6 @@ export async function renderDashboardPipeline(container, portalState) {
     const period = dashboardState.period;
     const isCurrent = isCurrentPeriod(period);
     const [py, pm] = period.split("-").map(Number);
-    const suffix = isCurrent ? "MTD" : MONTHS_SHORT[pm - 1];
     const now = new Date();
 
     document.getElementById("pip-period-note").textContent = isCurrent
@@ -64,46 +65,77 @@ export async function renderDashboardPipeline(container, portalState) {
     tilesEl.innerHTML = `<div class="dashboard-metric-box">
       <div class="dashboard-metric-sub">Loading&hellip;</div></div>`;
 
-    let data;
+    let leads, stages;
     try {
-      data = await fetchSection("/dashboard/pipeline", portalState);
+      [leads, stages] = await Promise.all([
+        fetchLeads(portalState.project),
+        fetchStages(portalState.project)
+      ]);
     } catch (err) {
       tilesEl.innerHTML = `<div class="dashboard-metric-box">
         <div class="dashboard-metric-sub">Couldn't load pipeline data. Try again.</div></div>`;
       document.getElementById("dashboardPipelineChart").innerHTML = "";
       document.getElementById("pip-legend").innerHTML = "";
+      console.error("[Dashboard Pipeline] Load error:", err);
       return;
     }
-    const p = data.pipeline;
 
-    // Close rate uses countBadge-style suppression via its underlying counts:
-    // when resolved deals are few, percent swings are noise, so show points.
-    const crBadge = (p.won.current + p.lost.current) >= 10
-      ? pctBadge(p.close_rate.change_pct)
-      : "";
+    // Count leads per stage, in the project's configured stage order
+    const counts = stages.map(s => ({
+      stage: s.value,
+      count: leads.filter(l => l.stage_name === s.value).length
+    }));
 
-    tilesEl.innerHTML =
-      tile("Leads in Pipeline",
-        `${p.leads.current} ${countBadge(p.leads.current, p.leads.prior)}`,
-        `Prior month: ${p.leads.prior}`) +
-      tile(`Won &middot; ${suffix}`,
-        `${p.won.current} ${countBadge(p.won.current, p.won.prior)}`,
-        `New revenue: $${Number(p.won.new_revenue || 0).toLocaleString()}`) +
-      tile(`Lost / Abandoned &middot; ${suffix}`,
-        `${p.lost.current} ${countBadge(p.lost.current, p.lost.prior, true)}`,
-        `Prior month: ${p.lost.prior}`) +
-      tile(`Close Rate &middot; ${suffix}`,
-        `${Number(p.close_rate.current).toFixed(1)}% ${crBadge}`,
-        `Won ÷ (won + lost), resolved this period`);
+    // Any leads whose stage_name doesn't match a configured lookup value
+    // (renamed/removed stage, bad data, etc.) — surfaced, not silently dropped
+    const knownStageNames = new Set(stages.map(s => s.value));
+    const uncategorized = leads.filter(l => !knownStageNames.has(l.stage_name)).length;
+    if (uncategorized > 0) {
+      counts.push({ stage: "Uncategorized", count: uncategorized });
+    }
 
-    const f = p.funnel;
-    document.getElementById("dashboardPipelineChart").innerHTML = funnelBar(f);
-    document.getElementById("pip-legend").innerHTML = `
-      <span><span class="swatch" style="background:#1e7a46"></span>Won (${f.won})</span>
-      <span><span class="swatch" style="background:#b8860b"></span>Working (${f.working})</span>
-      <span><span class="swatch" style="background:#c9c6bd"></span>No status (${f.unknown})</span>
-      <span><span class="swatch" style="background:#b02a24"></span>Lost (${f.lost})</span>`;
+    tilesEl.innerHTML = tile(
+      "Leads in Pipeline",
+      `${leads.length}`,
+      `Across ${counts.filter(c => c.count > 0).length} stage${counts.filter(c => c.count > 0).length === 1 ? "" : "s"}`
+    );
+
+    document.getElementById("dashboardPipelineChart").innerHTML = stageBar(counts);
+    document.getElementById("pip-legend").innerHTML = counts
+      .map((c, i) => `
+        <span>
+          <span class="swatch" style="background:${STAGE_COLORS[i % STAGE_COLORS.length]}"></span>
+          ${escapeHtml(c.stage)} (${c.count})
+        </span>
+      `)
+      .join("");
   }
+}
+
+async function fetchLeads(project) {
+  const url = `
+    https://leads-module.dennis-e64.workers.dev/leads/list?
+    project=${encodeURIComponent(project)}
+  `.replace(/\s+/g, "");
+
+  const res = await fetch(url, { cache: "no-cache" });
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
+async function fetchStages(project) {
+  const url = `
+    https://lookups-module.dennis-e64.workers.dev/lookups/list?
+    project=${encodeURIComponent(project)}
+  `.replace(/\s+/g, "");
+
+  const res = await fetch(url, { cache: "no-cache" });
+  const data = await res.json();
+  const all = Array.isArray(data.lookups) ? data.lookups : [];
+
+  return all
+    .filter(l => l.lookup_type === "lead_stage" && l.is_active !== false)
+    .sort((a, b) => a.sort_order - b.sort_order);
 }
 
 function tile(label, valueHtml, sub) {
@@ -115,28 +147,34 @@ function tile(label, valueHtml, sub) {
     </div>`;
 }
 
-function funnelBar(f) {
-  const total = (f.won + f.working + f.unknown + f.lost) || 1;
+function stageBar(counts) {
+  const total = counts.reduce((sum, c) => sum + c.count, 0) || 1;
   const W = 460, H = 64;
-  const segs = [
-    { v: f.won,     c: "#1e7a46" },
-    { v: f.working, c: "#b8860b" },
-    { v: f.unknown, c: "#c9c6bd" },
-    { v: f.lost,    c: "#b02a24" }
-  ];
+
   let xPos = 0, rects = "";
-  segs.forEach((s) => {
-    const w = (s.v / total) * W;
+  counts.forEach((c, i) => {
+    const w = (c.count / total) * W;
+    const color = STAGE_COLORS[i % STAGE_COLORS.length];
     if (w > 0) {
       rects += `<rect x="${xPos}" y="14" width="${Math.max(w - 2, 2)}" height="36"
-                fill="${s.c}" rx="4"/>`;
-      if (w > 34) {
+                fill="${color}" rx="4"/>`;
+      if (w > 24) {
         rects += `<text x="${xPos + w / 2}" y="37" text-anchor="middle"
-                  font-size="13" font-weight="700" fill="#fff">${s.v}</text>`;
+                  font-size="13" font-weight="700" fill="#fff">${c.count}</text>`;
       }
     }
     xPos += w;
   });
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Pipeline status breakdown"
+
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Leads by stage"
           style="width:100%;height:auto;display:block">${rects}</svg>`;
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
