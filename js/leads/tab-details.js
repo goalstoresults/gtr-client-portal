@@ -155,7 +155,8 @@ export async function renderLeadDetails(container, portalState) {
     const updates = {};
 
     formDiv.querySelectorAll("[data-field]").forEach(el => {
-      updates[el.dataset.field] = el.value;
+      const val = el.value;
+      updates[el.dataset.field] = val === "" ? null : val;   // ⭐ CHANGED
     });
 
     try {
@@ -185,6 +186,7 @@ export async function renderLeadDetails(container, portalState) {
       console.error(err);
     }
   });
+
 }
 
 
