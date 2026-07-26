@@ -64,12 +64,6 @@ export async function renderDashboardOverview(container, portalState, ctx) {
       pulseHtml += pulseTile(state, c.pct + "%", "List untouched in 30 days",
         `Of ${Number(c.marketable).toLocaleString()} marketable contacts.`);
     }
-    if (ov.pulse.hygiene) {
-      const h = ov.pulse.hygiene;
-      const state = h.untyped_pct < 15 ? "ok" : h.untyped_pct < 40 ? "warn" : "bad";
-      pulseHtml += pulseTile(state, h.untyped_pct + "%", "Contacts missing a type",
-        `${h.unknown_leads} of ${h.total_leads} pipeline leads have no status.`);
-    }
   }
   pulseEl.innerHTML = pulseHtml ||
     `<div class="dashboard-pulse dashboard-pulse-flat">
