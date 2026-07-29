@@ -2,9 +2,10 @@
 // Additional Services — CSI (ISN) only.
 //
 // Mirrors ISN's own Additional Services checkbox list, backed by
-// lookups where lookup_type='services'. Selections save to the
-// project_pipeline_leads.additional_services column (already present as a
-// default field on /leads/add). This tab only talks to the Portal's own
+// lookups where lookup_type='services'. Selections save as an array of
+// lookups.id values to project_pipeline_leads.isn_services_lookup_ids
+// (uuid[]) -- the Worker resolves those back to ISN's external_id + name
+// at order-create time. This tab only talks to the Portal's own
 // leads-module / lookups-module workers -- no ISN API calls happen here.
 // ISN sync happens later, via the webhook, once the lead's stage is set to
 // "Ready to Transfer".
@@ -58,9 +59,7 @@ export async function renderLeadServices(container, portalState) {
   const lead = await leadRes.json();
 
   const selectedIds = new Set(
-    (Array.isArray(lead.additional_services) ? lead.additional_services : []).map(
-      (s) => s.id
-    )
+    Array.isArray(lead.isn_services_lookup_ids) ? lead.isn_services_lookup_ids : []
   );
 
   /* -------------------------------------------------------
@@ -90,8 +89,6 @@ export async function renderLeadServices(container, portalState) {
           <input
             type="checkbox"
             data-id="${escapeHtml(s.id)}"
-            data-external-id="${escapeHtml(s.external_id || "")}"
-            data-value="${escapeHtml(s.value)}"
             ${selectedIds.has(s.id) ? "checked" : ""}
           />
           ${escapeHtml(s.value.trim())}
@@ -107,11 +104,7 @@ export async function renderLeadServices(container, portalState) {
     const checked = Array.from(
       listDiv.querySelectorAll('input[type="checkbox"]:checked')
     );
-    const additional_services = checked.map((cb) => ({
-      id: cb.dataset.id,
-      external_id: cb.dataset.externalId,
-      value: cb.dataset.value,
-    }));
+    const isn_services_lookup_ids = checked.map((cb) => cb.dataset.id);
 
     try {
       const res = await fetch(
@@ -121,7 +114,7 @@ export async function renderLeadServices(container, portalState) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             id: leadId,
-            updates: { additional_services },
+            updates: { isn_services_lookup_ids },
           }),
         }
       );
