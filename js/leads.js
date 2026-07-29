@@ -1,5 +1,4 @@
 // js/leads.js
-
 import { renderLeadsList } from "./leads/tab-list.js";
 import { renderLeadContact } from "./leads/tab-contact.js";
 import { renderLeadDetails } from "./leads/tab-details.js";
@@ -9,10 +8,36 @@ import { renderLeadSchedule } from "./leads/tab-schedule.js";
 import { renderLeadTimeline } from "./leads/tab-timeline.js";
 
 export async function loadLeadsTab({ portalState, tabContent }) {
-
   // Load base HTML
   const res = await fetch("./components/leads.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
+
+  // 🔧 Inject lead context bar -- mirrors the contacts.js context bar.
+  // tab-list.js owns keeping this current once a lead is selected, added,
+  // or deleted (it writes directly to #lead-context-bar) -- this just needs
+  // to create the element and set its correct state on initial load,
+  // restoring from localStorage if portalState hasn't been hydrated yet
+  // (e.g. on a page refresh).
+  let contextBar = document.getElementById("lead-context-bar");
+  if (!contextBar) {
+    contextBar = document.createElement("div");
+    contextBar.id = "lead-context-bar";
+    // Reuses the same styling as the contacts context bar -- no new CSS
+    // needed as long as .contact-context-bar exists in your stylesheet.
+    contextBar.className = "contact-context-bar";
+    tabContent.prepend(contextBar);
+  }
+
+  if (!portalState.activeLeadId) {
+    portalState.activeLeadId = localStorage.getItem("activeLeadId") || null;
+    portalState.activeLeadName = localStorage.getItem("activeLeadName") || "";
+    portalState.activeLeadContactName = localStorage.getItem("activeLeadContactName") || "";
+  }
+
+  contextBar.textContent = portalState.activeLeadId
+    ? `Lead: ${portalState.activeLeadName} (${portalState.activeLeadContactName})`
+    : "No Lead Selected";
+  contextBar.style.display = "block";
 
   const subtabsContainer = tabContent.querySelector("#leads-subtabs");
   const content = tabContent.querySelector("#leadsContent");
@@ -47,7 +72,7 @@ export async function loadLeadsTab({ portalState, tabContent }) {
 
   // FIX: Always pass tabLabel
   subtabsContainer.querySelectorAll("button").forEach(btn => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       const key = btn.dataset.subtab;
       const renderer = TAB_RENDERERS[key];
       const tabLabel = btn.textContent;
@@ -61,9 +86,8 @@ export async function loadLeadsTab({ portalState, tabContent }) {
       }
     });
   });
-  
+
   // ⭐ Always open List first
   const listBtn = subtabsContainer.querySelector('button[data-subtab="list"]');
   if (listBtn) listBtn.click();
 }
-
