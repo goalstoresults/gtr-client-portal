@@ -1,6 +1,8 @@
 // /js/setup/tab-contact-diagnostics.js
 
 const CD_BASE_URL = "https://contact-diagnostics.dennis-e64.workers.dev";
+const SYNC_BASE_URL = "https://portal-to-ghl-sync.dennis-e64.workers.dev";
+const SYNC_WEBHOOK_KEY = "77b4951a-a21e-4ae3-b5cc-8dc4ae7a9879";
 
 let CD_CACHE = [];
 
@@ -82,7 +84,7 @@ export async function renderContactDiagnostics(setupContent, portalState) {
               </span>
             </th>
             <th style="width:160px;">CRM ID</th>
-            <th style="width:180px; text-align:center;">Actions</th>
+            <th style="width:220px; text-align:center;">Actions</th>
           </tr>
         </thead>
 
@@ -99,7 +101,7 @@ export async function renderContactDiagnostics(setupContent, portalState) {
   document.getElementById("cd-select-all").onclick = toggleSelectAll;
   document.getElementById("cd-clear-all").onclick = clearAll;
   document.getElementById("cd-export").onclick = exportSelected;
-  document.getElementById("cd-bulk-sync").onclick = () => bulkSync(project);
+  document.getElementById("cd-bulk-sync").onclick = () => bulkSync(project, portalState);
   document.getElementById("cd-filter").onchange = () =>
     loadContacts(project, portalState);
 
@@ -161,7 +163,7 @@ function renderRows(portalState) {
           <td>${c.email || ""}</td>
           <td>${c.phone || ""}</td>
           <td>${c.contact_type || ""}</td>
-          <td>${crmDisplay}</td>
+          <td class="cd-crm-cell">${crmDisplay}</td>
           <td style="text-align:center;">
             <button class="btn btn-secondary" onclick="cdPreview('${c.contact_id}', '${c.project}')">Preview</button>
             <button class="btn btn-success" onclick="cdSync('${c.contact_id}', '${c.project}')">Sync</button>
@@ -250,14 +252,29 @@ window.cdPreview = async function (contactId, project) {
   alert(JSON.stringify(data.payload, null, 2));
 };
 
-window.cdSync = async function (contactId, project) {
-  const res = await fetch(`${CD_BASE_URL}/contact_diag/sync`, {
+// Calls the tested portal-to-ghl-sync worker directly — this is the one
+// real sync implementation, also used by the Postgres trigger and the
+// manual curl tests. This tab is just a UI wrapper around it, not a
+// second implementation.
+async function syncOneContact(contactId, project) {
+  const res = await fetch(SYNC_BASE_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-webhook-key": SYNC_WEBHOOK_KEY
+    },
     body: JSON.stringify({ project, contact_id: contactId })
   });
 
-  const data = await res.json();
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = { raw: text }; }
+
+  return { status: res.status, data };
+}
+
+window.cdSync = async function (contactId, project) {
+  const { data } = await syncOneContact(contactId, project);
   alert("Sync complete:\n" + JSON.stringify(data, null, 2));
 
   const portalState = window.portalState || {};
@@ -339,7 +356,11 @@ function exportSelected() {
   URL.revokeObjectURL(url);
 }
 
-async function bulkSync(project) {
+// Bulk sync now loops client-side, calling portal-to-ghl-sync once per
+// selected contact — sequential, not concurrent, same reasoning as the
+// backend: avoid bursting GHL's API with simultaneous requests on a
+// large batch. Progress is reflected in the button label as it runs.
+async function bulkSync(project, portalState) {
   const ids = [...document.querySelectorAll(".cd-row:checked")].map((cb) =>
     cb.closest("tr").dataset.id
   );
@@ -349,16 +370,31 @@ async function bulkSync(project) {
     return;
   }
 
-  const res = await fetch(`${CD_BASE_URL}/contact_diag/bulk_sync`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ project, contact_ids: ids })
-  });
+  const btn = document.getElementById("cd-bulk-sync");
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
 
-  const data = await res.json();
-  alert("Bulk sync complete:\n" + JSON.stringify(data, null, 2));
+  const results = [];
 
-  const portalState = window.portalState || {};
+  for (let i = 0; i < ids.length; i++) {
+    btn.textContent = `Syncing ${i + 1} of ${ids.length}...`;
+    const { status, data } = await syncOneContact(ids[i], project);
+    results.push({ contact_id: ids[i], status, data });
+  }
+
+  btn.disabled = false;
+  btn.textContent = originalLabel;
+
+  const succeeded = results.filter(r => r.status === 200 && r.data?.ok).length;
+  const failed = results.length - succeeded;
+
+  alert(
+    `Bulk sync complete: ${succeeded} succeeded, ${failed} failed.\n\n` +
+    results
+      .map(r => `${r.contact_id}: ${r.status === 200 && r.data?.ok ? "OK" : JSON.stringify(r.data)}`)
+      .join("\n")
+  );
+
   const effectiveProject = portalState.setup_project_id || project;
   loadContacts(effectiveProject, portalState);
 }
