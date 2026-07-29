@@ -67,11 +67,11 @@ export async function renderLeadServices(container, portalState) {
   ------------------------------------------------------- */
   container.innerHTML = `
     <section class="card">
-      <h2>Services</h2>
-      <div id="servicesList"></div>
-      <button id="btnSaveServices" class="btn-primary" style="margin-top:20px;">
-        Save Services
-      </button>
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <h2>Services</h2>
+        <button id="btnSaveServices" class="btn-primary">Save Services</button>
+      </div>
+      <div id="servicesList" style="margin-top:16px;"></div>
     </section>
   `;
 
