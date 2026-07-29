@@ -197,7 +197,7 @@ export async function renderLeadsList(container, portalState) {
 
           const bar = document.getElementById("lead-context-bar");
           if (bar) {
-            bar.textContent = `${name} (${contact})`;
+            bar.textContent = `Lead: ${name} (${contact})`;
             bar.style.display = "block";
           }
 
@@ -300,7 +300,10 @@ export async function renderLeadsList(container, portalState) {
           localStorage.removeItem("activeLeadContactName");
 
           const bar = document.getElementById("lead-context-bar");
-          if (bar) bar.style.display = "none";
+          if (bar) {
+            bar.textContent = "No Lead Selected";
+            bar.style.display = "block";
+          }
         }
       } catch (err) {
         console.error("[Delete Lead] Network error:", err);
