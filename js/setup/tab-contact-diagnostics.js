@@ -6,6 +6,10 @@ const SYNC_WEBHOOK_KEY = "77b4951a-a21e-4ae3-b5cc-8dc4ae7a9879";
 
 let CD_CACHE = [];
 
+function escapeForAttr(str) {
+  return String(str || "").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+}
+
 export async function renderContactDiagnostics(setupContent, portalState) {
   const project = portalState.setup_project_id;
 
@@ -167,6 +171,7 @@ function renderRows(portalState) {
           <td style="text-align:center;">
             <button class="btn btn-secondary" onclick="cdPreview('${c.contact_id}', '${c.project}')">Preview</button>
             <button class="btn btn-success" onclick="cdSync('${c.contact_id}', '${c.project}')">Sync</button>
+            <button class="btn btn-danger" onclick="cdDelete('${c.contact_id}', '${c.project}', '${escapeForAttr(name)}')">Delete</button>
           </td>
         </tr>
       `;
@@ -276,6 +281,30 @@ async function syncOneContact(contactId, project) {
 window.cdSync = async function (contactId, project) {
   const { data } = await syncOneContact(contactId, project);
   alert("Sync complete:\n" + JSON.stringify(data, null, 2));
+
+  const portalState = window.portalState || {};
+  const effectiveProject = portalState.setup_project_id || project;
+  loadContacts(effectiveProject, portalState);
+};
+
+window.cdDelete = async function (contactId, project, name) {
+  const confirmed = confirm(
+    `Delete "${name}" from Portal?\n\nThis cannot be undone.`
+  );
+  if (!confirmed) return;
+
+  try {
+    await fetch(
+      `https://contacts-module.dennis-e64.workers.dev/contacts/delete/${contactId}?project=${project}`,
+      {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" }
+      }
+    );
+  } catch (err) {
+    alert("Delete failed: " + err.message);
+    return;
+  }
 
   const portalState = window.portalState || {};
   const effectiveProject = portalState.setup_project_id || project;
