@@ -83,11 +83,13 @@ export async function renderLeadDetails(container, portalState) {
   ------------------------------------------------------- */
   container.innerHTML = `
     <section class="card">
-      <h2>Lead Details</h2>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <h2 style="margin:0;">Lead Details</h2>
+        <button id="btnSaveLeadDetails" class="btn-primary">
+          Save Lead Details
+        </button>
+      </div>
       <div id="leadDetailsForm"></div>
-      <button id="btnSaveLeadDetails" class="btn-primary" style="margin-top:24px;">
-        Save Lead Details
-      </button>
     </section>
   `;
 
