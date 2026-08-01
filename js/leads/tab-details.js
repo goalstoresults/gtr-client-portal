@@ -85,13 +85,50 @@ export async function renderLeadDetails(container, portalState) {
     <section class="card">
       <h2>Lead Details</h2>
       <div id="leadDetailsForm"></div>
-      <button id="btnSaveLeadDetails" class="btn-primary" style="margin-top:20px;">
+      <button id="btnSaveLeadDetails" class="btn-primary" style="margin-top:24px;">
         Save Lead Details
       </button>
     </section>
   `;
 
   const formDiv = container.querySelector("#leadDetailsForm");
+
+  /* -------------------------------------------------------
+     STYLE TOKENS (kept local so this file stays drop-in)
+  ------------------------------------------------------- */
+  const sectionHeaderStyle = `
+    background:#eef2f6;
+    color:#3d4a5c;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:0.07em;
+    text-transform:uppercase;
+    padding:10px 16px;
+    margin:0 0 18px;
+    border-radius:6px;
+    border-left:3px solid #7ea3c9;
+  `.replace(/\s+/g, " ");
+
+  const fieldLabelStyle = `
+    display:block;
+    margin-bottom:16px;
+  `.replace(/\s+/g, " ");
+
+  const fieldLabelTextStyle = `
+    display:block;
+    font-size:13px;
+    color:#5b6673;
+    margin-bottom:4px;
+  `.replace(/\s+/g, " ");
+
+  const fieldInputStyle = `
+    width:100%;
+    padding:8px 10px;
+    border:1px solid #d5dbe2;
+    border-radius:4px;
+    font-size:14px;
+    box-sizing:border-box;
+  `.replace(/\s+/g, " ");
 
   /* -------------------------------------------------------
      BUILD FORM (dynamic sections + fields)
@@ -117,9 +154,9 @@ export async function renderLeadDetails(container, portalState) {
               .join("");
 
             return `
-              <label style="display:block; margin-bottom:10px;">
-                <span>${escapeHtml(f.label)}</span>
-                <select data-field="${f.field_key}" style="width:100%;">
+              <label style="${fieldLabelStyle}">
+                <span style="${fieldLabelTextStyle}">${escapeHtml(f.label)}</span>
+                <select data-field="${f.field_key}" style="${fieldInputStyle}">
                   <option value="">-- select --</option>
                   ${options}
                 </select>
@@ -129,19 +166,19 @@ export async function renderLeadDetails(container, portalState) {
 
           // Text input
           return `
-            <label style="display:block; margin-bottom:10px;">
-              <span>${escapeHtml(f.label)}</span>
+            <label style="${fieldLabelStyle}">
+              <span style="${fieldLabelTextStyle}">${escapeHtml(f.label)}</span>
               <input type="text" data-field="${f.field_key}" value="${escapeHtml(
                 value
-              )}" style="width:100%;">
+              )}" style="${fieldInputStyle}">
             </label>
           `;
         })
         .join("");
 
       return `
-        <div style="margin-bottom:20px;">
-          <h3>${escapeHtml(sectionName)}</h3>
+        <div style="margin-bottom:32px;">
+          <h3 style="${sectionHeaderStyle}">${escapeHtml(sectionName)}</h3>
           ${rows}
         </div>
       `;
@@ -188,5 +225,3 @@ export async function renderLeadDetails(container, portalState) {
   });
 
 }
-
-
