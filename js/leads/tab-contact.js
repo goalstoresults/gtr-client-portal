@@ -190,7 +190,7 @@ export async function renderLeadContact(container, portalState, { tabLabel }) {
   const configData = await configRes.json();
 
   const configured = Array.isArray(configData.rows)
-    ? configData.rows.filter(r => r.lead_tab === "contact")
+    ? configData.rows.filter(r => r.lead_tab === tabLabel.toLowerCase())
     : [];
 
   /* ============================================================
