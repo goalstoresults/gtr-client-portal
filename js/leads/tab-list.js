@@ -221,6 +221,10 @@ export async function renderLeadsList(container, portalState) {
 
     /* -------------------------------------------------------
        TRANSFER TO ISN (CSI only)
+       Two-step chain: create/reuse the ISN client, then immediately
+       create the ISN order using the isnClientId that step returns.
+       Previously this only did step 1 and mislabeled the button "Sent to
+       ISN" even though no order had actually been created.
     ------------------------------------------------------- */
     async function handleTransferToIsn(btn) {
       const leadId = btn.dataset.leadId;
@@ -230,7 +234,8 @@ export async function renderLeadsList(container, portalState) {
       btn.textContent = "Sending…";
 
       try {
-        const res = await fetch(`${CSI_ISN_GATEWAY_URL}/lead/transfer-client`, {
+        // Step 1: create or reuse the ISN client for this lead's contact
+        const clientRes = await fetch(`${CSI_ISN_GATEWAY_URL}/lead/transfer-client`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -239,17 +244,45 @@ export async function renderLeadsList(container, portalState) {
           }),
         });
 
-        const data = await res.json();
+        const clientData = await clientRes.json();
 
-        if (!res.ok || !data.success) {
-          console.error("[To ISN] Transfer failed:", data);
-          alert(`Transfer to ISN failed: ${data.error || "Unknown error"}`);
+        if (!clientRes.ok || !clientData.success) {
+          console.error("[To ISN] Client transfer failed:", clientData);
+          alert(`Transfer to ISN failed (client step): ${clientData.error || "Unknown error"}`);
           btn.disabled = false;
           btn.textContent = originalText;
           return;
         }
 
-        btn.textContent = data.isnCreated ? "Sent to ISN" : "Already in ISN";
+        // Step 2: create the ISN order using the isnClientId from step 1
+        btn.textContent = "Creating order…";
+
+        const orderRes = await fetch(`${CSI_ISN_GATEWAY_URL}/order/create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lead_id: leadId,
+            isnClientId: clientData.isnClientId,
+            project: portalState.project,
+          }),
+        });
+
+        const orderData = await orderRes.json();
+
+        if (!orderRes.ok || !orderData.success) {
+          console.error("[To ISN] Order creation failed:", orderData);
+          alert(
+            `Client synced to ISN, but order creation failed: ${orderData.error || "Unknown error"}` +
+              (orderData.unresolved ? `\n\nMissing: ${orderData.unresolved.join(", ")}` : "")
+          );
+          // Client side succeeded even though order failed -- don't leave
+          // the button saying "Sending" forever, but don't claim success either.
+          btn.disabled = false;
+          btn.textContent = "Retry Order";
+          return;
+        }
+
+        btn.textContent = `Order #${orderData.isnResponse?.oid || orderData.isnOrderId} Created`;
         btn.classList.add("btn-to-isn-done");
       } catch (err) {
         console.error("[To ISN] Network error:", err);
