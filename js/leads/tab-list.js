@@ -373,7 +373,8 @@ export async function renderLeadsList(container, portalState) {
       const safeContact = (l.contact_search_name || "").replace(/"/g, '&quot;');
 
       const showToIsn =
-        l.stage_name === "Ready to Transfer" && portalState.project === "csi";
+        (l.stage_name === "Ready to Transfer" || l.stage_name === "Send to ISN") &&
+        portalState.project === "csi";
 
       const toIsnButton = showToIsn
         ? `<button class="secondary btn-to-isn" data-lead-id="${l.lead_id}">To ISN</button>`
