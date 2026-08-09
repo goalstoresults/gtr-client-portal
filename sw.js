@@ -24,14 +24,22 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  const url = event.request.url;
+  const req = event.request;
+
+  // Only handle GET requests
+  if (req.method !== 'GET') return;
+
+  // Never intercept page navigations — let the browser load these normally
+  if (req.mode === 'navigate') return;
+
+  const url = new URL(req.url);
 
   // Never cache API calls — always hit the network live
-  if (url.includes('client-portal-api.dennis-e64.workers.dev')) {
-    return;
-  }
+  if (url.hostname === 'client-portal-api.dennis-e64.workers.dev') return;
 
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    caches.match(req).then((cached) => {
+      return cached || fetch(req).catch(() => cached);
+    })
   );
 });
