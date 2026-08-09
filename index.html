@@ -9,7 +9,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="icon" type="image/png" href="./redumbrella_black.png" />
 
-<link rel="manifest" href="/manifest.json" />
 <meta name="theme-color" content="#000000" />
 
 <!-- iOS support -->
@@ -22,6 +21,20 @@
 <!-- Favicon -->
 <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png" />
 <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png" />    
+
+<!-- Dynamic manifest — carries the current ?project= into start_url so an
+     installed icon always reopens directly to that client's project -->
+<script>
+(function () {
+  const proj = new URLSearchParams(window.location.search).get('project');
+  const link = document.createElement('link');
+  link.rel = 'manifest';
+  link.href = proj
+    ? '/manifest.json?project=' + encodeURIComponent(proj)
+    : '/manifest.json';
+  document.head.appendChild(link);
+})();
+</script>
 
 <!-- Choices.js -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
@@ -63,6 +76,15 @@ margin-top: 10px;
 color: red;
 margin-top: 10px;
 height: 18px;
+}
+
+#noProjectError {
+display: none;
+text-align: center;
+margin-top: 60px;
+font-size: 20px;
+font-weight: 600;
+color: red;
 }
 
 header {
@@ -135,8 +157,13 @@ border-color: #d4a017;
 
 <body>
 
+<!-- NO-PROJECT ERROR -->
+<div id="noProjectError">
+No project specified. Please use your provided portal link.
+</div>
+
 <!-- LOGIN -->
-<div id="loginForm" class="login-wrapper">
+<div id="loginForm" class="login-wrapper" style="display:none;">
 
 <img src="./RedUmbrellaPro Header2.png" alt="Red Umbrella Pro" class="logo-waiting" />
 
@@ -226,6 +253,7 @@ deleteAllowed: false
 window.portalState = portalState;
 
 const loginForm = document.getElementById("loginForm");
+const noProjectError = document.getElementById("noProjectError");
 const projectFieldBlock = document.getElementById("projectFieldBlock");
 const projectInput = document.getElementById("projectInput");
 const emailInput = document.getElementById("emailInput");
@@ -662,10 +690,14 @@ window.addEventListener("DOMContentLoaded", () => {
 const urlParams = new URLSearchParams(window.location.search);
 const projectParam = urlParams.get("project");
 
-if (projectParam) {
-projectInput.value = projectParam;
-projectFieldBlock.style.display = "none";
+if (!projectParam) {
+// No project in URL — show error, never show a blank/guessable login form
+noProjectError.style.display = "block";
+return;
 }
+
+// Project present — show the field, pre-filled and still editable for testing
+projectInput.value = projectParam;
 
 checkIpLockout();
 
