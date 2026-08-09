@@ -696,8 +696,14 @@ noProjectError.style.display = "block";
 return;
 }
 
-// Project present — show the field, pre-filled and still editable for testing
+if (projectParam.toLowerCase() === "gtr") {
+// Your own testing project — show the field, pre-filled, editable
 projectInput.value = projectParam;
+} else {
+// Real client project — hide the field like before, just use the param
+projectInput.value = projectParam;
+projectFieldBlock.style.display = "none";
+}
 
 checkIpLockout();
 
