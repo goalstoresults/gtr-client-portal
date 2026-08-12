@@ -1,4 +1,4 @@
-const CACHE_NAME = 'redumbrella-shell-v1';
+const CACHE_NAME = 'redumbrella-shell-v2';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -39,7 +39,12 @@ self.addEventListener('fetch', (event) => {
   if (!url.protocol.startsWith('http')) return;
 
   // Never cache API calls — always hit the network live
-  if (url.hostname === 'client-portal-api.dennis-e64.workers.dev') return;
+  const API_HOSTS = [
+    'client-portal-api.dennis-e64.workers.dev',
+    'leads-module.dennis-e64.workers.dev',
+    'lookups-module.dennis-e64.workers.dev'
+  ];
+  if (API_HOSTS.includes(url.hostname)) return;
 
   event.respondWith(
     caches.match(req).then((cached) => {
