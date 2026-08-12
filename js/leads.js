@@ -29,9 +29,25 @@ export async function loadLeadsTab({ portalState, tabContent }) {
   }
 
   if (!portalState.activeLeadId) {
-    portalState.activeLeadId = localStorage.getItem("activeLeadId") || null;
-    portalState.activeLeadName = localStorage.getItem("activeLeadName") || "";
-    portalState.activeLeadContactName = localStorage.getItem("activeLeadContactName") || "";
+    // localStorage is shared across ALL projects (same domain) - only
+    // trust a stored lead if it was saved under this same project, or
+    // switching projects will leak the previous project's selected lead
+    // into the new one.
+    const storedProject = localStorage.getItem("activeLeadProject");
+    if (storedProject === portalState.project) {
+      portalState.activeLeadId = localStorage.getItem("activeLeadId") || null;
+      portalState.activeLeadName = localStorage.getItem("activeLeadName") || "";
+      portalState.activeLeadContactName = localStorage.getItem("activeLeadContactName") || "";
+    } else {
+      // stale lead from a different project - clear it out entirely
+      portalState.activeLeadId = null;
+      portalState.activeLeadName = "";
+      portalState.activeLeadContactName = "";
+      localStorage.removeItem("activeLeadId");
+      localStorage.removeItem("activeLeadName");
+      localStorage.removeItem("activeLeadContactName");
+      localStorage.removeItem("activeLeadProject");
+    }
   }
 
   contextBar.textContent = portalState.activeLeadId
