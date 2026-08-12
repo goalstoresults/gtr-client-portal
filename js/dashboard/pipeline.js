@@ -113,7 +113,7 @@ export async function renderDashboardPipeline(container, portalState) {
         <div class="dashboard-metric-sub">Couldn't load pipeline data. Try again.</div></div>`;
       document.getElementById("dashboardPipelineChart").innerHTML = "";
       document.getElementById("pip-legend").innerHTML = "";
-      console.error("[Dashboard Pipeline] Load error:", err);
+      console.error("[Dashboard Pipeline] Load error:", err.message || err);
       return;
     }
     /* -----------------------------------------------------
@@ -238,6 +238,12 @@ async function fetchDashboardPipeline(project, userId) {
     project=${encodeURIComponent(project)}&user_id=${encodeURIComponent(userId)}
   `.replace(/\s+/g, "");
   const res = await fetch(url, { cache: "no-cache" });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "(no body)");
+    throw new Error(
+      `/dashboard/pipeline ${res.status} ${res.statusText} - url=${url} - body=${body}`
+    );
+  }
   return res.json();
 }
 async function fetchLeadConfig(project) {
