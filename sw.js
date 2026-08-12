@@ -34,6 +34,10 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(req.url);
 
+  // Only handle http(s) - extensions (chrome-extension://, etc.) can't be cached
+
+  if (!url.protocol.startsWith('http')) return;
+
   // Never cache API calls — always hit the network live
   if (url.hostname === 'client-portal-api.dennis-e64.workers.dev') return;
 
