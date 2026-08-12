@@ -37,12 +37,10 @@
 // distinguish "was Inactive back then" from "was still Open back then." Only
 // affects the PRIOR comparison number, not the live current count (which
 // reads actual status).
-
 import {
   dashboardState, isCurrentPeriod, mountPeriodSelector,
   pctBadge, countBadge, MONTHS_SHORT, MONTHS_LONG
 } from "./dashboard-state.js";
-
 const STAGE_COLORS = [
   "#1e7a46", "#b8860b", "#2f6fb0", "#8e44ad",
   "#c9622a", "#5a8f29", "#b02a24", "#4b6584",
@@ -51,8 +49,11 @@ const STAGE_COLORS = [
   "#e67e22", "#16a085", "#7f1d1d", "#1a5276",
   "#6b4226", "#2c3e50", "#8d6e63", "#37474f"
 ];
-
 export async function renderDashboardPipeline(container, portalState) {
+  const todayLabel = (() => {
+    const d = new Date();
+    return `${MONTHS_LONG[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  })();
   container.innerHTML = `
     <section class="dashboard-card">
       <div class="dashboard-cat-head">
@@ -64,8 +65,8 @@ export async function renderDashboardPipeline(container, portalState) {
         <div class="dashboard-hero">
           <div class="dashboard-hero-head">
             <div>
-              <h3 class="dashboard-chart-title">Where your pipeline stands</h3>
-              <div class="dashboard-chart-sub">Open leads by stage.</div>
+              <h3 class="dashboard-chart-title">Pipeline as of ${todayLabel}</h3>
+              <div class="dashboard-chart-sub">Open leads by stage — always today's snapshot, independent of the period selector below.</div>
             </div>
             <div class="dashboard-period-control" id="pip-period-control"></div>
           </div>
@@ -75,28 +76,22 @@ export async function renderDashboardPipeline(container, portalState) {
       </div>
     </section>
   `;
-
   mountPeriodSelector(
     document.getElementById("pip-period-control"),
     () => paint()
   );
-
   await paint();
-
   async function paint() {
     const period = dashboardState.period;
     const isCurrent = isCurrentPeriod(period);
     const [py, pm] = period.split("-").map(Number);
     const now = new Date();
-
     document.getElementById("pip-period-note").textContent = isCurrent
       ? `Month to date · ${MONTHS_LONG[pm - 1]} 1–${now.getDate()}`
       : `${MONTHS_LONG[pm - 1]} ${py} · full month`;
-
     const tilesEl = document.getElementById("pip-tiles");
     tilesEl.innerHTML = `<div class="dashboard-metric-box">
       <div class="dashboard-metric-sub">Loading&hellip;</div></div>`;
-
     let leads, stages, revenueModel;
     try {
       const [leadsRes, stagesRes, configRes] = await Promise.all([
@@ -115,23 +110,19 @@ export async function renderDashboardPipeline(container, portalState) {
       console.error("[Dashboard Pipeline] Load error:", err);
       return;
     }
-
     /* -----------------------------------------------------
        STAGE BAR — live, Open leads only
     ----------------------------------------------------- */
     const openLeads = leads.filter(l => l.status === "Open");
-
     const counts = stages.map(s => ({
       stage: s.value,
       count: openLeads.filter(l => l.stage_name === s.value).length
     }));
-
     const knownStageNames = new Set(stages.map(s => s.value));
     const uncategorized = openLeads.filter(l => !knownStageNames.has(l.stage_name)).length;
     if (uncategorized > 0) {
       counts.push({ stage: "Uncategorized", count: uncategorized });
     }
-
     document.getElementById("dashboardPipelineChart").innerHTML = stageBar(counts);
     document.getElementById("pip-legend").innerHTML = counts
       .map((c, i) => `
@@ -141,17 +132,14 @@ export async function renderDashboardPipeline(container, portalState) {
         </span>
       `)
       .join("");
-
     /* -----------------------------------------------------
        PERIOD RANGES (current + prior, apples-to-apples cutoff)
     ----------------------------------------------------- */
     const cutoffDay = isCurrent ? now.getUTCDate() : null;
     const current = monthRange(py, pm, cutoffDay);
-
     let priorMonth = pm - 1, priorYear = py;
     if (priorMonth === 0) { priorMonth = 12; priorYear -= 1; }
     const prior = monthRange(priorYear, priorMonth, cutoffDay);
-
     /* -----------------------------------------------------
        WON / LOST — resolved within the period (via end_date)
     ----------------------------------------------------- */
@@ -159,31 +147,25 @@ export async function renderDashboardPipeline(container, portalState) {
     const wonPrior = leads.filter(l => l.status === "Won" && inRange(l.end_date, prior));
     const lostCurrent = leads.filter(l => l.status === "Lost" && inRange(l.end_date, current));
     const lostPrior = leads.filter(l => l.status === "Lost" && inRange(l.end_date, prior));
-
     const closeRateCurrent = rate(wonCurrent.length, lostCurrent.length);
     const closeRatePrior = rate(wonPrior.length, lostPrior.length);
     const closeRateChangePct = closeRatePrior === null
       ? null
       : closeRateCurrent - closeRatePrior;
-
     /* -----------------------------------------------------
        LEADS IN PIPELINE — live count + retroactive "as of" prior
     ----------------------------------------------------- */
-    const pipelineCurrent = openLeads.length;
+    const pipelineCurrent = leads.filter(l => wasOpenAsOf(l, current.end)).length;
     const pipelinePrior = leads.filter(l => wasOpenAsOf(l, prior.end)).length;
-
     const suffix = isCurrent ? "MTD" : MONTHS_SHORT[pm - 1];
     const resolvedCount = wonCurrent.length + lostCurrent.length;
-
     const crBadge = resolvedCount >= 10 && closeRateChangePct !== null
       ? pctBadge(closeRateChangePct)
       : "";
-
     /* -----------------------------------------------------
        REVENUE TILES — shape driven by project_lead_config.revenue_model
     ----------------------------------------------------- */
     let revenueTilesHtml = "";
-
     if (revenueModel === "amount" || revenueModel === "both") {
       const newRevenue = sumField(wonCurrent, "amount");
       revenueTilesHtml += tile(
@@ -192,11 +174,9 @@ export async function renderDashboardPipeline(container, portalState) {
         `From ${wonCurrent.length} won lead${wonCurrent.length === 1 ? "" : "s"} this period`
       );
     }
-
     if (revenueModel === "mmr_setup" || revenueModel === "both") {
       const newMrr = sumField(wonCurrent, "potential_mmr");
       const newSetup = sumField(wonCurrent, "potential_setup_flat");
-
       revenueTilesHtml +=
         tile(
           `New MRR &middot; ${suffix}`,
@@ -209,7 +189,6 @@ export async function renderDashboardPipeline(container, portalState) {
           `One-time fees, this period`
         );
     }
-
     tilesEl.innerHTML =
       tile("Leads in Pipeline",
         `${pipelineCurrent} ${countBadge(pipelineCurrent, pipelinePrior)}`,
@@ -226,61 +205,50 @@ export async function renderDashboardPipeline(container, portalState) {
       revenueTilesHtml;
   }
 }
-
 /* ============================================================
    FETCH
 ============================================================ */
-
 async function fetchLeads(project) {
   const url = `
     https://leads-module.dennis-e64.workers.dev/leads/list?
     project=${encodeURIComponent(project)}
   `.replace(/\s+/g, "");
-
   const res = await fetch(url, { cache: "no-cache" });
   const data = await res.json();
   return Array.isArray(data) ? data : [];
 }
-
 async function fetchStages(project) {
   const url = `
     https://lookups-module.dennis-e64.workers.dev/lookups/list?
     project=${encodeURIComponent(project)}
   `.replace(/\s+/g, "");
-
   const res = await fetch(url, { cache: "no-cache" });
   const data = await res.json();
   const all = Array.isArray(data.lookups) ? data.lookups : [];
-
   return all
     .filter(l => l.lookup_type === "lead_stage" && l.is_active !== false)
     .sort((a, b) => a.sort_order - b.sort_order);
 }
-
 async function fetchLeadConfig(project) {
   const url = `
     https://leads-module.dennis-e64.workers.dev/leads/config?
     project=${encodeURIComponent(project)}
   `.replace(/\s+/g, "");
-
   const res = await fetch(url, { cache: "no-cache" });
   const data = await res.json();
   // /leads/config proxies Supabase's select=* directly through, which
   // returns an array even for a single matching row.
   return Array.isArray(data) ? data[0] : data;
 }
-
 /* ============================================================
    DATE / PERIOD HELPERS
 ============================================================ */
-
 function parseDateSafe(raw) {
   if (!raw) return null;
   const iso = raw.endsWith("Z") ? raw : raw + "Z";
   const t = Date.parse(iso);
   return isNaN(t) ? null : new Date(t);
 }
-
 // month is 1-12. cutoffDay: if set, range ends at that day-of-month
 // (for MTD-style apples-to-apples comparison); if null, full month.
 function monthRange(year, month, cutoffDay) {
@@ -290,41 +258,32 @@ function monthRange(year, month, cutoffDay) {
     : new Date(Date.UTC(year, month, 0, 23, 59, 59)); // last day of month
   return { start, end };
 }
-
 function inRange(rawDate, range) {
   const d = parseDateSafe(rawDate);
   if (!d) return false;
   return d >= range.start && d <= range.end;
 }
-
 // Was this lead open as of a given point in time?
 // created_at <= asOf AND (end_date is null OR end_date > asOf)
 function wasOpenAsOf(lead, asOf) {
   const created = parseDateSafe(lead.created_at);
   if (!created || created > asOf) return false;
-
   if (!lead.end_date) return true;
-
   const closed = parseDateSafe(lead.end_date);
   if (!closed) return true;
-
   return closed > asOf;
 }
-
 function rate(won, lost) {
   const total = won + lost;
   if (total === 0) return 0;
   return (won / total) * 100;
 }
-
 function sumField(leadsArr, field) {
   return leadsArr.reduce((sum, l) => sum + (Number(l[field]) || 0), 0);
 }
-
 /* ============================================================
    RENDER HELPERS
 ============================================================ */
-
 function tile(label, valueHtml, sub) {
   return `
     <div class="dashboard-metric-box">
@@ -333,11 +292,9 @@ function tile(label, valueHtml, sub) {
       <div class="dashboard-metric-sub">${sub}</div>
     </div>`;
 }
-
 function stageBar(counts) {
   const total = counts.reduce((sum, c) => sum + c.count, 0) || 1;
   const W = 460, H = 64;
-
   let xPos = 0, rects = "";
   counts.forEach((c, i) => {
     const w = (c.count / total) * W;
@@ -352,11 +309,9 @@ function stageBar(counts) {
     }
     xPos += w;
   });
-
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Leads by stage"
           style="width:100%;height:auto;display:block">${rects}</svg>`;
 }
-
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, "&amp;")
