@@ -28,27 +28,18 @@ export async function loadLeadsTab({ portalState, tabContent }) {
     tabContent.prepend(contextBar);
   }
 
-  if (!portalState.activeLeadId) {
-    // localStorage is shared across ALL projects (same domain) - only
-    // trust a stored lead if it was saved under this same project, or
-    // switching projects will leak the previous project's selected lead
-    // into the new one.
-    const storedProject = localStorage.getItem("activeLeadProject");
-    if (storedProject === portalState.project) {
-      portalState.activeLeadId = localStorage.getItem("activeLeadId") || null;
-      portalState.activeLeadName = localStorage.getItem("activeLeadName") || "";
-      portalState.activeLeadContactName = localStorage.getItem("activeLeadContactName") || "";
-    } else {
-      // stale lead from a different project - clear it out entirely
-      portalState.activeLeadId = null;
-      portalState.activeLeadName = "";
-      portalState.activeLeadContactName = "";
-      localStorage.removeItem("activeLeadId");
-      localStorage.removeItem("activeLeadName");
-      localStorage.removeItem("activeLeadContactName");
-      localStorage.removeItem("activeLeadProject");
-    }
-  }
+  // Match contacts.js's behavior: landing on this tab always starts
+  // blank, no restore-from-localStorage. A lead selection only lives
+  // for as long as you stay within the Leads tab - navigate away to
+  // any other top-level tab (or switch projects) and it resets, same
+  // as "No contact selected" does when you leave and return to
+  // Contacts. localStorage is no longer used for this at all.
+  portalState.activeLeadId = null;
+  portalState.activeLeadName = "";
+  portalState.activeLeadContactName = "";
+  localStorage.removeItem("activeLeadId");
+  localStorage.removeItem("activeLeadName");
+  localStorage.removeItem("activeLeadContactName");
 
   contextBar.textContent = portalState.activeLeadId
     ? `Lead: ${portalState.activeLeadName} (${portalState.activeLeadContactName})`
