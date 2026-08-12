@@ -92,33 +92,26 @@ export async function renderDashboardPipeline(container, portalState) {
     const tilesEl = document.getElementById("pip-tiles");
     tilesEl.innerHTML = `<div class="dashboard-metric-box">
       <div class="dashboard-metric-sub">Loading&hellip;</div></div>`;
-    // NOTE: verify `portalState.user_id` matches the field name used
-    // elsewhere (revenue.js / clients.js) for this project's logged-in
-    // staff id - /dashboard/pipeline requires it same as every other
-    // /dashboard/* route.
-    let leads, stages, revenueModel, pipelineData;
+    let leads, stages, revenueModel;
     try {
-      const [leadsRes, stagesRes, configRes, dashRes] = await Promise.all([
+      const [leadsRes, stagesRes, configRes] = await Promise.all([
         fetchLeads(portalState.project),
         fetchStages(portalState.project),
-        fetchLeadConfig(portalState.project),
-        fetchDashboardPipeline(portalState.project, portalState.user_id)
+        fetchLeadConfig(portalState.project)
       ]);
       leads = leadsRes;
       stages = stagesRes;
       revenueModel = configRes?.revenue_model || "amount";
-      pipelineData = dashRes.pipeline;
     } catch (err) {
       tilesEl.innerHTML = `<div class="dashboard-metric-box">
         <div class="dashboard-metric-sub">Couldn't load pipeline data. Try again.</div></div>`;
       document.getElementById("dashboardPipelineChart").innerHTML = "";
       document.getElementById("pip-legend").innerHTML = "";
-      console.error("[Dashboard Pipeline] Load error:", err.message || err);
+      console.error("[Dashboard Pipeline] Load error:", err);
       return;
     }
     /* -----------------------------------------------------
-       STAGE BAR — live, Open leads only (still from leads-module;
-       /dashboard/pipeline doesn't return a per-stage breakdown)
+       STAGE BAR — live, Open leads only
     ----------------------------------------------------- */
     const openLeads = leads.filter(l => l.status === "Open");
     const counts = stages.map(s => ({
@@ -140,51 +133,55 @@ export async function renderDashboardPipeline(container, portalState) {
       `)
       .join("");
     /* -----------------------------------------------------
-       TILES — sourced from /dashboard/pipeline (server-side date
-       math, same reliable pattern as Revenue/Clients) instead of
-       reconstructing period filtering client-side.
+       PERIOD RANGES (current + prior, apples-to-apples cutoff)
     ----------------------------------------------------- */
+    const cutoffDay = isCurrent ? now.getUTCDate() : null;
+    const current = monthRange(py, pm, cutoffDay);
+    let priorMonth = pm - 1, priorYear = py;
+    if (priorMonth === 0) { priorMonth = 12; priorYear -= 1; }
+    const prior = monthRange(priorYear, priorMonth, cutoffDay);
+    /* -----------------------------------------------------
+       WON / LOST — resolved within the period (via end_date)
+    ----------------------------------------------------- */
+    const wonCurrent = leads.filter(l => l.status === "Won" && inRange(l.end_date, current));
+    const wonPrior = leads.filter(l => l.status === "Won" && inRange(l.end_date, prior));
+    const lostCurrent = leads.filter(l => l.status === "Lost" && inRange(l.end_date, current));
+    const lostPrior = leads.filter(l => l.status === "Lost" && inRange(l.end_date, prior));
+    const closeRateCurrent = rate(wonCurrent.length, lostCurrent.length);
+    const closeRatePrior = rate(wonPrior.length, lostPrior.length);
+    const closeRateChangePct = closeRatePrior === null
+      ? null
+      : closeRateCurrent - closeRatePrior;
+    /* -----------------------------------------------------
+       LEADS IN PIPELINE — live count + retroactive "as of" prior
+    ----------------------------------------------------- */
+    const pipelineCurrent = leads.filter(l => wasOpenAsOf(l, current.end)).length;
+    const pipelinePrior = leads.filter(l => wasOpenAsOf(l, prior.end)).length;
     const suffix = isCurrent ? "MTD" : MONTHS_SHORT[pm - 1];
-    const pipelineCurrent = pipelineData.leads.current;
-    const pipelinePrior = pipelineData.leads.prior;
-    const wonCurrentCount = pipelineData.won.current;
-    const wonPriorCount = pipelineData.won.prior;
-    const lostCurrentCount = pipelineData.lost.current;
-    const lostPriorCount = pipelineData.lost.prior;
-    const closeRateCurrent = pipelineData.close_rate.current;
-    const closeRateChangePct = pipelineData.close_rate.change_pct;
-    const resolvedCount = wonCurrentCount + lostCurrentCount;
+    const resolvedCount = wonCurrent.length + lostCurrent.length;
     const crBadge = resolvedCount >= 10 && closeRateChangePct !== null
       ? pctBadge(closeRateChangePct)
       : "";
     /* -----------------------------------------------------
-       REVENUE TILES — shape driven by project_lead_config.revenue_model.
-       'amount' model uses the backend's already-computed new_revenue.
-       'mmr_setup' isn't covered by /dashboard/pipeline yet, so that
-       path still computes client-side from leads-module (needs the
-       actual won-lead records, not just a count) - same period-range
-       logic as before, kept only for this case.
+       REVENUE TILES — shape driven by project_lead_config.revenue_model
     ----------------------------------------------------- */
     let revenueTilesHtml = "";
     if (revenueModel === "amount" || revenueModel === "both") {
-      const newRevenue = pipelineData.won.new_revenue;
+      const newRevenue = sumField(wonCurrent, "amount");
       revenueTilesHtml += tile(
         `New Revenue &middot; ${suffix}`,
         `$${newRevenue.toLocaleString()}`,
-        `From ${wonCurrentCount} won lead${wonCurrentCount === 1 ? "" : "s"} this period`
+        `From ${wonCurrent.length} won lead${wonCurrent.length === 1 ? "" : "s"} this period`
       );
     }
     if (revenueModel === "mmr_setup" || revenueModel === "both") {
-      const cutoffDay = isCurrent ? now.getUTCDate() : null;
-      const current = monthRange(py, pm, cutoffDay);
-      const wonCurrentLeads = leads.filter(l => l.status === "Won" && inRange(l.end_date, current));
-      const newMrr = sumField(wonCurrentLeads, "potential_mmr");
-      const newSetup = sumField(wonCurrentLeads, "potential_setup_flat");
+      const newMrr = sumField(wonCurrent, "potential_mmr");
+      const newSetup = sumField(wonCurrent, "potential_setup_flat");
       revenueTilesHtml +=
         tile(
           `New MRR &middot; ${suffix}`,
           `$${newMrr.toLocaleString()}`,
-          `From ${wonCurrentLeads.length} won lead${wonCurrentLeads.length === 1 ? "" : "s"} this period`
+          `From ${wonCurrent.length} won lead${wonCurrent.length === 1 ? "" : "s"} this period`
         ) +
         tile(
           `Setup Revenue &middot; ${suffix}`,
@@ -197,11 +194,11 @@ export async function renderDashboardPipeline(container, portalState) {
         `${pipelineCurrent} ${countBadge(pipelineCurrent, pipelinePrior)}`,
         `Prior month: ${pipelinePrior}`) +
       tile(`Won &middot; ${suffix}`,
-        `${wonCurrentCount} ${countBadge(wonCurrentCount, wonPriorCount)}`,
-        `Prior month: ${wonPriorCount}`) +
+        `${wonCurrent.length} ${countBadge(wonCurrent.length, wonPrior.length)}`,
+        `Prior month: ${wonPrior.length}`) +
       tile(`Lost &middot; ${suffix}`,
-        `${lostCurrentCount} ${countBadge(lostCurrentCount, lostPriorCount, true)}`,
-        `Prior month: ${lostPriorCount}`) +
+        `${lostCurrent.length} ${countBadge(lostCurrent.length, lostPrior.length, true)}`,
+        `Prior month: ${lostPrior.length}`) +
       tile(`Close Rate &middot; ${suffix}`,
         `${closeRateCurrent.toFixed(1)}% ${crBadge}`,
         `Won ÷ (won + lost), resolved this period`) +
@@ -231,20 +228,6 @@ async function fetchStages(project) {
   return all
     .filter(l => l.lookup_type === "lead_stage" && l.is_active !== false)
     .sort((a, b) => a.sort_order - b.sort_order);
-}
-async function fetchDashboardPipeline(project, userId) {
-  const url = `
-    https://client-portal-api.dennis-e64.workers.dev/dashboard/pipeline?
-    project=${encodeURIComponent(project)}&user_id=${encodeURIComponent(userId)}
-  `.replace(/\s+/g, "");
-  const res = await fetch(url, { cache: "no-cache" });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "(no body)");
-    throw new Error(
-      `/dashboard/pipeline ${res.status} ${res.statusText} - url=${url} - body=${body}`
-    );
-  }
-  return res.json();
 }
 async function fetchLeadConfig(project) {
   const url = `
@@ -287,6 +270,21 @@ function inRange(rawDate, range) {
   const d = parseDateSafe(rawDate);
   if (!d) return false;
   return d >= range.start && d <= range.end;
+}
+// Was this lead open as of a given point in time?
+// created_at <= asOf AND (end_date is null OR end_date > asOf)
+function wasOpenAsOf(lead, asOf) {
+  const created = parseDateSafe(lead.created_at);
+  if (!created || created > asOf) return false;
+  if (!lead.end_date) return true;
+  const closed = parseDateSafe(lead.end_date);
+  if (!closed) return true;
+  return closed > asOf;
+}
+function rate(won, lost) {
+  const total = won + lost;
+  if (total === 0) return 0;
+  return (won / total) * 100;
 }
 function sumField(leadsArr, field) {
   return leadsArr.reduce((sum, l) => sum + (Number(l[field]) || 0), 0);
