@@ -245,11 +245,15 @@ async function fetchLeadConfig(project) {
 ============================================================ */
 function parseDateSafe(raw) {
   if (!raw) return null;
-  // already has an explicit timezone marker (Z, or a +HH:MM/-HH:MM offset
-  // like Postgres timestamptz columns return) - parse as-is. Only bare
-  // date/datetime strings with no timezone info need "Z" appended.
+  // Bare date-only strings ("2026-06-15") are already valid ISO and must
+  // NOT get "Z" appended directly - "2026-06-15Z" is malformed (the Z
+  // designator can only follow a time component). Only append "Z" when
+  // there's a time component (T...) with no existing timezone marker -
+  // e.g. timestamp-without-timezone columns like end_date can come back
+  // as "2026-06-15T00:00:00" with no offset at all.
+  const hasTime = raw.includes("T");
   const hasTz = /Z$|[+-]\d{2}:\d{2}$/.test(raw);
-  const iso = hasTz ? raw : raw + "Z";
+  const iso = (hasTime && !hasTz) ? raw + "Z" : raw;
   const t = Date.parse(iso);
   return isNaN(t) ? null : new Date(t);
 }
