@@ -39,7 +39,22 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith(
     caches.match(req).then((cached) => {
-      return cached || fetch(req).catch(() => cached);
+      if (cached) return cached;
+
+      return fetch(req)
+        .then((networkRes) => {
+          // stash a copy of successful GETs for next time (shell assets etc.)
+          const resClone = networkRes.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, resClone));
+          return networkRes;
+        })
+        .catch(() => {
+          // network failed AND nothing cached for this exact URL —
+          // fall back to the cached app shell instead of undefined
+          return caches.match('/index.html').then((shell) => {
+            return shell || new Response('Offline', { status: 503, statusText: 'Offline' });
+          });
+        });
     })
   );
 });
