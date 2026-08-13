@@ -1,69 +1,28 @@
-const CACHE_NAME = 'redumbrella-shell-v2';
-const SHELL_ASSETS = [
-  '/',
-  '/index.html',
-  '/style.css'
-];
+const CACHE_NAME = 'redumbrella-shell-v4';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_ASSETS))
-  );
+  // Nothing precached - there's no cache to warm.
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
+  // Wipe every existing cache from any prior version of this file -
+  // no exceptions, since this version keeps none of its own.
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
-      )
+      Promise.all(keys.map((key) => caches.delete(key)))
     )
   );
   self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  const req = event.request;
-
-  // Only handle GET requests
-  if (req.method !== 'GET') return;
-
-  // Never intercept page navigations — let the browser load these normally
-  if (req.mode === 'navigate') return;
-
-  const url = new URL(req.url);
-
-  // Only handle http(s) - extensions (chrome-extension://, etc.) can't be cached
-
-  if (!url.protocol.startsWith('http')) return;
-
-  // Never cache API calls — always hit the network live
-  const API_HOSTS = [
-    'client-portal-api.dennis-e64.workers.dev',
-    'leads-module.dennis-e64.workers.dev',
-    'lookups-module.dennis-e64.workers.dev'
-  ];
-  if (API_HOSTS.includes(url.hostname)) return;
-
-  event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) return cached;
-
-      return fetch(req)
-        .then((networkRes) => {
-          // stash a copy of successful GETs for next time (shell assets etc.)
-          const resClone = networkRes.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(req, resClone));
-          return networkRes;
-        })
-        .catch(() => {
-          // network failed AND nothing cached for this exact URL —
-          // fall back to the cached app shell instead of undefined
-          return caches.match('/index.html').then((shell) => {
-            return shell || new Response('Offline', { status: 503, statusText: 'Offline' });
-          });
-        });
-    })
-  );
+  // Intentionally empty. No caching at all, at any layer - every
+  // request goes straight to the network, every time, full stop.
+  // This handler exists only so the browser sees a registered
+  // service worker with a fetch listener, which is required for
+  // "Add to Home Screen" / PWA installability. It never touches
+  // the request or response, so this is functionally identical to
+  // having no service worker at all from the app's perspective -
+  // stale data becomes structurally impossible, not just unlikely.
 });
