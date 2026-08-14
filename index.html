@@ -243,13 +243,15 @@ PORTAL STATE
 ============================================================ */
 
 const portalState = {
-project: "",
-userEmail: "",
-staffName: "",
-allowedTabs: [],
-deleteAllowed: false
+  project: "",
+  userEmail: "",
+  staffName: "",
+  allowedTabs: [],
+  deleteAllowed: false,
+  canEdit: false,
+  canSeeFinancials: false
 };
-
+     
 window.portalState = portalState;
 
 const loginForm = document.getElementById("loginForm");
@@ -552,6 +554,8 @@ portalState.project = project;
 portalState.userEmail = email;
 portalState.allowedTabs = result.allowed_tabs || [];
 portalState.deleteAllowed = result.delete_allowed === true;
+portalState.canEdit = result.can_edit === true;
+portalState.canSeeFinancials = result.can_see_financials === true;     
 portalState.user_id = result.staff_id;
 portalState.full_admin = result.full_admin === true;
 portalState.task_manager = (result.task_manager || "").trim().toLowerCase();
