@@ -123,9 +123,9 @@ export async function renderContactNotes(container, portalState, contactId) {
                                         : `<div class="raw-text-block">${n.raw_text}</div>`
                                     }
 
-                                    <button class="btn-primary btn-review-note" data-id="${n.id}" style="margin-top:8px; margin-right:8px;">
+                                    ${portalState.canEdit ? '<button class="btn-primary btn-review-note" data-id="${n.id}" style="margin-top:8px; margin-right:8px;">
                                         Review Note
-                                    </button>
+                                    </button>' : ''}
 
                                     ${
                                         portalState.deleteAllowed
