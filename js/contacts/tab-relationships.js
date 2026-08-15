@@ -111,18 +111,22 @@ async function renderContactRelationshipsSource(container, portalState, contactI
               <td>${r.financial_referral ? "✅" : ""}</td>
               <td>${formatDateTime(r.created_at)}</td>
               <td>
-                <button
-                  class="btn-secondary btn-edit"
-                  data-id="${r.id}"
-                  data-related-name="${escapeHtml(r.related_contact_name || "")}"
-                >
-                  Edit
-                </button>
-                ${
-                  portalState.deleteAllowed
-                    ? `<button class="btn-danger btn-delete" data-id="${r.id}">Delete</button>`
-                    : ``
-                }
+                  ${
+                    portalState.canEdit
+                      ? `<button
+                          class="btn-secondary btn-edit"
+                          data-id="${r.id}"
+                          data-related-name="${escapeHtml(r.related_contact_name || "")}"
+                        >
+                          Edit
+                        </button>`
+                      : ``
+                  }
+                  ${
+                    portalState.deleteAllowed
+                      ? `<button class="btn-danger btn-delete" data-id="${r.id}">Delete</button>`
+                      : ``
+                  }
               </td>
             </tr>
           `
