@@ -64,7 +64,7 @@ export async function renderContactNotes(container, portalState, contactId) {
         <section class="card">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <h2>Notes</h2>
-                <button id="contactAddNoteBtn" class="btn-primary">+ Add Note</button>
+                ${portalState.canEdit ? '<button id="contactAddNoteBtn" class="btn-primary">+ Add Note</button>' : ''}
             </div>
 
             <!-- FILTER BAR -->
