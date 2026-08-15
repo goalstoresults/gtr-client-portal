@@ -22,7 +22,7 @@ export async function renderContactRelationships(container, portalState, contact
     <section class="card">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <h3>Relationships originating from this contact</h3>
-              ${portalState.canEdit ? 'button id="btnAddSourceRel" class="btn-primary">Add Relationship</button>' : ''}
+              ${portalState.canEdit ? '<button id="btnAddSourceRel" class="btn-primary">Add Relationship</button>' : ''}
       </div>
       <div id="contactRelSourceGrid"></div>
     </section>
