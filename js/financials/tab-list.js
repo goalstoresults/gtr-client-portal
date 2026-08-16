@@ -150,7 +150,8 @@ export async function renderFinancialList(container, portalState) {
             <label>Invoice #:
               <input type="text" class="edit-invoice" value="${p.invoice_number || ""}">
             </label>
-             ${portalState.canEdit ? '<button class="btn-primary btn-save" data-id="${p.revenue_id}">Save</button>' : ''}
+            /* ---------- ${portalState.canEdit ? '<button class="btn-primary btn-save" data-id="${p.revenue_id}">Save</button>' : ''} ---------- */
+             <button class="btn-primary btn-save" data-id="${p.revenue_id}">Save</button>
             <button class="btn-tertiary btn-cancel" data-id="${p.revenue_id}">Cancel</button>
           </div>
         </td>
