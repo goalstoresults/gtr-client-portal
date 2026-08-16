@@ -45,18 +45,16 @@ export async function renderContactDetails(container, portalState, contactId) {
       HEADER WITH SAVE + DELETE
    ------------------------------------------------------- */
    container.innerHTML = `
-     <section class="card">
-       <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-         <h2 style="margin:0;">Contact Details for ${escapeHtml(headerName)}</h2>
-
-         if (portalState.canEdit) {
-            <button type="submit" class="btn-primary">Save Contact</button>
-         }
-         
-         ${portalState.deleteAllowed
-           ? `<button id="btnDeleteContact" class="btn-danger">Delete</button>`
-           : ``}
-       </div>
+  <section class="card">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+      <h2 style="margin:0;">Contact Details for ${escapeHtml(headerName)}</h2>
+      ${portalState.canEdit
+        ? `<button type="submit" class="btn-primary">Save Contact</button>`
+        : ``}
+      ${portalState.deleteAllowed
+        ? `<button id="btnDeleteContact" class="btn-danger">Delete</button>`
+        : ``}
+    </div>
    
        <form id="editContactForm" class="notes-form"></form>
    
