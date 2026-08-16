@@ -64,7 +64,9 @@ export async function renderContactNotes(container, portalState, contactId) {
         <section class="card">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <h2>Notes</h2>
-                ${portalState.canEdit ? '<button id="contactAddNoteBtn" class="btn-primary">+ Add Note</button>' : ''}
+                if (portalState.canEdit) {
+                    <button id="contactAddNoteBtn" class="btn-primary">+ Add Note</button>
+                }
             </div>
 
             <!-- FILTER BAR -->
@@ -123,10 +125,10 @@ export async function renderContactNotes(container, portalState, contactId) {
                                         : `<div class="raw-text-block">${n.raw_text}</div>`
                                     }
                                     
-                                    
-                                    ${portalState.canEdit ? `<button class="btn-primary btn-review-note" data-id="${n.id}" style="margin-top:8px; margin-right:8px;">
-                                        Review Note
-                                    </button>` : ``}
+                                   if (portalState.canEdit) { 
+                                        <button class="btn-primary btn-review-note" data-id="${n.id}" style="margin-top:8px; margin-right:8px;">Review Note
+                                    </button>
+                                    }
 
                                     ${
                                         portalState.deleteAllowed
