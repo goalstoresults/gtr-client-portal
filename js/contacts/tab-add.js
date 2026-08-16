@@ -42,7 +42,9 @@ export async function renderAddContactForm(container, portalState) {
       <h2 style="margin:0;">Add Contact for ${escapeHtml(
         portalState.display_name || projectId
       )}</h2>
-      ${portalState.canEdit ? '<button type="submit" class="btn-primary">Save Contact</button>' : ''}
+      if (portalState.canEdit) {
+        <button type="submit" class="btn-primary">Save Contact</button>
+      }
     </div>
   </form>
 </section>
