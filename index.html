@@ -604,8 +604,16 @@ tabContent.innerHTML =
 return;
 }
 
-subHeader.textContent = match.display_name || "";
+if (portalState.isDemoAccount) {
+  subHeader.innerHTML =
+    `FREE DEMO Account &middot; Read Privileges Only &middot; ` +
+    `To schedule a call for next steps, ` +
+    `<a href="https://goalstoresults.com/meet-with-dennis" target="_blank" rel="noopener">Click Here</a>`;
+} else {
+  subHeader.textContent = match.display_name || "";
+}
 pageTitle.textContent = match.display_name || "";
+     
 
 const projectTabs = normalizeTabs(match.enabled_tabs);
 const staffTabs = portalState.allowedTabs || [];
