@@ -134,7 +134,7 @@ export async function renderFinancialList(container, portalState) {
         <td>${escapeHtml(p.referral_name || "")}</td>
         <td>
           <button class="btn-secondary btn-edit" data-id="${p.revenue_id}">Edit</button>
-          <button class="btn-danger btn-delete" data-id="${p.revenue_id}">Delete</button>
+          ${portalState.deleteAllowed ? `<button class="btn-danger btn-delete" data-id="${p.revenue_id}">Delete</button>` : ``}
         </td>
       </tr>
 
@@ -150,7 +150,7 @@ export async function renderFinancialList(container, portalState) {
             <label>Invoice #:
               <input type="text" class="edit-invoice" value="${p.invoice_number || ""}">
             </label>
-            <button class="btn-primary btn-save" data-id="${p.revenue_id}">Save</button>
+             ${portalState.canEdit ? '<button class="btn-primary btn-save" data-id="${p.revenue_id}">Save</button>' : ''}
             <button class="btn-tertiary btn-cancel" data-id="${p.revenue_id}">Cancel</button>
           </div>
         </td>
