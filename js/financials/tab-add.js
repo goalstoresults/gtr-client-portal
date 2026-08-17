@@ -109,7 +109,9 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
     </section>
   `;
 
-  formArea.querySelector("#btnSavePayment").addEventListener("click", async () => {
+const savePaymentBtn = formArea.querySelector("#btnSavePayment");
+if (savePaymentBtn) {
+  savePaymentBtn.addEventListener("click", async () => {
     const amount = formArea.querySelector("#paymentAmount").value.trim();
     const date = formArea.querySelector("#paymentDate").value.trim();
     const invoice = formArea.querySelector("#invoiceNumber").value.trim();
@@ -127,7 +129,6 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
         payment_date: date,
         invoice_number: invoice || null
       });
-
       alert("Payment added");
     } catch (err) {
       console.error(err);
