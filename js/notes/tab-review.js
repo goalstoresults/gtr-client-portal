@@ -241,65 +241,67 @@ export async function renderReview(container, portalState, noteId) {
       document.getElementById("editNoteDate").value = getEasternDateOnly(note.note_date);
     }
 
-    // ------------------------------------------------------------
-    // SAVE METADATA
-    // ------------------------------------------------------------
-    document.getElementById("btnSaveNoteMeta").addEventListener("click", async () => {
-      const status = document.getElementById("noteStatus").value;
-      const needsReview = document.getElementById("noteNeedsReview").checked;
-      const newDateOnly = document.getElementById("editNoteDate").value;
+// ------------------------------------------------------------
+// SAVE METADATA
+// ------------------------------------------------------------
+const saveNoteMetaBtn = document.getElementById("btnSaveNoteMeta");
+if (saveNoteMetaBtn) {
+  saveNoteMetaBtn.addEventListener("click", async () => {
+    const status = document.getElementById("noteStatus").value;
+    const needsReview = document.getElementById("noteNeedsReview").checked;
+    const newDateOnly = document.getElementById("editNoteDate").value;
 
-      const updates = {
-        review_status: status,
-        needs_review: needsReview
-      };
+    const updates = {
+      review_status: status,
+      needs_review: needsReview
+    };
 
-      // ⭐ NEW: SUBJECT UPDATE
-      const newSubject = document.getElementById("editSubject").value.trim();
-      if (newSubject && newSubject !== note.subject) {
-        updates.subject = newSubject;
-      }
+    // ⭐ NEW: SUBJECT UPDATE
+    const newSubject = document.getElementById("editSubject").value.trim();
+    if (newSubject && newSubject !== note.subject) {
+      updates.subject = newSubject;
+    }
 
-      if (newDateOnly && note.note_date) {
-        const old = new Date(note.note_date);
-        const [year, month, day] = newDateOnly.split("-");
-        const merged = new Date(
-          Number(year),
-          Number(month) - 1,
-          Number(day),
-          old.getHours(),
-          old.getMinutes(),
-          old.getSeconds()
-        );
-        updates.note_date = merged.toISOString();
-      }
+    if (newDateOnly && note.note_date) {
+      const old = new Date(note.note_date);
+      const [year, month, day] = newDateOnly.split("-");
+      const merged = new Date(
+        Number(year),
+        Number(month) - 1,
+        Number(day),
+        old.getHours(),
+        old.getMinutes(),
+        old.getSeconds()
+      );
+      updates.note_date = merged.toISOString();
+    }
 
-      try {
-        const res = await fetch(
-          "https://notes-history-module.dennis-e64.workers.dev/notes_history",
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              id: note.id,
-              updates
-            })
-          }
-        );
-
-        if (!res.ok) {
-          const msg = await res.text().catch(() => "");
-          alert(`❌ Failed to save note metadata: ${msg}`);
-          return;
+    try {
+      const res = await fetch(
+        "https://notes-history-module.dennis-e64.workers.dev/notes_history",
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: note.id,
+            updates
+          })
         }
+      );
 
-        alert("✅ Note metadata saved.");
-
-      } catch (err) {
-        alert("Error saving note metadata: " + err.message);
-        console.error(err);
+      if (!res.ok) {
+        const msg = await res.text().catch(() => "");
+        alert(`❌ Failed to save note metadata: ${msg}`);
+        return;
       }
-    });
+
+      alert("✅ Note metadata saved.");
+    } catch (err) {
+      alert("Error saving note metadata: " + err.message);
+      console.error(err);
+    }
+  });
+}
 
     // ------------------------------------------------------------
     // SET CLIENT TOGGLE
