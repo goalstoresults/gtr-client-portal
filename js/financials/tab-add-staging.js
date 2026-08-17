@@ -578,7 +578,9 @@ window.showBulkUploadModal = function () {
       <input type="file" id="bulkCsvFile" accept=".csv" style="margin-top:10px;" />
       <div style="margin-top:16px; display:flex; justify-content:flex-end; gap:10px;">
         <button id="bulkCancel">Cancel</button>
-        <button id="bulkUpload" class="btn-primary">Upload</button>
+        ${portalState.canEdit
+        ? `<button id="bulkUpload" class="btn-primary">Upload</button>`
+        : ``}
       </div>
     </div>
   `;
