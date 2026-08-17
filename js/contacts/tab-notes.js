@@ -126,11 +126,11 @@ export async function renderContactNotes(container, portalState, contactId) {
                                         : `<div class="raw-text-block">${n.raw_text}</div>`
                                     }
                                     
-                                   if (portalState.canEdit) { 
-                                        <button class="btn-primary btn-review-note" data-id="${n.id}" style="margin-top:8px; margin-right:8px;">Review Note
-                                    </button>
-                                    }
-
+                                    ${portalState.canEdit
+                                    ? `<button class="btn-primary btn-review-note" data-id="${n.id}" style="margin-top:8px; margin-right:8px;">Review Note
+                                    </button>`
+                                    : ``}
+                                    
                                     ${
                                         portalState.deleteAllowed
                                         ? `<button class="btn-danger btn-delete-note" data-id="${n.id}" style="margin-top:8px;">Delete Note</button>`
