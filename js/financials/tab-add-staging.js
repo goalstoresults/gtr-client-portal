@@ -589,10 +589,11 @@ window.showBulkUploadModal = function () {
 
   modal.querySelector("#bulkCancel").onclick = () => modal.remove();
 
-  modal.querySelector("#bulkUpload").onclick = async () => {
+  const bulkUploadBtn = modal.querySelector("#bulkUpload");
+if (bulkUploadBtn) {
+  bulkUploadBtn.onclick = async () => {
     const fileInput = document.getElementById("bulkCsvFile");
     const file = fileInput.files[0];
-
     if (!file) {
       alert("Please select a CSV file.");
       return;
@@ -628,7 +629,6 @@ window.showBulkUploadModal = function () {
       );
 
       const text = await res.text();
-
       if (!res.ok) {
         console.error("Bulk upload failed:", text);
         alert("Bulk upload failed. Check console for details.");
@@ -645,6 +645,7 @@ window.showBulkUploadModal = function () {
       alert("Bulk upload failed due to a network or server error.");
     }
   };
+}
 };
 
 /* =========================================================
