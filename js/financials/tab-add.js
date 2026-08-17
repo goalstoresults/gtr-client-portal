@@ -89,7 +89,9 @@ async function renderAddPaymentForm(formArea, portalState, contact) {
     <section class="card">
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
         <h3 style="margin:0;">Add Payment for ${escapeHtml(contact.search_name || contact.contact_id)}</h3>
-        <button id="btnSavePayment" class="btn-primary">Save</button>
+        ${portalState.canEdit
+        ? `<button id="btnSavePayment" class="btn-primary">Save</button>`
+        : ``}
       </div>
 
       <div class="notes-row">
