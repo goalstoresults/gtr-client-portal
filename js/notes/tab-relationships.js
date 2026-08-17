@@ -444,177 +444,171 @@ or=(
         "<p>Error loading existing relationships.</p>";
     }
 
-    // STEP 6: Save Relationships
+// STEP 6: Save Relationships
+const saveRelationshipsBtn = document.getElementById("btnSaveRelationships");
+if (saveRelationshipsBtn) {
+  saveRelationshipsBtn.addEventListener("click", async () => {
+    const promoteRows = [...grid.querySelectorAll("tr")].filter(
+      r => r.querySelector(".promote-checkbox")?.checked
+    );
+
+    if (promoteRows.length === 0) {
+      alert("No relationships selected.");
+      return;
+    }
+
+    for (const row of promoteRows) {
+      const relId = row.dataset.relid;
+      const contactId = row.querySelector("td:nth-child(4)").textContent.trim();
+      const type = row.querySelector("td:nth-child(2) select").value.trim();
+      const role = row.querySelector("td:nth-child(3) select").value.trim();
+
+      if (!contactId) {
+        alert("❌ Cannot save relationship without a Contact ID.");
+        continue;
+      }
+      if (!role || !type) {
+        alert("❌ Relationship Type and Role cannot be blank.");
+        continue;
+      }
+
+      const contactName = row.querySelector(".rel-contact-name").textContent.trim();
+      const contactType = row.querySelector(".contact-type-dropdown")?.value || "";
+      const contactEmail = row.querySelector(".rel-contact-email").textContent.trim();
+
+      // PATCH notes_relationships
+      const patchPayload = {
+        relationship_type: type,
+        relationship_role: role,
+        contact_id: contactId,
+        contact_name: contactName,
+        contact_type: contactType,
+        contact_email: contactEmail
+      };
+
+      try {
+        const patchRes = await fetch(
+          `https://notes-history-module.dennis-e64.workers.dev/notes_relationships?id=eq.${relId}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(patchPayload)
+          }
+        );
+
+        if (!patchRes.ok) {
+          const patchText = await patchRes.text();
+          alert(`❌ Failed to update note relationship: ${patchText}`);
+          continue;
+        }
+      } catch (err) {
+        console.error("PATCH error:", err);
+        alert("Network error while updating note relationship.");
+        continue;
+      }
+
+      // POST contact_relationships
+      const insertPayload = {
+        project: portalState.project,
+        source_contact_id: portalState.clientId,
+        related_contact_id: contactId,
+        relationship_role: role,
+        relationship_type: type,
+        notes: "",
+        created_at: new Date().toISOString()
+      };
+
+      try {
+        const res = await fetch(
+          "https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(insertPayload)
+          }
+        );
+
+        const text = await res.text();
+        console.log("[SaveRelationships] POST contact_relationships:", res.status, text);
+
+        if (!res.ok) {
+          alert(`❌ Failed to save relationship: ${text}`);
+        } else {
+          console.log("Relationship saved successfully");
+        }
+      } catch (err) {
+        console.error("Relationship error:", err);
+        alert("Network error while saving relationship.");
+      }
+
+      // Step 3: PATCH contacts table to update master contact_type
+      if (contactId && contactType) {
+        try {
+          const url =
+            `https://client-portal-api.dennis-e64.workers.dev/api/contacts?contact_id=eq.${encodeURIComponent(contactId)}`;
+          const payload = { contact_type: contactType };
+
+          console.log("[PATCH contacts] URL:", url);
+          console.log("[PATCH contacts] Payload:", payload);
+
+          const contactPatchRes = await fetch(url, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+          });
+
+          const responseText = await contactPatchRes.text();
+          console.log("[PATCH contacts] Status:", contactPatchRes.status, responseText);
+
+          if (!contactPatchRes.ok) {
+            console.warn(`⚠️ Failed to update contact_type in contacts: ${responseText}`);
+          } else {
+            console.log(`✅ Contact ${contactId} type updated to ${contactType}`);
+          }
+        } catch (err) {
+          console.error("Contact PATCH error:", err);
+        }
+      }
+    }
+
+    // Handle Review Complete checkbox
+    const reviewComplete = document.getElementById("chkReviewComplete").checked;
+    if (reviewComplete) {
+      try {
+        await fetch(
+          "https://notes-history-module.dennis-e64.workers.dev/notes_history",
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              "Prefer": "return=representation"
+            },
+            body: JSON.stringify({
+              id: noteId,
+              updates: { needs_review: false }
+            })
+          }
+        );
+        console.log("Note marked as reviewed.");
+      } catch (err) {
+        console.error("Failed to update needs_review:", err);
+      }
+    }
+
+    alert("✅ Relationships saved.");
+
+    // Reset UI back to History view
+    await renderHistory(container, portalState);
+    document.querySelectorAll("#notes-subtabs button").forEach(b =>
+      b.classList.remove("active")
+    );
     document
-      .getElementById("btnSaveRelationships")
-      .addEventListener("click", async () => {
-        const promoteRows = [...grid.querySelectorAll("tr")].filter(
-          r => r.querySelector(".promote-checkbox")?.checked
-        );
-
-        if (promoteRows.length === 0) {
-          alert("No relationships selected.");
-          return;
-        }
-
-        for (const row of promoteRows) {
-          const relId = row.dataset.relid;
-          const contactId = row.querySelector("td:nth-child(4)").textContent.trim();
-          const type = row.querySelector("td:nth-child(2) select").value.trim();
-          const role = row.querySelector("td:nth-child(3) select").value.trim();
-
-          if (!contactId) {
-            alert("❌ Cannot save relationship without a Contact ID.");
-            continue;
-          }
-
-          if (!role || !type) {
-            alert("❌ Relationship Type and Role cannot be blank.");
-            continue;
-          }
-
-          const contactName = row.querySelector(".rel-contact-name").textContent.trim();
-          const contactType =
-            row.querySelector(".contact-type-dropdown")?.value || "";
-          const contactEmail = row
-            .querySelector(".rel-contact-email")
-            .textContent.trim();
-
-          // PATCH notes_relationships
-          const patchPayload = {
-            relationship_type: type,
-            relationship_role: role,
-            contact_id: contactId,
-            contact_name: contactName,
-            contact_type: contactType,
-            contact_email: contactEmail
-          };
-
-          try {
-            const patchRes = await fetch(
-              `https://notes-history-module.dennis-e64.workers.dev/notes_relationships?id=eq.${relId}`,
-              {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(patchPayload)
-              }
-            );
-
-            if (!patchRes.ok) {
-              const patchText = await patchRes.text();
-              alert(`❌ Failed to update note relationship: ${patchText}`);
-              continue;
-            }
-          } catch (err) {
-            console.error("PATCH error:", err);
-            alert("Network error while updating note relationship.");
-            continue;
-          }
-
-          // POST contact_relationships
-          const insertPayload = {
-            project: portalState.project,
-            source_contact_id: portalState.clientId,
-            related_contact_id: contactId,
-            relationship_role: role,
-            relationship_type: type,
-            notes: "",
-            created_at: new Date().toISOString()
-          };
-
-          try {
-            const res = await fetch(
-              "https://client-portal-api.dennis-e64.workers.dev/api/contact_relationships",
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(insertPayload)
-              }
-            );
-
-            const text = await res.text();
-            console.log("[SaveRelationships] POST contact_relationships:", res.status, text);
-
-            if (!res.ok) {
-              alert(`❌ Failed to save relationship: ${text}`);
-            } else {
-              console.log("Relationship saved successfully");
-            }
-          } catch (err) {
-            console.error("Relationship error:", err);
-            alert("Network error while saving relationship.");
-          }
-
-          // Step 3: PATCH contacts table to update master contact_type
-          if (contactId && contactType) {
-            try {
-              const url = `https://client-portal-api.dennis-e64.workers.dev/api/contacts?contact_id=eq.${encodeURIComponent(contactId)}`;
-              const payload = { contact_type: contactType };
-
-              console.log("[PATCH contacts] URL:", url);
-              console.log("[PATCH contacts] Payload:", payload);
-
-              const contactPatchRes = await fetch(url, {
-                method: "PATCH",
-                headers: {
-                  "Content-Type": "application/json"
-                },
-                body: JSON.stringify(payload)
-              });
-
-              const responseText = await contactPatchRes.text();
-              console.log("[PATCH contacts] Status:", contactPatchRes.status, responseText);
-
-              if (!contactPatchRes.ok) {
-                console.warn(`⚠️ Failed to update contact_type in contacts: ${responseText}`);
-              } else {
-                console.log(`✅ Contact ${contactId} type updated to ${contactType}`);
-              }
-            } catch (err) {
-              console.error("Contact PATCH error:", err);
-            }
-          }
-        }
-
-        // Handle Review Complete checkbox
-        const reviewComplete = document.getElementById("chkReviewComplete").checked;
-
-        if (reviewComplete) {
-          try {
-            await fetch(
-              "https://notes-history-module.dennis-e64.workers.dev/notes_history",
-              {
-                method: "PATCH",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Prefer": "return=representation"
-                },
-                body: JSON.stringify({
-                  id: noteId,
-                  updates: { needs_review: false }
-                })
-              }
-            );
-
-            console.log("Note marked as reviewed.");
-          } catch (err) {
-            console.error("Failed to update needs_review:", err);
-          }
-        }
-
-        alert("✅ Relationships saved.");
-
-        // Reset UI back to History view
-        await renderHistory(container, portalState);
-
-        document.querySelectorAll("#notes-subtabs button").forEach(b =>
-          b.classList.remove("active")
-        );
-
-        document
-          .querySelector('#notes-subtabs button[data-subtab="history"]')
-          ?.classList.add("active");
-      });
+      .querySelector('#notes-subtabs button[data-subtab="history"]')
+      ?.classList.add("active");
+  });
+}
   } catch (err) {
     console.error("renderRelationships error:", err);
     container.innerHTML = `<p>Error loading relationships: ${err.message}</p>`;
