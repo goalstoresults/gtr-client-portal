@@ -240,7 +240,9 @@ export async function renderRelationships(container, portalState) {
   </table>
 
   <div style="margin-top:12px;">
-    <button id="btnSaveRelationships" class="primary">Save Relationships</button>
+  ${portalState.canEdit
+  ? `<button id="btnSaveRelationships" class="primary">Save Relationships</button>`
+  : ``}
     <label style="margin-left:12px;">
       <input type="checkbox" id="chkReviewComplete" checked />
       Review Complete
