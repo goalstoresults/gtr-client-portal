@@ -139,7 +139,9 @@ export async function renderReview(container, portalState, noteId) {
       Needs Review
     </label>
 
-    <button id="btnSaveNoteMeta" class="btn-primary">Save</button>
+     ${portalState.canEdit
+      ? `<button id="btnSaveNoteMeta" class="btn-primary">Save</button>`
+      : ``}
   </div>
 
   <p style="margin-top:16px;"><strong>Summary:</strong></p>
