@@ -1,6 +1,5 @@
 // js/groups/tab-fees.js
 // GROUP FEES TAB — modular version
-
 import {
   escapeHtml,
   formatCurrency,
@@ -22,7 +21,7 @@ export async function renderGroupFees(container, portalState, groupId) {
     <section class="card">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <h3>Fees</h3>
-        <button id="btnAddFee" class="btn-primary">Add Fee</button>
+        ${portalState.canEdit ? `<button id="btnAddFee" class="btn-primary">Add Fee</button>` : ``}
       </div>
       <div id="feesTable">Loading...</div>
     </section>
@@ -31,9 +30,9 @@ export async function renderGroupFees(container, portalState, groupId) {
   const tableDiv = container.querySelector("#feesTable");
 
   // Fetch fees
-  const url = `https://groups-module.dennis-e64.workers.dev/groups/fees?project=${portalState.project}&group_id=${groupId}`;
+  const url =
+    `https://groups-module.dennis-e64.workers.dev/groups/fees?project=${portalState.project}&group_id=${groupId}`;
   const res = await fetch(url, { cache: "no-cache" });
-
   let fees = await res.json();
   if (!Array.isArray(fees)) fees = [];
 
@@ -46,7 +45,6 @@ export async function renderGroupFees(container, portalState, groupId) {
 
   let currentSortField = "fee_date";
   let currentSortDirection = "desc";
-
   let adding = false;
   let editing = null;
 
@@ -77,7 +75,6 @@ export async function renderGroupFees(container, portalState, groupId) {
 
       const strA = String(A).toLowerCase();
       const strB = String(B).toLowerCase();
-
       return currentSortDirection === "asc"
         ? strA.localeCompare(strB)
         : strB.localeCompare(strA);
@@ -102,7 +99,6 @@ export async function renderGroupFees(container, portalState, groupId) {
         const isSorted = currentSortField === col.key;
         const up = isSorted && currentSortDirection === "asc" ? "▲" : "△";
         const down = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
-
         return `
           <th class="sortable" data-field="${col.key}">
             ${escapeHtml(col.label)}
@@ -124,7 +120,7 @@ export async function renderGroupFees(container, portalState, groupId) {
           <td>(auto)</td>
           <td>(auto)</td>
           <td>
-            <button id="btnSaveNewFee" class="btn-primary">Save</button>
+            ${portalState.canEdit ? `<button id="btnSaveNewFee" class="btn-primary">Save</button>` : ``}
             <button id="btnCancelNewFee" class="btn-secondary">Cancel</button>
           </td>
         </tr>
@@ -148,13 +144,12 @@ export async function renderGroupFees(container, portalState, groupId) {
               <td>${escapeHtml(String(f.year || ""))}</td>
               <td>${formatDateTime(f.created_at)}</td>
               <td>
-                <button class="btn-primary btn-save-fee" data-id="${f.fee_id}">Save</button>
+                ${portalState.canEdit ? `<button class="btn-primary btn-save-fee" data-id="${f.fee_id}">Save</button>` : ``}
                 <button class="btn-secondary btn-cancel-edit" data-id="${f.fee_id}">Cancel</button>
               </td>
             </tr>
           `;
         }
-
         return `
           <tr data-fee-id="${f.fee_id}">
             <td>${formatDateOnly(f.fee_date)}</td>
@@ -163,8 +158,8 @@ export async function renderGroupFees(container, portalState, groupId) {
             <td>${escapeHtml(String(f.year || ""))}</td>
             <td>${formatDateTime(f.created_at)}</td>
             <td>
-              <button class="btn-secondary btn-edit-fee" data-id="${f.fee_id}">Edit</button>
-              <button class="btn-danger btn-delete-fee" data-id="${f.fee_id}">Delete</button>
+              ${portalState.canEdit ? `<button class="btn-secondary btn-edit-fee" data-id="${f.fee_id}">Edit</button>` : ``}
+              ${portalState.deleteAllowed ? `<button class="btn-danger btn-delete-fee" data-id="${f.fee_id}">Delete</button>` : ``}
             </td>
           </tr>
         `;
@@ -173,7 +168,6 @@ export async function renderGroupFees(container, portalState, groupId) {
 
     tableDiv.innerHTML = `
       <h4>Showing ${fees.length} fee ${fees.length === 1 ? "record" : "records"}</h4>
-
       <table class="notes-table">
         <thead>
           <tr>${headerHtml}<th>Actions</th></tr>
@@ -192,50 +186,49 @@ export async function renderGroupFees(container, portalState, groupId) {
     tableDiv.querySelectorAll("th.sortable").forEach(th => {
       th.addEventListener("click", () => {
         const field = th.dataset.field;
-
         if (currentSortField === field) {
-          currentSortDirection =
-            currentSortDirection === "asc" ? "desc" : "asc";
+          currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
         } else {
           currentSortField = field;
           currentSortDirection = "asc";
         }
-
         renderTable();
       });
     });
 
     // Add row save
     if (adding) {
-      tableDiv.querySelector("#btnSaveNewFee").addEventListener("click", async () => {
-        const dateVal = document.getElementById("feeAddDate").value;
-        const amountVal = document.getElementById("feeAddAmount").value;
-        const descVal = document.getElementById("feeAddDesc").value;
+      const saveNewFeeBtn = tableDiv.querySelector("#btnSaveNewFee");
+      if (saveNewFeeBtn) {
+        saveNewFeeBtn.addEventListener("click", async () => {
+          const dateVal = document.getElementById("feeAddDate").value;
+          const amountVal = document.getElementById("feeAddAmount").value;
+          const descVal = document.getElementById("feeAddDesc").value;
+          const amount = Number(amountVal);
 
-        const amount = Number(amountVal);
-
-        if (!dateVal || !amount) {
-          alert("Date and amount are required");
-          return;
-        }
-
-        await fetch(
-          `https://groups-module.dennis-e64.workers.dev/groups/fees/add?project=${portalState.project}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              group_id: groupId,
-              fee_date: dateVal,
-              fee_amount: amount,
-              description: descVal || ""
-            })
+          if (!dateVal || !amount) {
+            alert("Date and amount are required");
+            return;
           }
-        );
 
-        adding = false;
-        await renderGroupFees(container, portalState, groupId);
-      });
+          await fetch(
+            `https://groups-module.dennis-e64.workers.dev/groups/fees/add?project=${portalState.project}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                group_id: groupId,
+                fee_date: dateVal,
+                fee_amount: amount,
+                description: descVal || ""
+              })
+            }
+          );
+
+          adding = false;
+          await renderGroupFees(container, portalState, groupId);
+        });
+      }
 
       tableDiv.querySelector("#btnCancelNewFee").addEventListener("click", () => {
         adding = false;
@@ -265,11 +258,9 @@ export async function renderGroupFees(container, portalState, groupId) {
       btn.addEventListener("click", async () => {
         const feeId = btn.dataset.id;
         const row = tableDiv.querySelector(`tr[data-fee-id="${feeId}"]`);
-
         const dateVal = row.querySelector(".fee-edit-date").value;
         const amountVal = row.querySelector(".fee-edit-amount").value;
         const descVal = row.querySelector(".fee-edit-desc").value;
-
         const amount = Number(amountVal);
 
         if (!dateVal || !amount) {
@@ -299,7 +290,6 @@ export async function renderGroupFees(container, portalState, groupId) {
     tableDiv.querySelectorAll(".btn-delete-fee").forEach(btn => {
       btn.addEventListener("click", async () => {
         const feeId = btn.dataset.id;
-
         if (!confirm("Delete this fee record?")) return;
 
         await fetch(
@@ -319,9 +309,12 @@ export async function renderGroupFees(container, portalState, groupId) {
   renderTable();
 
   // Add Fee button
-  container.querySelector("#btnAddFee").addEventListener("click", () => {
-    editing = null;
-    adding = true;
-    renderTable();
-  });
+  const addFeeBtn = container.querySelector("#btnAddFee");
+  if (addFeeBtn) {
+    addFeeBtn.addEventListener("click", () => {
+      editing = null;
+      adding = true;
+      renderTable();
+    });
+  }
 }
