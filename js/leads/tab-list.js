@@ -1,13 +1,11 @@
 // js/leads/tab-list.js
 // Lead List Tab — Clean version using project_pipeline_leads_view
-
 import { escapeHtml, formatDateTime } from "../utilities.js";
 
 const CSI_ISN_GATEWAY_URL = "https://csi-isn-gateway.dennis-e64.workers.dev";
 
 export async function renderLeadsList(container, portalState) {
   try {
-
     /* -------------------------------------------------------
        RENDER FILTER BAR + TABLE SHELL
     ------------------------------------------------------- */
@@ -30,7 +28,7 @@ export async function renderLeadsList(container, portalState) {
         <div style="display:flex; gap:10px; margin-bottom:12px;">
           <button id="btnApplyLeadFilter" class="secondary">Apply Filter</button>
           <button id="btnClearLeadFilter" class="secondary">Clear Filter</button>
-          <button id="btnAddLead" class="btn-primary">Add Lead</button>
+          ${portalState.canEdit ? `<button id="btnAddLead" class="btn-primary">Add Lead</button>` : ``}
         </div>
 
         <div id="leadTable">(loading…)</div>
@@ -62,7 +60,6 @@ export async function renderLeadsList(container, portalState) {
         https://leads-module.dennis-e64.workers.dev/leads/list?
         project=${encodeURIComponent(portalState.project)}
       `.replace(/\s+/g, "");
-
       const res = await fetch(url, { cache: "no-cache" });
       const data = await res.json();
       return Array.isArray(data) ? data : [];
@@ -73,16 +70,13 @@ export async function renderLeadsList(container, portalState) {
     ------------------------------------------------------- */
     async function loadDefault() {
       leads = await fetchLeads();
-
       leads.sort((a, b) => {
         const da = a.updated_at ? new Date(a.updated_at) : new Date(0);
         const db = b.updated_at ? new Date(b.updated_at) : new Date(0);
         return db - da;
       });
-
       currentSortField = "updated_at";
       currentSortDirection = "desc";
-
       renderTable();
     }
 
@@ -91,7 +85,6 @@ export async function renderLeadsList(container, portalState) {
     ------------------------------------------------------- */
     async function applyFilter() {
       const term = searchInput.value.trim().toLowerCase();
-
       leads = await fetchLeads();
 
       if (term !== "") {
@@ -103,10 +96,8 @@ export async function renderLeadsList(container, portalState) {
       }
 
       leads.sort((a, b) => a.lead_name.localeCompare(b.lead_name));
-
       currentSortField = "lead_name";
       currentSortDirection = "asc";
-
       renderTable();
     }
 
@@ -118,18 +109,14 @@ export async function renderLeadsList(container, portalState) {
 
       if (currentSortField) {
         sorted.sort((a, b) => {
-
           // ⭐ Timestamp sorting
           if (currentSortField === "created_at" || currentSortField === "updated_at") {
             const aRaw = a[currentSortField] || "";
             const bRaw = b[currentSortField] || "";
-
             const aUTC = aRaw ? Date.parse(aRaw.endsWith("Z") ? aRaw : aRaw + "Z") : 0;
             const bUTC = bRaw ? Date.parse(bRaw.endsWith("Z") ? bRaw : bRaw + "Z") : 0;
-
             return currentSortDirection === "asc" ? aUTC - bUTC : bUTC - aUTC;
           }
-
           // ⭐ Normal string sorting
           const A = (a[currentSortField] || "").toLowerCase();
           const B = (b[currentSortField] || "").toLowerCase();
@@ -168,14 +155,12 @@ export async function renderLeadsList(container, portalState) {
       tableDiv.querySelectorAll("th.sortable").forEach(th => {
         th.addEventListener("click", () => {
           const field = th.dataset.field;
-
           if (currentSortField === field) {
             currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
           } else {
             currentSortField = field;
             currentSortDirection = "asc";
           }
-
           renderTable();
         });
       });
@@ -229,7 +214,6 @@ export async function renderLeadsList(container, portalState) {
     async function handleTransferToIsn(btn) {
       const leadId = btn.dataset.leadId;
       const originalText = btn.textContent;
-
       btn.disabled = true;
       btn.textContent = "Sending…";
 
@@ -243,7 +227,6 @@ export async function renderLeadsList(container, portalState) {
             project: portalState.project,
           }),
         });
-
         const clientData = await clientRes.json();
 
         if (!clientRes.ok || !clientData.success) {
@@ -256,7 +239,6 @@ export async function renderLeadsList(container, portalState) {
 
         // Step 2: create the ISN order using the isnClientId from step 1
         btn.textContent = "Creating order…";
-
         const orderRes = await fetch(`${CSI_ISN_GATEWAY_URL}/order/create`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -266,14 +248,13 @@ export async function renderLeadsList(container, portalState) {
             project: portalState.project,
           }),
         });
-
         const orderData = await orderRes.json();
 
         if (!orderRes.ok || !orderData.success) {
           console.error("[To ISN] Order creation failed:", orderData);
           alert(
             `Client synced to ISN, but order creation failed: ${orderData.error || "Unknown error"}` +
-              (orderData.unresolved ? `\n\nMissing: ${orderData.unresolved.join(", ")}` : "")
+            (orderData.unresolved ? `\n\nMissing: ${orderData.unresolved.join(", ")}` : "")
           );
           // Client side succeeded even though order failed -- don't leave
           // the button saying "Sending" forever, but don't claim success either.
@@ -353,7 +334,6 @@ export async function renderLeadsList(container, portalState) {
       const isSorted = currentSortField === field;
       const up = isSorted && currentSortDirection === "asc" ? "▲" : "△";
       const down = isSorted && currentSortDirection === "desc" ? "▼" : "▽";
-
       return `
         <th class="sortable" data-field="${field}">
           ${label}
@@ -387,7 +367,6 @@ export async function renderLeadsList(container, portalState) {
           <td>${escapeHtml(l.stage_name || "")}</td>
           <td>${escapeHtml(l.status || "")}</td>
           <td>${formatDateTime(l.created_at)}</td>
-
           <td>
             <button class="btn-primary btn-select-lead"
               data-id="${l.lead_id}"
@@ -396,11 +375,13 @@ export async function renderLeadsList(container, portalState) {
               Select
             </button>
             ${toIsnButton}
-            <button class="btn-danger btn-delete-lead"
-              data-id="${l.lead_id}"
-              data-name="${safeName}">
-              Delete
-            </button>
+            ${portalState.deleteAllowed ? `
+              <button class="btn-danger btn-delete-lead"
+                data-id="${l.lead_id}"
+                data-name="${safeName}">
+                Delete
+              </button>
+            ` : ``}
           </td>
         </tr>
       `;
@@ -416,32 +397,33 @@ export async function renderLeadsList(container, portalState) {
       await loadDefault();
     });
 
-    document.getElementById("btnAddLead").addEventListener("click", () => {
-      portalState.activeLeadId = null;
-      portalState.activeLeadName = "";
-      portalState.activeLeadContactName = "";
+    const addLeadBtn = document.getElementById("btnAddLead");
+    if (addLeadBtn) {
+      addLeadBtn.addEventListener("click", () => {
+        portalState.activeLeadId = null;
+        portalState.activeLeadName = "";
+        portalState.activeLeadContactName = "";
+        localStorage.removeItem("activeLeadId");
+        localStorage.removeItem("activeLeadName");
+        localStorage.removeItem("activeLeadContactName");
 
-      localStorage.removeItem("activeLeadId");
-      localStorage.removeItem("activeLeadName");
-      localStorage.removeItem("activeLeadContactName");
+        const bar = document.getElementById("lead-context-bar");
+        if (bar) {
+          bar.textContent = "No Lead Selected";
+          bar.style.display = "block";
+        }
 
-      const bar = document.getElementById("lead-context-bar");
-      if (bar) {
-        bar.textContent = "No Lead Selected";
-        bar.style.display = "block";
-      }
-
-      const contactBtn = document.querySelector(
-        '#leads-subtabs button[data-subtab="contact"]'
-      );
-      if (contactBtn) contactBtn.click();
-    });
+        const contactBtn = document.querySelector(
+          '#leads-subtabs button[data-subtab="contact"]'
+        );
+        if (contactBtn) contactBtn.click();
+      });
+    }
 
     /* -------------------------------------------------------
        INITIAL LOAD
     ------------------------------------------------------- */
     await loadDefault();
-
   } catch (err) {
     tableDiv.innerHTML = `<p class="error">Error loading leads.</p>`;
     console.error("[Leads] Error:", err);
