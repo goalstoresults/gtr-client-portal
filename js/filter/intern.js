@@ -42,6 +42,7 @@ export async function renderAgentFilter(container, portalState) {
         </div>
       </div>
 
+            <!--
       <!-- RUN BY -->
       <label style="margin-top:20px;">Run By</label>
       <select id="agent-runby"></select>
@@ -72,6 +73,8 @@ export async function renderAgentFilter(container, portalState) {
         <input type="checkbox" id="agent-customers" />
         <label for="agent-customers">Include Customers</label>
       </div>
+      -->
+
 
       <button id="agent-run" class="primary" style="margin-top:20px;">Run Filter</button>
     </div>
@@ -86,7 +89,9 @@ export async function renderAgentFilter(container, portalState) {
       <div class="btn-row" style="margin-top:12px;">
         <button id="agent-selectall" class="secondary">Select All</button>
         <button id="agent-clearall" class="secondary">Clear All</button>
+        <!--
         <button id="agent-savecsv" class="secondary">Save CSV</button>
+        -->
       </div>
 
       <table id="agent-results" class="notes-table" style="display:none; margin-top:16px;">
