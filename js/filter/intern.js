@@ -1,9 +1,11 @@
-// /js/filter/agent_run.js
-// Agent Filter — with business_name, industry, vertical_market, row selection, Selected count, and CSV of selected rows
+// /js/filter/intern.js
+
+// Intern Filter — cloned from Agent Filter but with hidden fields
 
 import { escapeHtml, formatDateOnly } from "../utilities.js";
 
-export async function renderAgentFilter(container, portalState) {
+export async function renderInternFilter(container, portalState) {
+
 
   // ------------------------------------------------------------
   // Initialize sort state
