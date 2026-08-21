@@ -61,8 +61,8 @@ export async function renderInternFilter(container, portalState) {
 <button id="agent-selectall" class="secondary">Select All</button>
 <button id="agent-clearall" class="secondary">Clear All</button>
 
-<!-- CSV button hidden -->
-<!-- <button id="agent-savecsv" class="secondary">Save CSV</button> -->
+<!-- CSV button -->
+<button id="agent-savecsv" class="secondary">Save CSV</button>
 </div>
 
 <table id="agent-results" class="notes-table" style="display:none; margin-top:16px;">
