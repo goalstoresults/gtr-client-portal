@@ -1,4 +1,6 @@
 // /js/jobs.js
+import { renderJobDetails } from "./jobs/tab-details.js";
+
 
 export async function loadJobsTab({ portalState, tabContent }) {
 
