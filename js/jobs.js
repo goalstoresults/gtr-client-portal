@@ -2,55 +2,59 @@
 
 export async function loadJobsTab({ portalState, tabContent }) {
 
-  tabContent.innerHTML = `
-    <section class="card">
-      <h2>Jobs</h2>
+  // Load base HTML
+  const res = await fetch("./components/jobs.html", { cache: "no-cache" });
+  tabContent.innerHTML = await res.text();
 
-      <nav class="subtabs" id="jobs-subtabs">
-        <button data-subtab="list">List</button>
-        <button data-subtab="details">Details</button>
-        <button data-subtab="cost">Cost</button>
-        <button data-subtab="staff">Staff</button>
-        <button data-subtab="timeline">Timeline</button>
-      </nav>
+  const content = tabContent.querySelector("#jobsContent");
+  const buttons = tabContent.querySelectorAll("#jobs-subtabs button");
 
-      <div id="jobsSubContent">Loading…</div>
-    </section>
-  `;
+  // ⭐ SUBTAB ROUTER (same as contacts.js)
+  buttons.forEach(btn => {
+    btn.addEventListener("click", async () => {
 
-  const subContent = document.getElementById("jobsSubContent");
+      // REMOVE ACTIVE FROM ALL
+      buttons.forEach(b => b.classList.remove("active"));
 
-  async function show(tab) {
-    switch (tab) {
-      case "list": {
-        const { renderJobsList } = await import("./jobs/tab-list.js");
-        return renderJobsList(subContent, portalState);
+      // ADD ACTIVE TO CLICKED
+      btn.classList.add("active");
+
+      const subtab = btn.dataset.subtab;
+
+      switch (subtab) {
+        case "list": {
+          const { renderJobsList } = await import("./jobs/tab-list.js");
+          await renderJobsList(content, portalState);
+          break;
+        }
+
+        case "details":
+          content.innerHTML = `<section class="card"><h2>Job Details</h2></section>`;
+          break;
+
+        case "cost":
+          content.innerHTML = `<section class="card"><h2>Job Cost</h2></section>`;
+          break;
+
+        case "staff":
+          content.innerHTML = `<section class="card"><h2>Job Staff</h2></section>`;
+          break;
+
+        case "timeline":
+          content.innerHTML = `<section class="card"><h2>Job Timeline</h2></section>`;
+          break;
+
+        default:
+          content.innerHTML = `<section class="card"><p>Select a subtab to begin.</p></section>`;
       }
-
-      case "details":
-        subContent.innerHTML = `<h3>Job Details</h3><p>(placeholder)</p>`;
-        break;
-
-      case "cost":
-        subContent.innerHTML = `<h3>Job Cost</h3><p>(placeholder)</p>`;
-        break;
-
-      case "staff":
-        subContent.innerHTML = `<h3>Job Staff</h3><p>(placeholder)</p>`;
-        break;
-
-      case "timeline":
-        subContent.innerHTML = `<h3>Job Timeline</h3><p>(placeholder)</p>`;
-        break;
-
-      default:
-        subContent.innerHTML = `<p>Unknown tab.</p>`;
-    }
-  }
-
-  document.querySelectorAll("#jobs-subtabs button").forEach(btn => {
-    btn.addEventListener("click", () => show(btn.dataset.subtab));
+    });
   });
 
-  show("list");
+  // ⭐ DEFAULT TO LIST VIEW
+  const defaultBtn = tabContent.querySelector('#jobs-subtabs button[data-subtab="list"]');
+  if (defaultBtn) {
+    defaultBtn.classList.add("active");
+    const { renderJobsList } = await import("./jobs/tab-list.js");
+    await renderJobsList(content, portalState);
+  }
 }
