@@ -29,7 +29,7 @@ export async function loadJobsTab({ portalState, tabContent }) {
         }
 
         case "details":
-          content.innerHTML = `<section class="card"><h2>Job Details</h2></section>`;
+          await renderJobDetails(content, portalState);
           break;
 
         case "cost":
