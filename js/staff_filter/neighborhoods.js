@@ -1,8 +1,7 @@
-// /js/staff-filter/neighborhoods.js
-// Staff Filter — Neighborhood Drill‑Down subtab
+// /js/staff_filter/neighborhoods.js
 
-import { renderFilterNeighborhoods } from "../filter/neighborhoods.js";
+import { renderFilterNeighborhoods as baseNeighborhoods } from "../filter/neighborhoods.js";
 
-export async function renderFilterNeighborhoods(container, portalState) {
-  return renderFilterNeighborhoods(container, portalState);
+export async function renderStaffFilterNeighborhoods(container, portalState) {
+  return baseNeighborhoods(container, portalState);
 }
