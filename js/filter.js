@@ -1,9 +1,7 @@
 // /filter.js
 // Filter module controller — loads HTML, initializes subtabs, routes to subtab modules
 
-import { renderRunFilter } from "./filter/run.js";
-import { renderAgentFilter } from "./filter/agent_run.js";
-import { renderInternFilter } from "./filter/intern.js";   // <-- NEW
+import { renderRunFilter } from "./filter/agent_run.js";   // Agent becomes Run Filter
 import { renderFilterHistory } from "./filter/history.js";
 import { renderFilterCoverage } from "./filter/coverage.js";
 import { renderFilterNeighborhoods } from "./filter/neighborhoods.js";
@@ -64,8 +62,8 @@ function initFilterModule(portalState) {
     );
   });
 
-  // Default subtab
-  loadFilterSubtab("run", portalState);
+  // Default subtab → agent (renamed to Run Filter)
+  loadFilterSubtab("agent", portalState);
 }
 
 // ------------------------------------------------------------
@@ -92,9 +90,7 @@ async function loadFilterSubtab(subtab, portalState) {
     ?.classList.add("active");
 
   // Route to subtab modules
-  if (subtab === "run") return renderRunFilter(container, portalState);
-  if (subtab === "agent") return renderAgentFilter(container, portalState);
-  if (subtab === "intern") return renderInternFilter(container, portalState);   // <-- NEW
+  if (subtab === "agent") return renderRunFilter(container, portalState);  // Agent → Run Filter
   if (subtab === "history") return renderFilterHistory(container, portalState);
   if (subtab === "coverage") return renderFilterCoverage(container, portalState);
   if (subtab === "neighborhoods") return renderFilterNeighborhoods(container, portalState);
