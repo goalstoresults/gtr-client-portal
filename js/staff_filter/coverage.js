@@ -1,8 +1,7 @@
-// /js/staff-filter/coverage.js
-// Staff Filter — Coverage Gaps subtab
+// /js/staff_filter/coverage.js
 
-import { renderFilterCoverage } from "../filter/coverage.js";
+import { renderFilterCoverage as baseCoverage } from "../filter/coverage.js";
 
-export async function renderFilterCoverage(container, portalState) {
-  return renderFilterCoverage(container, portalState);
+export async function renderStaffFilterCoverage(container, portalState) {
+  return baseCoverage(container, portalState);
 }
