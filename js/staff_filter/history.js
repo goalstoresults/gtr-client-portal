@@ -1,8 +1,7 @@
-// /js/staff-filter/history.js
-// Staff Filter — History subtab
+// /js/staff_filter/history.js
 
-import { renderFilterHistory } from "../filter/history.js";
+import { renderFilterHistory as baseHistory } from "../filter/history.js";
 
-export async function renderFilterHistory(container, portalState) {
-  return renderFilterHistory(container, portalState);
+export async function renderStaffFilterHistory(container, portalState) {
+  return baseHistory(container, portalState);
 }
