@@ -2,24 +2,19 @@
 // Staff Filter module controller — loads HTML, initializes subtabs, routes to subtab modules
 
 import { renderStaffRunFilter } from "./staff_filter/run-filter.js";
-import { renderFilterHistory } from "./staff_filter/history.js";
-import { renderFilterCoverage } from "./staff_filter/coverage.js";
-import { renderFilterNeighborhoods } from "./staff_filter/neighborhoods.js";
-
+import { renderStaffFilterHistory } from "./staff_filter/history.js";
+import { renderStaffFilterCoverage } from "./staff_filter/coverage.js";
+import { renderStaffFilterNeighborhoods } from "./staff_filter/neighborhoods.js";
 
 console.log("[Staff Filter] loaded");
 
-// ------------------------------------------------------------
 // Load Staff Filter Tab
-// ------------------------------------------------------------
 export async function loadStaffFilterTab({ portalState, tabContent }) {
   await loadPartial("/components/staff-filter.html", tabContent);
   initStaffFilterModule(portalState);
 }
 
-// ------------------------------------------------------------
 // Load HTML partial
-// ------------------------------------------------------------
 async function loadPartial(url, tabContent) {
   try {
     const res = await fetch(url, { cache: "no-cache" });
@@ -39,9 +34,7 @@ async function loadPartial(url, tabContent) {
   }
 }
 
-// ------------------------------------------------------------
 // Initialize Staff Filter module
-// ------------------------------------------------------------
 function initStaffFilterModule(portalState) {
   window.portalState = portalState;
 
@@ -54,20 +47,17 @@ function initStaffFilterModule(portalState) {
     `;
   }
 
-  // Wire subtab buttons
   document.querySelectorAll("#staff-filter-subtabs button").forEach(btn => {
     btn.addEventListener("click", () =>
       loadStaffFilterSubtab(btn.dataset.subtab, portalState)
     );
   });
 
-  // Default subtab → Run Filter (agent)
+  // Default subtab → Run Filter
   loadStaffFilterSubtab("agent", portalState);
 }
 
-// ------------------------------------------------------------
 // Subtab Router
-// ------------------------------------------------------------
 async function loadStaffFilterSubtab(subtab, portalState) {
   const container = document.getElementById("staff-filter-subtab-content");
   if (!container) return;
@@ -79,7 +69,6 @@ async function loadStaffFilterSubtab(subtab, portalState) {
 
   container.innerHTML = `<p>Loading ${subtab}...</p>`;
 
-  // Update active UI
   document
     .querySelectorAll("#staff-filter-subtabs button")
     .forEach(btn => btn.classList.remove("active"));
@@ -88,11 +77,10 @@ async function loadStaffFilterSubtab(subtab, portalState) {
     .querySelector(`#staff-filter-subtabs button[data-subtab="${subtab}"]`)
     ?.classList.add("active");
 
-  // Route to subtab modules
   if (subtab === "agent") return renderStaffRunFilter(container, portalState);
-  if (subtab === "history") return renderFilterHistory(container, portalState);
-  if (subtab === "coverage") return renderFilterCoverage(container, portalState);
-  if (subtab === "neighborhoods") return renderFilterNeighborhoods(container, portalState);
+  if (subtab === "history") return renderStaffFilterHistory(container, portalState);
+  if (subtab === "coverage") return renderStaffFilterCoverage(container, portalState);
+  if (subtab === "neighborhoods") return renderStaffFilterNeighborhoods(container, portalState);
 
   container.innerHTML = `<p>Unknown subtab</p>`;
 }
