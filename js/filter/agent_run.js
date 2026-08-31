@@ -3,7 +3,7 @@
 
 import { escapeHtml, formatDateOnly } from "../utilities.js";
 
-export async function renderAgentFilter(container, portalState) {
+export async function renderRunFilter(container, portalState) {
 
   // ------------------------------------------------------------
   // Initialize sort state
