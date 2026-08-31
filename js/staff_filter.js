@@ -10,7 +10,7 @@ console.log("[Staff Filter] loaded");
 
 // Load Staff Filter Tab
 export async function loadStaffFilterTab({ portalState, tabContent }) {
-  await loadPartial("/components/staff-filter.html", tabContent);
+  await loadPartial("/components/staff_filter.html", tabContent);
   initStaffFilterModule(portalState);
 }
 
