@@ -265,7 +265,7 @@ user-select: none;
     };
 
     try {
-      const res = await fetch("https://filter-module.dennis-e64.workers.dev/intern-run", {
+      const res = await fetch("https://filter-module.dennis-e64.workers.dev/staff-run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
