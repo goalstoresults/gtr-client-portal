@@ -1,10 +1,11 @@
 // /js/staff_filter.js
 // Staff Filter module controller — loads HTML, initializes subtabs, routes to subtab modules
 
-import { renderStaffRunFilter } from "./staff-filter/run-filter.js";
-import { renderFilterHistory } from "./staff-filter/history.js";
-import { renderFilterCoverage } from "./staff-filter/coverage.js";
-import { renderFilterNeighborhoods } from "./staff-filter/neighborhoods.js";
+import { renderStaffRunFilter } from "./staff_filter/run-filter.js";
+import { renderFilterHistory } from "./staff_filter/history.js";
+import { renderFilterCoverage } from "./staff_filter/coverage.js";
+import { renderFilterNeighborhoods } from "./staff_filter/neighborhoods.js";
+
 
 console.log("[Staff Filter] loaded");
 
