@@ -613,9 +613,10 @@ document.getElementById("agent-savecsv").onclick = async () => {
       .join(",") + "\n";
 
     selectedResults.push({
-      contact_id: contactId,
+      contact_id: contactId,                     // REQUIRED
       email: rowValues[0],
-      name: rowValues[1],
+      first_name: "",                            // REQUIRED (even empty)
+      last_name: "",                             // REQUIRED (even empty)
       business_name: rowValues[2],
       industry: rowValues[3],
       vertical_market: rowValues[4],
@@ -623,8 +624,10 @@ document.getElementById("agent-savecsv").onclick = async () => {
       square_footage: rowValues[6],
       lead_level: rowValues[7],
       type: rowValues[8],
-      last_email_date: rowValues[9]
+      last_email_date: rowValues[9],
+      last_reply_date: null                      // REQUIRED (even null)
     });
+
   });
 
   // Download CSV
