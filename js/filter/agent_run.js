@@ -445,8 +445,7 @@ export async function renderRunFilter(container, portalState) {
               square_footage: sqft,
               contact_ids: window.currentContactIds,
               result_count: results.length,
-              results,
-              update_last_email_date: true
+              results
             })
           });
         } catch (err) {
