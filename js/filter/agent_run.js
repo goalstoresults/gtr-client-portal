@@ -574,46 +574,102 @@ export async function renderRunFilter(container, portalState) {
   // ------------------------------------------------------------
   // Save CSV (only selected rows)
   // ------------------------------------------------------------
-  document.getElementById("agent-savecsv").onclick = async () => {
-    const rows = Array.from(document.querySelectorAll("#agent-results-body tr"));
-    const checkedRows = rows.filter(r => r.querySelector(".row-check")?.checked);
-    if (!checkedRows.length) {
-      alert("No rows selected.");
-      return;
-    }
+document.getElementById("agent-savecsv").onclick = async () => {
+  const rows = Array.from(document.querySelectorAll("#agent-results-body tr"));
+  const checkedRows = rows.filter(r => r.querySelector(".row-check")?.checked);
 
-    const headers = [
-      "Email",
-      "Name",
-      "Business",
-      "Industry",
-      "Vertical",
-      "Neighborhood",
-      "Square Footage",
-      "Lead Level",
-      "Type",
-      "Last Email"
-    ];
+  if (!checkedRows.length) {
+    alert("No rows selected.");
+    return;
+  }
 
-    let csv = headers.join(",") + "\n";
+  // Build CSV from selected rows
+  const headers = [
+    "Email",
+    "Name",
+    "Business",
+    "Industry",
+    "Vertical",
+    "Neighborhood",
+    "Square Footage",
+    "Lead Level",
+    "Type",
+    "Last Email"
+  ];
 
-    checkedRows.forEach(tr => {
-      const tds = Array.from(tr.querySelectorAll("td")).slice(1); // skip checkbox
-      const row = tds.map(td =>
-        `"${td.textContent.replace(/"/g, '""')}"`
-      ).join(",");
-      csv += row + "\n";
+  let csv = headers.join(",") + "\n";
+
+  const selectedResults = [];
+
+  checkedRows.forEach(tr => {
+    const cb = tr.querySelector(".row-check");
+    const contactId = cb?.dataset.id || null;
+
+    const tds = Array.from(tr.querySelectorAll("td")).slice(1);
+    const rowValues = tds.map(td => td.textContent);
+
+    csv += rowValues
+      .map(v => `"${v.replace(/"/g, '""')}"`)
+      .join(",") + "\n";
+
+    selectedResults.push({
+      contact_id: contactId,
+      email: rowValues[0],
+      name: rowValues[1],
+      business_name: rowValues[2],
+      industry: rowValues[3],
+      vertical_market: rowValues[4],
+      neighborhood: rowValues[5],
+      square_footage: rowValues[6],
+      lead_level: rowValues[7],
+      type: rowValues[8],
+      last_email_date: rowValues[9]
     });
+  });
 
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "jw_contacts_selected.csv";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+  // Download CSV
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "jw_contacts_selected.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  // 🔹 NOW commit to backend (ONLY on Save CSV)
+  const runBy = document.getElementById("agent-runby").value;
+  const neighborhoods = Array.from(
+    document.querySelectorAll("#agent-nh-grid input:checked")
+  ).map(cb => cb.value);
+  const sqft = Array.from(
+    document.querySelectorAll("#agent-sqft-grid input:checked")
+  ).map(cb => cb.value);
+
+  const contactIds = selectedResults
+    .map(r => r.contact_id)
+    .filter(Boolean)
+    .map(String);
+
+  try {
+    await fetch("https://filter-module.dennis-e64.workers.dev/commit-run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_label: runBy,
+        neighborhoods,
+        square_footage: sqft,
+        contact_ids: contactIds,
+        result_count: selectedResults.length,
+        results: selectedResults,
+        update_last_email_date: true
+      })
+    });
+  } catch (err) {
+    console.error("Save CSV commit failed:", err);
+  }
+};
+
 
 }
