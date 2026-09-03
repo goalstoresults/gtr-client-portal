@@ -431,29 +431,6 @@ export async function renderRunFilter(container, portalState) {
       });
 
       // ------------------------------------------------------------
-      // AUTO-SAVE COMMIT
-      // ------------------------------------------------------------
-      const autoSave = document.getElementById("agent-autosave").checked;
-      if (autoSave) {
-        try {
-          await fetch("https://filter-module.dennis-e64.workers.dev/commit-run", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              user_label: runBy,
-              neighborhoods,
-              square_footage: sqft,
-              contact_ids: window.currentContactIds,
-              result_count: results.length,
-              results
-            })
-          });
-        } catch (err) {
-          console.error("Auto-save failed:", err);
-        }
-      }
-
-      // ------------------------------------------------------------
       // SORT + RENDER TABLE
       // ------------------------------------------------------------
       function sortResults() {
