@@ -578,34 +578,35 @@ document.getElementById("agent-savecsv").onclick = async () => {
 
   const selectedResults = [];
 
-  checkedRows.forEach(tr => {
-    const cb = tr.querySelector(".row-check");
-    const contactId = cb?.dataset.id || null;
+checkedRows.forEach(tr => {
+  const cb = tr.querySelector(".row-check");
+  const contactId = cb?.dataset.id || null;
+  const tds = Array.from(tr.querySelectorAll("td")).slice(1);
+  const rowValues = tds.map(td => td.textContent);
+  csv += rowValues
+    .map(v => `"${v.replace(/"/g, '""')}"`)
+    .join(",") + "\n";
 
-    const tds = Array.from(tr.querySelectorAll("td")).slice(1);
-    const rowValues = tds.map(td => td.textContent);
+  // Pull the DB payload from the ORIGINAL result object, not the rendered <td> text —
+  // this keeps neighborhood/square_footage as real arrays (matches text[] columns)
+  const original = results.find(r => String(r.contact_id) === String(contactId));
 
-    csv += rowValues
-      .map(v => `"${v.replace(/"/g, '""')}"`)
-      .join(",") + "\n";
-
-    selectedResults.push({
-      contact_id: contactId,                     // REQUIRED
-      email: rowValues[0],
-      first_name: "",                            // REQUIRED (even empty)
-      last_name: "",                             // REQUIRED (even empty)
-      business_name: rowValues[2],
-      industry: rowValues[3],
-      vertical_market: rowValues[4],
-      neighborhood: rowValues[5],
-      square_footage: rowValues[6],
-      lead_level: rowValues[7],
-      type: rowValues[8],
-      last_email_date: rowValues[9],
-      last_reply_date: null                      // REQUIRED (even null)
-    });
-
+  selectedResults.push({
+    contact_id: contactId,                                     // REQUIRED
+    email: original?.email || "",
+    first_name: original?.first_name || "",                    // REQUIRED (even empty)
+    last_name: original?.last_name || "",                       // REQUIRED (even empty)
+    business_name: original?.business_name || "",
+    industry: original?.industry || "",
+    vertical_market: original?.vertical_market || "",
+    neighborhood: Array.isArray(original?.neighborhood) ? original.neighborhood : [],
+    square_footage: Array.isArray(original?.square_footage) ? original.square_footage : [],
+    lead_level: original?.lead_level || "",
+    type: original?.type || "",
+    last_email_date: original?.last_email_date || null,
+    last_reply_date: null                                        // REQUIRED (even null)
   });
+});
 
   // Download CSV
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
