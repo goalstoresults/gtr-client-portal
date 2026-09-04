@@ -632,23 +632,27 @@ document.getElementById("agent-savecsv").onclick = async () => {
     .filter(Boolean)
     .map(String);
 
-  try {
-    await fetch("https://filter-module.dennis-e64.workers.dev/commit-run", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_label: runBy,
-        neighborhoods,
-        square_footage: sqft,
-        contact_ids: contactIds,
-        result_count: selectedResults.length,
-        results: selectedResults,
-        update_last_email_date: true
-      })
-    });
-  } catch (err) {
-    console.error("Save CSV commit failed:", err);
-  }
+try {
+  const commitResp = await fetch("https://filter-module.dennis-e64.workers.dev/commit-run", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      user_label: runBy,
+      neighborhoods,
+      square_footage: sqft,
+      contact_ids: contactIds,
+      result_count: selectedResults.length,
+      results: selectedResults
+    })
+  });
+
+  const commitJson = await commitResp.json();
+  console.log("COMMIT RESPONSE:", commitJson);
+
+} catch (err) {
+  console.error("Save CSV commit failed:", err);
+}
+
 };
 
 
