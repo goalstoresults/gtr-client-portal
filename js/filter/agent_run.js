@@ -15,6 +15,9 @@ export async function renderRunFilter(container, portalState) {
     };
   }
 
+  // Shared state between the "Run Filter" handler and the "Save CSV" handler
+  let currentResults = [];
+
   container.innerHTML = `
   <section class="card two-col">
 
@@ -260,7 +263,7 @@ export async function renderRunFilter(container, portalState) {
     <label><input type="checkbox" value="55K - 65K"> 55K - 65K</label>
     <label><input type="checkbox" value="300K - 350K"> 300K - 350K</label>
     <span class="sqft-spacer"></span>
-    
+
     <label><input type="checkbox" value="6K - 6.5K"> 6K - 6.5K</label>
     <label><input type="checkbox" value="16.5K - 18.5K"> 16.5K - 18.5K</label>
     <label><input type="checkbox" value="65K - 75K"> 65K - 75K</label>
@@ -415,18 +418,18 @@ export async function renderRunFilter(container, portalState) {
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "Unknown error");
 
-      const results = data.results || [];
-      if (!results.length) {
+      currentResults = data.results || [];
+      if (!currentResults.length) {
         msg.textContent = "No matching records found.";
         return;
       }
 
       msg.textContent = "";
       table.style.display = "";
-      total.textContent = `Total Rows: ${results.length}`;
+      total.textContent = `Total Rows: ${currentResults.length}`;
 
       window.currentContactIds = [];
-      results.forEach(c => {
+      currentResults.forEach(c => {
         if (c.contact_id) window.currentContactIds.push(String(c.contact_id));
       });
 
@@ -439,7 +442,7 @@ export async function renderRunFilter(container, portalState) {
         // Do not sort on the "select" column
         if (column === "select") return;
 
-        results.sort((a, b) => {
+        currentResults.sort((a, b) => {
           let A = a[column];
           let B = b[column];
 
@@ -497,7 +500,7 @@ export async function renderRunFilter(container, portalState) {
         document.getElementById("agent-header-row").innerHTML = headerHtml;
 
         const body = document.getElementById("agent-results-body");
-        body.innerHTML = results.map(c => {
+        body.innerHTML = currentResults.map(c => {
           const name = c.first_name || "";
           const nh = Array.isArray(c.neighborhood) ? c.neighborhood.join(", ") : (c.neighborhood || "");
           const sq = Array.isArray(c.square_footage) ? c.square_footage.join(", ") : (c.square_footage || "");
@@ -549,112 +552,117 @@ export async function renderRunFilter(container, portalState) {
   };
 
   // ------------------------------------------------------------
-  // Save CSV (only selected rows)
+  // Save CSV (only selected rows) — FIXED:
+  //   - pulls DB payload from currentResults (real objects with real arrays)
+  //     instead of scraping rendered <td> text
+  //   - no longer hard-codes first_name/last_name to ""
+  //   - currentResults is scoped to renderRunFilter so both this handler
+  //     and the "Run Filter" handler above can share it
   // ------------------------------------------------------------
-document.getElementById("agent-savecsv").onclick = async () => {
-  const rows = Array.from(document.querySelectorAll("#agent-results-body tr"));
-  const checkedRows = rows.filter(r => r.querySelector(".row-check")?.checked);
+  document.getElementById("agent-savecsv").onclick = async () => {
+    const rows = Array.from(document.querySelectorAll("#agent-results-body tr"));
+    const checkedRows = rows.filter(r => r.querySelector(".row-check")?.checked);
 
-  if (!checkedRows.length) {
-    alert("No rows selected.");
-    return;
-  }
+    if (!checkedRows.length) {
+      alert("No rows selected.");
+      return;
+    }
 
-  // Build CSV from selected rows
-  const headers = [
-    "Email",
-    "Name",
-    "Business",
-    "Industry",
-    "Vertical",
-    "Neighborhood",
-    "Square Footage",
-    "Lead Level",
-    "Type",
-    "Last Email"
-  ];
+    // Build CSV from selected rows (download file — comma-joined display text is fine here)
+    const headers = [
+      "Email",
+      "Name",
+      "Business",
+      "Industry",
+      "Vertical",
+      "Neighborhood",
+      "Square Footage",
+      "Lead Level",
+      "Type",
+      "Last Email"
+    ];
 
-  let csv = headers.join(",") + "\n";
+    let csv = headers.join(",") + "\n";
+    const selectedResults = [];
 
-  const selectedResults = [];
+    checkedRows.forEach(tr => {
+      const cb = tr.querySelector(".row-check");
+      const contactId = cb?.dataset.id || null;
 
-checkedRows.forEach(tr => {
-  const cb = tr.querySelector(".row-check");
-  const contactId = cb?.dataset.id || null;
-  const tds = Array.from(tr.querySelectorAll("td")).slice(1);
-  const rowValues = tds.map(td => td.textContent);
-  csv += rowValues
-    .map(v => `"${v.replace(/"/g, '""')}"`)
-    .join(",") + "\n";
+      const tds = Array.from(tr.querySelectorAll("td")).slice(1);
+      const rowValues = tds.map(td => td.textContent);
 
-  // Pull the DB payload from the ORIGINAL result object, not the rendered <td> text —
-  // this keeps neighborhood/square_footage as real arrays (matches text[] columns)
-  const original = results.find(r => String(r.contact_id) === String(contactId));
+      csv += rowValues
+        .map(v => `"${v.replace(/"/g, '""')}"`)
+        .join(",") + "\n";
 
-  selectedResults.push({
-    contact_id: contactId,                                     // REQUIRED
-    email: original?.email || "",
-    first_name: original?.first_name || "",                    // REQUIRED (even empty)
-    last_name: original?.last_name || "",                       // REQUIRED (even empty)
-    business_name: original?.business_name || "",
-    industry: original?.industry || "",
-    vertical_market: original?.vertical_market || "",
-    neighborhood: Array.isArray(original?.neighborhood) ? original.neighborhood : [],
-    square_footage: Array.isArray(original?.square_footage) ? original.square_footage : [],
-    lead_level: original?.lead_level || "",
-    type: original?.type || "",
-    last_email_date: original?.last_email_date || null,
-    last_reply_date: null                                        // REQUIRED (even null)
-  });
-});
+      // DB payload — pulled from the ORIGINAL result object (currentResults),
+      // not the rendered <td> text, so neighborhood/square_footage stay real
+      // arrays that match the jw_filter_run_results text[] columns.
+      const original = currentResults.find(r => String(r.contact_id) === String(contactId));
 
-  // Download CSV
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "jw_contacts_selected.csv";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+      selectedResults.push({
+        contact_id: contactId,                                     // REQUIRED
+        email: original?.email || "",
+        first_name: original?.first_name || "",                    // REQUIRED (even empty)
+        last_name: original?.last_name || "",                       // REQUIRED (even empty)
+        business_name: original?.business_name || "",
+        industry: original?.industry || "",
+        vertical_market: original?.vertical_market || "",
+        neighborhood: Array.isArray(original?.neighborhood) ? original.neighborhood : [],
+        square_footage: Array.isArray(original?.square_footage) ? original.square_footage : [],
+        lead_level: original?.lead_level || "",
+        type: original?.type || "",
+        last_email_date: original?.last_email_date || null,
+        last_reply_date: null                                        // REQUIRED (even null)
+      });
+    });
 
-  // 🔹 NOW commit to backend (ONLY on Save CSV)
-  const runBy = document.getElementById("agent-runby").value;
-  const neighborhoods = Array.from(
-    document.querySelectorAll("#agent-nh-grid input:checked")
-  ).map(cb => cb.value);
-  const sqft = Array.from(
-    document.querySelectorAll("#agent-sqft-grid input:checked")
-  ).map(cb => cb.value);
+    // Download CSV
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "jw_contacts_selected.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 
-  const contactIds = selectedResults
-    .map(r => r.contact_id)
-    .filter(Boolean)
-    .map(String);
+    // Commit to backend (ONLY on Save CSV)
+    const runBy = document.getElementById("agent-runby").value;
+    const neighborhoods = Array.from(
+      document.querySelectorAll("#agent-nh-grid input:checked")
+    ).map(cb => cb.value);
+    const sqft = Array.from(
+      document.querySelectorAll("#agent-sqft-grid input:checked")
+    ).map(cb => cb.value);
 
-try {
-  const commitResp = await fetch("https://filter-module.dennis-e64.workers.dev/commit-run", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      user_label: runBy,
-      neighborhoods,
-      square_footage: sqft,
-      contact_ids: contactIds,
-      result_count: selectedResults.length,
-      results: selectedResults
-    })
-  });
+    const contactIds = selectedResults
+      .map(r => r.contact_id)
+      .filter(Boolean)
+      .map(String);
 
-  const commitJson = await commitResp.json();
-  console.log("COMMIT RESPONSE:", commitJson);
+    try {
+      const commitResp = await fetch("https://filter-module.dennis-e64.workers.dev/commit-run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_label: runBy,
+          neighborhoods,
+          square_footage: sqft,
+          contact_ids: contactIds,
+          result_count: selectedResults.length,
+          results: selectedResults
+        })
+      });
 
-} catch (err) {
-  console.error("Save CSV commit failed:", err);
-}
+      const commitJson = await commitResp.json();
+      console.log("COMMIT RESPONSE:", commitJson);
 
-};
-
+    } catch (err) {
+      console.error("Save CSV commit failed:", err);
+    }
+  };
 
 }
