@@ -3,6 +3,64 @@
 import { escapeHtml } from "../utilities.js";
 
 /* =========================================================
+CSV EXPORT STATE
+Tracks whatever rows/columns are currently on screen so the
+Save CSV button always exports exactly what's visible,
+regardless of which Summary Type / Year is selected.
+========================================================= */
+let lastSummaryRows = [];
+let lastSummaryColumns = [];
+let lastSummaryType = "";
+let lastSummaryYear = "all";
+
+function csvEscape(value) {
+  const str = value === null || value === undefined ? "" : String(value);
+  if (/[",\n]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+function exportCurrentSummaryToCsv() {
+  if (!lastSummaryRows.length || !lastSummaryColumns.length) {
+    alert("No summary data to export yet.");
+    return;
+  }
+
+  // Skip the non-data "expand" arrow column
+  const dataColumns = lastSummaryColumns.filter(c => c.key !== "expand");
+
+  const headerLine = dataColumns.map(c => csvEscape(c.label)).join(",");
+
+  const bodyLines = lastSummaryRows.map(row =>
+    dataColumns
+      .map(col => {
+        const val = row[col.key];
+        // Export raw numbers (not "$1,234.56") so totals stay usable in Excel
+        if (col.numeric) return csvEscape(Number(val) || 0);
+        return csvEscape(val);
+      })
+      .join(",")
+  );
+
+  const csvContent = [headerLine, ...bodyLines].join("\r\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  const filename = `financial-summary-${lastSummaryType || "export"}-${lastSummaryYear}-${stamp}.csv`;
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/* =========================================================
 ENTRY POINT: Render Summary Tab
 ========================================================= */
 
@@ -27,6 +85,7 @@ export async function renderFinancialSummary(container, portalState) {
     <select id="summaryYear">
       <option value="all">All</option>
     </select>
+    <button id="summaryExportCsv" class="btn-secondary" style="margin-left: 20px;">Save CSV</button>
   </div>
   <div id="summaryGrid"></div>
 </section>
@@ -41,6 +100,10 @@ export async function renderFinancialSummary(container, portalState) {
 
   document.getElementById("summaryYear").addEventListener("change", () => {
     loadSummaryData(portalState);
+  });
+
+  document.getElementById("summaryExportCsv").addEventListener("click", () => {
+    exportCurrentSummaryToCsv();
   });
 }
 
@@ -179,6 +242,7 @@ async function loadSummaryData(portalState) {
   }
 
   // ⭐⭐⭐ CRITICAL FIX — pass nameById into renderSummaryGrid
+  lastSummaryYear = year;
   renderSummaryGrid(summaryRows, type, portalState, nameById);
 }
 
@@ -481,6 +545,13 @@ function renderSummaryGrid(rows, type, portalState, nameById) {
 
     const columns = columnSets[type];
 
+    // Keep CSV export in sync with what's currently on screen.
+    // `rows` is sorted in place below, so this reference stays current
+    // even after the user re-sorts by clicking a column header.
+    lastSummaryRows = rows;
+    lastSummaryColumns = columns;
+    lastSummaryType = type;
+
     let currentSortField = columns[1].key;
     let currentSortDirection = "asc";
 
@@ -751,5 +822,3 @@ function renderSummaryGrid(rows, type, portalState, nameById) {
 
     render();
 }
-
-
