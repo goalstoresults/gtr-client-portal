@@ -12,6 +12,8 @@ let lastSummaryRows = [];
 let lastSummaryColumns = [];
 let lastSummaryType = "";
 let lastSummaryYear = "all";
+let lastPortalState = null;
+let lastNameById = new Map();
 
 function csvEscape(value) {
   const str = value === null || value === undefined ? "" : String(value);
@@ -61,6 +63,156 @@ function exportCurrentSummaryToCsv() {
 }
 
 /* =========================================================
+DETAIL FETCH (shared by the row-expand arrows AND the
+header/detail CSV export, so both stay in sync)
+========================================================= */
+async function fetchSummaryDetailRows(row, type, portalState) {
+  const yearFilter = document.getElementById("summaryYear")?.value || "all";
+  const project = portalState.project;
+
+  let url = `https://financials-module.dennis-e64.workers.dev/payments/details?project=${project}`;
+
+  if (type === "client" || type === "year_client") {
+    if (row.contact_id) url += `&contact_id=${encodeURIComponent(row.contact_id)}`;
+  }
+
+  if (type === "referral" || type === "year_referral") {
+    if (row.referral_id) url += `&referral_id=${encodeURIComponent(row.referral_id)}`;
+  }
+
+  if (type === "group" || type === "group_year") {
+    if (row.group_id) url += `&group_id=${encodeURIComponent(row.group_id)}`;
+  }
+
+  if (type === "year" || type === "year_client" || type === "year_referral" || type === "group_year") {
+    if (row.year) url += `&year=${encodeURIComponent(row.year)}`;
+  } else if (yearFilter !== "all") {
+    url += `&year=${encodeURIComponent(yearFilter)}`;
+  }
+
+  const res = await fetch(url, { cache: "no-cache" });
+  let data = [];
+  try {
+    data = await res.json();
+  } catch {
+    data = [];
+  }
+  return Array.isArray(data) ? data : [];
+}
+
+/* =========================================================
+HEADER/DETAIL CSV EXPORT
+For each visible summary row, writes a HEADER line with the
+group totals, followed by one DETAIL line per underlying
+transaction (same data the ▶ expand arrow shows).
+========================================================= */
+async function exportSummaryDetailToCsv() {
+  if (!lastSummaryRows.length || !lastSummaryColumns.length || !lastPortalState) {
+    alert("No summary data to export yet.");
+    return;
+  }
+
+  const btn = document.getElementById("summaryExportCsvDetail");
+  const originalLabel = btn ? btn.textContent : null;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Exporting...";
+  }
+
+  try {
+    // The non-numeric columns (Referral / Client / Year / Group, etc.)
+    // describe which group a header row belongs to.
+    const dimensionColumns = lastSummaryColumns.filter(
+      c => c.key !== "expand" && !c.numeric
+    );
+
+    const header = [
+      "Row Type",
+      "Group",
+      "Date",
+      "Client",
+      "Amount",
+      "Invoice #",
+      "# of Payments",
+      "Total Amount",
+      "# of Clients",
+      "# of Referrals"
+    ]
+      .map(csvEscape)
+      .join(",");
+
+    const lines = [header];
+
+    for (const row of lastSummaryRows) {
+      const groupLabel = dimensionColumns
+        .map(c => row[c.key])
+        .filter(v => v !== undefined && v !== null && v !== "")
+        .join(" - ");
+
+      lines.push(
+        [
+          "HEADER",
+          groupLabel,
+          "",
+          "",
+          "",
+          "",
+          row.count ?? "",
+          Number(row.total_amount) || 0,
+          row.clients ?? "",
+          row.referrals ?? ""
+        ]
+          .map(csvEscape)
+          .join(",")
+      );
+
+      const details = await fetchSummaryDetailRows(row, lastSummaryType, lastPortalState);
+
+      for (const d of details) {
+        const clientName = d.contact_id ? lastNameById.get(d.contact_id) || "" : "";
+
+        lines.push(
+          [
+            "DETAIL",
+            "",
+            d.transaction_date || "",
+            clientName,
+            Number(d.amount) || 0,
+            d.invoice_number || "",
+            "",
+            "",
+            "",
+            ""
+          ]
+            .map(csvEscape)
+            .join(",")
+        );
+      }
+    }
+
+    const csvContent = lines.join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    const filename = `financial-summary-detail-${lastSummaryType || "export"}-${lastSummaryYear}-${stamp}.csv`;
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  }
+}
+
+/* =========================================================
 ENTRY POINT: Render Summary Tab
 ========================================================= */
 
@@ -86,6 +238,7 @@ export async function renderFinancialSummary(container, portalState) {
       <option value="all">All</option>
     </select>
     <button id="summaryExportCsv" class="btn-secondary" style="margin-left: 20px;">Save CSV</button>
+    <button id="summaryExportCsvDetail" class="btn-secondary" style="margin-left: 8px;">Save CSV (Header/Detail)</button>
   </div>
   <div id="summaryGrid"></div>
 </section>
@@ -104,6 +257,10 @@ export async function renderFinancialSummary(container, portalState) {
 
   document.getElementById("summaryExportCsv").addEventListener("click", () => {
     exportCurrentSummaryToCsv();
+  });
+
+  document.getElementById("summaryExportCsvDetail").addEventListener("click", () => {
+    exportSummaryDetailToCsv();
   });
 }
 
@@ -551,6 +708,8 @@ function renderSummaryGrid(rows, type, portalState, nameById) {
     lastSummaryRows = rows;
     lastSummaryColumns = columns;
     lastSummaryType = type;
+    lastPortalState = portalState;
+    lastNameById = nameById;
 
     let currentSortField = columns[1].key;
     let currentSortDirection = "asc";
@@ -596,39 +755,10 @@ function renderSummaryGrid(rows, type, portalState, nameById) {
         return totals;
     }
 
+    // Shared with the header/detail CSV export so the ▶ expand arrow
+    // and the export always fetch details the same way.
     async function loadDetails(row) {
-        const yearFilter = document.getElementById("summaryYear").value;
-        const project = portalState.project;
-
-        let url = `https://financials-module.dennis-e64.workers.dev/payments/details?project=${project}`;
-
-        if (type === "client" || type === "year_client") {
-            if (row.contact_id) url += `&contact_id=${encodeURIComponent(row.contact_id)}`;
-        }
-
-        if (type === "referral" || type === "year_referral") {
-            if (row.referral_id) url += `&referral_id=${encodeURIComponent(row.referral_id)}`;
-        }
-
-        if (type === "group" || type === "group_year") {
-            if (row.group_id) url += `&group_id=${encodeURIComponent(row.group_id)}`;
-        }
-
-        if (type === "year" || type === "year_client" || type === "year_referral" || type === "group_year") {
-            if (row.year) url += `&year=${encodeURIComponent(row.year)}`;
-        } else if (yearFilter !== "all") {
-            url += `&year=${encodeURIComponent(yearFilter)}`;
-        }
-
-        const res = await fetch(url, { cache: "no-cache" });
-        let data = [];
-        try {
-            data = await res.json();
-        } catch {
-            data = [];
-        }
-
-        return Array.isArray(data) ? data : [];
+        return fetchSummaryDetailRows(row, type, portalState);
     }
 
     function render() {
