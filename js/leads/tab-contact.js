@@ -12,21 +12,50 @@ import { escapeHtml } from "../utilities.js";
 */
 
 function renderAgentPicker({ container, project, label, agent, onChange }) {
-  const safeLabel = label.replace(/[^a-zA-Z0-9]/g, '');
+  const safeLabel = label.replace(/[^a-zA-Z0-9]/g, "");
+
+  const selectedAgentName = agent?.id
+    ? `${agent.first_name || ""} ${agent.last_name || ""}`.trim()
+    : "";
 
   container.innerHTML = `
     <section class="card" style="margin-top:20px;">
-      <h3>${label}</h3>
+      <h3>${escapeHtml(label)}</h3>
+
+      <div
+        id="${safeLabel}CurrentSelection"
+        style="
+          margin-bottom:12px;
+          padding:10px 12px;
+          border-radius:4px;
+          background:${selectedAgentName ? "#eef7ee" : "#f7f7f7"};
+          color:${selectedAgentName ? "#1f5f2c" : "#666"};
+        "
+      >
+        ${
+          selectedAgentName
+            ? `Current selection: <strong>${escapeHtml(selectedAgentName)}</strong>`
+            : "No agent selected."
+        }
+      </div>
 
       <div class="row" style="gap:12px; margin-bottom:16px;">
-        <input id="${safeLabel}SearchInput"
-               placeholder="Search name, business, or email"
-               style="flex:1;">
-        <button id="${safeLabel}FindBtn" class="btn-secondary">Find</button>
+        <input
+          id="${safeLabel}SearchInput"
+          placeholder="Search name, business, or email"
+          style="flex:1;"
+        >
+        <button id="${safeLabel}FindBtn" class="btn-secondary">
+          Find
+        </button>
       </div>
 
       <div id="${safeLabel}Results" class="muted" style="margin-bottom:20px;">
-        Enter search text and click Find.
+        ${
+          selectedAgentName
+            ? "Search to replace the current selection."
+            : "Enter search text and click Find."
+        }
       </div>
     </section>
   `;
@@ -34,6 +63,9 @@ function renderAgentPicker({ container, project, label, agent, onChange }) {
   const searchInput = container.querySelector(`#${safeLabel}SearchInput`);
   const findBtn = container.querySelector(`#${safeLabel}FindBtn`);
   const resultsDiv = container.querySelector(`#${safeLabel}Results`);
+  const currentSelectionDiv = container.querySelector(
+    `#${safeLabel}CurrentSelection`
+  );
 
   findBtn.addEventListener("click", async () => {
     const term = searchInput.value.trim();
@@ -45,63 +77,98 @@ function renderAgentPicker({ container, project, label, agent, onChange }) {
 
     resultsDiv.textContent = "Searching…";
 
-    const encoded = encodeURIComponent(`*${term}*`);
-
-const url = `
-  https://contacts-module.dennis-e64.workers.dev/contacts/search?
-  project=${project}&
-  contact_type=Agent&
-  search=${encodeURIComponent(term)}
-`.replace(/\s+/g, "");
-
-
+    const url = `
+      https://contacts-module.dennis-e64.workers.dev/contacts/search?
+      project=${encodeURIComponent(project)}&
+      contact_type=Agent&
+      search=${encodeURIComponent(term)}
+    `.replace(/\s+/g, "");
 
     try {
       const res = await fetch(url);
       const agents = await res.json();
 
+      if (!res.ok) {
+        console.error("[Agent Search] API error:", agents);
+        resultsDiv.innerHTML =
+          "<div class='muted'>Unable to search agents.</div>";
+        return;
+      }
+
       if (!Array.isArray(agents) || agents.length === 0) {
-        resultsDiv.innerHTML = "<div class='muted'>No agents found.</div>";
+        resultsDiv.innerHTML =
+          "<div class='muted'>No agents found.</div>";
         return;
       }
 
       resultsDiv.innerHTML = agents
         .map(
           a => `
-            <div class="contact-result"
-                 data-id="${a.contact_id}"
-                 data-json='${JSON.stringify(a)}'>
-              <strong>${a.first_name} ${a.last_name} (${a.contact_type || "No type"})</strong><br/>
-              <small>${a.email || "No email"}</small>
-            </div>
+            <button
+              type="button"
+              class="contact-result"
+              style="
+                display:block;
+                width:100%;
+                text-align:left;
+                cursor:pointer;
+                margin-bottom:8px;
+              "
+              data-id="${escapeHtml(a.contact_id || "")}"
+              data-first-name="${escapeHtml(a.first_name || "")}"
+              data-last-name="${escapeHtml(a.last_name || "")}"
+            >
+              <strong>
+                ${escapeHtml(a.first_name || "")}
+                ${escapeHtml(a.last_name || "")}
+              </strong>
+              (${escapeHtml(a.contact_type || "No type")})<br>
+              <small>${escapeHtml(a.email || "No email")}</small>
+            </button>
           `
         )
         .join("");
 
       resultsDiv.querySelectorAll(".contact-result").forEach(el => {
         el.addEventListener("click", () => {
-          const data = JSON.parse(el.dataset.json);
+          const selectedAgent = {
+            id: el.dataset.id,
+            first_name: el.dataset.firstName,
+            last_name: el.dataset.lastName,
+          };
 
-          onChange({
-            id: data.contact_id,
-            first_name: data.first_name,
-            last_name: data.last_name
-          });
+          onChange(selectedAgent);
+
+          const name = [
+            selectedAgent.first_name,
+            selectedAgent.last_name,
+          ]
+            .filter(Boolean)
+            .join(" ");
+
+          currentSelectionDiv.innerHTML =
+            `Current selection: <strong>${escapeHtml(name)}</strong>`;
+
+          currentSelectionDiv.style.background = "#eef7ee";
+          currentSelectionDiv.style.color = "#1f5f2c";
 
           resultsDiv.innerHTML = `
             <div class="muted">
-              Selected: ${data.first_name} ${data.last_name}
+              Selected: ${escapeHtml(name)}
+              <br>
+              Search again to replace the current selection.
             </div>
           `;
+
+          searchInput.value = "";
         });
       });
     } catch (err) {
       resultsDiv.textContent = "❌ Error searching agents.";
-      console.error(err);
+      console.error("[Agent Search] Network error:", err);
     }
   });
 }
-
 
 
 
