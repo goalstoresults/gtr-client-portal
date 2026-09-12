@@ -445,113 +445,213 @@ if (portalState.project === "csi") {
   ============================================================ */
 
   async function saveLead() {
-    const updates = {};
+  const updates = {};
 
-    leadFieldsForm.querySelectorAll("[data-field]").forEach(el => {
-      updates[el.dataset.field] = el.value;
-    });
+  /*
+   * Collect every dynamically configured Client-tab field.
+   *
+   * This includes:
+   * - lead_name
+   * - primary_referral
+   * - secondary_referral_source
+   * - who_sold_inspection
+   *
+   * Anything rendered with data-field="..." is included automatically.
+   */
+  leadFieldsForm.querySelectorAll("[data-field]").forEach(el => {
+    updates[el.dataset.field] = el.value;
+  });
 
-    if (!portalState.pendingContactId) {
-      alert(`Select or create a ${tabLabel} first.`);
-      return;
-    }
+  if (!portalState.pendingContactId) {
+    alert(`Select or create a ${tabLabel} first.`);
+    return;
+  }
 
-    if (!updates.lead_name || !updates.lead_name.trim()) {
-      alert("Enter a lead name.");
-      return;
-    }
+  if (!updates.lead_name || !updates.lead_name.trim()) {
+    alert("Enter a lead name.");
+    return;
+  }
 
-    const agentFields = {
-      buyers_agent_id: portalState.pendingBuyersAgent?.id || null,
-      buyers_agent_first_name: portalState.pendingBuyersAgent?.first_name || null,
-      buyers_agent_last_name: portalState.pendingBuyersAgent?.last_name || null,
-      sellers_agent_id: portalState.pendingSellersAgent?.id || null,
-      sellers_agent_first_name: portalState.pendingSellersAgent?.first_name || null,
-      sellers_agent_last_name: portalState.pendingSellersAgent?.last_name || null
-    };
+  /*
+   * Agent pickers are outside leadFieldsForm, so their values must be
+   * explicitly added to the lead record.
+   *
+   * These are sent on both lead creation and lead update.
+   */
+  const agentFields = {
+    buyers_agent_id: portalState.pendingBuyersAgent?.id || null,
+    buyers_agent_first_name:
+      portalState.pendingBuyersAgent?.first_name || null,
+    buyers_agent_last_name:
+      portalState.pendingBuyersAgent?.last_name || null,
 
-    try {
-      let res, data, leadId;
+    sellers_agent_id: portalState.pendingSellersAgent?.id || null,
+    sellers_agent_first_name:
+      portalState.pendingSellersAgent?.first_name || null,
+    sellers_agent_last_name:
+      portalState.pendingSellersAgent?.last_name || null,
+  };
 
-      if (isEditingExistingLead) {
-        res = await fetch("https://leads-module.dennis-e64.workers.dev/leads/update", {
+  try {
+    let res;
+    let data;
+    let leadId;
+
+    if (isEditingExistingLead) {
+      /*
+       * IMPORTANT:
+       * project belongs at the TOP LEVEL of the request, not inside updates.
+       * The lead-update Worker needs it to safely scope its Supabase PATCH to
+       * this project's lead row.
+       */
+      const updatePayload = {
+        id: portalState.activeLeadId,
+        project: portalState.project,
+        updates: {
+          ...updates,
+          contact_id: portalState.pendingContactId,
+          ...agentFields,
+        },
+      };
+
+      console.log("[Update Lead] Sending:", updatePayload);
+
+      res = await fetch(
+        "https://leads-module.dennis-e64.workers.dev/leads/update",
+        {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: portalState.activeLeadId,
-            updates: { ...updates, contact_id: portalState.pendingContactId, ...agentFields }
-          })
-        });
-
-        data = await res.json();
-
-        if (!res.ok) {
-          alert("❌ Failed to update lead.");
-          console.error(data);
-          return;
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatePayload),
         }
+      );
 
-        leadId = portalState.activeLeadId;
-      } else {
-        res = await fetch("https://leads-module.dennis-e64.workers.dev/leads/add", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            project: portalState.project,
-            contact_id: portalState.pendingContactId,
-            pipeline_name: portalState.project,   // use global project, no hardcoding
-            stage_name: "New",
-            status: "Open",
-            ...agentFields,
-            ...updates
-          })
-        });
+      data = await res.json().catch(() => ({}));
 
-        data = await res.json();
-
-        if (!res.ok) {
-          alert("❌ Failed to create lead.");
-          console.error(data);
-          return;
-        }
-
-        leadId = data.lead_id;
+      if (!res.ok || data?.error) {
+        alert(
+          `❌ Failed to update lead: ${
+            data?.error || data?.detail || "Unknown error"
+          }`
+        );
+        console.error("[Update Lead] Failed response:", data);
+        return;
       }
 
-      portalState.activeLeadId = leadId;
-      portalState.activeLeadName = updates.lead_name;
-      portalState.activeLeadContactName = portalState.pendingContactName;
+      /*
+       * Preserve the newly saved values locally so the current session
+       * doesn't retain stale agent or Client-tab data.
+       */
+      lead = {
+        ...lead,
+        ...updatePayload.updates,
+      };
 
-      localStorage.setItem("activeLeadId", leadId);
-      localStorage.setItem("activeLeadName", updates.lead_name);
-      localStorage.setItem("activeLeadContactName", portalState.pendingContactName);
+      leadId = portalState.activeLeadId;
+    } else {
+      /*
+       * New-lead creation already includes project at the top level.
+       */
+      const createPayload = {
+        project: portalState.project,
+        contact_id: portalState.pendingContactId,
+        pipeline_name: portalState.project,
+        stage_name: "New",
+        status: "Open",
 
-      const bar = document.getElementById("lead-context-bar");
-      if (bar) {
-        bar.textContent = `${updates.lead_name} (${portalState.pendingContactName})`;
-        bar.style.display = "block";
+        ...agentFields,
+        ...updates,
+      };
+
+      console.log("[Create Lead] Sending:", createPayload);
+
+      res = await fetch(
+        "https://leads-module.dennis-e64.workers.dev/leads/add",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(createPayload),
+        }
+      );
+
+      data = await res.json().catch(() => ({}));
+
+      if (!res.ok || data?.error) {
+        alert(
+          `❌ Failed to create lead: ${
+            data?.error || data?.detail || "Unknown error"
+          }`
+        );
+        console.error("[Create Lead] Failed response:", data);
+        return;
       }
 
-      window.dispatchEvent(new CustomEvent("lead-created", {
+      leadId = data.lead_id || data.id;
+
+      if (!leadId) {
+        alert("❌ Lead was created, but the server returned no lead ID.");
+        console.error("[Create Lead] Unexpected response:", data);
+        return;
+      }
+
+      isEditingExistingLead = true;
+
+      lead = {
+        ...createPayload,
+        lead_id: leadId,
+      };
+    }
+
+    portalState.activeLeadId = leadId;
+    portalState.activeLeadName = updates.lead_name;
+    portalState.activeLeadContactName = portalState.pendingContactName;
+
+    localStorage.setItem("activeLeadId", leadId);
+    localStorage.setItem("activeLeadName", updates.lead_name);
+    localStorage.setItem(
+      "activeLeadContactName",
+      portalState.pendingContactName || ""
+    );
+
+    const bar = document.getElementById("lead-context-bar");
+
+    if (bar) {
+      bar.textContent =
+        `Lead: ${updates.lead_name} ` +
+        `(${portalState.pendingContactName || ""})`;
+
+      bar.style.display = "block";
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("lead-created", {
         detail: {
           lead_id: leadId,
           lead_name: updates.lead_name,
-          contact_name: portalState.pendingContactName
-        }
-      }));
+          contact_name: portalState.pendingContactName,
+        },
+      })
+    );
 
-      portalState._contactTabDirty = false;
+    portalState._contactTabDirty = false;
 
-      alert(isEditingExistingLead ? "✅ Lead updated." : "✅ Lead created.");
+    alert(isEditingExistingLead ? "✅ Lead updated." : "✅ Lead created.");
 
-      const detailsBtn = document.querySelector('#leads-subtabs button[data-subtab="details"]');
-      if (detailsBtn) detailsBtn.click();
+    const detailsBtn = document.querySelector(
+      '#leads-subtabs button[data-subtab="details"]'
+    );
 
-    } catch (err) {
-      alert("Error saving lead: " + err.message);
-      console.error(err);
+    if (detailsBtn) {
+      detailsBtn.click();
     }
+  } catch (err) {
+    alert(`Error saving lead: ${err.message}`);
+    console.error("[Save Lead] Error:", err);
   }
+}
 
   createLeadBtn.addEventListener("click", saveLead);
   createLeadBtnTop.addEventListener("click", saveLead);
