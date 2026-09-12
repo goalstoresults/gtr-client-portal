@@ -263,7 +263,14 @@ export async function renderLeadsList(container, portalState) {
           return;
         }
 
-        btn.textContent = `Order #${orderData.isnResponse?.oid || orderData.isnOrderId} Created`;
+        const orderDisplayNumber =
+          orderData.isnOrderOid ??
+          orderData.isn_order_oid ??
+          orderData.isnResponse?.oid ??
+          orderData.isnResponse?.order?.oid ??
+          orderData.isnOrderId;
+        
+        btn.textContent = `Order #${orderDisplayNumber} Created`;
         btn.classList.add("btn-to-isn-done");
       } catch (err) {
         console.error("[To ISN] Network error:", err);
