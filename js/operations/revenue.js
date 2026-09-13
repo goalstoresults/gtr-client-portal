@@ -27,6 +27,8 @@ export async function loadRevenueTab({ portalState, content }) {
 
     <div id="rev-yoy"></div>
 
+    <div id="rev-paying-contacts-yoy"></div>
+
     <h3 style="margin-top: 20px;">
       Month By Month Revenue — (<span id="rev-year-label"></span>)
     </h3>
@@ -38,14 +40,21 @@ export async function loadRevenueTab({ portalState, content }) {
   const yearSelect = document.getElementById("rev-year-select");
   const compareYearSelect = document.getElementById("rev-compare-year-select");
   const compareYearWrap = document.getElementById("rev-compare-year-wrap");
+
   const yearLabel = document.getElementById("rev-year-label");
+
   const yoyDiv = document.getElementById("rev-yoy");
+  const payingContactsYoyDiv = document.getElementById(
+    "rev-paying-contacts-yoy"
+  );
+
   const grid = document.getElementById("rev-grid");
 
-  // Load the years for this project once when the Revenue tab opens.
+  // ------------------------------------------------------------
+  // LOAD AVAILABLE YEARS
+  // ------------------------------------------------------------
   const yearsResponse = await fetchYears(portalState.project);
 
-  // Ensure values are valid numeric years and sort chronologically.
   const years = Array.isArray(yearsResponse)
     ? yearsResponse
         .map((year) => Number(year))
@@ -59,7 +68,7 @@ export async function loadRevenueTab({ portalState, content }) {
     return;
   }
 
-  // Populate the primary Select Year dropdown.
+  // Populate Select Year dropdown.
   years.forEach((year) => {
     const option = document.createElement("option");
     option.value = String(year);
@@ -67,25 +76,25 @@ export async function loadRevenueTab({ portalState, content }) {
     yearSelect.appendChild(option);
   });
 
-  // Default to the newest available year.
+  // Default primary year to the newest year available.
   yearSelect.value = String(years[years.length - 1]);
 
-  // Populate comparison-year choices and default to Selected Year - 1.
+  // Populate Compare Year options and apply default selection.
   updateCompareYearOptions(Number(yearSelect.value));
 
-  // Initial Revenue tab load.
+  // Initial page load.
   await loadYear({
     selectedYear: Number(yearSelect.value),
     compareYear: getCompareYear()
   });
 
-  // When the primary year changes:
-  // - Refresh valid comparison years
-  // - Default comparison to selected year - 1 when it exists
-  // - Reload comparison and detailed grid
+  // ------------------------------------------------------------
+  // EVENT LISTENERS
+  // ------------------------------------------------------------
   yearSelect.addEventListener("change", async () => {
     const selectedYear = Number(yearSelect.value);
 
+    // Rebuild eligible prior-year choices.
     updateCompareYearOptions(selectedYear);
 
     await loadYear({
@@ -94,31 +103,27 @@ export async function loadRevenueTab({ portalState, content }) {
     });
   });
 
-  // When the user chooses a different comparison year,
-  // reload only the YoY section. The detailed grid still reflects Selected Year.
   compareYearSelect.addEventListener("change", async () => {
-    const selectedYear = Number(yearSelect.value);
-    const compareYear = getCompareYear();
-
     await loadComparison({
-      selectedYear,
-      compareYear
+      selectedYear: Number(yearSelect.value),
+      compareYear: getCompareYear()
     });
   });
 
   // ------------------------------------------------------------
-  // COMPARE YEAR DROPDOWN
+  // COMPARE-YEAR DROPDOWN
   // ------------------------------------------------------------
   function updateCompareYearOptions(selectedYear) {
-    // A comparison year must be older than the selected year.
+    // Only earlier years can be comparison years.
     const eligibleCompareYears = years.filter((year) => year < selectedYear);
 
     compareYearSelect.innerHTML = "";
 
-    // No earlier year exists, so hide Compare Year and YoY section.
+    // No earlier year exists, so do not show comparison controls or tables.
     if (!eligibleCompareYears.length) {
       compareYearWrap.style.display = "none";
       yoyDiv.innerHTML = "";
+      payingContactsYoyDiv.innerHTML = "";
       return;
     }
 
@@ -133,14 +138,13 @@ export async function loadRevenueTab({ portalState, content }) {
 
     const previousCalendarYear = selectedYear - 1;
 
-    // Requirement: default to selected year - 1 if that exact year exists.
+    // Default to exactly Selected Year - 1 if it exists.
     if (eligibleCompareYears.includes(previousCalendarYear)) {
       compareYearSelect.value = String(previousCalendarYear);
       return;
     }
 
-    // If the immediately prior calendar year does not exist but there is
-    // historical data, use the closest available prior year.
+    // Otherwise choose the closest older available year.
     compareYearSelect.value = String(
       eligibleCompareYears[eligibleCompareYears.length - 1]
     );
@@ -157,15 +161,14 @@ export async function loadRevenueTab({ portalState, content }) {
   }
 
   // ------------------------------------------------------------
-  // LOAD SELECTED YEAR
+  // LOAD SELECTED-YEAR DATA
   // ------------------------------------------------------------
   async function loadYear({ selectedYear, compareYear }) {
     yearLabel.textContent = String(selectedYear);
 
-    // These requests are independent, so run them in parallel.
-    // This loads:
-    // - one detailed selected-year grid
-    // - one lightweight selected-year vs compare-year summary
+    // Both operations are independent:
+    // 1. Detailed per-contact selected-year grid
+    // 2. Compact revenue + paying-contact comparison data
     const [monthlyData] = await Promise.all([
       fetchMonthlyDetailed(portalState.project, selectedYear),
       loadComparison({ selectedYear, compareYear })
@@ -175,12 +178,12 @@ export async function loadRevenueTab({ portalState, content }) {
   }
 
   // ------------------------------------------------------------
-  // LOAD COMPARISON
+  // LOAD REVENUE + PAYING-CONTACT COMPARISON
   // ------------------------------------------------------------
   async function loadComparison({ selectedYear, compareYear }) {
-    // No valid older year available; comparison remains hidden.
     if (!compareYear || compareYear >= selectedYear) {
       yoyDiv.innerHTML = "";
+      payingContactsYoyDiv.innerHTML = "";
       return;
     }
 
@@ -190,11 +193,15 @@ export async function loadRevenueTab({ portalState, content }) {
       compareYear
     );
 
+    // Revenue comparison table.
     renderYoY(yoy, selectedYear, compareYear);
+
+    // New Paying Contacts comparison table.
+    renderPayingContactsYoY(yoy, selectedYear, compareYear);
   }
 
   // ------------------------------------------------------------
-  // RENDER YOY BLOCK
+  // RENDER REVENUE YOY BLOCK
   // ------------------------------------------------------------
   function renderYoY(yoy, selectedYear, compareYear) {
     if (!yoy || !yoy.thisYear || !yoy.lastYear) {
@@ -205,8 +212,6 @@ export async function loadRevenueTab({ portalState, content }) {
     const thisYearData = yoy.thisYear;
     const compareYearData = yoy.lastYear;
 
-    // Do not display a comparison if the selected comparison year
-    // has no revenue at all.
     const compareYearHasRevenue = Object.values(compareYearData).some(
       (value) => Number(value) > 0
     );
@@ -216,33 +221,18 @@ export async function loadRevenueTab({ portalState, content }) {
       return;
     }
 
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec"
-    ];
+    const months = getMonths();
 
     const diffAmt = {};
     const diffPct = {};
 
-    // Preserve your existing display rule:
-    // If the selected/current year has no revenue in a month,
-    // leave that month's difference cells blank.
     for (let i = 1; i <= 12; i++) {
       const key = String(i).padStart(2, "0");
 
       const currentAmount = Number(thisYearData[key]) || 0;
       const comparedAmount = Number(compareYearData[key]) || 0;
 
+      // Keep future/no-current-year-revenue comparison cells blank.
       if (currentAmount === 0) {
         diffAmt[key] = null;
         diffPct[key] = null;
@@ -257,8 +247,6 @@ export async function loadRevenueTab({ portalState, content }) {
           : ((currentAmount - comparedAmount) / comparedAmount) * 100;
     }
 
-    // YTD is calculated only through months in which the selected year
-    // currently has revenue. This keeps partial current-year reporting fair.
     let ytdThisYear = 0;
     let ytdCompareYear = 0;
 
@@ -283,8 +271,6 @@ export async function loadRevenueTab({ portalState, content }) {
         ? null
         : (ytdAmt / ytdCompareYear) * 100;
 
-    // Uses the full-year total supplied by the YoY backend response.
-    // Fallback prevents an error if the field is absent.
     const fullCompareYearTotal =
       Number(yoy.totals?.lastYear) || 0;
 
@@ -300,17 +286,17 @@ export async function loadRevenueTab({ portalState, content }) {
 
     yoyDiv.innerHTML = `
     <section class="card" style="margin-bottom: 20px;">
-      <h3 style="cursor: pointer;" id="yoy-toggle">
-        Year‑Over‑Year Comparison (${selectedYear} vs ${compareYear})
+      <h3 style="cursor: pointer;" id="revenue-yoy-toggle">
+        Year‑Over‑Year Revenue Comparison (${selectedYear} vs ${compareYear})
         <span
-          id="yoy-hint"
+          id="revenue-yoy-hint"
           style="font-weight: normal; font-size: 0.85em; opacity: 0.7;"
         >
           (click to expand)
         </span>
       </h3>
 
-      <div id="yoy-body" style="display: none; margin-top: 12px;">
+      <div id="revenue-yoy-body" style="display: none; margin-top: 12px;">
         <table class="notes-table">
           <thead>
             <tr>
@@ -344,32 +330,10 @@ export async function loadRevenueTab({ portalState, content }) {
                     return `<td></td>`;
                   }
 
-                  const cssClass =
-                    value > 0
-                      ? "rev-up"
-                      : value < 0
-                        ? "rev-down"
-                        : "rev-same";
-
-                  const arrow =
-                    value > 0
-                      ? " ▲"
-                      : value < 0
-                        ? " ▼"
-                        : "";
-
-                  return `
-                    <td>
-                      <span class="${cssClass}">
-                        ${formatCurrency(value)}${arrow}
-                      </span>
-                    </td>
-                  `;
+                  return `<td>${renderTrendCurrency(value)}</td>`;
                 })
                 .join("")}
-              <td>
-                <strong>${formatCurrency(ytdAmt)}</strong>
-              </td>
+              <td><strong>${formatCurrency(ytdAmt)}</strong></td>
             </tr>
 
             <tr>
@@ -383,27 +347,7 @@ export async function loadRevenueTab({ portalState, content }) {
                     return `<td></td>`;
                   }
 
-                  const cssClass =
-                    value > 0
-                      ? "rev-up"
-                      : value < 0
-                        ? "rev-down"
-                        : "rev-same";
-
-                  const arrow =
-                    value > 0
-                      ? " ▲"
-                      : value < 0
-                        ? " ▼"
-                        : "";
-
-                  return `
-                    <td>
-                      <span class="${cssClass}">
-                        ${value.toFixed(1)}%${arrow}
-                      </span>
-                    </td>
-                  `;
+                  return `<td>${renderTrendPercent(value)}</td>`;
                 })
                 .join("")}
               <td>
@@ -418,30 +362,188 @@ export async function loadRevenueTab({ portalState, content }) {
     </section>
     `;
 
-    const yoyToggle = document.getElementById("yoy-toggle");
-    const yoyBody = document.getElementById("yoy-body");
-    const yoyHint = document.getElementById("yoy-hint");
-
-    yoyToggle.onclick = () => {
-      const isClosed = yoyBody.style.display === "none";
-
-      yoyBody.style.display = isClosed ? "block" : "none";
-      yoyHint.textContent = isClosed
-        ? "(click to collapse)"
-        : "(click to expand)";
-    };
+    attachToggle({
+      toggleId: "revenue-yoy-toggle",
+      bodyId: "revenue-yoy-body",
+      hintId: "revenue-yoy-hint"
+    });
   }
 
   // ------------------------------------------------------------
-  // RENDER DETAILED MONTH-BY-MONTH GRID
+  // RENDER PAYING CONTACTS YOY BLOCK
   // ------------------------------------------------------------
-  function renderGrid(data) {
-    if (!data || !data.months) {
-      grid.innerHTML = `<p>No revenue data available for this year.</p>`;
+  function renderPayingContactsYoY(yoy, selectedYear, compareYear) {
+    const payingContacts = yoy?.payingContacts;
+
+    if (
+      !payingContacts ||
+      !payingContacts.thisYear ||
+      !payingContacts.lastYear ||
+      !payingContacts.thisYear.months ||
+      !payingContacts.lastYear.months
+    ) {
+      payingContactsYoyDiv.innerHTML = "";
       return;
     }
 
-    const months = [
+    const thisYearMonths = payingContacts.thisYear.months;
+    const compareYearMonths = payingContacts.lastYear.months;
+
+    const compareYearHasPayingContacts = Object.values(
+      compareYearMonths
+    ).some((value) => Number(value) > 0);
+
+    // If comparison year has no contacts with payments, hide this table.
+    if (!compareYearHasPayingContacts) {
+      payingContactsYoyDiv.innerHTML = "";
+      return;
+    }
+
+    const months = getMonths();
+
+    const diffContacts = {};
+    const diffPct = {};
+
+    for (let i = 1; i <= 12; i++) {
+      const key = String(i).padStart(2, "0");
+
+      const selectedYearCount = Number(thisYearMonths[key]) || 0;
+      const compareYearCount = Number(compareYearMonths[key]) || 0;
+
+      // Match the revenue comparison convention:
+      // future/no-payment months in selected year remain blank in change rows.
+      if (selectedYearCount === 0) {
+        diffContacts[key] = null;
+        diffPct[key] = null;
+        continue;
+      }
+
+      diffContacts[key] = selectedYearCount - compareYearCount;
+
+      diffPct[key] =
+        compareYearCount === 0
+          ? null
+          : ((selectedYearCount - compareYearCount) / compareYearCount) * 100;
+    }
+
+    // These are unique contact counts across the matching YTD period,
+    // calculated by the backend with Sets to prevent repeat-client double counting.
+    const ytdThisYear =
+      Number(payingContacts.thisYear.ytdUnique) || 0;
+
+    const ytdCompareYear =
+      Number(payingContacts.lastYear.ytdUnique) || 0;
+
+    const ytdDiff = ytdThisYear - ytdCompareYear;
+
+    const ytdPct =
+      ytdCompareYear === 0
+        ? null
+        : (ytdDiff / ytdCompareYear) * 100;
+
+    const row = (monthData) =>
+      months
+        .map((_, index) => {
+          const key = String(index + 1).padStart(2, "0");
+          const value = Number(monthData[key]) || 0;
+
+          return `<td>${value}</td>`;
+        })
+        .join("");
+
+    payingContactsYoyDiv.innerHTML = `
+    <section class="card" style="margin-bottom: 20px;">
+      <h3 style="cursor: pointer;" id="paying-contacts-yoy-toggle">
+        Year‑Over‑Year Paying Contacts (${selectedYear} vs ${compareYear})
+        <span
+          id="paying-contacts-yoy-hint"
+          style="font-weight: normal; font-size: 0.85em; opacity: 0.7;"
+        >
+          (click to expand)
+        </span>
+      </h3>
+
+      <div
+        id="paying-contacts-yoy-body"
+        style="display: none; margin-top: 12px;"
+      >
+        <table class="notes-table">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              ${months.map((month) => `<th>${month}</th>`).join("")}
+              <th>YTD</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr>
+              <td><strong>${selectedYear}</strong></td>
+              ${row(thisYearMonths)}
+              <td><strong>${ytdThisYear}</strong></td>
+            </tr>
+
+            <tr>
+              <td><strong>${compareYear}</strong></td>
+              ${row(compareYearMonths)}
+              <td><strong>${ytdCompareYear}</strong></td>
+            </tr>
+
+            <tr>
+              <td><strong>Δ Paying Contacts</strong></td>
+              ${months
+                .map((_, index) => {
+                  const key = String(index + 1).padStart(2, "0");
+                  const value = diffContacts[key];
+
+                  if (value === null || value === undefined) {
+                    return `<td></td>`;
+                  }
+
+                  return `<td>${renderTrendCount(value)}</td>`;
+                })
+                .join("")}
+              <td><strong>${renderTrendCount(ytdDiff)}</strong></td>
+            </tr>
+
+            <tr>
+              <td><strong>Δ Percent</strong></td>
+              ${months
+                .map((_, index) => {
+                  const key = String(index + 1).padStart(2, "0");
+                  const value = diffPct[key];
+
+                  if (value === null || value === undefined) {
+                    return `<td></td>`;
+                  }
+
+                  return `<td>${renderTrendPercent(value)}</td>`;
+                })
+                .join("")}
+              <td>
+                <strong>
+                  ${ytdPct === null ? "" : `${ytdPct.toFixed(1)}%`}
+                </strong>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    `;
+
+    attachToggle({
+      toggleId: "paying-contacts-yoy-toggle",
+      bodyId: "paying-contacts-yoy-body",
+      hintId: "paying-contacts-yoy-hint"
+    });
+  }
+
+  // ------------------------------------------------------------
+  // REUSABLE DISPLAY HELPERS
+  // ------------------------------------------------------------
+  function getMonths() {
+    return [
       "Jan",
       "Feb",
       "Mar",
@@ -455,6 +557,83 @@ export async function loadRevenueTab({ portalState, content }) {
       "Nov",
       "Dec"
     ];
+  }
+
+  function getTrendClass(value) {
+    if (value > 0) return "rev-up";
+    if (value < 0) return "rev-down";
+    return "rev-same";
+  }
+
+  function getTrendArrow(value) {
+    if (value > 0) return " ▲";
+    if (value < 0) return " ▼";
+    return "";
+  }
+
+  function renderTrendCurrency(value) {
+    const cssClass = getTrendClass(value);
+    const arrow = getTrendArrow(value);
+
+    return `
+      <span class="${cssClass}">
+        ${formatCurrency(value)}${arrow}
+      </span>
+    `;
+  }
+
+  function renderTrendCount(value) {
+    const cssClass = getTrendClass(value);
+    const arrow = getTrendArrow(value);
+
+    return `
+      <span class="${cssClass}">
+        ${value}${arrow}
+      </span>
+    `;
+  }
+
+  function renderTrendPercent(value) {
+    const cssClass = getTrendClass(value);
+    const arrow = getTrendArrow(value);
+
+    return `
+      <span class="${cssClass}">
+        ${value.toFixed(1)}%${arrow}
+      </span>
+    `;
+  }
+
+  function attachToggle({ toggleId, bodyId, hintId }) {
+    const toggle = document.getElementById(toggleId);
+    const body = document.getElementById(bodyId);
+    const hint = document.getElementById(hintId);
+
+    if (!toggle || !body || !hint) {
+      return;
+    }
+
+    toggle.onclick = () => {
+      const isClosed = body.style.display === "none";
+
+      body.style.display = isClosed ? "block" : "none";
+
+      hint.textContent = isClosed
+        ? "(click to collapse)"
+        : "(click to expand)";
+    };
+  }
+
+  // ------------------------------------------------------------
+  // RENDER DETAILED MONTH-BY-MONTH REVENUE GRID
+  // ------------------------------------------------------------
+  function renderGrid(data) {
+    if (!data || !data.months) {
+      grid.innerHTML = `<p>No revenue data available for this year.</p>`;
+      return;
+    }
+
+    const months = getMonths();
 
     const headerHtml = months
       .map((month) => `<th>${month}</th>`)
@@ -610,15 +789,6 @@ export async function loadRevenueTab({ portalState, content }) {
     }
   }
 
-  // Backend requirement:
-  //
-  // GET /revenue/yoy?project=PROJECT&year=2026&compareYear=2024
-  //
-  // The backend must use:
-  // - year as the selected/current year
-  // - compareYear as the selected comparison year
-  //
-  // It must NOT automatically calculate compareYear = year - 1.
   async function fetchYoY(project, year, compareYear) {
     try {
       const url =
