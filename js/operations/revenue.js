@@ -29,6 +29,8 @@ export async function loadRevenueTab({ portalState, content }) {
 
     <div id="rev-paying-contacts-yoy"></div>
 
+    <div id="rev-average-revenue-yoy"></div>
+
     <h3 style="margin-top: 20px;">
       Month By Month Revenue — (<span id="rev-year-label"></span>)
     </h3>
@@ -44,8 +46,13 @@ export async function loadRevenueTab({ portalState, content }) {
   const yearLabel = document.getElementById("rev-year-label");
 
   const yoyDiv = document.getElementById("rev-yoy");
+
   const payingContactsYoyDiv = document.getElementById(
     "rev-paying-contacts-yoy"
+  );
+
+  const averageRevenueYoyDiv = document.getElementById(
+    "rev-average-revenue-yoy"
   );
 
   const grid = document.getElementById("rev-grid");
@@ -76,13 +83,13 @@ export async function loadRevenueTab({ portalState, content }) {
     yearSelect.appendChild(option);
   });
 
-  // Default primary year to the newest year available.
+  // Default to newest available year.
   yearSelect.value = String(years[years.length - 1]);
 
-  // Populate Compare Year options and apply default selection.
+  // Populate valid comparison years and apply the default selection.
   updateCompareYearOptions(Number(yearSelect.value));
 
-  // Initial page load.
+  // Initial tab load.
   await loadYear({
     selectedYear: Number(yearSelect.value),
     compareYear: getCompareYear()
@@ -94,7 +101,6 @@ export async function loadRevenueTab({ portalState, content }) {
   yearSelect.addEventListener("change", async () => {
     const selectedYear = Number(yearSelect.value);
 
-    // Rebuild eligible prior-year choices.
     updateCompareYearOptions(selectedYear);
 
     await loadYear({
@@ -114,16 +120,16 @@ export async function loadRevenueTab({ portalState, content }) {
   // COMPARE-YEAR DROPDOWN
   // ------------------------------------------------------------
   function updateCompareYearOptions(selectedYear) {
-    // Only earlier years can be comparison years.
     const eligibleCompareYears = years.filter((year) => year < selectedYear);
 
     compareYearSelect.innerHTML = "";
 
-    // No earlier year exists, so do not show comparison controls or tables.
+    // No older year exists. Hide every comparison block.
     if (!eligibleCompareYears.length) {
       compareYearWrap.style.display = "none";
       yoyDiv.innerHTML = "";
       payingContactsYoyDiv.innerHTML = "";
+      averageRevenueYoyDiv.innerHTML = "";
       return;
     }
 
@@ -136,15 +142,15 @@ export async function loadRevenueTab({ portalState, content }) {
       compareYearSelect.appendChild(option);
     });
 
-    const previousCalendarYear = selectedYear - 1;
+    const priorCalendarYear = selectedYear - 1;
 
-    // Default to exactly Selected Year - 1 if it exists.
-    if (eligibleCompareYears.includes(previousCalendarYear)) {
-      compareYearSelect.value = String(previousCalendarYear);
+    // Default to Selected Year - 1 if that year is available.
+    if (eligibleCompareYears.includes(priorCalendarYear)) {
+      compareYearSelect.value = String(priorCalendarYear);
       return;
     }
 
-    // Otherwise choose the closest older available year.
+    // Otherwise use the closest available earlier year.
     compareYearSelect.value = String(
       eligibleCompareYears[eligibleCompareYears.length - 1]
     );
@@ -161,14 +167,14 @@ export async function loadRevenueTab({ portalState, content }) {
   }
 
   // ------------------------------------------------------------
-  // LOAD SELECTED-YEAR DATA
+  // LOAD SELECTED YEAR
   // ------------------------------------------------------------
   async function loadYear({ selectedYear, compareYear }) {
     yearLabel.textContent = String(selectedYear);
 
-    // Both operations are independent:
-    // 1. Detailed per-contact selected-year grid
-    // 2. Compact revenue + paying-contact comparison data
+    // Both calls are independent and run simultaneously:
+    // - Detailed per-contact grid for Select Year
+    // - Summary data for all three comparison grids
     const [monthlyData] = await Promise.all([
       fetchMonthlyDetailed(portalState.project, selectedYear),
       loadComparison({ selectedYear, compareYear })
@@ -178,12 +184,13 @@ export async function loadRevenueTab({ portalState, content }) {
   }
 
   // ------------------------------------------------------------
-  // LOAD REVENUE + PAYING-CONTACT COMPARISON
+  // LOAD ALL COMPARISON DATA
   // ------------------------------------------------------------
   async function loadComparison({ selectedYear, compareYear }) {
     if (!compareYear || compareYear >= selectedYear) {
       yoyDiv.innerHTML = "";
       payingContactsYoyDiv.innerHTML = "";
+      averageRevenueYoyDiv.innerHTML = "";
       return;
     }
 
@@ -193,11 +200,10 @@ export async function loadRevenueTab({ portalState, content }) {
       compareYear
     );
 
-    // Revenue comparison table.
+    // One backend response renders all three summary grids.
     renderYoY(yoy, selectedYear, compareYear);
-
-    // New Paying Contacts comparison table.
     renderPayingContactsYoY(yoy, selectedYear, compareYear);
+    renderAverageRevenueYoY(yoy, selectedYear, compareYear);
   }
 
   // ------------------------------------------------------------
@@ -230,21 +236,22 @@ export async function loadRevenueTab({ portalState, content }) {
       const key = String(i).padStart(2, "0");
 
       const currentAmount = Number(thisYearData[key]) || 0;
-      const comparedAmount = Number(compareYearData[key]) || 0;
+      const comparisonAmount = Number(compareYearData[key]) || 0;
 
-      // Keep future/no-current-year-revenue comparison cells blank.
+      // Preserve existing rule: do not show a change in months with
+      // no selected-year revenue yet.
       if (currentAmount === 0) {
         diffAmt[key] = null;
         diffPct[key] = null;
         continue;
       }
 
-      diffAmt[key] = currentAmount - comparedAmount;
+      diffAmt[key] = currentAmount - comparisonAmount;
 
       diffPct[key] =
-        comparedAmount === 0
+        comparisonAmount === 0
           ? null
-          : ((currentAmount - comparedAmount) / comparedAmount) * 100;
+          : ((currentAmount - comparisonAmount) / comparisonAmount) * 100;
     }
 
     let ytdThisYear = 0;
@@ -254,33 +261,32 @@ export async function loadRevenueTab({ portalState, content }) {
       const key = String(i).padStart(2, "0");
 
       const currentAmount = Number(thisYearData[key]) || 0;
-      const comparedAmount = Number(compareYearData[key]) || 0;
+      const comparisonAmount = Number(compareYearData[key]) || 0;
 
       if (currentAmount === 0) {
         continue;
       }
 
       ytdThisYear += currentAmount;
-      ytdCompareYear += comparedAmount;
+      ytdCompareYear += comparisonAmount;
     }
 
-    const ytdAmt = ytdThisYear - ytdCompareYear;
+    const ytdAmountDifference = ytdThisYear - ytdCompareYear;
 
-    const ytdPct =
+    const ytdPercentDifference =
       ytdCompareYear === 0
         ? null
-        : (ytdAmt / ytdCompareYear) * 100;
+        : (ytdAmountDifference / ytdCompareYear) * 100;
 
-    const fullCompareYearTotal =
-      Number(yoy.totals?.lastYear) || 0;
+    const fullCompareYearTotal = Number(yoy.totals?.lastYear) || 0;
 
-    const row = (monthData, formatter) =>
+    const renderRevenueRow = (monthData) =>
       months
         .map((_, index) => {
           const key = String(index + 1).padStart(2, "0");
           const value = Number(monthData[key]) || 0;
 
-          return `<td>${formatter(value)}</td>`;
+          return `<td>${formatCurrency(value)}</td>`;
         })
         .join("");
 
@@ -309,13 +315,13 @@ export async function loadRevenueTab({ portalState, content }) {
           <tbody>
             <tr>
               <td><strong>${selectedYear}</strong></td>
-              ${row(thisYearData, (value) => formatCurrency(value))}
+              ${renderRevenueRow(thisYearData)}
               <td><strong>${formatCurrency(ytdThisYear)}</strong></td>
             </tr>
 
             <tr>
               <td><strong>${compareYear}</strong></td>
-              ${row(compareYearData, (value) => formatCurrency(value))}
+              ${renderRevenueRow(compareYearData)}
               <td><strong>${formatCurrency(fullCompareYearTotal)}</strong></td>
             </tr>
 
@@ -333,7 +339,9 @@ export async function loadRevenueTab({ portalState, content }) {
                   return `<td>${renderTrendCurrency(value)}</td>`;
                 })
                 .join("")}
-              <td><strong>${formatCurrency(ytdAmt)}</strong></td>
+              <td>
+                <strong>${formatCurrency(ytdAmountDifference)}</strong>
+              </td>
             </tr>
 
             <tr>
@@ -352,7 +360,11 @@ export async function loadRevenueTab({ portalState, content }) {
                 .join("")}
               <td>
                 <strong>
-                  ${ytdPct === null ? "" : `${ytdPct.toFixed(1)}%`}
+                  ${
+                    ytdPercentDifference === null
+                      ? ""
+                      : `${ytdPercentDifference.toFixed(1)}%`
+                  }
                 </strong>
               </td>
             </tr>
@@ -377,10 +389,8 @@ export async function loadRevenueTab({ portalState, content }) {
 
     if (
       !payingContacts ||
-      !payingContacts.thisYear ||
-      !payingContacts.lastYear ||
-      !payingContacts.thisYear.months ||
-      !payingContacts.lastYear.months
+      !payingContacts.thisYear?.months ||
+      !payingContacts.lastYear?.months
     ) {
       payingContactsYoyDiv.innerHTML = "";
       return;
@@ -393,7 +403,6 @@ export async function loadRevenueTab({ portalState, content }) {
       compareYearMonths
     ).some((value) => Number(value) > 0);
 
-    // If comparison year has no contacts with payments, hide this table.
     if (!compareYearHasPayingContacts) {
       payingContactsYoyDiv.innerHTML = "";
       return;
@@ -410,8 +419,7 @@ export async function loadRevenueTab({ portalState, content }) {
       const selectedYearCount = Number(thisYearMonths[key]) || 0;
       const compareYearCount = Number(compareYearMonths[key]) || 0;
 
-      // Match the revenue comparison convention:
-      // future/no-payment months in selected year remain blank in change rows.
+      // Keep future/no-payment selected-year months blank in difference rows.
       if (selectedYearCount === 0) {
         diffContacts[key] = null;
         diffPct[key] = null;
@@ -426,22 +434,19 @@ export async function loadRevenueTab({ portalState, content }) {
           : ((selectedYearCount - compareYearCount) / compareYearCount) * 100;
     }
 
-    // These are unique contact counts across the matching YTD period,
-    // calculated by the backend with Sets to prevent repeat-client double counting.
-    const ytdThisYear =
-      Number(payingContacts.thisYear.ytdUnique) || 0;
+    // The backend calculates these using Sets across the matching YTD months,
+    // so repeat clients are counted only once in the YTD column.
+    const ytdThisYear = Number(payingContacts.thisYear.ytdUnique) || 0;
+    const ytdCompareYear = Number(payingContacts.lastYear.ytdUnique) || 0;
 
-    const ytdCompareYear =
-      Number(payingContacts.lastYear.ytdUnique) || 0;
+    const ytdContactDifference = ytdThisYear - ytdCompareYear;
 
-    const ytdDiff = ytdThisYear - ytdCompareYear;
-
-    const ytdPct =
+    const ytdPercentDifference =
       ytdCompareYear === 0
         ? null
-        : (ytdDiff / ytdCompareYear) * 100;
+        : (ytdContactDifference / ytdCompareYear) * 100;
 
-    const row = (monthData) =>
+    const renderContactsRow = (monthData) =>
       months
         .map((_, index) => {
           const key = String(index + 1).padStart(2, "0");
@@ -479,13 +484,13 @@ export async function loadRevenueTab({ portalState, content }) {
           <tbody>
             <tr>
               <td><strong>${selectedYear}</strong></td>
-              ${row(thisYearMonths)}
+              ${renderContactsRow(thisYearMonths)}
               <td><strong>${ytdThisYear}</strong></td>
             </tr>
 
             <tr>
               <td><strong>${compareYear}</strong></td>
-              ${row(compareYearMonths)}
+              ${renderContactsRow(compareYearMonths)}
               <td><strong>${ytdCompareYear}</strong></td>
             </tr>
 
@@ -503,7 +508,9 @@ export async function loadRevenueTab({ portalState, content }) {
                   return `<td>${renderTrendCount(value)}</td>`;
                 })
                 .join("")}
-              <td><strong>${renderTrendCount(ytdDiff)}</strong></td>
+              <td>
+                <strong>${renderTrendCount(ytdContactDifference)}</strong>
+              </td>
             </tr>
 
             <tr>
@@ -522,7 +529,11 @@ export async function loadRevenueTab({ portalState, content }) {
                 .join("")}
               <td>
                 <strong>
-                  ${ytdPct === null ? "" : `${ytdPct.toFixed(1)}%`}
+                  ${
+                    ytdPercentDifference === null
+                      ? ""
+                      : `${ytdPercentDifference.toFixed(1)}%`
+                  }
                 </strong>
               </td>
             </tr>
@@ -540,7 +551,247 @@ export async function loadRevenueTab({ portalState, content }) {
   }
 
   // ------------------------------------------------------------
-  // REUSABLE DISPLAY HELPERS
+  // RENDER AVERAGE REVENUE PER PAYING CONTACT YOY BLOCK
+  // ------------------------------------------------------------
+  function renderAverageRevenueYoY(yoy, selectedYear, compareYear) {
+    const payingContacts = yoy?.payingContacts;
+
+    if (
+      !yoy ||
+      !yoy.thisYear ||
+      !yoy.lastYear ||
+      !payingContacts ||
+      !payingContacts.thisYear?.months ||
+      !payingContacts.lastYear?.months
+    ) {
+      averageRevenueYoyDiv.innerHTML = "";
+      return;
+    }
+
+    const thisYearRevenue = yoy.thisYear;
+    const compareYearRevenue = yoy.lastYear;
+
+    const thisYearContacts = payingContacts.thisYear.months;
+    const compareYearContacts = payingContacts.lastYear.months;
+
+    const months = getMonths();
+
+    const thisYearAverages = {};
+    const compareYearAverages = {};
+    const diffAmounts = {};
+    const diffPercents = {};
+
+    for (let i = 1; i <= 12; i++) {
+      const key = String(i).padStart(2, "0");
+
+      const thisRevenue = Number(thisYearRevenue[key]) || 0;
+      const compareRevenue = Number(compareYearRevenue[key]) || 0;
+
+      const thisContacts = Number(thisYearContacts[key]) || 0;
+      const compareContacts = Number(compareYearContacts[key]) || 0;
+
+      // A monthly average only exists if one or more contacts paid that month.
+      thisYearAverages[key] =
+        thisContacts > 0 ? thisRevenue / thisContacts : null;
+
+      compareYearAverages[key] =
+        compareContacts > 0 ? compareRevenue / compareContacts : null;
+
+      // Follow the same current-year convention as the other YoY tables:
+      // no selected-year revenue/contact activity = blank change cells.
+      if (thisContacts === 0 || thisRevenue === 0) {
+        diffAmounts[key] = null;
+        diffPercents[key] = null;
+        continue;
+      }
+
+      const thisAverage = thisYearAverages[key];
+      const compareAverage = compareYearAverages[key];
+
+      // If comparison year had no paying contacts in the month,
+      // an average and percentage comparison cannot be calculated.
+      if (compareAverage === null) {
+        diffAmounts[key] = null;
+        diffPercents[key] = null;
+        continue;
+      }
+
+      diffAmounts[key] = thisAverage - compareAverage;
+
+      diffPercents[key] =
+        compareAverage === 0
+          ? null
+          : ((thisAverage - compareAverage) / compareAverage) * 100;
+    }
+
+    // Use matching YTD revenue and matching-period unique paying-contact counts.
+    // Do not average the 12 monthly averages.
+    let ytdThisRevenue = 0;
+    let ytdCompareRevenue = 0;
+
+    for (let i = 1; i <= 12; i++) {
+      const key = String(i).padStart(2, "0");
+
+      const thisRevenue = Number(thisYearRevenue[key]) || 0;
+      const compareRevenue = Number(compareYearRevenue[key]) || 0;
+
+      // Match existing revenue YTD calculation:
+      // include only months in which the selected year has revenue.
+      if (thisRevenue === 0) {
+        continue;
+      }
+
+      ytdThisRevenue += thisRevenue;
+      ytdCompareRevenue += compareRevenue;
+    }
+
+    const ytdThisContacts = Number(payingContacts.thisYear.ytdUnique) || 0;
+    const ytdCompareContacts = Number(payingContacts.lastYear.ytdUnique) || 0;
+
+    const ytdThisAverage =
+      ytdThisContacts > 0
+        ? ytdThisRevenue / ytdThisContacts
+        : null;
+
+    const ytdCompareAverage =
+      ytdCompareContacts > 0
+        ? ytdCompareRevenue / ytdCompareContacts
+        : null;
+
+    const ytdDifference =
+      ytdThisAverage === null || ytdCompareAverage === null
+        ? null
+        : ytdThisAverage - ytdCompareAverage;
+
+    const ytdPercentDifference =
+      ytdDifference === null || ytdCompareAverage === 0
+        ? null
+        : (ytdDifference / ytdCompareAverage) * 100;
+
+    const renderAverageRow = (averageData) =>
+      months
+        .map((_, index) => {
+          const key = String(index + 1).padStart(2, "0");
+          const value = averageData[key];
+
+          return `<td>${value === null ? "" : formatCurrency(value)}</td>`;
+        })
+        .join("");
+
+    averageRevenueYoyDiv.innerHTML = `
+    <section class="card" style="margin-bottom: 20px;">
+      <h3 style="cursor: pointer;" id="average-revenue-yoy-toggle">
+        Year‑Over‑Year Average Revenue per Paying Contact (${selectedYear} vs ${compareYear})
+        <span
+          id="average-revenue-yoy-hint"
+          style="font-weight: normal; font-size: 0.85em; opacity: 0.7;"
+        >
+          (click to expand)
+        </span>
+      </h3>
+
+      <div
+        id="average-revenue-yoy-body"
+        style="display: none; margin-top: 12px;"
+      >
+        <table class="notes-table">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              ${months.map((month) => `<th>${month}</th>`).join("")}
+              <th>YTD</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr>
+              <td><strong>${selectedYear}</strong></td>
+              ${renderAverageRow(thisYearAverages)}
+              <td>
+                <strong>
+                  ${ytdThisAverage === null ? "" : formatCurrency(ytdThisAverage)}
+                </strong>
+              </td>
+            </tr>
+
+            <tr>
+              <td><strong>${compareYear}</strong></td>
+              ${renderAverageRow(compareYearAverages)}
+              <td>
+                <strong>
+                  ${
+                    ytdCompareAverage === null
+                      ? ""
+                      : formatCurrency(ytdCompareAverage)
+                  }
+                </strong>
+              </td>
+            </tr>
+
+            <tr>
+              <td><strong>Δ Avg. Revenue / Contact</strong></td>
+              ${months
+                .map((_, index) => {
+                  const key = String(index + 1).padStart(2, "0");
+                  const value = diffAmounts[key];
+
+                  if (value === null || value === undefined) {
+                    return `<td></td>`;
+                  }
+
+                  return `<td>${renderTrendCurrency(value)}</td>`;
+                })
+                .join("")}
+              <td>
+                <strong>
+                  ${
+                    ytdDifference === null
+                      ? ""
+                      : renderTrendCurrency(ytdDifference)
+                  }
+                </strong>
+              </td>
+            </tr>
+
+            <tr>
+              <td><strong>Δ Percent</strong></td>
+              ${months
+                .map((_, index) => {
+                  const key = String(index + 1).padStart(2, "0");
+                  const value = diffPercents[key];
+
+                  if (value === null || value === undefined) {
+                    return `<td></td>`;
+                  }
+
+                  return `<td>${renderTrendPercent(value)}</td>`;
+                })
+                .join("")}
+              <td>
+                <strong>
+                  ${
+                    ytdPercentDifference === null
+                      ? ""
+                      : renderTrendPercent(ytdPercentDifference)
+                  }
+                </strong>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    `;
+
+    attachToggle({
+      toggleId: "average-revenue-yoy-toggle",
+      bodyId: "average-revenue-yoy-body",
+      hintId: "average-revenue-yoy-hint"
+    });
+  }
+
+  // ------------------------------------------------------------
+  // REUSABLE HELPERS
   // ------------------------------------------------------------
   function getMonths() {
     return [
@@ -572,34 +823,25 @@ export async function loadRevenueTab({ portalState, content }) {
   }
 
   function renderTrendCurrency(value) {
-    const cssClass = getTrendClass(value);
-    const arrow = getTrendArrow(value);
-
     return `
-      <span class="${cssClass}">
-        ${formatCurrency(value)}${arrow}
+      <span class="${getTrendClass(value)}">
+        ${formatCurrency(value)}${getTrendArrow(value)}
       </span>
     `;
   }
 
   function renderTrendCount(value) {
-    const cssClass = getTrendClass(value);
-    const arrow = getTrendArrow(value);
-
     return `
-      <span class="${cssClass}">
-        ${value}${arrow}
+      <span class="${getTrendClass(value)}">
+        ${value}${getTrendArrow(value)}
       </span>
     `;
   }
 
   function renderTrendPercent(value) {
-    const cssClass = getTrendClass(value);
-    const arrow = getTrendArrow(value);
-
     return `
-      <span class="${cssClass}">
-        ${value.toFixed(1)}%${arrow}
+      <span class="${getTrendClass(value)}">
+        ${value.toFixed(1)}%${getTrendArrow(value)}
       </span>
     `;
   }
