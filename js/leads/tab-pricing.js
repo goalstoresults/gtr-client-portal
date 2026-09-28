@@ -5,6 +5,10 @@ import { escapeHtml } from "../utilities.js";
 const LEADS_MODULE_URL = "https://leads-module.dennis-e64.workers.dev";
 
 function formatMoney(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
   const numericValue = Number(value);
 
   if (!Number.isFinite(numericValue)) {
@@ -12,6 +16,52 @@ function formatMoney(value) {
   }
 
   return `$${numericValue.toFixed(2)}`;
+}
+
+function getInputPriceValue(value) {
+  if (value === null || value === undefined || value === "") {
+    return "";
+  }
+
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return "";
+  }
+
+  return numericValue.toFixed(2);
+}
+
+function calculateQuoteTotals(lines) {
+  return lines.reduce(
+    (result, line) => {
+      const rawPrice = line.unit_price;
+      const quantity = Number(line.quantity || 1);
+
+      if (
+        rawPrice === null ||
+        rawPrice === undefined ||
+        String(rawPrice).trim() === ""
+      ) {
+        result.unpricedCount += 1;
+        return result;
+      }
+
+      const price = Number(rawPrice);
+
+      if (!Number.isFinite(price)) {
+        result.unpricedCount += 1;
+        return result;
+      }
+
+      result.total += price * quantity;
+      return result;
+    },
+    {
+      total: 0,
+      unpricedCount: 0
+    }
+  );
 }
 
 export async function renderLeadPricing(container, portalState) {
@@ -22,9 +72,7 @@ export async function renderLeadPricing(container, portalState) {
     container.innerHTML = `
       <section class="card">
         <h2>Pricing Chart</h2>
-        <p class="muted">
-          Select or create a lead first.
-        </p>
+        <p class="muted">Select or create a lead first.</p>
       </section>
     `;
     return;
@@ -71,48 +119,38 @@ export async function renderLeadPricing(container, portalState) {
 
           <p class="muted">
             Go to the <strong>Services</strong> tab, select one or more
-            services, and click <strong>Save Services</strong>. That will
-            create the draft quote and its service rows here.
+            services, and click <strong>Save Services</strong>.
           </p>
         </section>
       `;
       return;
     }
 
-    const totals = lines.reduce(
-      (result, line) => {
-        const quantity = Number(line.quantity || 1);
-        const price = Number(line.unit_price);
-
-        if (!Number.isFinite(price)) {
-          result.unpricedCount += 1;
-          return result;
-        }
-
-        result.total += price * quantity;
-        return result;
-      },
-      {
-        total: 0,
-        unpricedCount: 0
-      }
-    );
-
-    const totalDisplay = formatMoney(totals.total) || "$0.00";
+    const initialTotals = calculateQuoteTotals(lines);
 
     const rowsHtml = lines.length
       ? lines
           .map((line) => {
-            const priceDisplay = formatMoney(line.unit_price);
             const quantity = Number(line.quantity || 1);
+            const priceValue = getInputPriceValue(line.unit_price);
 
             return `
-              <tr>
+              <tr
+                data-quote-service-id="${escapeHtml(line.quote_service_id || "")}"
+                data-quantity="${escapeHtml(String(quantity))}"
+              >
                 <td>
                   <strong>${escapeHtml(line.service_name || "")}</strong>
                   ${
                     line.required
-                      ? `<div class="muted" style="font-size:0.85em; margin-top:3px;">Required service</div>`
+                      ? `
+                        <div
+                          class="muted"
+                          style="font-size:0.85em; margin-top:3px;"
+                        >
+                          Required service
+                        </div>
+                      `
                       : ""
                   }
                 </td>
@@ -129,12 +167,35 @@ export async function renderLeadPricing(container, portalState) {
                   ${escapeHtml(String(quantity))}
                 </td>
 
-                <td style="text-align:right;">
-                  ${
-                    priceDisplay
-                      ? escapeHtml(priceDisplay)
-                      : `<span class="muted">Price not entered</span>`
-                  }
+                <td style="text-align:right; min-width:180px;">
+                  <div
+                    style="
+                      display:flex;
+                      justify-content:flex-end;
+                      align-items:center;
+                      gap:5px;
+                    "
+                  >
+                    <span class="muted">$</span>
+
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputmode="decimal"
+                      class="quote-price-input"
+                      data-quote-service-id="${escapeHtml(line.quote_service_id || "")}"
+                      value="${escapeHtml(priceValue)}"
+                      placeholder="Enter price"
+                      aria-label="Quoted price for ${escapeHtml(line.service_name || "service")}"
+                      style="
+                        width:115px;
+                        text-align:right;
+                        padding:7px 8px;
+                        box-sizing:border-box;
+                      "
+                    />
+                  </div>
                 </td>
               </tr>
             `;
@@ -144,7 +205,7 @@ export async function renderLeadPricing(container, portalState) {
           <tr>
             <td colspan="4" class="muted">
               No services are currently on this draft quote.
-              Return to Services, select services, and click Save Services.
+              Return to Services, choose services, and click Save Services.
             </td>
           </tr>
         `;
@@ -172,15 +233,37 @@ export async function renderLeadPricing(container, portalState) {
 
           <div
             style="
-              padding:8px 12px;
-              border-radius:4px;
-              background:#f7f7f7;
-              color:#555;
-              font-size:0.9em;
+              display:flex;
+              gap:10px;
+              align-items:center;
+              flex-wrap:wrap;
             "
           >
-            Status:
-            <strong>${escapeHtml(quote.status || "draft")}</strong>
+            <div
+              style="
+                padding:8px 12px;
+                border-radius:4px;
+                background:#f7f7f7;
+                color:#555;
+                font-size:0.9em;
+              "
+            >
+              Status:
+              <strong>${escapeHtml(quote.status || "draft")}</strong>
+            </div>
+
+            ${
+              lines.length
+                ? `
+                  <button
+                    id="btnSaveQuotePrices"
+                    class="btn-primary"
+                  >
+                    Save Prices
+                  </button>
+                `
+                : ""
+            }
           </div>
         </div>
 
@@ -193,8 +276,8 @@ export async function renderLeadPricing(container, portalState) {
             color:#4a5968;
           "
         >
-          Services are created from the Services tab.
-          Pricing entry will be added next.
+          Enter the quoted price for each service. Prices are saved only to
+          this draft quote and do not change the master Services lookup list.
         </div>
 
         <div style="overflow-x:auto;">
@@ -204,7 +287,7 @@ export async function renderLeadPricing(container, portalState) {
                 <th style="min-width:190px;">Service</th>
                 <th style="min-width:260px;">Description</th>
                 <th style="text-align:center; min-width:80px;">Qty</th>
-                <th style="text-align:right; min-width:150px;">Quoted Price</th>
+                <th style="text-align:right; min-width:180px;">Quoted Price</th>
               </tr>
             </thead>
 
@@ -218,48 +301,208 @@ export async function renderLeadPricing(container, portalState) {
                   Current Quote Total
                 </th>
 
-                <th style="text-align:right;">
-                  ${escapeHtml(totalDisplay)}
+                <th
+                  id="quoteTotalDisplay"
+                  style="text-align:right;"
+                >
+                  ${formatMoney(initialTotals.total) || "$0.00"}
                 </th>
               </tr>
             </tfoot>
           </table>
         </div>
 
-        ${
-          totals.unpricedCount
-            ? `
-              <p
-                class="muted"
-                style="
-                  margin:14px 0 0;
-                  padding:10px 12px;
+        <p
+          id="quotePriceStatus"
+          class="muted"
+          style="
+            margin:14px 0 0;
+            padding:10px 12px;
+            ${
+              initialTotals.unpricedCount
+                ? `
                   background:#fff8e8;
                   border-left:3px solid #e0a52d;
-                "
-              >
-                ${totals.unpricedCount}
-                service${totals.unpricedCount === 1 ? "" : "s"}
-                still need${totals.unpricedCount === 1 ? "s" : ""}
-                a quoted price.
-              </p>
-            `
-            : `
-              <p
-                class="muted"
-                style="
-                  margin:14px 0 0;
-                  padding:10px 12px;
+                `
+                : `
                   background:#eef7ee;
                   border-left:3px solid #4f9b57;
-                "
-              >
+                `
+            }
+          "
+        >
+          ${
+            initialTotals.unpricedCount
+              ? `
+                ${initialTotals.unpricedCount}
+                service${initialTotals.unpricedCount === 1 ? "" : "s"}
+                still need${initialTotals.unpricedCount === 1 ? "s" : ""}
+                a quoted price.
+              `
+              : `
                 All current quote services have a price.
-              </p>
-            `
-        }
+              `
+          }
+        </p>
       </section>
     `;
+
+    const totalDisplay = container.querySelector("#quoteTotalDisplay");
+    const priceStatus = container.querySelector("#quotePriceStatus");
+    const priceInputs = Array.from(
+      container.querySelectorAll(".quote-price-input")
+    );
+
+    function refreshLiveTotal() {
+      let total = 0;
+      let unpricedCount = 0;
+
+      priceInputs.forEach((input) => {
+        const rawValue = input.value.trim();
+        const row = input.closest("tr");
+        const quantity = Number(row?.dataset?.quantity || 1);
+
+        if (rawValue === "") {
+          unpricedCount += 1;
+          return;
+        }
+
+        const price = Number(rawValue);
+
+        if (!Number.isFinite(price) || price < 0) {
+          unpricedCount += 1;
+          return;
+        }
+
+        total += price * quantity;
+      });
+
+      totalDisplay.textContent = `$${total.toFixed(2)}`;
+
+      if (unpricedCount > 0) {
+        priceStatus.style.background = "#fff8e8";
+        priceStatus.style.borderLeft = "3px solid #e0a52d";
+        priceStatus.textContent =
+          `${unpricedCount} service${unpricedCount === 1 ? "" : "s"} ` +
+          `still need${unpricedCount === 1 ? "s" : ""} a quoted price.`;
+      } else {
+        priceStatus.style.background = "#eef7ee";
+        priceStatus.style.borderLeft = "3px solid #4f9b57";
+        priceStatus.textContent =
+          "All current quote services have a price.";
+      }
+    }
+
+    priceInputs.forEach((input) => {
+      input.addEventListener("input", refreshLiveTotal);
+
+      input.addEventListener("blur", () => {
+        const rawValue = input.value.trim();
+
+        if (rawValue === "") {
+          return;
+        }
+
+        const numericValue = Number(rawValue);
+
+        if (Number.isFinite(numericValue) && numericValue >= 0) {
+          input.value = numericValue.toFixed(2);
+          refreshLiveTotal();
+        }
+      });
+    });
+
+    const savePricesBtn = container.querySelector("#btnSaveQuotePrices");
+
+    if (savePricesBtn) {
+      savePricesBtn.addEventListener("click", async () => {
+        const originalButtonText = savePricesBtn.textContent;
+
+        const priceLines = [];
+        let hasInvalidPrice = false;
+
+        priceInputs.forEach((input) => {
+          const rawValue = input.value.trim();
+
+          if (rawValue !== "") {
+            const numericValue = Number(rawValue);
+
+            if (!Number.isFinite(numericValue) || numericValue < 0) {
+              hasInvalidPrice = true;
+              input.style.borderColor = "#c0392b";
+              return;
+            }
+          }
+
+          input.style.borderColor = "";
+
+          priceLines.push({
+            quote_service_id: input.dataset.quoteServiceId,
+            unit_price: rawValue === "" ? null : Number(rawValue)
+          });
+        });
+
+        if (hasInvalidPrice) {
+          alert(
+            "Please correct invalid prices. Each entered amount must be zero or greater."
+          );
+          return;
+        }
+
+        savePricesBtn.disabled = true;
+        savePricesBtn.textContent = "Saving…";
+
+        try {
+          const saveRes = await fetch(
+            `${LEADS_MODULE_URL}/quotes/draft/prices`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                project,
+                quote_id: quote.quote_id,
+                lines: priceLines
+              })
+            }
+          );
+
+          const saveData = await saveRes.json();
+
+          if (!saveRes.ok) {
+            throw new Error(
+              saveData?.error ||
+              `Unable to save quote prices (${saveRes.status}).`
+            );
+          }
+
+          priceInputs.forEach((input) => {
+            const rawValue = input.value.trim();
+
+            if (rawValue !== "") {
+              input.value = Number(rawValue).toFixed(2);
+            }
+          });
+
+          refreshLiveTotal();
+
+          alert(
+            `✅ Prices saved for ${quote.quote_number}. ` +
+            `Current quote total: $${Number(
+              saveData.offered_total || 0
+            ).toFixed(2)}`
+          );
+        } catch (err) {
+          console.error("[Pricing Chart] Error saving prices:", err);
+
+          alert(`❌ Unable to save quote prices: ${err.message}`);
+        } finally {
+          savePricesBtn.disabled = false;
+          savePricesBtn.textContent = originalButtonText;
+        }
+      });
+    }
   } catch (err) {
     console.error("[Pricing Chart] Error loading draft quote:", err);
 
