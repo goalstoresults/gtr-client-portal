@@ -1,11 +1,10 @@
 // js/contacts/tab-documents.js
-// Contact Documents Tab — grid of documents for the selected contact with Download buttons
+// Contact Documents Tab — grid of documents for the selected contact with Download + Delete buttons
 
 import { escapeHtml, formatDateTime } from "../utilities.js";
 
-// ⚠️ Set this to your client API worker's URL (the one with /api/contact_documents)
+// Client API worker (has /api/contact_documents)
 const API_BASE = "https://client-portal-api.dennis-e64.workers.dev";
-
 
 /* -------------------------------------------------------
    MAIN ENTRY: Render Contact Documents
@@ -157,7 +156,7 @@ export async function renderContactDocuments(container, portalState) {
           const result = await delRes.json().catch(() => ({}));
 
           if (!delRes.ok || !result.success) {
-            throw new Error(result?.error || `HTTP ${delRes.status}`);
+            throw new Error([result?.error || `HTTP ${delRes.status}`, result?.detail].filter(Boolean).join(" — "));
           }
 
           // Reload the grid
