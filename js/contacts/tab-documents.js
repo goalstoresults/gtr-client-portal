@@ -6,6 +6,7 @@ import { escapeHtml, formatDateTime } from "../utilities.js";
 // ⚠️ Set this to your client API worker's URL (the one with /api/contact_documents)
 const API_BASE = "https://client-portal-api.dennis-e64.workers.dev";
 
+
 /* -------------------------------------------------------
    MAIN ENTRY: Render Contact Documents
 ------------------------------------------------------- */
@@ -56,9 +57,13 @@ export async function renderContactDocuments(container, portalState) {
       <tr>
         <td>${escapeHtml(d.title || d.file_name || "")}</td>
         <td>${escapeHtml(d.description || "")}</td>
+        <td>${escapeHtml(formatStatus(d.status))}</td>
         <td>${formatDateTime(d.created_at)}</td>
-        <td>
+        <td style="white-space:nowrap;">
           <button class="btn-primary btn-download" data-id="${d.id}">Download</button>
+          <button class="btn-danger btn-delete-doc" data-id="${d.id}"
+                  data-title="${escapeHtml(d.title || d.file_name || "this document")}"
+                  style="background:#dc3545; color:#fff; border-color:#dc3545; margin-left:6px;">Delete</button>
         </td>
       </tr>
     `).join("");
@@ -70,12 +75,13 @@ export async function renderContactDocuments(container, portalState) {
           <tr>
             <th>Name</th>
             <th>Description</th>
+            <th>Status</th>
             <th>Date</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          ${rows || `<tr><td colspan="4">(no documents yet)</td></tr>`}
+          ${rows || `<tr><td colspan="5">(no documents yet)</td></tr>`}
         </tbody>
       </table>
     `;
@@ -124,10 +130,59 @@ export async function renderContactDocuments(container, portalState) {
       });
     });
 
+    /* -------------------------------------------------------
+       DELETE BUTTONS
+       Confirm first, then delete the file and the table row
+    ------------------------------------------------------- */
+    tableDiv.querySelectorAll(".btn-delete-doc").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const title = btn.dataset.title || "this document";
+        if (!confirm(`Are you sure you want to delete "${title}"?\n\nThis cannot be undone.`)) {
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = "Deleting…";
+
+        try {
+          const delParams = new URLSearchParams({
+            project: portalState.project,
+            id: btn.dataset.id
+          });
+
+          const delRes = await fetch(
+            `${API_BASE}/api/contact_documents?${delParams}`,
+            { method: "DELETE" }
+          );
+          const result = await delRes.json().catch(() => ({}));
+
+          if (!delRes.ok || !result.success) {
+            throw new Error(result?.error || `HTTP ${delRes.status}`);
+          }
+
+          // Reload the grid
+          await renderContactDocuments(container, portalState);
+        } catch (err) {
+          console.error("[Documents] Delete failed:", err);
+          alert(`Delete failed: ${err.message || "Unknown error"}`);
+          btn.disabled = false;
+          btn.textContent = "Delete";
+        }
+      });
+    });
+
   } catch (err) {
     tableDiv.innerHTML = `
       <p>Error loading documents: ${escapeHtml(err.message || "Unknown error")}</p>
     `;
     console.error("[Documents] Error in renderContactDocuments:", err);
   }
+}
+
+/* -------------------------------------------------------
+   HELPERS
+------------------------------------------------------- */
+function formatStatus(status) {
+  if (!status) return "";
+  return status.charAt(0).toUpperCase() + status.slice(1);
 }
