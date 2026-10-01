@@ -4,7 +4,7 @@
 import { escapeHtml, formatDateTime } from "../utilities.js";
 
 // ⚠️ Set this to your client API worker's URL (the one with /api/contact_documents)
-const API_BASE = "https://YOUR-CLIENT-API-WORKER.dennis-e64.workers.dev";
+const API_BASE = "https://client-portal-api.dennis-e64.workers.dev";
 
 /* -------------------------------------------------------
    MAIN ENTRY: Render Contact Documents
