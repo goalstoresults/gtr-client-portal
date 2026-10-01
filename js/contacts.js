@@ -1,4 +1,4 @@
-// js/contacts.js v2.1
+// js/contacts.js v2.2
 
 import { renderAddContactForm } from "./contacts/tab-add.js";
 import { renderContactList } from "./contacts/tab-list.js";
@@ -6,7 +6,8 @@ import { renderContactDetails } from "./contacts/tab-details.js";
 import { renderContactRelationships } from "./contacts/tab-relationships.js";
 import { renderContactNotes } from "./contacts/tab-notes.js";
 import { renderContactServicesTab } from "./contacts/tab-services.js";   
-import { renderContactTimeline } from "./contacts/tab-timeline.js";  // ⭐ NEW IMPORT
+import { renderContactTimeline } from "./contacts/tab-timeline.js";
+import { renderContactDocuments } from "./contacts/tab-documents.js";  // ⭐ NEW IMPORT
 
 
 export async function loadContactsTab({ portalState, tabContent }) {
@@ -128,7 +129,20 @@ export async function loadContactsTab({ portalState, tabContent }) {
             `;
           }
           break;
-          
+
+        // ⭐ NEW DOCUMENTS SUBTAB
+        case "documents":
+          if (portalState.selectedContactId) {
+            await renderContactDocuments(content, portalState);
+          } else {
+            content.innerHTML = `
+              <section class="card">
+                <h2>Documents</h2>
+                <p>Select a contact from the list to view their documents.</p>
+              </section>
+            `;
+          }
+          break;
 
         // ⭐ NEW SERVICES SUBTAB
         case "services":
