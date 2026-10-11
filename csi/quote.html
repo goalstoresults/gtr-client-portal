@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+
+  <title>Your Quote | Clear Sight Inspections</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #f3f5f7;
+      color: #243447;
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.5;
+    }
+
+    .quote-page {
+      max-width: 1000px;
+      margin: 32px auto;
+      padding: 0 16px;
+    }
+
+    .quote-header,
+    .quote-section {
+      background: #fff;
+      border: 1px solid #dce2e8;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .quote-header {
+      border-top: 5px solid #244b70;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 28px;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 21px;
+    }
+
+    p {
+      margin: 0 0 12px;
+    }
+
+    p:last-child {
+      margin-bottom: 0;
+    }
+
+    .muted {
+      color: #647180;
+    }
+
+    .notice {
+      padding: 14px 16px;
+      background: #f0f5fa;
+      border-left: 4px solid #244b70;
+    }
+
+    @media (max-width: 600px) {
+      .quote-page {
+        margin: 16px auto;
+      }
+
+      .quote-header,
+      .quote-section {
+        padding: 18px;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="quote-page">
+    <header class="quote-header">
+      <h1>Clear Sight Inspections</h1>
+      <p class="muted">Your inspection quote</p>
+    </header>
+
+    <section class="quote-section" aria-labelledby="quote-heading">
+      <h2 id="quote-heading">Quote Details</h2>
+
+      <div id="quoteStatus" class="notice" role="status">
+        Checking quote link…
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const token = new URLSearchParams(window.location.search)
+        .get("token");
+
+      const status = document.getElementById("quoteStatus");
+
+      if (!token || !token.trim()) {
+        status.textContent =
+          "No quote access link was provided. Please use the complete " +
+          "link supplied by Clear Sight Inspections.";
+        return;
+      }
+
+      status.textContent =
+        "The CSI quote page is deployed. Secure quote loading " +
+        "will be connected in the next step.";
+    })();
+  </script>
+</body>
+</html>
