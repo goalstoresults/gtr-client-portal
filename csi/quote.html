@@ -10,9 +10,7 @@
   <title>Your Quote | Clear Sight Inspections</title>
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -22,14 +20,13 @@
       line-height: 1.5;
     }
 
-    .quote-page {
+    main {
       max-width: 1000px;
       margin: 32px auto;
       padding: 0 16px;
     }
 
-    .quote-header,
-    .quote-section {
+    header, section {
       background: #fff;
       border: 1px solid #dce2e8;
       border-radius: 8px;
@@ -37,31 +34,12 @@
       margin-bottom: 20px;
     }
 
-    .quote-header {
-      border-top: 5px solid #244b70;
-    }
+    header { border-top: 5px solid #244b70; }
 
-    h1 {
-      margin: 0 0 6px;
-      font-size: 28px;
-    }
-
-    h2 {
-      margin: 0 0 12px;
-      font-size: 21px;
-    }
-
-    p {
-      margin: 0 0 12px;
-    }
-
-    p:last-child {
-      margin-bottom: 0;
-    }
-
-    .muted {
-      color: #647180;
-    }
+    h1 { margin: 0 0 6px; font-size: 28px; }
+    h2 { margin: 0 0 16px; font-size: 21px; }
+    p { margin: 0 0 12px; }
+    .muted { color: #647180; }
 
     .notice {
       padding: 14px 16px;
@@ -69,57 +47,376 @@
       border-left: 4px solid #244b70;
     }
 
+    .error {
+      background: #fff0f0;
+      border-left-color: #b73636;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px 24px;
+    }
+
+    .field-label {
+      color: #647180;
+      font-size: 13px;
+      margin-bottom: 3px;
+    }
+
+    .field-value {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .service {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: start;
+      padding: 18px 0;
+      border-bottom: 1px solid #e4e8ed;
+    }
+
+    .service input {
+      width: 18px;
+      height: 18px;
+      margin-top: 5px;
+    }
+
+    .service-name { font-weight: 700; }
+    .service-description {
+      margin-top: 5px;
+      white-space: pre-wrap;
+      color: #647180;
+    }
+
+    .service-price {
+      text-align: right;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .totals {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 16px;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .message { white-space: pre-wrap; }
+    [hidden] { display: none !important; }
+
     @media (max-width: 600px) {
-      .quote-page {
-        margin: 16px auto;
-      }
-
-      .quote-header,
-      .quote-section {
-        padding: 18px;
-      }
-
-      h1 {
-        font-size: 24px;
-      }
+      main { margin: 16px auto; }
+      header, section { padding: 18px; }
+      h1 { font-size: 24px; }
+      .grid { grid-template-columns: 1fr; }
+      .service { gap: 8px; }
     }
   </style>
 </head>
 
 <body>
-  <main class="quote-page">
-    <header class="quote-header">
+  <main>
+    <header>
       <h1>Clear Sight Inspections</h1>
       <p class="muted">Your inspection quote</p>
+      <div id="quoteHeading"></div>
     </header>
 
-    <section class="quote-section" aria-labelledby="quote-heading">
-      <h2 id="quote-heading">Quote Details</h2>
-
-      <div id="quoteStatus" class="notice" role="status">
-        Checking quote link…
+    <section id="statusSection">
+      <div id="pageStatus" class="notice" role="status">
+        Loading your quote…
       </div>
     </section>
+
+    <div id="quoteContent" hidden>
+      <section>
+        <h2>Client</h2>
+        <div id="customerFields" class="grid"></div>
+      </section>
+
+      <section>
+        <h2>Subject Property</h2>
+        <div id="propertyFields" class="grid"></div>
+      </section>
+
+      <section>
+        <h2>Property Information</h2>
+        <div id="propertyInfoFields" class="grid"></div>
+      </section>
+
+      <section id="messageSection" hidden>
+        <h2>A Message From CSI</h2>
+        <div id="customerMessage" class="message"></div>
+      </section>
+
+      <section>
+        <h2>Your Services</h2>
+        <p id="serviceInstructions" class="muted"></p>
+
+        <div id="serviceList"></div>
+
+        <div class="totals">
+          <span>Offered Services Total</span>
+          <span id="offeredTotal"></span>
+        </div>
+
+        <div id="acceptedTotalRow" class="totals" hidden>
+          <span>Confirmed Services Total</span>
+          <span id="acceptedTotal"></span>
+        </div>
+
+        <p class="notice" style="margin-top:20px;">
+          Service confirmation is not enabled in this build.
+          This step verifies that your quote information displays correctly.
+        </p>
+      </section>
+    </div>
   </main>
 
-  <script>
-    (() => {
-      const token = new URLSearchParams(window.location.search)
-        .get("token");
+  <script type="module">
+    const API_URL =
+      "https://quotes-module.dennis-e64.workers.dev/quotes/public/read";
 
-      const status = document.getElementById("quoteStatus");
+    const pageStatus = document.getElementById("pageStatus");
+    const content = document.getElementById("quoteContent");
 
-      if (!token || !token.trim()) {
-        status.textContent =
-          "No quote access link was provided. Please use the complete " +
-          "link supplied by Clear Sight Inspections.";
+    function money(value) {
+      if (value === null || value === undefined || value === "") {
+        return "Not priced";
+      }
+
+      const number = Number(value);
+
+      return Number.isFinite(number)
+        ? new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: "USD"
+          }).format(number)
+        : "Not priced";
+    }
+
+    function addField(container, label, value) {
+      if (
+        value === null ||
+        value === undefined ||
+        String(value).trim() === ""
+      ) {
         return;
       }
 
-      status.textContent =
-        "The CSI quote page is deployed. Secure quote loading " +
-        "will be connected in the next step.";
-    })();
+      const field = document.createElement("div");
+      const labelElement = document.createElement("div");
+      const valueElement = document.createElement("div");
+
+      labelElement.className = "field-label";
+      labelElement.textContent = label;
+
+      valueElement.className = "field-value";
+      valueElement.textContent = String(value);
+
+      field.append(labelElement, valueElement);
+      container.append(field);
+    }
+
+    function displayFields(containerId, fields) {
+      const container = document.getElementById(containerId);
+
+      fields.forEach(([label, value]) => {
+        addField(container, label, value);
+      });
+
+      if (!container.children.length) {
+        const note = document.createElement("p");
+        note.className = "muted";
+        note.textContent = "No information provided.";
+        container.append(note);
+      }
+    }
+
+    function renderServices(lines) {
+      const list = document.getElementById("serviceList");
+
+      if (!lines.length) {
+        list.textContent = "No offered services are available.";
+        return;
+      }
+
+      for (const line of lines) {
+        const row = document.createElement("div");
+        row.className = "service";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = line.customer_selected === true;
+        checkbox.disabled = true;
+        checkbox.setAttribute(
+          "aria-label",
+          line.service_name || "Service"
+        );
+
+        const details = document.createElement("div");
+        const name = document.createElement("div");
+        name.className = "service-name";
+        name.textContent = (line.service_name || "").trim();
+        details.append(name);
+
+        if (line.service_description) {
+          const description = document.createElement("div");
+          description.className = "service-description";
+          description.textContent = line.service_description;
+          details.append(description);
+        }
+
+        const quantity = document.createElement("div");
+        quantity.className = "muted";
+        quantity.textContent =
+          "Quantity: " + line.quantity +
+          (line.required ? " · Required service" : "");
+        details.append(quantity);
+
+        const price = document.createElement("div");
+        price.className = "service-price";
+
+        const unitPrice = line.unit_price;
+        price.textContent =
+          unitPrice === null || unitPrice === undefined
+            ? "Not priced"
+            : money(Number(unitPrice) * Number(line.quantity));
+
+        if (Number(line.quantity) !== 1 && unitPrice != null) {
+          const unitNote = document.createElement("div");
+          unitNote.className = "muted";
+          unitNote.style.fontWeight = "400";
+          unitNote.style.fontSize = "13px";
+          unitNote.textContent = money(unitPrice) + " each";
+          price.append(unitNote);
+        }
+
+        row.append(checkbox, details, price);
+        list.append(row);
+      }
+    }
+
+    async function loadQuote() {
+      const token = new URLSearchParams(location.search).get("token");
+
+      if (!token || !/^[a-f0-9]{64}$/.test(token)) {
+        pageStatus.classList.add("error");
+        pageStatus.textContent =
+          "This quote link is incomplete or invalid. " +
+          "Please use the private link supplied by CSI.";
+        return;
+      }
+
+      try {
+        const response = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+          body: JSON.stringify({
+            project: "csi",
+            token
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || "Unable to load your quote.");
+        }
+
+        const quote = data.quote;
+        const customer = data.customer;
+        const property = data.property;
+        const lines = Array.isArray(data.lines) ? data.lines : [];
+
+        const heading = document.getElementById("quoteHeading");
+        heading.textContent =
+          "Quote " + quote.quote_number +
+          " · Status: " + quote.status;
+
+        displayFields("customerFields", [
+          [
+            "Name",
+            [customer.first_name, customer.last_name]
+              .filter(Boolean)
+              .join(" ")
+          ],
+          ["Business", customer.business_name],
+          ["Email", customer.email],
+          ["Phone", customer.phone]
+        ]);
+
+        displayFields("propertyFields", [
+          ["Address", property.inspection_address1],
+          ["Address Line 2", property.inspection_address2],
+          ["City", property.inspection_city],
+          ["State", property.inspection_state],
+          ["ZIP Code", property.inspection_postal_code],
+          ["Inspection Classification", property.inspection_classification]
+        ]);
+
+        displayFields("propertyInfoFields", [
+          ["Inspection Type", property.inspection_type],
+          ["Multi-Family Information", property.multi_family_type],
+          ["Year Built", property.building_year_built],
+          ["Square Feet", property.building_sq_feet],
+          ["Exclusions", property.exclusions]
+        ]);
+
+        if (quote.expires_at) {
+          const date = new Date(quote.expires_at);
+
+          if (!Number.isNaN(date.getTime())) {
+            const expiration = document.createElement("p");
+            expiration.className = "muted";
+            expiration.textContent =
+              "Quote expires: " + date.toLocaleString();
+            heading.append(expiration);
+          }
+        }
+
+        if (quote.customer_message) {
+          document.getElementById("customerMessage").textContent =
+            quote.customer_message;
+          document.getElementById("messageSection").hidden = false;
+        }
+
+        renderServices(lines);
+
+        document.getElementById("offeredTotal").textContent =
+          money(quote.offered_total);
+
+        if (quote.accepted_total !== null) {
+          document.getElementById("acceptedTotal").textContent =
+            money(quote.accepted_total);
+          document.getElementById("acceptedTotalRow").hidden = false;
+        }
+
+        document.getElementById("serviceInstructions").textContent =
+          quote.status === "accepted"
+            ? "Your confirmed selections are shown below."
+            : "Available services and their quoted prices are shown below.";
+
+        pageStatus.textContent =
+          quote.status === "draft"
+            ? "Draft quote preview — customer selection is not enabled."
+            : "Quote loaded — this build displays services read-only.";
+
+        content.hidden = false;
+      } catch (error) {
+        pageStatus.classList.add("error");
+        pageStatus.textContent =
+          error.message || "Unable to load your quote. Please contact CSI.";
+      }
+    }
+
+    loadQuote();
   </script>
 </body>
 </html>
