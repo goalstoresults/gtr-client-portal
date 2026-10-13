@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
 
@@ -39,17 +38,24 @@
     h1 { margin: 0 0 6px; font-size: 28px; }
     h2 { margin: 0 0 16px; font-size: 21px; }
     p { margin: 0 0 12px; }
+
     .muted { color: #647180; }
 
     .notice {
       padding: 14px 16px;
       background: #f0f5fa;
       border-left: 4px solid #244b70;
+      white-space: pre-wrap;
     }
 
     .error {
       background: #fff0f0;
       border-left-color: #b73636;
+    }
+
+    .success {
+      background: #edf8ef;
+      border-left-color: #2c7b42;
     }
 
     .grid {
@@ -84,7 +90,11 @@
       margin-top: 5px;
     }
 
-    .service-name { font-weight: 700; }
+    .service-name {
+      font-weight: 700;
+      cursor: inherit;
+    }
+
     .service-description {
       margin-top: 5px;
       white-space: pre-wrap;
@@ -106,7 +116,74 @@
       font-weight: 700;
     }
 
+    .selected-total {
+      padding-top: 16px;
+      border-top: 2px solid #244b70;
+    }
+
     .message { white-space: pre-wrap; }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    button {
+      padding: 12px 18px;
+      border: 1px solid #244b70;
+      border-radius: 6px;
+      background: #244b70;
+      color: #fff;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: #fff;
+      color: #244b70;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    button:focus-visible,
+    input:focus-visible {
+      outline: 3px solid #d4a017;
+      outline-offset: 3px;
+    }
+
+    .review-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 0;
+      border-bottom: 1px solid #e4e8ed;
+    }
+
+    .review-price {
+      white-space: nowrap;
+      font-weight: 700;
+    }
+
+    .confirmation-check {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .confirmation-check input {
+      width: 18px;
+      height: 18px;
+      margin-top: 4px;
+      flex-shrink: 0;
+    }
+
     [hidden] { display: none !important; }
 
     @media (max-width: 600px) {
@@ -115,6 +192,7 @@
       h1 { font-size: 24px; }
       .grid { grid-template-columns: 1fr; }
       .service { gap: 8px; }
+      .actions button { width: 100%; }
     }
   </style>
 </head>
@@ -128,7 +206,12 @@
     </header>
 
     <section id="statusSection">
-      <div id="pageStatus" class="notice" role="status">
+      <div
+        id="pageStatus"
+        class="notice"
+        role="status"
+        aria-live="polite"
+      >
         Loading your quote…
       </div>
     </section>
@@ -154,7 +237,7 @@
         <div id="customerMessage" class="message"></div>
       </section>
 
-      <section>
+      <section id="servicesSection">
         <h2>Your Services</h2>
         <p id="serviceInstructions" class="muted"></p>
 
@@ -165,28 +248,158 @@
           <span id="offeredTotal"></span>
         </div>
 
+        <div
+          id="selectedTotalRow"
+          class="totals selected-total"
+          hidden
+        >
+          <span>Your Selected Services Total</span>
+          <span id="selectedTotal" aria-live="polite"></span>
+        </div>
+
         <div id="acceptedTotalRow" class="totals" hidden>
           <span>Confirmed Services Total</span>
           <span id="acceptedTotal"></span>
         </div>
 
-        <p class="notice" style="margin-top:20px;">
-          Service confirmation is not enabled in this build.
-          This step verifies that your quote information displays correctly.
+        <div
+          id="selectionNotice"
+          class="notice"
+          style="margin-top:20px;"
+          role="status"
+          aria-live="polite"
+          hidden
+        ></div>
+
+        <div id="selectionActions" class="actions" hidden>
+          <button id="reviewButton" type="button">
+            Review and Confirm
+          </button>
+        </div>
+      </section>
+
+      <section
+        id="reviewSection"
+        tabindex="-1"
+        aria-labelledby="reviewHeading"
+        hidden
+      >
+        <h2 id="reviewHeading">Review Your Selections</h2>
+
+        <p>
+          Please review the services and total below before
+          confirming.
         </p>
+
+        <div id="reviewList"></div>
+
+        <div class="totals selected-total">
+          <span>Total to Confirm</span>
+          <span id="reviewTotal"></span>
+        </div>
+
+        <label class="confirmation-check">
+          <input id="confirmationCheck" type="checkbox">
+          <span>
+            I confirm that I want the services listed above
+            at the quoted total.
+          </span>
+        </label>
+
+        <p class="muted" style="margin-top:16px;">
+          Once confirmed, your selections will be saved and
+          cannot be changed on this page. Contact CSI if you
+          need a correction.
+        </p>
+
+        <div
+          id="confirmationNotice"
+          class="notice"
+          role="status"
+          aria-live="polite"
+          style="margin-top:16px;"
+          hidden
+        ></div>
+
+        <div class="actions">
+          <button
+            id="confirmButton"
+            type="button"
+            disabled
+          >
+            Confirm My Services
+          </button>
+
+          <button
+            id="editButton"
+            class="secondary"
+            type="button"
+          >
+            Back to Selections
+          </button>
+
+          <button
+            id="reloadButton"
+            class="secondary"
+            type="button"
+            hidden
+          >
+            Reload Quote
+          </button>
+        </div>
+      </section>
+
+      <section id="confirmationSection" hidden>
+        <h2>Services Confirmed</h2>
+
+        <div class="notice success">
+          Your service selections have been saved.
+          Please contact CSI if you need to make a correction.
+        </div>
+
+        <p
+          id="confirmationDetails"
+          class="muted"
+          style="margin-top:16px;"
+        ></p>
       </section>
     </div>
   </main>
 
   <script type="module">
-    const API_URL =
+    const READ_URL =
       "https://quotes-module.dennis-e64.workers.dev/quotes/public/read";
+
+    const ACCEPT_URL =
+      "https://quotes-module.dennis-e64.workers.dev/quotes/public/accept";
+
+    const PROJECT = "csi";
+
+    const token = new URLSearchParams(location.search).get("token");
 
     const pageStatus = document.getElementById("pageStatus");
     const content = document.getElementById("quoteContent");
+    const serviceList = document.getElementById("serviceList");
+    const reviewSection = document.getElementById("reviewSection");
+    const reviewButton = document.getElementById("reviewButton");
+    const confirmButton = document.getElementById("confirmButton");
+    const editButton = document.getElementById("editButton");
+    const reloadButton = document.getElementById("reloadButton");
+    const confirmationCheck =
+      document.getElementById("confirmationCheck");
+
+    let quote = null;
+    let lines = [];
+    let selectedIds = new Set();
+    let submissionInProgress = false;
+    let confirmationOutcomeUnknown = false;
 
     function money(value) {
-      if (value === null || value === undefined || value === "") {
+      if (
+        value === null ||
+        value === undefined ||
+        value === ""
+      ) {
         return "Not priced";
       }
 
@@ -198,6 +411,39 @@
             currency: "USD"
           }).format(number)
         : "Not priced";
+    }
+
+    function dateText(value) {
+      if (!value) return "";
+
+      const date = new Date(value);
+
+      return Number.isNaN(date.getTime())
+        ? ""
+        : date.toLocaleString();
+    }
+
+    function setPageStatus(message, type = "") {
+      pageStatus.className = "notice";
+
+      if (type) {
+        pageStatus.classList.add(type);
+      }
+
+      pageStatus.textContent = message;
+    }
+
+    function showNotice(id, message, type = "") {
+      const element = document.getElementById(id);
+
+      element.className = "notice";
+
+      if (type) {
+        element.classList.add(type);
+      }
+
+      element.textContent = message;
+      element.hidden = !message;
     }
 
     function addField(container, label, value) {
@@ -225,6 +471,7 @@
 
     function displayFields(containerId, fields) {
       const container = document.getElementById(containerId);
+      container.replaceChildren();
 
       fields.forEach(([label, value]) => {
         addField(container, label, value);
@@ -238,31 +485,167 @@
       }
     }
 
-    function renderServices(lines) {
-      const list = document.getElementById("serviceList");
+    function lineTotalCents(line) {
+      if (
+        line.unit_price === null ||
+        line.unit_price === undefined ||
+        String(line.unit_price).trim() === ""
+      ) {
+        return null;
+      }
 
-      if (!lines.length) {
-        list.textContent = "No offered services are available.";
+      const unitPrice = Number(line.unit_price);
+      const quantity = Number(line.quantity);
+
+      if (
+        !Number.isFinite(unitPrice) ||
+        unitPrice < 0 ||
+        !Number.isInteger(quantity) ||
+        quantity <= 0
+      ) {
+        return null;
+      }
+
+      return Math.round(unitPrice * 100) * quantity;
+    }
+
+    function isAccepted() {
+      return Boolean(
+        quote &&
+        (
+          quote.status === "accepted" ||
+          quote.accepted_at
+        )
+      );
+    }
+
+    function canEditSelections() {
+      return Boolean(
+        quote &&
+        quote.can_select === true &&
+        !isAccepted() &&
+        !submissionInProgress &&
+        !confirmationOutcomeUnknown
+      );
+    }
+
+    function selectionSummary() {
+      const selectedLines = lines.filter(
+        line => selectedIds.has(line.quote_service_id)
+      );
+
+      const invalidLines = selectedLines.filter(
+        line => lineTotalCents(line) === null
+      );
+
+      const missingRequired = lines.some(
+        line =>
+          line.required === true &&
+          !selectedIds.has(line.quote_service_id)
+      );
+
+      const totalCents = selectedLines.reduce(
+        (sum, line) => sum + (lineTotalCents(line) ?? 0),
+        0
+      );
+
+      return {
+        selectedLines,
+        invalidLines,
+        missingRequired,
+        totalCents,
+        valid:
+          selectedLines.length > 0 &&
+          invalidLines.length === 0 &&
+          !missingRequired
+      };
+    }
+
+    function updateCheckboxStates() {
+      serviceList
+        .querySelectorAll("input[type='checkbox']")
+        .forEach(checkbox => {
+          const line = lines.find(
+            item =>
+              item.quote_service_id === checkbox.dataset.serviceId
+          );
+
+          checkbox.checked = selectedIds.has(
+            checkbox.dataset.serviceId
+          );
+
+          checkbox.disabled =
+            !canEditSelections() ||
+            !reviewSection.hidden ||
+            line?.required === true;
+        });
+    }
+
+    function updateSelectionSummary() {
+      const summary = selectionSummary();
+
+      document.getElementById("selectedTotal").textContent =
+        summary.invalidLines.length
+          ? "Pricing needed"
+          : money(summary.totalCents / 100);
+
+      reviewButton.disabled =
+        !canEditSelections() || !summary.valid;
+
+      if (!quote?.can_select || isAccepted()) {
+        showNotice("selectionNotice", "");
         return;
       }
 
-      for (const line of lines) {
+      if (summary.missingRequired) {
+        showNotice(
+          "selectionNotice",
+          "All required services must be included.",
+          "error"
+        );
+      } else if (summary.invalidLines.length) {
+        showNotice(
+          "selectionNotice",
+          "A selected service has not been priced. " +
+          "Please contact CSI before confirming.",
+          "error"
+        );
+      } else if (!summary.selectedLines.length) {
+        showNotice(
+          "selectionNotice",
+          "Please select at least one service."
+        );
+      } else {
+        showNotice("selectionNotice", "");
+      }
+    }
+
+    function renderServices() {
+      serviceList.replaceChildren();
+
+      if (!lines.length) {
+        serviceList.textContent =
+          "No offered services are available.";
+        return;
+      }
+
+      for (const [index, line] of lines.entries()) {
         const row = document.createElement("div");
         row.className = "service";
 
         const checkbox = document.createElement("input");
         checkbox.type = "checkbox";
-        checkbox.checked = line.customer_selected === true;
-        checkbox.disabled = true;
-        checkbox.setAttribute(
-          "aria-label",
-          line.service_name || "Service"
-        );
+        checkbox.id = "serviceChoice-" + index;
+        checkbox.dataset.serviceId = line.quote_service_id;
+        checkbox.checked = selectedIds.has(line.quote_service_id);
 
         const details = document.createElement("div");
-        const name = document.createElement("div");
+
+        const name = document.createElement("label");
         name.className = "service-name";
-        name.textContent = (line.service_name || "").trim();
+        name.htmlFor = checkbox.id;
+        name.textContent =
+          (line.service_name || "Service").trim();
         details.append(name);
 
         if (line.service_description) {
@@ -276,147 +659,149 @@
         quantity.className = "muted";
         quantity.textContent =
           "Quantity: " + line.quantity +
-          (line.required ? " · Required service" : "");
+          (line.required === true ? " · Required service" : "");
         details.append(quantity);
 
         const price = document.createElement("div");
         price.className = "service-price";
 
-        const unitPrice = line.unit_price;
-        price.textContent =
-          unitPrice === null || unitPrice === undefined
-            ? "Not priced"
-            : money(Number(unitPrice) * Number(line.quantity));
+        const totalCents = lineTotalCents(line);
 
-        if (Number(line.quantity) !== 1 && unitPrice != null) {
+        price.textContent =
+          totalCents === null
+            ? "Not priced"
+            : money(totalCents / 100);
+
+        if (
+          Number(line.quantity) !== 1 &&
+          totalCents !== null
+        ) {
           const unitNote = document.createElement("div");
           unitNote.className = "muted";
           unitNote.style.fontWeight = "400";
           unitNote.style.fontSize = "13px";
-          unitNote.textContent = money(unitPrice) + " each";
+          unitNote.textContent =
+            money(line.unit_price) + " each";
           price.append(unitNote);
         }
 
-        row.append(checkbox, details, price);
-        list.append(row);
-      }
-    }
+        checkbox.addEventListener("change", () => {
+          if (
+            !canEditSelections() ||
+            !reviewSection.hidden
+          ) {
+            updateCheckboxStates();
+            return;
+          }
 
-    async function loadQuote() {
-      const token = new URLSearchParams(location.search).get("token");
+          if (checkbox.checked || line.required === true) {
+            selectedIds.add(line.quote_service_id);
+          } else {
+            selectedIds.delete(line.quote_service_id);
+          }
 
-      if (!token || !/^[a-f0-9]{64}$/.test(token)) {
-        pageStatus.classList.add("error");
-        pageStatus.textContent =
-          "This quote link is incomplete or invalid. " +
-          "Please use the private link supplied by CSI.";
-        return;
-      }
-
-      try {
-        const response = await fetch(API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          cache: "no-store",
-          body: JSON.stringify({
-            project: "csi",
-            token
-          })
+          updateCheckboxStates();
+          updateSelectionSummary();
         });
 
-        const data = await response.json();
-
-        if (!response.ok || !data.success) {
-          throw new Error(data.error || "Unable to load your quote.");
-        }
-
-        const quote = data.quote;
-        const customer = data.customer;
-        const property = data.property;
-        const lines = Array.isArray(data.lines) ? data.lines : [];
-
-        const heading = document.getElementById("quoteHeading");
-        heading.textContent =
-          "Quote " + quote.quote_number +
-          " · Status: " + quote.status;
-
-        displayFields("customerFields", [
-          [
-            "Name",
-            [customer.first_name, customer.last_name]
-              .filter(Boolean)
-              .join(" ")
-          ],
-          ["Business", customer.business_name],
-          ["Email", customer.email],
-          ["Phone", customer.phone]
-        ]);
-
-        displayFields("propertyFields", [
-          ["Address", property.inspection_address1],
-          ["Address Line 2", property.inspection_address2],
-          ["City", property.inspection_city],
-          ["State", property.inspection_state],
-          ["ZIP Code", property.inspection_postal_code],
-          ["Inspection Classification", property.inspection_classification]
-        ]);
-
-        displayFields("propertyInfoFields", [
-          ["Inspection Type", property.inspection_type],
-          ["Multi-Family Information", property.multi_family_type],
-          ["Year Built", property.building_year_built],
-          ["Square Feet", property.building_sq_feet],
-          ["Exclusions", property.exclusions]
-        ]);
-
-        if (quote.expires_at) {
-          const date = new Date(quote.expires_at);
-
-          if (!Number.isNaN(date.getTime())) {
-            const expiration = document.createElement("p");
-            expiration.className = "muted";
-            expiration.textContent =
-              "Quote expires: " + date.toLocaleString();
-            heading.append(expiration);
-          }
-        }
-
-        if (quote.customer_message) {
-          document.getElementById("customerMessage").textContent =
-            quote.customer_message;
-          document.getElementById("messageSection").hidden = false;
-        }
-
-        renderServices(lines);
-
-        document.getElementById("offeredTotal").textContent =
-          money(quote.offered_total);
-
-        if (quote.accepted_total !== null) {
-          document.getElementById("acceptedTotal").textContent =
-            money(quote.accepted_total);
-          document.getElementById("acceptedTotalRow").hidden = false;
-        }
-
-        document.getElementById("serviceInstructions").textContent =
-          quote.status === "accepted"
-            ? "Your confirmed selections are shown below."
-            : "Available services and their quoted prices are shown below.";
-
-        pageStatus.textContent =
-          quote.status === "draft"
-            ? "Draft quote preview — customer selection is not enabled."
-            : "Quote loaded — this build displays services read-only.";
-
-        content.hidden = false;
-      } catch (error) {
-        pageStatus.classList.add("error");
-        pageStatus.textContent =
-          error.message || "Unable to load your quote. Please contact CSI.";
+        row.append(checkbox, details, price);
+        serviceList.append(row);
       }
+
+      updateCheckboxStates();
     }
 
-    loadQuote();
+    function renderQuote(data) {
+      quote = data.quote;
+      lines = Array.isArray(data.lines) ? data.lines : [];
+
+      const customer = data.customer || {};
+      const property = data.property || {};
+
+      const accepted = isAccepted();
+
+      // Existing choices are retained.
+      // Required services are preselected only for an editable quote.
+      selectedIds = new Set(
+        lines
+          .filter(
+            line =>
+              line.customer_selected === true ||
+              (
+                !accepted &&
+                quote.can_select === true &&
+                line.required === true
+              )
+          )
+          .map(line => line.quote_service_id)
+      );
+
+      const heading = document.getElementById("quoteHeading");
+      heading.replaceChildren();
+
+      const headingText = document.createElement("div");
+      headingText.textContent =
+        "Quote " + quote.quote_number +
+        " · Status: " + quote.status;
+      heading.append(headingText);
+
+      const expirationText = dateText(quote.expires_at);
+
+      if (expirationText) {
+        const expiration = document.createElement("p");
+        expiration.className = "muted";
+        expiration.textContent =
+          "Quote expires: " + expirationText;
+        heading.append(expiration);
+      }
+
+      displayFields("customerFields", [
+        [
+          "Name",
+          [customer.first_name, customer.last_name]
+            .filter(Boolean)
+            .join(" ")
+        ],
+        ["Business", customer.business_name],
+        ["Email", customer.email],
+        ["Phone", customer.phone]
+      ]);
+
+      displayFields("propertyFields", [
+        ["Address", property.inspection_address1],
+        ["Address Line 2", property.inspection_address2],
+        ["City", property.inspection_city],
+        ["State", property.inspection_state],
+        ["ZIP Code", property.inspection_postal_code],
+        [
+          "Inspection Classification",
+          property.inspection_classification
+        ]
+      ]);
+
+      displayFields("propertyInfoFields", [
+        ["Inspection Type", property.inspection_type],
+        ["Multi-Family Information", property.multi_family_type],
+        ["Year Built", property.building_year_built],
+        ["Square Feet", property.building_sq_feet],
+        ["Exclusions", property.exclusions]
+      ]);
+
+      const messageSection =
+        document.getElementById("messageSection");
+
+      document.getElementById("customerMessage").textContent =
+        quote.customer_message || "";
+
+      messageSection.hidden = !quote.customer_message;
+
+      reviewSection.hidden = true;
+      confirmationCheck.checked = false;
+      confirmationCheck.disabled = false;
+      confirmButton.disabled = true;
+      confirmButton.textContent = "Confirm My Services";
+      editButton.disabled = false;
+      reloadButton.hidden =
   </script>
 </body>
 </html>
