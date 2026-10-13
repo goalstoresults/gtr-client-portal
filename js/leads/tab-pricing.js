@@ -1,4 +1,5 @@
 // js/leads/tab-pricing.js
+// Saved-price readiness and unchanged-save protection.
 
 import { escapeHtml } from "../utilities.js";
 
@@ -124,8 +125,8 @@ export async function renderLeadPricing(container, portalState) {
       cache: "no-store"
     });
 
-    const quote = data.quote || null;
-    const lines = Array.isArray(data.lines) ? data.lines : [];
+    let quote = data.quote || null;
+    let lines = Array.isArray(data.lines) ? data.lines : [];
 
     if (!quote) {
       container.innerHTML = `
@@ -151,7 +152,7 @@ export async function renderLeadPricing(container, portalState) {
       data.can_edit_prices === true &&
       portalState.canEdit === true;
 
-    const offeredLines = lines.filter(
+    let offeredLines = lines.filter(
       line => line.offered === true
     );
 
@@ -360,8 +361,9 @@ export async function renderLeadPricing(container, portalState) {
         (isCsi
           ? "Enter the service price for each offered service. "
           : "Enter the unit price for each offered service. ") +
-        "Save Prices first. The Quote button appears after a " +
-        "successful save when every offered service has a valid price.";
+        "Quote remains available after pricing has been saved. " +
+        "Save changed prices before opening the quote. " +
+        "Unchanged prices do not need to be saved again.";
     } else if (draft) {
       notice =
         "This is a draft quote. Your current Portal permissions " +
@@ -554,7 +556,19 @@ export async function renderLeadPricing(container, portalState) {
           style="margin:14px 0 0;padding:10px 12px;"
         ></p>
 
-        <div id="internalQuotePreview" hidden></div>
+        <dialog
+          id="internalQuotePreview"
+          aria-label="Saved quote preview"
+          style="
+            width:min(1000px,90vw);
+            max-height:85vh;
+            overflow:auto;
+            border:1px solid #cbd5e1;
+            border-radius:6px;
+            padding:0;
+            background:#fff;
+          "
+        ></dialog>
       </section>
     `;
 
@@ -593,6 +607,15 @@ export async function renderLeadPricing(container, portalState) {
     let previewLoading = false;
     let previewReady = false;
 
+    let savedPriceBaseline = new Map(
+      offeredLines.map(line => [
+        line.quote_service_id,
+        numericPrice(line.unit_price)
+      ])
+    );
+
+    let historyWarning = "";
+
     function isCurrentView() {
       return (
         container.contains(quoteButton) &&
@@ -601,12 +624,49 @@ export async function renderLeadPricing(container, portalState) {
       );
     }
 
+    function hasUnsavedChanges() {
+      return inputs.some(input => {
+        const raw = input.value.trim();
+        const price = numericPrice(raw);
+
+        return (
+          input.validity.badInput ||
+          (raw !== "" && price === null) ||
+          price !== savedPriceBaseline.get(
+            input.dataset.quoteServiceId
+          )
+        );
+      });
+    }
+
+    function currentOfferedLines() {
+      const inputValues = new Map(
+        inputs.map(input => [
+          input.dataset.quoteServiceId,
+          input.value
+        ])
+      );
+
+      return offeredLines.map(line => (
+        inputValues.has(line.quote_service_id)
+          ? {
+              ...line,
+              unit_price: inputValues.get(line.quote_service_id)
+            }
+          : line
+      ));
+    }
+
+    function closePreview() {
+      if (previewDiv.open) previewDiv.close();
+      previewDiv.innerHTML = "";
+    }
+
     function hideQuote() {
       previewReady = false;
       quoteButton.hidden = true;
       quoteButton.style.display = "none";
-      previewDiv.hidden = true;
-      previewDiv.innerHTML = "";
+      closePreview();
     }
 
     function showQuote() {
@@ -615,16 +675,59 @@ export async function renderLeadPricing(container, portalState) {
       quoteButton.style.display = "";
     }
 
+    function refreshQuoteAvailability() {
+      const totals = calculateTotals(currentOfferedLines());
+      const dirty = hasUnsavedChanges();
+
+      const savedReady =
+        quote.status !== "draft" ||
+        Boolean(quote.prices_saved_at);
+
+      const ready =
+        !dirty &&
+        offeredLines.length > 0 &&
+        totals.unpricedCount === 0 &&
+        savedReady;
+
+      if (ready) {
+        showQuote();
+      } else {
+        hideQuote();
+      }
+
+      quoteButton.disabled = saving || previewLoading;
+
+      if (saveButton) {
+        const unchangedAndSaved =
+          !dirty && Boolean(quote.prices_saved_at);
+
+        saveButton.disabled =
+          saving || previewLoading || unchangedAndSaved;
+
+        saveButton.title = unchangedAndSaved
+          ? "Prices are already saved. Change a price to save again."
+          : "Save this quote's service prices";
+      }
+    }
+
     function showPriceStatus(unpricedCount) {
+      const dirty = hasUnsavedChanges();
+      const attention = unpricedCount > 0 || dirty || historyWarning;
+
       priceStatus.style.background =
-        unpricedCount ? "#fff8e8" : "#eef7ee";
+        attention ? "#fff8e8" : "#eef7ee";
 
       priceStatus.style.borderLeft =
-        unpricedCount
+        attention
           ? "3px solid #e0a52d"
           : "3px solid #4f9b57";
 
-      if (accepted) {
+      if (historyWarning) {
+        priceStatus.textContent = historyWarning;
+      } else if (dirty) {
+        priceStatus.textContent =
+          "Unsaved price changes. Click Save Prices before opening Quote.";
+      } else if (accepted) {
         const selectedCount = offeredLines.filter(
           line => line.customer_selected === true
         ).length;
@@ -636,17 +739,23 @@ export async function renderLeadPricing(container, portalState) {
         priceStatus.textContent =
           `${unpricedCount} offered service` +
           `${unpricedCount === 1 ? "" : "s"} still ` +
-          `${unpricedCount === 1 ? "needs" : "need"} a valid price.`;
+          `${unpricedCount === 1 ? "needs" : "need"} a valid price or quantity.`;
+      } else if (!offeredLines.length) {
+        priceStatus.textContent =
+          "No offered services are available.";
+      } else if (quote.status !== "draft" || quote.prices_saved_at) {
+        priceStatus.textContent =
+          "Saved quote is ready. Click Quote to open it. " +
+          "Unchanged prices do not need to be saved again.";
       } else {
-        priceStatus.textContent = offeredLines.length
-          ? "All offered services have a price."
-          : "No offered services are available.";
+        priceStatus.textContent =
+          "All offered services have a price. " +
+          "Click Save Prices once to record pricing and enable Quote.";
       }
     }
 
     function refreshLiveTotal() {
-      let cents = 0;
-      let unpricedCount = 0;
+      const totals = calculateTotals(currentOfferedLines());
 
       for (const input of inputs) {
         const total = lineTotal({
@@ -662,23 +771,26 @@ export async function renderLeadPricing(container, portalState) {
           totalElement.textContent =
             (isCsi ? "Total: " : "") + formatMoney(total);
         }
-
-        if (total === null) {
-          unpricedCount += 1;
-        } else {
-          cents += Math.round(total * 100);
-        }
       }
 
-      totalDisplay.textContent = formatMoney(cents / 100);
-      showPriceStatus(unpricedCount);
+      totalDisplay.textContent = formatMoney(
+        canEdit ? totals.total : quote.offered_total
+      );
+
+      refreshQuoteAvailability();
+      showPriceStatus(totals.unpricedCount);
     }
 
-    showPriceStatus(initialTotals.unpricedCount);
+    // Initialize from database state, not a save in this screen visit.
+    refreshLiveTotal();
+
+    previewDiv.addEventListener("close", () => {
+      if (isCurrentView()) quoteButton.focus();
+    });
 
     for (const input of inputs) {
       input.addEventListener("input", () => {
-        hideQuote();
+        closePreview();
         refreshLiveTotal();
       });
 
@@ -686,13 +798,7 @@ export async function renderLeadPricing(container, portalState) {
         const price = numericPrice(input.value);
 
         if (price !== null) {
-          const formatted = price.toFixed(2);
-          const changed = Number(formatted) !== price;
-
-          input.value = formatted;
-
-          if (changed) hideQuote();
-
+          input.value = price.toFixed(2);
           refreshLiveTotal();
         }
       });
@@ -701,12 +807,26 @@ export async function renderLeadPricing(container, portalState) {
     refreshButton.addEventListener("click", async () => {
       if (saving || previewLoading) return;
 
+      if (
+        hasUnsavedChanges() &&
+        !window.confirm("Discard unsaved price changes and refresh?")
+      ) {
+        return;
+      }
+
+      closePreview();
       await renderLeadPricing(container, portalState);
     });
 
     if (saveButton) {
       saveButton.addEventListener("click", async () => {
         if (saving || previewLoading) return;
+
+        // Do not write another save event for unchanged saved prices.
+        if (!hasUnsavedChanges() && quote.prices_saved_at) {
+          refreshLiveTotal();
+          return;
+        }
 
         const priceLines = [];
         let invalid = false;
@@ -737,12 +857,12 @@ export async function renderLeadPricing(container, portalState) {
           return;
         }
 
-        hideQuote();
-
+        closePreview();
         saving = true;
         saveButton.disabled = true;
         saveButton.textContent = "Saving…";
         refreshButton.disabled = true;
+        quoteButton.disabled = true;
 
         inputs.forEach(input => {
           input.disabled = true;
@@ -777,6 +897,9 @@ export async function renderLeadPricing(container, portalState) {
             );
           }
 
+          quote = saved.quote;
+          historyWarning = saved.warning || "";
+
           // Match the two-decimal values saved by the backend.
           inputs.forEach(input => {
             const price = numericPrice(input.value);
@@ -786,57 +909,66 @@ export async function renderLeadPricing(container, portalState) {
             }
           });
 
+          savedPriceBaseline = new Map(
+            inputs.map(input => [
+              input.dataset.quoteServiceId,
+              numericPrice(input.value)
+            ])
+          );
+
+          lines = lines.map(line => (
+            savedPriceBaseline.has(line.quote_service_id)
+              ? {
+                  ...line,
+                  unit_price: savedPriceBaseline.get(
+                    line.quote_service_id
+                  )
+                }
+              : line
+          ));
+
+          offeredLines = lines.filter(
+            line => line.offered === true
+          );
+
           refreshLiveTotal();
-
-          const locallyComplete = inputs.length > 0 &&
-            inputs.every(input =>
-              lineTotal({
-                unit_price: input.value,
-                quantity: input.dataset.quantity
-              }) !== null
-            );
-
-          if (
-            saved.unpriced_count === 0 &&
-            locallyComplete &&
-            numericPrice(saved.offered_total) !== null
-          ) {
-            showQuote();
-
-            priceStatus.textContent =
-              `Prices saved. Offered total: ` +
-              `${formatMoney(saved.offered_total)}. ` +
-              `Click Quote to open the internal preview.`;
-          } else {
-            priceStatus.textContent =
-              "Prices saved. Complete all offered service prices " +
-              "and save again to enable Quote.";
-          }
         } catch (error) {
           console.error("[Pricing Chart] Price save failed:", error);
 
           if (isCurrentView()) {
+            // A partial backend save may have invalidated readiness.
+            quote = { ...quote, prices_saved_at: null };
             hideQuote();
+            historyWarning =
+              "Save did not complete. Refresh to verify saved data before retrying.";
             alert(`Unable to save prices: ${error.message}`);
           }
         } finally {
           saving = false;
 
           if (isCurrentView()) {
-            saveButton.disabled = false;
             saveButton.textContent = "Save Prices";
             refreshButton.disabled = false;
 
             inputs.forEach(input => {
               input.disabled = false;
             });
+
+            refreshLiveTotal();
           }
         }
       });
     }
 
     quoteButton.addEventListener("click", async () => {
-      if (!previewReady || saving || previewLoading) return;
+      if (
+        !previewReady ||
+        hasUnsavedChanges() ||
+        saving ||
+        previewLoading
+      ) {
+        return;
+      }
 
       previewLoading = true;
       quoteButton.disabled = true;
@@ -876,10 +1008,9 @@ export async function renderLeadPricing(container, portalState) {
         }
 
         if (
-          savedQuote.status !== "draft" ||
-          savedQuote.accepted_at
+          savedQuote.status !== quote.status ||
+          Boolean(savedQuote.accepted_at) !== Boolean(quote.accepted_at)
         ) {
-          hideQuote();
           throw new Error(
             "The quote status has changed. Refresh Pricing Chart."
           );
@@ -895,10 +1026,15 @@ export async function renderLeadPricing(container, portalState) {
 
         const totals = calculateTotals(savedLines);
 
-        if (!savedLines.length || totals.unpricedCount > 0) {
+        if (
+          !savedLines.length ||
+          totals.unpricedCount > 0 ||
+          (savedQuote.status === "draft" && !savedQuote.prices_saved_at)
+        ) {
+          quote = { ...quote, prices_saved_at: null };
           hideQuote();
           throw new Error(
-            "The saved quote has missing prices or invalid quantities. " +
+            "The saved quote needs pricing review. " +
             "Refresh, complete pricing, and save again."
           );
         }
@@ -933,23 +1069,31 @@ export async function renderLeadPricing(container, portalState) {
                   ? '<div class="muted">Required service</div>'
                   : ""
               }
+
+              ${
+                isCsi && Number(line.quantity) > 1
+                  ? `
+                    <div class="muted">
+                      Quantity: ${escapeHtml(String(line.quantity))}
+                    </div>
+                  `
+                  : ""
+              }
             </td>
 
-            <td style="
-              padding:12px;
-              text-align:center;
-              border-bottom:1px solid #e1e6ec;
-            ">
-              ${escapeHtml(String(line.quantity))}
-            </td>
+            ${
+              !isCsi
+                ? `
+                  <td style="padding:12px;text-align:center;">
+                    ${escapeHtml(String(line.quantity))}
+                  </td>
 
-            <td style="
-              padding:12px;
-              text-align:right;
-              border-bottom:1px solid #e1e6ec;
-            ">
-              ${escapeHtml(formatMoney(line.unit_price))}
-            </td>
+                  <td style="padding:12px;text-align:right;">
+                    ${escapeHtml(formatMoney(line.unit_price))}
+                  </td>
+                `
+                : ""
+            }
 
             <td style="
               padding:12px;
@@ -962,13 +1106,7 @@ export async function renderLeadPricing(container, portalState) {
         `).join("");
 
         previewDiv.innerHTML = `
-          <section style="
-            margin-top:24px;
-            padding:22px;
-            border:1px solid #cbd5e1;
-            border-radius:6px;
-            background:#fff;
-          ">
+          <section style="padding:22px;background:#fff;">
             <div style="
               display:flex;
               justify-content:space-between;
@@ -988,6 +1126,17 @@ export async function renderLeadPricing(container, portalState) {
                 <div class="muted">
                   Status: ${escapeHtml(savedQuote.status || "")}
                 </div>
+
+                ${
+                  savedQuote.prices_saved_at
+                    ? `
+                      <div class="muted">
+                        Prices saved:
+                        ${escapeHtml(formatDate(savedQuote.prices_saved_at))}
+                      </div>
+                    `
+                    : ""
+                }
               </div>
 
               <button
@@ -1005,8 +1154,8 @@ export async function renderLeadPricing(container, portalState) {
               background:#fff8e8;
               border-left:3px solid #e0a52d;
             ">
-              Internal Preview — Not Sent.
-              No customer link has been released by this action.
+              Internal Saved Quote View.
+              Opening this screen does not release a link or send the quote.
             </div>
 
             <div style="margin-bottom:18px;">
@@ -1038,9 +1187,19 @@ export async function renderLeadPricing(container, portalState) {
                 <thead>
                   <tr>
                     <th>Service</th>
-                    <th style="text-align:center;">Qty</th>
-                    <th style="text-align:right;">Unit Price</th>
-                    <th style="text-align:right;">Service Total</th>
+
+                    ${
+                      !isCsi
+                        ? `
+                          <th style="text-align:center;">Qty</th>
+                          <th style="text-align:right;">Unit Price</th>
+                        `
+                        : ""
+                    }
+
+                    <th style="text-align:right;">
+                      ${isCsi ? "Service Price" : "Service Total"}
+                    </th>
                   </tr>
                 </thead>
 
@@ -1048,7 +1207,10 @@ export async function renderLeadPricing(container, portalState) {
 
                 <tfoot>
                   <tr>
-                    <th colspan="3" style="text-align:right;">
+                    <th
+                      colspan="${isCsi ? 1 : 3}"
+                      style="text-align:right;"
+                    >
                       Offered Total
                     </th>
 
@@ -1056,6 +1218,24 @@ export async function renderLeadPricing(container, portalState) {
                       ${escapeHtml(formatMoney(totals.total))}
                     </th>
                   </tr>
+
+                  ${
+                    savedQuote.accepted_at || savedQuote.status === "accepted"
+                      ? `
+                        <tr>
+                          <th
+                            colspan="${isCsi ? 1 : 3}"
+                            style="text-align:right;"
+                          >
+                            Confirmed Total
+                          </th>
+                          <th style="text-align:right;color:#26703b;">
+                            ${escapeHtml(formatMoney(savedQuote.accepted_total))}
+                          </th>
+                        </tr>
+                      `
+                      : ""
+                  }
                 </tfoot>
               </table>
             </div>
@@ -1073,25 +1253,18 @@ export async function renderLeadPricing(container, portalState) {
             }
 
             <p class="muted" style="margin-bottom:0;">
-              This is an internal review only.
               Customer selection and acceptance are not enabled here.
+              Customer-link generation is not connected in this version.
             </p>
           </section>
         `;
 
-        previewDiv.hidden = false;
-
         previewDiv.querySelector("#btnCloseQuotePreview")
           .addEventListener("click", () => {
-            previewDiv.hidden = true;
-            previewDiv.innerHTML = "";
-            quoteButton.focus();
+            closePreview();
           });
 
-        previewDiv.scrollIntoView({
-          behavior: "smooth",
-          block: "start"
-        });
+        if (!previewDiv.open) previewDiv.showModal();
       } catch (error) {
         console.error("[Quote Preview] Load failed:", error);
 
@@ -1102,15 +1275,14 @@ export async function renderLeadPricing(container, portalState) {
         previewLoading = false;
 
         if (isCurrentView()) {
-          quoteButton.disabled = false;
           quoteButton.textContent = "Quote";
           refreshButton.disabled = false;
-
-          if (saveButton) saveButton.disabled = false;
 
           inputs.forEach(input => {
             input.disabled = false;
           });
+
+          refreshQuoteAvailability();
         }
       }
     });
@@ -1130,3 +1302,4 @@ export async function renderLeadPricing(container, portalState) {
     `;
   }
 }
+
