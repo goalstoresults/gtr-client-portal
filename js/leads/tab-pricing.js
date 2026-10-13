@@ -80,6 +80,7 @@ function calculateTotals(lines) {
 export async function renderLeadPricing(container, portalState) {
   const leadId = portalState.activeLeadId;
   const project = portalState.project;
+  const isCsi = String(project || "").toLowerCase() === "csi";
 
   if (!leadId) {
     container.innerHTML = `
@@ -152,6 +153,9 @@ export async function renderLeadPricing(container, portalState) {
     const acceptedDate = formatDate(quote.accepted_at);
     const sentDate = formatDate(quote.sent_at);
 
+    const columnCount = isCsi ? 3 : 6;
+    const totalLabelColspan = isCsi ? 1 : 4;
+
     const selectionLabel = (line) => {
       if (!line.offered) {
         return "Not offered";
@@ -179,46 +183,132 @@ export async function renderLeadPricing(container, portalState) {
     const rows = lines.length
       ? lines.map((line) => {
           const price = numericPrice(line.unit_price);
+          const quantity = Number(line.quantity);
 
-          const priceCell = canEdit && line.offered
-            ? `
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                inputmode="decimal"
-                class="quote-price-input"
-                data-quote-service-id="${escapeHtml(
-                  line.quote_service_id || ""
-                )}"
-                data-quantity="${escapeHtml(String(line.quantity))}"
-                value="${escapeHtml(
-                  price === null ? "" : price.toFixed(2)
-                )}"
-                placeholder="Enter price"
-                aria-label="Unit price for ${escapeHtml(
-                  line.service_name || "service"
-                )}"
-                style="width:115px;text-align:right;padding:7px 8px;"
-              >
-            `
-            : escapeHtml(formatMoney(line.unit_price));
+          // CSI normally uses quantity 1.
+          // Preserve existing quantity calculations for all projects.
+          const showQuantityNote =
+            isCsi &&
+            Number.isInteger(quantity) &&
+            quantity > 1;
+
+          const priceInput = `
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              inputmode="decimal"
+              class="quote-price-input"
+              data-quote-service-id="${escapeHtml(
+                line.quote_service_id || ""
+              )}"
+              data-quantity="${escapeHtml(String(line.quantity))}"
+              value="${escapeHtml(
+                price === null ? "" : price.toFixed(2)
+              )}"
+              placeholder="Enter price"
+              aria-label="${isCsi ? "Service price" : "Unit price"} for ${escapeHtml(
+                line.service_name || "service"
+              )}"
+              style="
+                width:130px;
+                text-align:right;
+                padding:7px 8px;
+                box-sizing:border-box;
+              "
+            >
+          `;
+
+          const serviceCell = `
+            <td>
+              <strong>${escapeHtml(line.service_name || "")}</strong>
+
+              ${
+                line.required
+                  ? '<div class="muted">Required service</div>'
+                  : ""
+              }
+
+              ${
+                !line.offered
+                  ? '<div class="muted">Not offered</div>'
+                  : ""
+              }
+
+              ${
+                showQuantityNote
+                  ? `
+                    <div class="muted" style="font-size:0.85em;">
+                      Quantity: ${escapeHtml(String(quantity))}
+                      ${
+                        canEdit && line.offered
+                          ? " · Enter the price per item"
+                          : ""
+                      }
+                    </div>
+                  `
+                  : ""
+              }
+            </td>
+          `;
+
+          const selectionCell = `
+            <td style="${
+              accepted &&
+              line.offered &&
+              line.customer_selected === true
+                ? "color:#26703b;font-weight:700;"
+                : ""
+            }">
+              ${escapeHtml(selectionLabel(line))}
+            </td>
+          `;
+
+          if (isCsi) {
+            return `
+              <tr>
+                ${serviceCell}
+
+                <td style="text-align:right;">
+                  ${
+                    canEdit && line.offered
+                      ? `
+                        ${priceInput}
+                        ${
+                          showQuantityNote
+                            ? `
+                              <div
+                                class="quote-line-total"
+                                data-quote-service-id="${escapeHtml(
+                                  line.quote_service_id || ""
+                                )}"
+                                style="
+                                  margin-top:4px;
+                                  color:#647180;
+                                  font-size:0.85em;
+                                "
+                              >
+                                Total: ${escapeHtml(
+                                  formatMoney(lineTotal(line))
+                                )}
+                              </div>
+                            `
+                            : ""
+                        }
+                      `
+                      : escapeHtml(formatMoney(lineTotal(line)))
+                  }
+                </td>
+
+                ${selectionCell}
+              </tr>
+            `;
+          }
 
           return `
             <tr>
-              <td>
-                <strong>${escapeHtml(line.service_name || "")}</strong>
-                ${
-                  line.required
-                    ? '<div class="muted">Required service</div>'
-                    : ""
-                }
-                ${
-                  !line.offered
-                    ? '<div class="muted">Not offered</div>'
-                    : ""
-                }
-              </td>
+              ${serviceCell}
+
               <td>
                 ${
                   line.service_description
@@ -226,12 +316,19 @@ export async function renderLeadPricing(container, portalState) {
                     : '<span class="muted">No description entered.</span>'
                 }
               </td>
+
               <td style="text-align:center;">
                 ${escapeHtml(String(line.quantity))}
               </td>
+
               <td style="text-align:right;">
-                ${priceCell}
+                ${
+                  canEdit && line.offered
+                    ? priceInput
+                    : escapeHtml(formatMoney(line.unit_price))
+                }
               </td>
+
               <td
                 class="quote-line-total"
                 data-quote-service-id="${escapeHtml(
@@ -241,20 +338,14 @@ export async function renderLeadPricing(container, portalState) {
               >
                 ${escapeHtml(formatMoney(lineTotal(line)))}
               </td>
-              <td style="${
-                accepted && line.offered &&
-                line.customer_selected === true
-                  ? "color:#26703b;font-weight:700;"
-                  : ""
-              }">
-                ${escapeHtml(selectionLabel(line))}
-              </td>
+
+              ${selectionCell}
             </tr>
           `;
         }).join("")
       : `
         <tr>
-          <td colspan="6" class="muted">
+          <td colspan="${columnCount}" class="muted">
             No service lines exist on this quote.
           </td>
         </tr>
@@ -269,7 +360,9 @@ export async function renderLeadPricing(container, portalState) {
         "staff correction access has not been added yet.";
     } else if (canEdit) {
       notice =
-        "Enter the unit price for each offered service. " +
+        (isCsi
+          ? "Enter the service price for each offered service. "
+          : "Enter the unit price for each offered service. ") +
         "Prices are saved only to this draft quote and do not " +
         "change the master Services lookup list.";
     } else if (draft) {
@@ -285,60 +378,80 @@ export async function renderLeadPricing(container, portalState) {
     container.innerHTML = `
       <section class="card">
         <div style="
-          display:flex;justify-content:space-between;
-          align-items:flex-start;gap:16px;flex-wrap:wrap;
+          display:flex;
+          justify-content:space-between;
+          align-items:flex-start;
+          gap:16px;
+          flex-wrap:wrap;
           margin-bottom:18px;
         ">
           <div>
             <h2 style="margin:0 0 6px;">Pricing Chart</h2>
+
             <div>
               Quote:
               <strong>${escapeHtml(
                 quote.quote_number || "Unnamed Quote"
               )}</strong>
             </div>
+
             <div class="muted">
               Showing the newest quote for this lead.
             </div>
+
             ${
               sentDate
-                ? `<div class="muted">
+                ? `
+                  <div class="muted">
                     Released: ${escapeHtml(sentDate)}
-                   </div>`
+                  </div>
+                `
                 : ""
             }
+
             ${
               acceptedDate
-                ? `<div class="muted">
+                ? `
+                  <div class="muted">
                     Accepted: ${escapeHtml(acceptedDate)}
-                   </div>`
+                  </div>
+                `
                 : ""
             }
           </div>
 
           <div style="
-            display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+            display:flex;
+            gap:10px;
+            align-items:center;
+            flex-wrap:wrap;
           ">
             <span>
               Status:
               <strong>${escapeHtml(quote.status || "")}</strong>
             </span>
+
             <button id="btnRefreshQuote" class="secondary">
               Refresh
             </button>
+
             ${
               canEdit && offeredLines.length
-                ? `<button id="btnSaveQuotePrices" class="btn-primary">
+                ? `
+                  <button id="btnSaveQuotePrices" class="btn-primary">
                     Save Prices
-                   </button>`
+                  </button>
+                `
                 : ""
             }
           </div>
         </div>
 
         <div style="
-          padding:12px 14px;margin-bottom:18px;
-          border-left:3px solid #7ea3c9;background:#f6f9fc;
+          padding:12px 14px;
+          margin-bottom:18px;
+          border-left:3px solid #7ea3c9;
+          background:#f6f9fc;
         ">
           ${escapeHtml(notice)}
         </div>
@@ -347,24 +460,51 @@ export async function renderLeadPricing(container, portalState) {
           <table class="notes-table" style="width:100%;">
             <thead>
               <tr>
-                <th style="min-width:180px;">Service</th>
-                <th style="min-width:220px;">Description</th>
-                <th style="text-align:center;">Qty</th>
-                <th style="text-align:right;min-width:140px;">
-                  Unit Price
+                <th style="min-width:220px;">Service</th>
+
+                ${
+                  isCsi
+                    ? `
+                      <th style="text-align:right;min-width:150px;">
+                        Service Price
+                      </th>
+                    `
+                    : `
+                      <th style="min-width:220px;">Description</th>
+
+                      <th style="text-align:center;">
+                        Qty
+                      </th>
+
+                      <th style="text-align:right;min-width:140px;">
+                        Unit Price
+                      </th>
+
+                      <th style="text-align:right;min-width:120px;">
+                        Line Total
+                      </th>
+                    `
+                }
+
+                <th style="min-width:180px;">
+                  Customer Selection
                 </th>
-                <th style="text-align:right;min-width:120px;">
-                  Line Total
-                </th>
-                <th style="min-width:160px;">Customer Selection</th>
               </tr>
             </thead>
-            <tbody>${rows}</tbody>
+
+            <tbody>
+              ${rows}
+            </tbody>
+
             <tfoot>
               <tr>
-                <th colspan="4" style="text-align:right;">
+                <th
+                  colspan="${totalLabelColspan}"
+                  style="text-align:right;"
+                >
                   ${canEdit ? "Current Offered Total" : "Offered Total"}
                 </th>
+
                 <th id="quoteTotalDisplay" style="text-align:right;">
                   ${escapeHtml(formatMoney(
                     canEdit
@@ -372,18 +512,25 @@ export async function renderLeadPricing(container, portalState) {
                       : quote.offered_total
                   ))}
                 </th>
+
                 <th></th>
               </tr>
+
               ${
                 accepted
                   ? `
                     <tr>
-                      <th colspan="4" style="text-align:right;">
+                      <th
+                        colspan="${totalLabelColspan}"
+                        style="text-align:right;"
+                      >
                         Confirmed Total
                       </th>
+
                       <th style="text-align:right;color:#26703b;">
                         ${escapeHtml(formatMoney(quote.accepted_total))}
                       </th>
+
                       <th></th>
                     </tr>
                   `
@@ -394,18 +541,35 @@ export async function renderLeadPricing(container, portalState) {
         </div>
 
         <p id="quotePriceStatus" class="muted" style="
-          margin:14px 0 0;padding:10px 12px;
+          margin:14px 0 0;
+          padding:10px 12px;
         "></p>
       </section>
     `;
 
-    const totalDisplay = container.querySelector("#quoteTotalDisplay");
-    const priceStatus = container.querySelector("#quotePriceStatus");
-    const saveButton = container.querySelector("#btnSaveQuotePrices");
-    const refreshButton = container.querySelector("#btnRefreshQuote");
+    const totalDisplay =
+      container.querySelector("#quoteTotalDisplay");
+
+    const priceStatus =
+      container.querySelector("#quotePriceStatus");
+
+    const saveButton =
+      container.querySelector("#btnSaveQuotePrices");
+
+    const refreshButton =
+      container.querySelector("#btnRefreshQuote");
 
     const inputs = Array.from(
       container.querySelectorAll(".quote-price-input")
+    );
+
+    const lineTotalElements = new Map(
+      Array.from(
+        container.querySelectorAll(".quote-line-total")
+      ).map(element => [
+        element.dataset.quoteServiceId,
+        element
+      ])
     );
 
     let saving = false;
@@ -450,16 +614,13 @@ export async function renderLeadPricing(container, portalState) {
           quantity: input.dataset.quantity
         });
 
-        const totalCell = Array.from(
-          container.querySelectorAll(".quote-line-total")
-        ).find(
-          cell =>
-            cell.dataset.quoteServiceId ===
-            input.dataset.quoteServiceId
+        const totalElement = lineTotalElements.get(
+          input.dataset.quoteServiceId
         );
 
-        if (totalCell) {
-          totalCell.textContent = formatMoney(total);
+        if (totalElement) {
+          totalElement.textContent =
+            (isCsi ? "Total: " : "") + formatMoney(total);
         }
 
         if (total === null) {
@@ -527,6 +688,7 @@ export async function renderLeadPricing(container, portalState) {
         saveButton.disabled = true;
         saveButton.textContent = "Saving…";
         refreshButton.disabled = true;
+
         inputs.forEach(input => {
           input.disabled = true;
         });
@@ -588,10 +750,16 @@ export async function renderLeadPricing(container, portalState) {
     container.innerHTML = `
       <section class="card">
         <h2>Pricing Chart</h2>
-        <p class="error">Unable to load the quote.</p>
-        <p class="muted">${escapeHtml(
-          error.message || "Please try again."
-        )}</p>
+
+        <p class="error">
+          Unable to load the quote.
+        </p>
+
+        <p class="muted">
+          ${escapeHtml(
+            error.message || "Please try again."
+          )}
+        </p>
       </section>
     `;
   }
