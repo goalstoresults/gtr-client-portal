@@ -9,7 +9,9 @@
   <title>Your Quote | Clear Sight Inspections</title>
 
   <style>
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     body {
       margin: 0;
@@ -25,7 +27,8 @@
       padding: 0 16px;
     }
 
-    header, section {
+    header,
+    section {
       background: #fff;
       border: 1px solid #dce2e8;
       border-radius: 8px;
@@ -33,13 +36,27 @@
       margin-bottom: 20px;
     }
 
-    header { border-top: 5px solid #244b70; }
+    header {
+      border-top: 5px solid #244b70;
+    }
 
-    h1 { margin: 0 0 6px; font-size: 28px; }
-    h2 { margin: 0 0 16px; font-size: 21px; }
-    p { margin: 0 0 12px; }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 28px;
+    }
 
-    .muted { color: #647180; }
+    h2 {
+      margin: 0 0 16px;
+      font-size: 21px;
+    }
+
+    p {
+      margin: 0 0 12px;
+    }
+
+    .muted {
+      color: #647180;
+    }
 
     .notice {
       padding: 14px 16px;
@@ -92,7 +109,6 @@
 
     .service-name {
       font-weight: 700;
-      cursor: inherit;
     }
 
     .service-description {
@@ -121,7 +137,9 @@
       border-top: 2px solid #244b70;
     }
 
-    .message { white-space: pre-wrap; }
+    .message {
+      white-space: pre-wrap;
+    }
 
     .actions {
       display: flex;
@@ -184,15 +202,35 @@
       flex-shrink: 0;
     }
 
-    [hidden] { display: none !important; }
+    [hidden] {
+      display: none !important;
+    }
 
     @media (max-width: 600px) {
-      main { margin: 16px auto; }
-      header, section { padding: 18px; }
-      h1 { font-size: 24px; }
-      .grid { grid-template-columns: 1fr; }
-      .service { gap: 8px; }
-      .actions button { width: 100%; }
+      main {
+        margin: 16px auto;
+      }
+
+      header,
+      section {
+        padding: 18px;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .service {
+        gap: 8px;
+      }
+
+      .actions button {
+        width: 100%;
+      }
     }
   </style>
 </head>
@@ -205,15 +243,13 @@
       <div id="quoteHeading"></div>
     </header>
 
-    <section id="statusSection">
+    <section>
       <div
         id="pageStatus"
         class="notice"
         role="status"
         aria-live="polite"
-      >
-        Loading your quote…
-      </div>
+      >Loading your quote…</div>
     </section>
 
     <div id="quoteContent" hidden>
@@ -287,8 +323,7 @@
         <h2 id="reviewHeading">Review Your Selections</h2>
 
         <p>
-          Please review the services and total below before
-          confirming.
+          Please review the services and total below before confirming.
         </p>
 
         <div id="reviewList"></div>
@@ -307,9 +342,8 @@
         </label>
 
         <p class="muted" style="margin-top:16px;">
-          Once confirmed, your selections will be saved and
-          cannot be changed on this page. Contact CSI if you
-          need a correction.
+          Once confirmed, your selections will be saved and cannot
+          be changed on this page. Contact CSI if you need a correction.
         </p>
 
         <div
@@ -322,11 +356,7 @@
         ></div>
 
         <div class="actions">
-          <button
-            id="confirmButton"
-            type="button"
-            disabled
-          >
+          <button id="confirmButton" type="button" disabled>
             Confirm My Services
           </button>
 
@@ -374,7 +404,6 @@
       "https://quotes-module.dennis-e64.workers.dev/quotes/public/accept";
 
     const PROJECT = "csi";
-
     const token = new URLSearchParams(location.search).get("token");
 
     const pageStatus = document.getElementById("pageStatus");
@@ -388,8 +417,15 @@
     const confirmationCheck =
       document.getElementById("confirmationCheck");
 
+    const currencyFormatter = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD"
+    });
+
     let quote = null;
     let lines = [];
+    let customer = {};
+    let property = {};
     let selectedIds = new Set();
     let submissionInProgress = false;
     let confirmationOutcomeUnknown = false;
@@ -398,7 +434,7 @@
       if (
         value === null ||
         value === undefined ||
-        value === ""
+        String(value).trim() === ""
       ) {
         return "Not priced";
       }
@@ -406,10 +442,7 @@
       const number = Number(value);
 
       return Number.isFinite(number)
-        ? new Intl.NumberFormat("en-US", {
-            style: "currency",
-            currency: "USD"
-          }).format(number)
+        ? currencyFormatter.format(number)
         : "Not priced";
     }
 
@@ -435,7 +468,6 @@
 
     function showNotice(id, message, type = "") {
       const element = document.getElementById(id);
-
       element.className = "notice";
 
       if (type) {
@@ -473,9 +505,9 @@
       const container = document.getElementById(containerId);
       container.replaceChildren();
 
-      fields.forEach(([label, value]) => {
+      for (const [label, value] of fields) {
         addField(container, label, value);
-      });
+      }
 
       if (!container.children.length) {
         const note = document.createElement("p");
@@ -562,17 +594,17 @@
     }
 
     function updateCheckboxStates() {
+      const lineById = new Map(
+        lines.map(line => [line.quote_service_id, line])
+      );
+
       serviceList
         .querySelectorAll("input[type='checkbox']")
         .forEach(checkbox => {
-          const line = lines.find(
-            item =>
-              item.quote_service_id === checkbox.dataset.serviceId
-          );
+          const id = checkbox.dataset.serviceId;
+          const line = lineById.get(id);
 
-          checkbox.checked = selectedIds.has(
-            checkbox.dataset.serviceId
-          );
+          checkbox.checked = selectedIds.has(id);
 
           checkbox.disabled =
             !canEditSelections() ||
@@ -714,14 +746,11 @@
     function renderQuote(data) {
       quote = data.quote;
       lines = Array.isArray(data.lines) ? data.lines : [];
-
-      const customer = data.customer || {};
-      const property = data.property || {};
+      customer = data.customer || {};
+      property = data.property || {};
 
       const accepted = isAccepted();
 
-      // Existing choices are retained.
-      // Required services are preselected only for an editable quote.
       selectedIds = new Set(
         lines
           .filter(
@@ -787,13 +816,11 @@
         ["Exclusions", property.exclusions]
       ]);
 
-      const messageSection =
-        document.getElementById("messageSection");
-
       document.getElementById("customerMessage").textContent =
         quote.customer_message || "";
 
-      messageSection.hidden = !quote.customer_message;
+      document.getElementById("messageSection").hidden =
+        !quote.customer_message;
 
       reviewSection.hidden = true;
       confirmationCheck.checked = false;
@@ -801,7 +828,414 @@
       confirmButton.disabled = true;
       confirmButton.textContent = "Confirm My Services";
       editButton.disabled = false;
-      reloadButton.hidden =
+      reloadButton.hidden = true;
+
+      showNotice("confirmationNotice", "");
+
+      document.getElementById("offeredTotal").textContent =
+        money(quote.offered_total);
+
+      document.getElementById("selectedTotalRow").hidden =
+        !quote.can_select || accepted;
+
+      document.getElementById("selectionActions").hidden =
+        !quote.can_select || accepted;
+
+      const hasAcceptedTotal =
+        quote.accepted_total !== null &&
+        quote.accepted_total !== undefined;
+
+      document.getElementById("acceptedTotalRow").hidden =
+        !hasAcceptedTotal;
+
+      document.getElementById("acceptedTotal").textContent =
+        hasAcceptedTotal ? money(quote.accepted_total) : "";
+
+      document.getElementById("confirmationSection").hidden =
+        !accepted;
+
+      const acceptedTime = dateText(quote.accepted_at);
+
+      document.getElementById("confirmationDetails").textContent =
+        accepted
+          ? "Quote " + quote.quote_number +
+            (acceptedTime ? " · Confirmed: " + acceptedTime : "")
+          : "";
+
+      const instructions =
+        document.getElementById("serviceInstructions");
+
+      if (accepted) {
+        instructions.textContent =
+          "Your confirmed selections are shown below. " +
+          "Unchecked services are not included.";
+
+        setPageStatus(
+          "Your services have been confirmed and saved.",
+          "success"
+        );
+      } else if (quote.can_select === true) {
+        instructions.textContent =
+          "Choose the services you want included. " +
+          "Required services are already selected. " +
+          "Then select Review and Confirm.";
+
+        setPageStatus(
+          "Your quote is ready. Please review and select your services."
+        );
+      } else if (quote.status === "draft") {
+        instructions.textContent =
+          "Available services and their quoted prices are shown below.";
+
+        setPageStatus(
+          "Draft quote preview — customer confirmation is not enabled."
+        );
+      } else {
+        instructions.textContent =
+          "Available services and their quoted prices are shown below.";
+
+        setPageStatus(
+          "This quote is available for viewing only. " +
+          "Please contact CSI if you need assistance."
+        );
+      }
+
+      renderServices();
+      updateSelectionSummary();
+      content.hidden = false;
+    }
+
+    async function fetchQuoteData() {
+      const response = await fetch(READ_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          project: PROJECT,
+          token
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success || !data.quote) {
+        throw new Error(
+          data.error || "Unable to load your quote."
+        );
+      }
+
+      return data;
+    }
+
+    function openReview() {
+      if (!canEditSelections()) return;
+
+      const summary = selectionSummary();
+
+      if (!summary.valid) {
+        updateSelectionSummary();
+        return;
+      }
+
+      const reviewList = document.getElementById("reviewList");
+      reviewList.replaceChildren();
+
+      for (const line of summary.selectedLines) {
+        const item = document.createElement("div");
+        item.className = "review-item";
+
+        const details = document.createElement("div");
+
+        const name = document.createElement("div");
+        name.textContent = line.service_name || "Service";
+        details.append(name);
+
+        const quantity = document.createElement("div");
+        quantity.className = "muted";
+        quantity.textContent =
+          "Quantity: " + line.quantity +
+          (line.required === true ? " · Required service" : "");
+        details.append(quantity);
+
+        const price = document.createElement("div");
+        price.className = "review-price";
+        price.textContent =
+          money(lineTotalCents(line) / 100);
+
+        item.append(details, price);
+        reviewList.append(item);
+      }
+
+      document.getElementById("reviewTotal").textContent =
+        money(summary.totalCents / 100);
+
+      confirmationCheck.checked = false;
+      confirmButton.disabled = true;
+      showNotice("confirmationNotice", "");
+
+      reviewSection.hidden = false;
+      document.getElementById("selectionActions").hidden = true;
+      updateCheckboxStates();
+
+      reviewSection.focus();
+      reviewSection.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }
+
+    function closeReview() {
+      if (
+        submissionInProgress ||
+        confirmationOutcomeUnknown
+      ) {
+        return;
+      }
+
+      reviewSection.hidden = true;
+      confirmationCheck.checked = false;
+      confirmButton.disabled = true;
+
+      document.getElementById("selectionActions").hidden =
+        !quote?.can_select || isAccepted();
+
+      updateCheckboxStates();
+      updateSelectionSummary();
+      reviewButton.focus();
+    }
+
+    function applyAcceptedResult(data, submittedIds) {
+      const acceptedQuote = {
+        ...quote,
+        ...data.quote,
+        status: "accepted",
+        can_select: false
+      };
+
+      const confirmedIds = new Set(submittedIds);
+
+      const acceptedLines = lines.map(line => ({
+        ...line,
+        customer_selected:
+          confirmedIds.has(line.quote_service_id)
+      }));
+
+      submissionInProgress = false;
+      confirmationOutcomeUnknown = false;
+
+      renderQuote({
+        quote: acceptedQuote,
+        lines: acceptedLines,
+        customer,
+        property
+      });
+
+      document.getElementById("confirmationSection")
+        .scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
+    }
+
+    function blockUnverifiedConfirmation(message) {
+      submissionInProgress = false;
+      confirmationOutcomeUnknown = true;
+
+      confirmationCheck.disabled = true;
+      confirmButton.disabled = true;
+      confirmButton.textContent =
+        "Confirmation Status Unverified";
+      editButton.disabled = true;
+      reloadButton.hidden = false;
+      reviewButton.disabled = true;
+
+      updateCheckboxStates();
+
+      showNotice(
+        "confirmationNotice",
+        message,
+        "error"
+      );
+    }
+
+    async function verifyAfterUncertainSubmission() {
+      try {
+        const latest = await fetchQuoteData();
+
+        if (
+          latest.quote.status === "accepted" ||
+          latest.quote.accepted_at
+        ) {
+          submissionInProgress = false;
+          confirmationOutcomeUnknown = false;
+          renderQuote(latest);
+          return;
+        }
+      } catch {
+        // Keep submission blocked when the result cannot be verified.
+      }
+
+      blockUnverifiedConfirmation(
+        "We could not verify whether your confirmation was saved. " +
+        "Please reload the quote before attempting confirmation again. " +
+        "If the problem continues, contact CSI."
+      );
+    }
+
+    async function confirmSelections() {
+      if (
+        !canEditSelections() ||
+        !confirmationCheck.checked ||
+        reviewSection.hidden
+      ) {
+        return;
+      }
+
+      const summary = selectionSummary();
+
+      if (!summary.valid) return;
+
+      const submittedIds = summary.selectedLines.map(
+        line => line.quote_service_id
+      );
+
+      submissionInProgress = true;
+      confirmationCheck.disabled = true;
+      confirmButton.disabled = true;
+      confirmButton.textContent = "Saving Confirmation…";
+      editButton.disabled = true;
+
+      updateCheckboxStates();
+
+      showNotice(
+        "confirmationNotice",
+        "Saving your confirmed services…"
+      );
+
+      try {
+        const response = await fetch(ACCEPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+          body: JSON.stringify({
+            project: PROJECT,
+            token,
+            selected_service_ids: submittedIds
+          })
+        });
+
+        let data;
+
+        try {
+          data = await response.json();
+        } catch {
+          await verifyAfterUncertainSubmission();
+          return;
+        }
+
+        if (
+          response.ok &&
+          data.success === true &&
+          data.quote?.status === "accepted"
+        ) {
+          applyAcceptedResult(data, submittedIds);
+          return;
+        }
+
+        if (response.status >= 500 || response.ok) {
+          await verifyAfterUncertainSubmission();
+          return;
+        }
+
+        if (
+          response.status === 409 ||
+          response.status === 404
+        ) {
+          try {
+            const latest = await fetchQuoteData();
+
+            submissionInProgress = false;
+            confirmationOutcomeUnknown = false;
+            renderQuote(latest);
+
+            if (!isAccepted()) {
+              showNotice(
+                "selectionNotice",
+                data.error ||
+                  "This quote is no longer available for confirmation.",
+                "error"
+              );
+            }
+          } catch {
+            blockUnverifiedConfirmation(
+              data.error ||
+                "This quote is unavailable. Please reload or contact CSI."
+            );
+          }
+
+          return;
+        }
+
+        submissionInProgress = false;
+        confirmationCheck.disabled = false;
+        confirmButton.textContent = "Confirm My Services";
+        confirmButton.disabled = !confirmationCheck.checked;
+        editButton.disabled = false;
+
+        showNotice(
+          "confirmationNotice",
+          data.error ||
+            "Unable to confirm your selections. Please contact CSI.",
+          "error"
+        );
+      } catch {
+        await verifyAfterUncertainSubmission();
+      }
+    }
+
+    reviewButton.addEventListener("click", openReview);
+    editButton.addEventListener("click", closeReview);
+    confirmButton.addEventListener("click", confirmSelections);
+
+    confirmationCheck.addEventListener("change", () => {
+      confirmButton.disabled =
+        !confirmationCheck.checked ||
+        submissionInProgress ||
+        confirmationOutcomeUnknown ||
+        !quote?.can_select ||
+        isAccepted();
+    });
+
+    reloadButton.addEventListener("click", () => {
+      location.reload();
+    });
+
+    async function initialize() {
+      if (
+        !token ||
+        !/^[a-f0-9]{64}$/.test(token)
+      ) {
+        setPageStatus(
+          "This quote link is incomplete or invalid. " +
+          "Please use the private link supplied by CSI.",
+          "error"
+        );
+        return;
+      }
+
+      try {
+        const data = await fetchQuoteData();
+        renderQuote(data);
+      } catch (error) {
+        setPageStatus(
+          error.message ||
+            "Unable to load your quote. Please contact CSI.",
+          "error"
+        );
+      }
+    }
+
+    initialize();
   </script>
 </body>
 </html>
