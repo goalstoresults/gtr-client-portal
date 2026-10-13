@@ -2,66 +2,79 @@
 
 import { escapeHtml } from "../utilities.js";
 
-const LEADS_MODULE_URL = "https://leads-module.dennis-e64.workers.dev";
+const LEADS_MODULE_URL =
+  "https://leads-module.dennis-e64.workers.dev";
+
+function numericPrice(value) {
+  if (
+    value === null ||
+    value === undefined ||
+    String(value).trim() === ""
+  ) {
+    return null;
+  }
+
+  const number = Number(value);
+
+  return Number.isFinite(number) && number >= 0
+    ? number
+    : null;
+}
 
 function formatMoney(value) {
-  if (value === null || value === undefined || value === "") {
+  const number = numericPrice(value);
+
+  return number === null
+    ? "Not priced"
+    : new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD"
+      }).format(number);
+}
+
+function formatDate(value) {
+  if (!value) return "";
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime())
+    ? ""
+    : date.toLocaleString();
+}
+
+function lineTotal(line) {
+  const price = numericPrice(line.unit_price);
+  const quantity = Number(line.quantity);
+
+  if (
+    price === null ||
+    !Number.isInteger(quantity) ||
+    quantity <= 0
+  ) {
     return null;
   }
 
-  const numericValue = Number(value);
-
-  if (!Number.isFinite(numericValue)) {
-    return null;
-  }
-
-  return `$${numericValue.toFixed(2)}`;
+  return Math.round(price * 100) * quantity / 100;
 }
 
-function getInputPriceValue(value) {
-  if (value === null || value === undefined || value === "") {
-    return "";
-  }
+function calculateTotals(lines) {
+  let totalCents = 0;
+  let unpricedCount = 0;
 
-  const numericValue = Number(value);
+  for (const line of lines) {
+    const total = lineTotal(line);
 
-  if (!Number.isFinite(numericValue)) {
-    return "";
-  }
-
-  return numericValue.toFixed(2);
-}
-
-function calculateQuoteTotals(lines) {
-  return lines.reduce(
-    (result, line) => {
-      const rawPrice = line.unit_price;
-      const quantity = Number(line.quantity || 1);
-
-      if (
-        rawPrice === null ||
-        rawPrice === undefined ||
-        String(rawPrice).trim() === ""
-      ) {
-        result.unpricedCount += 1;
-        return result;
-      }
-
-      const price = Number(rawPrice);
-
-      if (!Number.isFinite(price)) {
-        result.unpricedCount += 1;
-        return result;
-      }
-
-      result.total += price * quantity;
-      return result;
-    },
-    {
-      total: 0,
-      unpricedCount: 0
+    if (total === null) {
+      unpricedCount += 1;
+    } else {
+      totalCents += Math.round(total * 100);
     }
-  );
+  }
+
+  return {
+    total: totalCents / 100,
+    unpricedCount
+  };
 }
 
 export async function renderLeadPricing(container, portalState) {
@@ -81,379 +94,447 @@ export async function renderLeadPricing(container, portalState) {
   container.innerHTML = `
     <section class="card">
       <h2>Pricing Chart</h2>
-      <p class="muted">Loading draft quote…</p>
+      <p class="muted">Loading quote…</p>
     </section>
   `;
 
   try {
-    const quoteUrl =
-      `${LEADS_MODULE_URL}/quotes/draft` +
+    const url =
+      `${LEADS_MODULE_URL}/quotes/current` +
       `?project=${encodeURIComponent(project)}` +
       `&lead_id=${encodeURIComponent(leadId)}`;
 
-    const quoteRes = await fetch(quoteUrl, {
-      cache: "no-cache"
+    const response = await fetch(url, {
+      cache: "no-store"
     });
 
-    const quoteData = await quoteRes.json();
+    const data = await response.json();
 
-    if (!quoteRes.ok) {
+    if (!response.ok || data.success === false) {
       throw new Error(
-        quoteData?.error || `Unable to load draft quote (${quoteRes.status}).`
+        data.error || `Unable to load quote (${response.status}).`
       );
     }
 
-    const quote = quoteData?.quote || null;
-    const lines = Array.isArray(quoteData?.lines)
-      ? quoteData.lines
-      : [];
+    const quote = data.quote || null;
+    const lines = Array.isArray(data.lines) ? data.lines : [];
 
     if (!quote) {
       container.innerHTML = `
         <section class="card">
           <h2>Pricing Chart</h2>
-
+          <p class="muted">No quote exists for this lead yet.</p>
           <p class="muted">
-            No draft quote exists for this lead yet.
-          </p>
-
-          <p class="muted">
-            Go to the <strong>Services</strong> tab, select one or more
-            services, and click <strong>Save Services</strong>.
+            To create the initial draft, choose services in the
+            Services tab and click Save Services.
           </p>
         </section>
       `;
       return;
     }
 
-    const initialTotals = calculateQuoteTotals(lines);
+    const accepted =
+      quote.status === "accepted" || Boolean(quote.accepted_at);
 
-    const rowsHtml = lines.length
-      ? lines
-          .map((line) => {
-            const quantity = Number(line.quantity || 1);
-            const priceValue = getInputPriceValue(line.unit_price);
+    const draft =
+      quote.status === "draft" && !accepted;
 
-            return `
-              <tr
-                data-quote-service-id="${escapeHtml(line.quote_service_id || "")}"
-                data-quantity="${escapeHtml(String(quantity))}"
+    const canEdit =
+      draft &&
+      data.can_edit_prices === true &&
+      portalState.canEdit === true;
+
+    const offeredLines = lines.filter(
+      line => line.offered === true
+    );
+
+    const initialTotals = calculateTotals(offeredLines);
+    const acceptedDate = formatDate(quote.accepted_at);
+    const sentDate = formatDate(quote.sent_at);
+
+    const selectionLabel = (line) => {
+      if (!line.offered) {
+        return "Not offered";
+      }
+
+      if (accepted) {
+        return line.customer_selected === true
+          ? "Selected"
+          : "Not selected";
+      }
+
+      if (line.customer_selected === true) {
+        return "Selected";
+      }
+
+      if (line.customer_selected === false) {
+        return "Not selected";
+      }
+
+      return draft
+        ? "Not yet confirmed"
+        : "Awaiting confirmation";
+    };
+
+    const rows = lines.length
+      ? lines.map((line) => {
+          const price = numericPrice(line.unit_price);
+
+          const priceCell = canEdit && line.offered
+            ? `
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                inputmode="decimal"
+                class="quote-price-input"
+                data-quote-service-id="${escapeHtml(
+                  line.quote_service_id || ""
+                )}"
+                data-quantity="${escapeHtml(String(line.quantity))}"
+                value="${escapeHtml(
+                  price === null ? "" : price.toFixed(2)
+                )}"
+                placeholder="Enter price"
+                aria-label="Unit price for ${escapeHtml(
+                  line.service_name || "service"
+                )}"
+                style="width:115px;text-align:right;padding:7px 8px;"
               >
-                <td>
-                  <strong>${escapeHtml(line.service_name || "")}</strong>
-                  ${
-                    line.required
-                      ? `
-                        <div
-                          class="muted"
-                          style="font-size:0.85em; margin-top:3px;"
-                        >
-                          Required service
-                        </div>
-                      `
-                      : ""
-                  }
-                </td>
+            `
+            : escapeHtml(formatMoney(line.unit_price));
 
-                <td>
-                  ${
-                    line.service_description
-                      ? escapeHtml(line.service_description)
-                      : `<span class="muted">No description entered.</span>`
-                  }
-                </td>
-
-                <td style="text-align:center;">
-                  ${escapeHtml(String(quantity))}
-                </td>
-
-                <td style="text-align:right; min-width:180px;">
-                  <div
-                    style="
-                      display:flex;
-                      justify-content:flex-end;
-                      align-items:center;
-                      gap:5px;
-                    "
-                  >
-                    <span class="muted">$</span>
-
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      inputmode="decimal"
-                      class="quote-price-input"
-                      data-quote-service-id="${escapeHtml(line.quote_service_id || "")}"
-                      value="${escapeHtml(priceValue)}"
-                      placeholder="Enter price"
-                      aria-label="Quoted price for ${escapeHtml(line.service_name || "service")}"
-                      style="
-                        width:115px;
-                        text-align:right;
-                        padding:7px 8px;
-                        box-sizing:border-box;
-                      "
-                    />
-                  </div>
-                </td>
-              </tr>
-            `;
-          })
-          .join("")
+          return `
+            <tr>
+              <td>
+                <strong>${escapeHtml(line.service_name || "")}</strong>
+                ${
+                  line.required
+                    ? '<div class="muted">Required service</div>'
+                    : ""
+                }
+                ${
+                  !line.offered
+                    ? '<div class="muted">Not offered</div>'
+                    : ""
+                }
+              </td>
+              <td>
+                ${
+                  line.service_description
+                    ? escapeHtml(line.service_description)
+                    : '<span class="muted">No description entered.</span>'
+                }
+              </td>
+              <td style="text-align:center;">
+                ${escapeHtml(String(line.quantity))}
+              </td>
+              <td style="text-align:right;">
+                ${priceCell}
+              </td>
+              <td
+                class="quote-line-total"
+                data-quote-service-id="${escapeHtml(
+                  line.quote_service_id || ""
+                )}"
+                style="text-align:right;"
+              >
+                ${escapeHtml(formatMoney(lineTotal(line)))}
+              </td>
+              <td style="${
+                accepted && line.offered &&
+                line.customer_selected === true
+                  ? "color:#26703b;font-weight:700;"
+                  : ""
+              }">
+                ${escapeHtml(selectionLabel(line))}
+              </td>
+            </tr>
+          `;
+        }).join("")
       : `
-          <tr>
-            <td colspan="4" class="muted">
-              No services are currently on this draft quote.
-              Return to Services, choose services, and click Save Services.
-            </td>
-          </tr>
-        `;
+        <tr>
+          <td colspan="6" class="muted">
+            No service lines exist on this quote.
+          </td>
+        </tr>
+      `;
+
+    let notice;
+
+    if (accepted) {
+      notice =
+        "The customer has confirmed this quote. Saved selections " +
+        "and totals are shown below. Prices are read-only; " +
+        "staff correction access has not been added yet.";
+    } else if (canEdit) {
+      notice =
+        "Enter the unit price for each offered service. " +
+        "Prices are saved only to this draft quote and do not " +
+        "change the master Services lookup list.";
+    } else if (draft) {
+      notice =
+        "This is a draft quote. Your current Portal permissions " +
+        "do not allow price editing.";
+    } else {
+      notice =
+        "This quote is read-only in its current status. " +
+        "Customer selections will appear here after confirmation.";
+    }
 
     container.innerHTML = `
       <section class="card">
-        <div
-          style="
-            display:flex;
-            align-items:flex-start;
-            justify-content:space-between;
-            gap:16px;
-            flex-wrap:wrap;
-            margin-bottom:18px;
-          "
-        >
+        <div style="
+          display:flex;justify-content:space-between;
+          align-items:flex-start;gap:16px;flex-wrap:wrap;
+          margin-bottom:18px;
+        ">
           <div>
             <h2 style="margin:0 0 6px;">Pricing Chart</h2>
-
-            <div class="muted">
-              Draft quote:
-              <strong>${escapeHtml(quote.quote_number || "Unnamed Quote")}</strong>
+            <div>
+              Quote:
+              <strong>${escapeHtml(
+                quote.quote_number || "Unnamed Quote"
+              )}</strong>
             </div>
+            <div class="muted">
+              Showing the newest quote for this lead.
+            </div>
+            ${
+              sentDate
+                ? `<div class="muted">
+                    Released: ${escapeHtml(sentDate)}
+                   </div>`
+                : ""
+            }
+            ${
+              acceptedDate
+                ? `<div class="muted">
+                    Accepted: ${escapeHtml(acceptedDate)}
+                   </div>`
+                : ""
+            }
           </div>
 
-          <div
-            style="
-              display:flex;
-              gap:10px;
-              align-items:center;
-              flex-wrap:wrap;
-            "
-          >
-            <div
-              style="
-                padding:8px 12px;
-                border-radius:4px;
-                background:#f7f7f7;
-                color:#555;
-                font-size:0.9em;
-              "
-            >
+          <div style="
+            display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+          ">
+            <span>
               Status:
-              <strong>${escapeHtml(quote.status || "draft")}</strong>
-            </div>
-
+              <strong>${escapeHtml(quote.status || "")}</strong>
+            </span>
+            <button id="btnRefreshQuote" class="secondary">
+              Refresh
+            </button>
             ${
-              lines.length
-                ? `
-                  <button
-                    id="btnSaveQuotePrices"
-                    class="btn-primary"
-                  >
+              canEdit && offeredLines.length
+                ? `<button id="btnSaveQuotePrices" class="btn-primary">
                     Save Prices
-                  </button>
-                `
+                   </button>`
                 : ""
             }
           </div>
         </div>
 
-        <div
-          style="
-            padding:12px 14px;
-            margin-bottom:18px;
-            border-left:3px solid #7ea3c9;
-            background:#f6f9fc;
-            color:#4a5968;
-          "
-        >
-          Enter the quoted price for each service. Prices are saved only to
-          this draft quote and do not change the master Services lookup list.
+        <div style="
+          padding:12px 14px;margin-bottom:18px;
+          border-left:3px solid #7ea3c9;background:#f6f9fc;
+        ">
+          ${escapeHtml(notice)}
         </div>
 
         <div style="overflow-x:auto;">
           <table class="notes-table" style="width:100%;">
             <thead>
               <tr>
-                <th style="min-width:190px;">Service</th>
-                <th style="min-width:260px;">Description</th>
-                <th style="text-align:center; min-width:80px;">Qty</th>
-                <th style="text-align:right; min-width:180px;">Quoted Price</th>
+                <th style="min-width:180px;">Service</th>
+                <th style="min-width:220px;">Description</th>
+                <th style="text-align:center;">Qty</th>
+                <th style="text-align:right;min-width:140px;">
+                  Unit Price
+                </th>
+                <th style="text-align:right;min-width:120px;">
+                  Line Total
+                </th>
+                <th style="min-width:160px;">Customer Selection</th>
               </tr>
             </thead>
-
-            <tbody>
-              ${rowsHtml}
-            </tbody>
-
+            <tbody>${rows}</tbody>
             <tfoot>
               <tr>
-                <th colspan="3" style="text-align:right;">
-                  Current Quote Total
+                <th colspan="4" style="text-align:right;">
+                  ${canEdit ? "Current Offered Total" : "Offered Total"}
                 </th>
-
-                <th
-                  id="quoteTotalDisplay"
-                  style="text-align:right;"
-                >
-                  ${formatMoney(initialTotals.total) || "$0.00"}
+                <th id="quoteTotalDisplay" style="text-align:right;">
+                  ${escapeHtml(formatMoney(
+                    canEdit
+                      ? initialTotals.total
+                      : quote.offered_total
+                  ))}
                 </th>
+                <th></th>
               </tr>
+              ${
+                accepted
+                  ? `
+                    <tr>
+                      <th colspan="4" style="text-align:right;">
+                        Confirmed Total
+                      </th>
+                      <th style="text-align:right;color:#26703b;">
+                        ${escapeHtml(formatMoney(quote.accepted_total))}
+                      </th>
+                      <th></th>
+                    </tr>
+                  `
+                  : ""
+              }
             </tfoot>
           </table>
         </div>
 
-        <p
-          id="quotePriceStatus"
-          class="muted"
-          style="
-            margin:14px 0 0;
-            padding:10px 12px;
-            ${
-              initialTotals.unpricedCount
-                ? `
-                  background:#fff8e8;
-                  border-left:3px solid #e0a52d;
-                `
-                : `
-                  background:#eef7ee;
-                  border-left:3px solid #4f9b57;
-                `
-            }
-          "
-        >
-          ${
-            initialTotals.unpricedCount
-              ? `
-                ${initialTotals.unpricedCount}
-                service${initialTotals.unpricedCount === 1 ? "" : "s"}
-                still need${initialTotals.unpricedCount === 1 ? "s" : ""}
-                a quoted price.
-              `
-              : `
-                All current quote services have a price.
-              `
-          }
-        </p>
+        <p id="quotePriceStatus" class="muted" style="
+          margin:14px 0 0;padding:10px 12px;
+        "></p>
       </section>
     `;
 
     const totalDisplay = container.querySelector("#quoteTotalDisplay");
     const priceStatus = container.querySelector("#quotePriceStatus");
-    const priceInputs = Array.from(
+    const saveButton = container.querySelector("#btnSaveQuotePrices");
+    const refreshButton = container.querySelector("#btnRefreshQuote");
+
+    const inputs = Array.from(
       container.querySelectorAll(".quote-price-input")
     );
 
-    function refreshLiveTotal() {
-      let total = 0;
-      let unpricedCount = 0;
+    let saving = false;
 
-      priceInputs.forEach((input) => {
-        const rawValue = input.value.trim();
-        const row = input.closest("tr");
-        const quantity = Number(row?.dataset?.quantity || 1);
+    function showPriceStatus(unpricedCount) {
+      priceStatus.style.background =
+        unpricedCount ? "#fff8e8" : "#eef7ee";
 
-        if (rawValue === "") {
-          unpricedCount += 1;
-          return;
-        }
+      priceStatus.style.borderLeft =
+        unpricedCount
+          ? "3px solid #e0a52d"
+          : "3px solid #4f9b57";
 
-        const price = Number(rawValue);
+      if (accepted) {
+        const selectedCount = offeredLines.filter(
+          line => line.customer_selected === true
+        ).length;
 
-        if (!Number.isFinite(price) || price < 0) {
-          unpricedCount += 1;
-          return;
-        }
-
-        total += price * quantity;
-      });
-
-      totalDisplay.textContent = `$${total.toFixed(2)}`;
-
-      if (unpricedCount > 0) {
-        priceStatus.style.background = "#fff8e8";
-        priceStatus.style.borderLeft = "3px solid #e0a52d";
         priceStatus.textContent =
-          `${unpricedCount} service${unpricedCount === 1 ? "" : "s"} ` +
-          `still need${unpricedCount === 1 ? "s" : ""} a quoted price.`;
+          `Customer confirmed ${selectedCount} of ` +
+          `${offeredLines.length} offered services.`;
+      } else if (unpricedCount) {
+        priceStatus.textContent =
+          `${unpricedCount} offered service` +
+          `${unpricedCount === 1 ? "" : "s"} still ` +
+          `${unpricedCount === 1 ? "needs" : "need"} a valid price.`;
       } else {
-        priceStatus.style.background = "#eef7ee";
-        priceStatus.style.borderLeft = "3px solid #4f9b57";
         priceStatus.textContent =
-          "All current quote services have a price.";
+          offeredLines.length
+            ? "All offered services have a price."
+            : "No offered services are available.";
       }
     }
 
-    priceInputs.forEach((input) => {
+    function refreshLiveTotal() {
+      let cents = 0;
+      let unpricedCount = 0;
+
+      for (const input of inputs) {
+        const total = lineTotal({
+          unit_price: input.value,
+          quantity: input.dataset.quantity
+        });
+
+        const totalCell = Array.from(
+          container.querySelectorAll(".quote-line-total")
+        ).find(
+          cell =>
+            cell.dataset.quoteServiceId ===
+            input.dataset.quoteServiceId
+        );
+
+        if (totalCell) {
+          totalCell.textContent = formatMoney(total);
+        }
+
+        if (total === null) {
+          unpricedCount += 1;
+        } else {
+          cents += Math.round(total * 100);
+        }
+      }
+
+      totalDisplay.textContent = formatMoney(cents / 100);
+      showPriceStatus(unpricedCount);
+    }
+
+    showPriceStatus(initialTotals.unpricedCount);
+
+    for (const input of inputs) {
       input.addEventListener("input", refreshLiveTotal);
 
       input.addEventListener("blur", () => {
-        const rawValue = input.value.trim();
+        const price = numericPrice(input.value);
 
-        if (rawValue === "") {
-          return;
-        }
-
-        const numericValue = Number(rawValue);
-
-        if (Number.isFinite(numericValue) && numericValue >= 0) {
-          input.value = numericValue.toFixed(2);
+        if (price !== null) {
+          input.value = price.toFixed(2);
           refreshLiveTotal();
         }
       });
+    }
+
+    refreshButton.addEventListener("click", async () => {
+      if (saving) return;
+
+      await renderLeadPricing(container, portalState);
     });
 
-    const savePricesBtn = container.querySelector("#btnSaveQuotePrices");
-
-    if (savePricesBtn) {
-      savePricesBtn.addEventListener("click", async () => {
-        const originalButtonText = savePricesBtn.textContent;
+    if (saveButton) {
+      saveButton.addEventListener("click", async () => {
+        if (saving) return;
 
         const priceLines = [];
-        let hasInvalidPrice = false;
+        let invalid = false;
 
-        priceInputs.forEach((input) => {
-          const rawValue = input.value.trim();
+        for (const input of inputs) {
+          const raw = input.value.trim();
+          const price = numericPrice(raw);
 
-          if (rawValue !== "") {
-            const numericValue = Number(rawValue);
+          if (raw !== "" && price === null) {
+            invalid = true;
+            input.style.borderColor = "#c0392b";
+          } else {
+            input.style.borderColor = "";
 
-            if (!Number.isFinite(numericValue) || numericValue < 0) {
-              hasInvalidPrice = true;
-              input.style.borderColor = "#c0392b";
-              return;
-            }
+            priceLines.push({
+              quote_service_id: input.dataset.quoteServiceId,
+              unit_price: price
+            });
           }
+        }
 
-          input.style.borderColor = "";
-
-          priceLines.push({
-            quote_service_id: input.dataset.quoteServiceId,
-            unit_price: rawValue === "" ? null : Number(rawValue)
-          });
-        });
-
-        if (hasInvalidPrice) {
-          alert(
-            "Please correct invalid prices. Each entered amount must be zero or greater."
-          );
+        if (invalid) {
+          alert("Every entered price must be zero or greater.");
           return;
         }
 
-        savePricesBtn.disabled = true;
-        savePricesBtn.textContent = "Saving…";
+        saving = true;
+        saveButton.disabled = true;
+        saveButton.textContent = "Saving…";
+        refreshButton.disabled = true;
+        inputs.forEach(input => {
+          input.disabled = true;
+        });
+
+        let succeeded = false;
 
         try {
-          const saveRes = await fetch(
+          const saveResponse = await fetch(
             `${LEADS_MODULE_URL}/quotes/draft/prices`,
             {
               method: "POST",
@@ -468,55 +549,49 @@ export async function renderLeadPricing(container, portalState) {
             }
           );
 
-          const saveData = await saveRes.json();
+          const saved = await saveResponse.json();
 
-          if (!saveRes.ok) {
+          if (!saveResponse.ok || saved.success === false) {
             throw new Error(
-              saveData?.error ||
-              `Unable to save quote prices (${saveRes.status}).`
+              saved.error || "Unable to save quote prices."
             );
           }
 
-          priceInputs.forEach((input) => {
-            const rawValue = input.value.trim();
-
-            if (rawValue !== "") {
-              input.value = Number(rawValue).toFixed(2);
-            }
-          });
-
-          refreshLiveTotal();
+          succeeded = true;
 
           alert(
-            `✅ Prices saved for ${quote.quote_number}. ` +
-            `Current quote total: $${Number(
-              saveData.offered_total || 0
-            ).toFixed(2)}`
+            `Prices saved for ${quote.quote_number}. ` +
+            `Offered total: ${formatMoney(saved.offered_total)}`
           );
-        } catch (err) {
-          console.error("[Pricing Chart] Error saving prices:", err);
-
-          alert(`❌ Unable to save quote prices: ${err.message}`);
+        } catch (error) {
+          console.error("[Pricing Chart] Price save failed:", error);
+          alert(`Unable to save prices: ${error.message}`);
         } finally {
-          savePricesBtn.disabled = false;
-          savePricesBtn.textContent = originalButtonText;
+          saving = false;
+          saveButton.disabled = false;
+          saveButton.textContent = "Save Prices";
+          refreshButton.disabled = false;
+
+          inputs.forEach(input => {
+            input.disabled = false;
+          });
+        }
+
+        if (succeeded) {
+          await renderLeadPricing(container, portalState);
         }
       });
     }
-  } catch (err) {
-    console.error("[Pricing Chart] Error loading draft quote:", err);
+  } catch (error) {
+    console.error("[Pricing Chart] Quote load failed:", error);
 
     container.innerHTML = `
       <section class="card">
         <h2>Pricing Chart</h2>
-
-        <p class="error">
-          Unable to load the draft quote.
-        </p>
-
-        <p class="muted">
-          Check the browser console and Worker logs for the specific error.
-        </p>
+        <p class="error">Unable to load the quote.</p>
+        <p class="muted">${escapeHtml(
+          error.message || "Please try again."
+        )}</p>
       </section>
     `;
   }
