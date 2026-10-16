@@ -144,6 +144,7 @@ export async function renderLeadPricing(container, portalState) {
           </p>
         </section>
       `;
+      void renderQuoteHistory(container, portalState, leadId, project, null);
       return;
     }
 
@@ -576,6 +577,8 @@ export async function renderLeadPricing(container, portalState) {
         ></dialog>
       </section>
     `;
+
+    void renderQuoteHistory(container, portalState, leadId, project, quote.quote_id);
 
     const totalDisplay =
       container.querySelector("#quoteTotalDisplay");
@@ -1142,7 +1145,7 @@ export async function renderLeadPricing(container, portalState) {
                     referrerpolicy="no-referrer"
                   >Open Customer Quote</a>
                 </p>
-                <p class="muted">No email was sent or quote marked sent.</p>
+                <p class="muted">The quote action may release the quote and update GHL. Email delivery is handled by the GHL workflow.</p>
                 <button type="button" id="btnCloseQuotePreview" class="secondary">
                   Close
                 </button>
@@ -1428,3 +1431,162 @@ export async function renderLeadPricing(container, portalState) {
     `;
   }
 }
+
+/* Quote history is read-only: never call /quotes/public/prepare here. */
+async function renderQuoteHistory(container, portalState, leadId, project, currentQuoteId) {
+  const section = document.createElement("section");
+  section.className = "card";
+  section.style.marginTop = "20px";
+  section.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+      <h2 style="margin:0;">Quote History</h2>
+      <button type="button" class="secondary" data-history-refresh>Refresh History</button>
+    </div>
+    <p class="muted">Saved quote versions, newest first. Viewing a quote does not release it or send an email.</p>
+    <div data-history-content role="status">Loading quote history…</div>
+    <dialog data-history-dialog aria-label="Saved quote version"
+      style="width:min(1000px,90vw);max-height:85vh;overflow:auto;border:1px solid #cbd5e1;border-radius:6px;padding:0;background:#fff;"></dialog>
+  `;
+  container.appendChild(section);
+  const content = section.querySelector("[data-history-content]");
+  const refresh = section.querySelector("[data-history-refresh]");
+  const dialog = section.querySelector("[data-history-dialog]");
+  let loading = false;
+  let viewLoading = false;
+  const current = () => container.contains(section) &&
+    portalState.activeLeadId === leadId && portalState.project === project;
+
+  function showVersion(savedQuote, savedLines) {
+    const offered = savedLines.filter(line => line.offered === true);
+    const totals = calculateTotals(offered);
+    const confirmed = savedQuote.status === "accepted" || Boolean(savedQuote.accepted_at);
+    dialog.innerHTML = `
+      <section style="padding:22px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
+          <div>
+            <h2 style="margin:0 0 8px;">Quote ${escapeHtml(savedQuote.quote_number || "Unnamed Quote")}</h2>
+            <div>Status: ${escapeHtml(savedQuote.status || "")}</div>
+            ${savedQuote.created_at ? `<div class="muted">Created: ${escapeHtml(formatDate(savedQuote.created_at))}</div>` : ""}
+            ${savedQuote.sent_at ? `<div class="muted">Released: ${escapeHtml(formatDate(savedQuote.sent_at))}</div>` : ""}
+            ${savedQuote.accepted_at ? `<div class="muted">Accepted: ${escapeHtml(formatDate(savedQuote.accepted_at))}</div>` : ""}
+          </div>
+          <button type="button" class="secondary" data-history-close>Close</button>
+        </div>
+        <p style="padding:12px;background:#f6f9fc;border-left:3px solid #7ea3c9;">
+          Read-only saved quote view. Services and prices belong to this exact quote record.
+          Opening it does not generate a link, change its status, update GHL, or send an email.
+          ${savedQuote.status === "draft" ? "This draft can still change until released." : ""}
+        </p>
+        <div style="overflow-x:auto;">
+          <table class="notes-table" style="width:100%;">
+            <thead><tr>
+              <th>Service</th><th style="text-align:center;">Qty</th>
+              <th style="text-align:right;">Unit Price</th>
+              <th style="text-align:right;">Service Total</th><th>Customer Selection</th>
+            </tr></thead>
+            <tbody>${savedLines.length ? savedLines.map(line => `
+              <tr>
+                <td><strong>${escapeHtml(line.service_name || "")}</strong>
+                  ${line.service_description ? `<div class="muted">${escapeHtml(line.service_description)}</div>` : ""}
+                  ${line.required ? '<div class="muted">Required service</div>' : ""}
+                  ${!line.offered ? '<div class="muted">Not offered</div>' : ""}
+                </td>
+                <td style="text-align:center;">${escapeHtml(String(line.quantity ?? ""))}</td>
+                <td style="text-align:right;">${escapeHtml(formatMoney(line.unit_price))}</td>
+                <td style="text-align:right;">${escapeHtml(formatMoney(lineTotal(line)))}</td>
+                <td>${escapeHtml(!line.offered ? "Not offered" :
+                  line.customer_selected === true ? "Selected" :
+                  line.customer_selected === false ? "Not selected" :
+                  confirmed ? "Not selected" : "Not yet confirmed")}</td>
+              </tr>`).join("") : '<tr><td colspan="5" class="muted">No saved service lines.</td></tr>'}
+            </tbody>
+            <tfoot>
+              <tr><th colspan="3" style="text-align:right;">Saved Offered Total</th>
+                <th style="text-align:right;">${escapeHtml(formatMoney(savedQuote.offered_total))}</th><th></th></tr>
+              ${confirmed ? `<tr><th colspan="3" style="text-align:right;">Confirmed Total</th>
+                <th style="text-align:right;color:#26703b;">${escapeHtml(formatMoney(savedQuote.accepted_total))}</th><th></th></tr>` : ""}
+            </tfoot>
+          </table>
+        </div>
+        ${totals.unpricedCount ? `<p class="muted">${totals.unpricedCount} offered service(s) do not have a valid saved price or quantity.</p>` : ""}
+        ${savedQuote.customer_message ? `<div style="margin-top:16px;white-space:pre-wrap;overflow-wrap:anywhere;">${escapeHtml(savedQuote.customer_message)}</div>` : ""}
+      </section>`;
+    dialog.querySelector("[data-history-close]").addEventListener("click", () => dialog.close());
+    if (!dialog.open) dialog.showModal();
+  }
+
+  async function loadHistory() {
+    if (loading || viewLoading || !current()) return;
+    loading = true;
+    refresh.disabled = true;
+    content.textContent = "Loading quote history…";
+    try {
+      const params = new URLSearchParams({ project, lead_id: leadId });
+      const result = await readJson(`${LEADS_MODULE_URL}/quotes/history?${params}`, { cache: "no-store" });
+      if (!current()) return;
+      const quotes = Array.isArray(result.quotes) ? result.quotes : [];
+      if (!quotes.length) {
+        content.textContent = "No quotes have been created for this lead yet.";
+        return;
+      }
+      content.innerHTML = `
+        ${result.truncated ? '<p class="muted">Showing the newest 200 quotes.</p>' : ""}
+        <div style="overflow-x:auto;">
+          <table class="notes-table" style="width:100%;">
+            <thead><tr><th>Quote</th><th>Created</th><th>Released</th><th>Services</th>
+              <th style="text-align:right;">Offered Total</th><th style="text-align:right;">Confirmed Total</th>
+              <th>Status</th><th>Action</th></tr></thead>
+            <tbody>${quotes.map(q => `<tr>
+              <td><strong>${escapeHtml(q.quote_number || "Unnamed Quote")}</strong>
+                ${q.quote_id === currentQuoteId ? '<div class="muted">Shown above</div>' : ""}</td>
+              <td>${escapeHtml(formatDate(q.created_at) || "—")}</td>
+              <td>${escapeHtml(formatDate(q.sent_at) || "—")}</td>
+              <td title="${escapeHtml((q.service_names || []).join(", "))}">${escapeHtml(String(q.offered_service_count ?? 0))}</td>
+              <td style="text-align:right;">${escapeHtml(formatMoney(q.offered_total))}</td>
+              <td style="text-align:right;">${q.status === "accepted" || q.accepted_at ? escapeHtml(formatMoney(q.accepted_total)) : "—"}</td>
+              <td>${escapeHtml(q.status || "")}</td>
+              <td><button type="button" class="secondary" data-view-history-quote="${escapeHtml(q.quote_id)}">View Quote</button></td>
+            </tr>`).join("")}</tbody>
+          </table>
+        </div>`;
+      content.querySelectorAll("[data-view-history-quote]").forEach(button => {
+        button.addEventListener("click", async () => {
+          if (viewLoading || !current()) return;
+          viewLoading = true;
+          button.disabled = true;
+          button.textContent = "Loading…";
+          refresh.disabled = true;
+          try {
+            const quoteId = button.dataset.viewHistoryQuote;
+            const params = new URLSearchParams({ project, lead_id: leadId, quote_id: quoteId });
+            const saved = await readJson(`${LEADS_MODULE_URL}/quotes/current?${params}`, { cache: "no-store" });
+            if (!current()) return;
+            if (!saved.quote || saved.quote.quote_id !== quoteId || saved.quote.lead_id !== leadId ||
+                (saved.quote.project && saved.quote.project !== project)) {
+              throw new Error("The requested quote version could not be verified.");
+            }
+            showVersion(saved.quote, Array.isArray(saved.lines) ? saved.lines : []);
+            dialog.addEventListener("close", () => { if (current() && button.isConnected) button.focus(); }, { once: true });
+          } catch (error) {
+            if (current()) alert(`Unable to view saved quote: ${error.message}`);
+          } finally {
+            viewLoading = false;
+            if (current()) {
+              button.disabled = false;
+              button.textContent = "View Quote";
+              refresh.disabled = false;
+            }
+          }
+        });
+      });
+    } catch (error) {
+      if (current()) content.textContent = `Unable to load quote history: ${error.message}`;
+    } finally {
+      loading = false;
+      if (current()) refresh.disabled = viewLoading;
+    }
+  }
+  refresh.addEventListener("click", loadHistory);
+  await loadHistory();
+}
+
