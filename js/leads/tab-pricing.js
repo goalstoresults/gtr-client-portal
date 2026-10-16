@@ -1,10 +1,15 @@
 // js/leads/tab-pricing.js
-// Saved-price readiness, unchanged-save protection, and CSI customer quote links.
+// Saved-price readiness and unchanged-save protection.
 
 import { escapeHtml } from "../utilities.js";
 
 const LEADS_MODULE_URL =
   "https://leads-module.dennis-e64.workers.dev";
+
+// Public quotes-worker base URL, not a secret.
+// Copy the value of QUOTES_MODULE_URL already saved on leads-module.
+const QUOTES_MODULE_URL = "https://quotes-module.dennis-e64.workers.dev/";
+
 
 function numericPrice(value) {
   if (
@@ -683,20 +688,19 @@ export async function renderLeadPricing(container, portalState) {
         quote.status !== "draft" ||
         Boolean(quote.prices_saved_at);
 
-      const csiLinkAllowed =
-        !isCsi ||
-        (
-          portalState.canEdit === true &&
-          portalState.isDemoAccount !== true &&
-          ["draft", "sent", "viewed", "accepted"].includes(quote.status)
-        );
-
       const ready =
         !dirty &&
         offeredLines.length > 0 &&
         totals.unpricedCount === 0 &&
         savedReady &&
-        csiLinkAllowed;
+        (
+          !isCsi ||
+          (
+            portalState.canEdit === true &&
+            portalState.isDemoAccount !== true &&
+            ["draft", "sent", "viewed", "accepted"].includes(quote.status)
+          )
+        );
 
       if (ready) {
         showQuote();
@@ -736,21 +740,6 @@ export async function renderLeadPricing(container, portalState) {
       } else if (dirty) {
         priceStatus.textContent =
           "Unsaved price changes. Click Save Prices before opening Quote.";
-      } else if (
-        isCsi &&
-        (
-          portalState.canEdit !== true ||
-          portalState.isDemoAccount === true
-        )
-      ) {
-        priceStatus.textContent =
-          "Your Portal permissions do not allow customer quote links.";
-      } else if (
-        isCsi &&
-        !["draft", "sent", "viewed", "accepted"].includes(quote.status)
-      ) {
-        priceStatus.textContent =
-          "A customer quote link is not available in this quote status.";
       } else if (accepted) {
         const selectedCount = offeredLines.filter(
           line => line.customer_selected === true
@@ -803,209 +792,6 @@ export async function renderLeadPricing(container, portalState) {
 
       refreshQuoteAvailability();
       showPriceStatus(totals.unpricedCount);
-    }
-
-    async function openCsiCustomerQuote() {
-      const userEmail = String(portalState.userEmail || "").trim();
-
-      if (!userEmail) {
-        alert("Your Portal email is missing. Reopen the Portal and log in again.");
-        return;
-      }
-
-      if (
-        portalState.canEdit !== true ||
-        portalState.isDemoAccount === true
-      ) {
-        alert("Your Portal permissions do not allow quote link preparation.");
-        return;
-      }
-
-      let quoteWindow = null;
-      let navigated = false;
-
-      // Open during the click so the asynchronous request does not trigger a popup block.
-      try {
-        quoteWindow = window.open("about:blank", "_blank");
-
-        if (quoteWindow) {
-          quoteWindow.opener = null;
-          quoteWindow.document.title = "Loading Quote";
-          quoteWindow.document.body.textContent = "Loading saved quote…";
-        }
-      } catch {
-        if (quoteWindow && !quoteWindow.closed) quoteWindow.close();
-        quoteWindow = null;
-      }
-
-      closePreview();
-      previewLoading = true;
-      quoteButton.disabled = true;
-      quoteButton.textContent = "Opening Quote…";
-      refreshButton.disabled = true;
-
-      if (saveButton) saveButton.disabled = true;
-
-      inputs.forEach(input => {
-        input.disabled = true;
-      });
-
-      try {
-        const quoteUrl =
-          currentUrl +
-          `&quote_id=${encodeURIComponent(quote.quote_id)}`;
-
-        const savedData = await readJson(quoteUrl, {
-          cache: "no-store"
-        });
-
-        if (!isCurrentView()) return;
-
-        const savedQuote = savedData.quote;
-        const savedLines = Array.isArray(savedData.lines)
-          ? savedData.lines.filter(line => line.offered === true)
-          : [];
-
-        if (!savedQuote || savedQuote.quote_id !== quote.quote_id) {
-          throw new Error("The saved quote could not be found.");
-        }
-
-        if (
-          savedQuote.status !== quote.status ||
-          Boolean(savedQuote.accepted_at) !== Boolean(quote.accepted_at)
-        ) {
-          throw new Error("The quote status has changed. Refresh Pricing Chart.");
-        }
-
-        const totals = calculateTotals(savedLines);
-
-        if (
-          !savedLines.length ||
-          totals.unpricedCount > 0 ||
-          (savedQuote.status === "draft" && !savedQuote.prices_saved_at)
-        ) {
-          quote = { ...quote, prices_saved_at: null };
-          hideQuote();
-          throw new Error(
-            "The saved quote needs pricing review. " +
-            "Refresh, complete pricing, and save again."
-          );
-        }
-
-        const prepared = await readJson(
-          `${LEADS_MODULE_URL}/quotes/prepare`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            cache: "no-store",
-            body: JSON.stringify({
-              project: "csi",
-              lead_id: leadId,
-              quote_id: savedQuote.quote_id,
-              userEmail
-            })
-          }
-        );
-
-        if (!isCurrentView()) return;
-
-        if (
-          prepared.success !== true ||
-          prepared.project !== "csi" ||
-          prepared.quote_id !== savedQuote.quote_id ||
-          typeof prepared.customer_url !== "string"
-        ) {
-          throw new Error("The customer quote link could not be verified.");
-        }
-
-        const customerUrl = new URL(prepared.customer_url);
-
-        if (
-          customerUrl.origin !== "https://portal.redumbrella.pro" ||
-          customerUrl.pathname !== "/csi/quote.html" ||
-          customerUrl.username ||
-          customerUrl.password ||
-          customerUrl.hash ||
-          !/^[a-f0-9]{64}$/.test(customerUrl.searchParams.get("token") || "")
-        ) {
-          throw new Error("The customer quote link is invalid.");
-        }
-
-        if (quoteWindow && !quoteWindow.closed) {
-          quoteWindow.location.replace(customerUrl.toString());
-          navigated = true;
-        } else {
-          // If popups are blocked, provide a normal link requiring a fresh click.
-          previewDiv.innerHTML = `
-            <section style="padding:22px;background:#fff;">
-              <h2 style="margin-top:0;">Customer Quote</h2>
-
-              <p>
-                The customer quote link is ready.
-                Click below to open it in a new tab.
-              </p>
-
-              <p>
-                <a
-                  id="customerQuoteLink"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  referrerpolicy="no-referrer"
-                  class="btn-primary"
-                >
-                  Open Customer Quote
-                </a>
-              </p>
-
-              <p class="muted">
-                No email was sent and the quote was not marked sent.
-              </p>
-
-              <button
-                type="button"
-                id="btnCloseCustomerQuoteLink"
-                class="secondary"
-              >
-                Close
-              </button>
-            </section>
-          `;
-
-          previewDiv.querySelector("#customerQuoteLink").href =
-            customerUrl.toString();
-
-          previewDiv.querySelector("#btnCloseCustomerQuoteLink")
-            .addEventListener("click", closePreview);
-
-          if (!previewDiv.open) previewDiv.showModal();
-        }
-      } catch (error) {
-        // Do not log the private customer link or token.
-        console.error("[CSI Quote] Unable to open customer quote");
-
-        if (isCurrentView()) {
-          alert(`Unable to open quote: ${error.message}`);
-        }
-      } finally {
-        if (quoteWindow && !quoteWindow.closed && !navigated) {
-          quoteWindow.close();
-        }
-
-        previewLoading = false;
-
-        if (isCurrentView()) {
-          quoteButton.textContent = "Quote";
-          refreshButton.disabled = false;
-
-          inputs.forEach(input => {
-            input.disabled = false;
-          });
-
-          refreshQuoteAvailability();
-        }
-      }
     }
 
     // Initialize from database state, not a save in this screen visit.
@@ -1197,9 +983,27 @@ export async function renderLeadPricing(container, portalState) {
         return;
       }
 
+      let quoteWindow = null;
+      let quoteOpened = false;
+
       if (isCsi) {
-        await openCsiCustomerQuote();
-        return;
+        if (!QUOTES_MODULE_URL.trim()) {
+          alert("Set QUOTES_MODULE_URL at the top of tab-pricing.js first.");
+          return;
+        }
+
+        if (!String(portalState.userEmail || "").trim()) {
+          alert("Your Portal email is missing. Reopen the Portal and log in again.");
+          return;
+        }
+
+        try {
+          quoteWindow = window.open("about:blank", "_blank");
+          if (quoteWindow) quoteWindow.opener = null;
+        } catch {
+          if (quoteWindow && !quoteWindow.closed) quoteWindow.close();
+          quoteWindow = null;
+        }
       }
 
       previewLoading = true;
@@ -1269,6 +1073,92 @@ export async function renderLeadPricing(container, portalState) {
             "The saved quote needs pricing review. " +
             "Refresh, complete pricing, and save again."
           );
+        }
+
+        if (isCsi) {
+          const workerUrl = new URL(QUOTES_MODULE_URL.trim());
+
+          if (
+            workerUrl.protocol !== "https:" ||
+            workerUrl.username || workerUrl.password ||
+            workerUrl.search || workerUrl.hash ||
+            workerUrl.pathname !== "/"
+          ) {
+            throw new Error("QUOTES_MODULE_URL must be the HTTPS worker base URL.");
+          }
+
+          const prepared = await readJson(
+            new URL("/quotes/public/prepare", workerUrl).toString(),
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              cache: "no-store",
+              body: JSON.stringify({
+                project: "csi",
+                lead_id: leadId,
+                quote_id: savedQuote.quote_id,
+                userEmail: portalState.userEmail.trim()
+              })
+            }
+          );
+
+          if (!isCurrentView()) return;
+
+          if (
+            prepared.success !== true ||
+            prepared.project !== "csi" ||
+            prepared.quote_id !== savedQuote.quote_id ||
+            typeof prepared.customer_url !== "string"
+          ) {
+            throw new Error("The customer quote link could not be verified.");
+          }
+
+          const customerUrl = new URL(prepared.customer_url);
+
+          if (
+            customerUrl.origin !== "https://portal.redumbrella.pro" ||
+            customerUrl.pathname !== "/csi/quote.html" ||
+            customerUrl.username || customerUrl.password || customerUrl.hash ||
+            !/^[a-f0-9]{64}$/.test(customerUrl.searchParams.get("token") || "")
+          ) {
+            throw new Error("The customer quote link is invalid.");
+          }
+
+          if (quoteWindow && !quoteWindow.closed) {
+            quoteWindow.location.replace(customerUrl.toString());
+            quoteOpened = true;
+          } else {
+            previewDiv.innerHTML = `
+              <section style="padding:22px;background:#fff;">
+                <h2>Customer Quote</h2>
+                <p>Your browser blocked the new tab. Use the link below.</p>
+                <p>
+                  <a
+                    id="customerQuoteLink"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    referrerpolicy="no-referrer"
+                  >Open Customer Quote</a>
+                </p>
+                <p class="muted">No email was sent or quote marked sent.</p>
+                <button type="button" id="btnCloseQuotePreview" class="secondary">
+                  Close
+                </button>
+              </section>
+            `;
+
+            previewDiv.querySelector("#customerQuoteLink").href =
+              customerUrl.toString();
+
+            previewDiv.querySelector("#btnCloseQuotePreview")
+              .addEventListener("click", closePreview);
+
+            if (!previewDiv.open) previewDiv.showModal();
+          }
+
+          return;
         }
 
         const addressLines = [
@@ -1504,6 +1394,10 @@ export async function renderLeadPricing(container, portalState) {
           alert(`Unable to open quote: ${error.message}`);
         }
       } finally {
+        if (quoteWindow && !quoteWindow.closed && !quoteOpened) {
+          quoteWindow.close();
+        }
+
         previewLoading = false;
 
         if (isCurrentView()) {
