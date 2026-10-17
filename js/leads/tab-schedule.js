@@ -5,7 +5,6 @@ export async function renderLeadSchedule(
   portalState,
   { tabLabel }
 ) {
-  // Stop polling from a previous rendering of this tab.
   container._scheduleCleanup?.();
 
   const leadId = portalState.activeLeadId;
@@ -19,6 +18,7 @@ export async function renderLeadSchedule(
 
   const heading = document.createElement("h2");
   heading.textContent = label;
+
   card.appendChild(heading);
   container.appendChild(card);
 
@@ -37,6 +37,7 @@ export async function renderLeadSchedule(
   ------------------------------------------------------- */
 
   const controller = new AbortController();
+
   let stopped = false;
   let pollTimer = null;
   let loadingAppointment = false;
@@ -61,7 +62,9 @@ export async function renderLeadSchedule(
   };
 
   const observer = new MutationObserver(() => {
-    if (!card.isConnected) cleanup();
+    if (!card.isConnected) {
+      cleanup();
+    }
   });
 
   observer.observe(document.body, {
@@ -108,13 +111,21 @@ export async function renderLeadSchedule(
 
   card.appendChild(summary);
 
-  const displayAppointment = lead => {
-    const rawDatetime = lead.inspection_datetime;
+  const showNoAppointment = () => {
+    appointmentText.textContent = "No appointment scheduled yet";
+    appointmentNote.textContent =
+      "After booking, the saved appointment will appear here.";
+  };
 
-    if (!rawDatetime) {
-      appointmentText.textContent = "No appointment scheduled";
-      appointmentNote.textContent =
-        "After booking, the saved appointment will appear here.";
+  const displayAppointment = lead => {
+    const rawDatetime = lead?.inspection_datetime;
+
+    if (
+      rawDatetime === null ||
+      rawDatetime === undefined ||
+      String(rawDatetime).trim() === ""
+    ) {
+      showNoAppointment();
       return;
     }
 
@@ -131,7 +142,6 @@ export async function renderLeadSchedule(
     const timezone = lead.inspection_timezone;
 
     if (!timezone) {
-      // Do not silently use the staff member's browser timezone.
       appointmentText.textContent =
         new Intl.DateTimeFormat("en-US", {
           timeZone: "UTC",
@@ -145,8 +155,8 @@ export async function renderLeadSchedule(
         }).format(date);
 
       appointmentNote.textContent =
-        "Shown in UTC because the lead response did not include " +
-        "the appointment timezone.";
+        "Shown in UTC because the appointment timezone " +
+        "was not included in the lead response.";
       return;
     }
 
@@ -164,8 +174,7 @@ export async function renderLeadSchedule(
         }).format(date);
 
       appointmentNote.textContent =
-        `Appointment timezone: ${timezone}. ` +
-        "Updates automatically after the booking is saved.";
+        `Appointment timezone: ${timezone}.`;
     } catch {
       appointmentText.textContent =
         "The appointment is saved, but its timezone is invalid.";
@@ -201,8 +210,30 @@ export async function renderLeadSchedule(
       const data = await response.json();
       const lead = Array.isArray(data) ? data[0] : data;
 
+      if (!isCurrent()) return;
+
+      // A successful empty response has no appointment to display.
       if (
-        !lead ||
+        lead === null ||
+        lead === undefined ||
+        (
+          typeof lead === "object" &&
+          !Array.isArray(lead) &&
+          Object.keys(lead).length === 0
+        )
+      ) {
+        showNoAppointment();
+        return;
+      }
+
+      if (
+        typeof lead !== "object" ||
+        Array.isArray(lead)
+      ) {
+        throw new Error("Unexpected lead response.");
+      }
+
+      if (
         String(lead.lead_id).toLowerCase() !==
           String(leadId).toLowerCase() ||
         lead.project !== project
@@ -210,25 +241,29 @@ export async function renderLeadSchedule(
         throw new Error("The matching lead was not returned.");
       }
 
-      if (!isCurrent()) return;
-
       displayAppointment(lead);
     } catch (error) {
-      if (error.name === "AbortError" || !isCurrent()) return;
+      if (
+        error.name === "AbortError" ||
+        !isCurrent()
+      ) {
+        return;
+      }
 
       console.error(
         "[Schedule Tab] Failed to load saved appointment:",
         error
       );
 
-      appointmentNote.textContent =
-        "Unable to refresh the appointment. " +
-        "Any date shown above may be out of date. Retrying automatically.";
-
       if (appointmentText.textContent === "Loading appointment…") {
         appointmentText.textContent =
-          "Unable to load the saved appointment.";
+          "Unable to check the saved appointment.";
       }
+
+      appointmentNote.textContent =
+        "Unable to refresh the appointment. " +
+        "Any information shown above may be out of date. " +
+        "Retrying automatically.";
     } finally {
       loadingAppointment = false;
     }
@@ -271,11 +306,14 @@ export async function renderLeadSchedule(
         ? config.tabs
         : [];
 
-      scheduleConfig = tabs.find(tab => tab.key === "calendar");
+      scheduleConfig = tabs.find(
+        tab => tab.key === "calendar"
+      );
     } catch (error) {
       if (error.name === "AbortError") return;
 
       configFailed = true;
+
       console.error(
         "[Schedule Tab] Failed to load calendar configuration:",
         error
@@ -284,8 +322,7 @@ export async function renderLeadSchedule(
 
     if (!isCurrent()) return;
 
-    // Preserve the existing CSI fallback, but never use it
-    // for a different project.
+    // Keep the original CSI fallback for CSI only.
     const iframeSrc =
       scheduleConfig?.iframe_src ||
       (
@@ -310,7 +347,11 @@ export async function renderLeadSchedule(
         throw new Error("Calendar URL must use HTTPS.");
       }
     } catch (error) {
-      console.error("[Schedule Tab] Invalid calendar URL:", error);
+      console.error(
+        "[Schedule Tab] Invalid calendar URL:",
+        error
+      );
+
       calendarMessage.textContent =
         "The configured booking calendar URL is invalid.";
       return;
@@ -338,6 +379,7 @@ export async function renderLeadSchedule(
       "https://api.leadconnectorhq.com/js/form_embed.js";
     embedScript.type = "text/javascript";
     embedScript.async = true;
+
     wrapper.appendChild(embedScript);
   };
 
