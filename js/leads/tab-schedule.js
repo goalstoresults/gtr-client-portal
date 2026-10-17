@@ -40,12 +40,16 @@ export async function renderLeadSchedule(
 
   let stopped = false;
   let pollTimer = null;
-  let loadingAppointment = false;
+  let appointmentRequest = null;
 
   // null = not yet successfully determined
   // false = no saved appointment
   // true = saved appointment exists
   let appointmentFound = null;
+
+  // Preserve the last successfully loaded appointment note
+  // when a later refresh fails.
+  let savedAppointmentNote = "";
 
   const isCurrent = () =>
     !stopped &&
@@ -95,9 +99,43 @@ export async function renderLeadSchedule(
     "background:#f8fafc"
   ].join(";");
 
+  const summaryHeader = document.createElement("div");
+  summaryHeader.style.cssText = [
+    "display:flex",
+    "align-items:center",
+    "justify-content:space-between",
+    "flex-wrap:wrap",
+    "gap:12px",
+    "margin-bottom:8px"
+  ].join(";");
+
   const summaryHeading = document.createElement("h3");
   summaryHeading.textContent = "Scheduled Inspection";
-  summaryHeading.style.cssText = "margin:0 0 8px;";
+  summaryHeading.style.margin = "0";
+
+  const refreshButton = document.createElement("button");
+  refreshButton.type = "button";
+  refreshButton.className = "secondary";
+  refreshButton.textContent = "Refresh Appointment";
+  refreshButton.setAttribute(
+    "aria-label",
+    "Refresh saved inspection appointment"
+  );
+  refreshButton.style.cssText = [
+    "padding:8px 12px",
+    "border:1px solid #244b70",
+    "border-radius:6px",
+    "background:#fff",
+    "color:#244b70",
+    "font:inherit",
+    "font-weight:600",
+    "cursor:pointer"
+  ].join(";");
+
+  summaryHeader.append(
+    summaryHeading,
+    refreshButton
+  );
 
   const appointmentText = document.createElement("p");
   appointmentText.style.cssText =
@@ -111,10 +149,19 @@ export async function renderLeadSchedule(
     "margin:8px 0 0;font-size:13px;";
   appointmentNote.hidden = true;
 
+  const refreshStatus = document.createElement("p");
+  refreshStatus.className = "muted";
+  refreshStatus.style.cssText =
+    "margin:8px 0 0;font-size:13px;";
+  refreshStatus.setAttribute("role", "status");
+  refreshStatus.setAttribute("aria-live", "polite");
+  refreshStatus.hidden = true;
+
   summary.append(
-    summaryHeading,
+    summaryHeader,
     appointmentText,
-    appointmentNote
+    appointmentNote,
+    refreshStatus
   );
 
   card.appendChild(summary);
@@ -122,6 +169,30 @@ export async function renderLeadSchedule(
   const setNote = text => {
     appointmentNote.textContent = text;
     appointmentNote.hidden = !text;
+  };
+
+  const setRefreshStatus = text => {
+    refreshStatus.textContent = text;
+    refreshStatus.hidden = !text;
+  };
+
+  const setRefreshing = refreshing => {
+    refreshButton.disabled = refreshing;
+    refreshButton.textContent =
+      refreshing
+        ? "Refreshing…"
+        : "Refresh Appointment";
+
+    refreshButton.style.opacity =
+      refreshing ? "0.6" : "1";
+
+    refreshButton.style.cursor =
+      refreshing ? "wait" : "pointer";
+
+    refreshButton.setAttribute(
+      "aria-busy",
+      String(refreshing)
+    );
   };
 
   /* -------------------------------------------------------
@@ -142,7 +213,8 @@ export async function renderLeadSchedule(
      BOOKING CALENDAR SECTION
 
      Hide the entire section when an appointment exists.
-     Keep the iframe mounted so polling does not reload it.
+     Keep the iframe mounted so refreshing the appointment
+     does not reload the booking calendar.
   ------------------------------------------------------- */
 
   const bookingSection = document.createElement("div");
@@ -185,6 +257,7 @@ export async function renderLeadSchedule(
 
   const showNoAppointment = () => {
     appointmentFound = false;
+    savedAppointmentNote = "";
     appointmentText.textContent = "No appointment found.";
     setNote("");
     updateBookingVisibility();
@@ -214,28 +287,19 @@ export async function renderLeadSchedule(
     // textContent displays text without interpreting HTML.
     appointmentText.textContent = datetimeText;
 
-    setNote(
-      timezoneText
-        ? `Appointment timezone: ${timezoneText}`
-        : ""
-    );
+    savedAppointmentNote = timezoneText
+      ? `Appointment timezone: ${timezoneText}`
+      : "";
 
+    setNote(savedAppointmentNote);
     updateBookingVisibility();
   };
 
   /* -------------------------------------------------------
-     LOAD SAVED APPOINTMENT
+     FETCH AND DISPLAY THE SAVED APPOINTMENT
   ------------------------------------------------------- */
 
-  const loadAppointment = async () => {
-    if (!isCurrent()) {
-      cleanup();
-      return;
-    }
-
-    if (loadingAppointment) return;
-    loadingAppointment = true;
-
+  const fetchAndDisplayAppointment = async () => {
     try {
       const response = await fetch(
         `https://leads-module.dennis-e64.workers.dev/leads/get?id=${encodeURIComponent(leadId)}`,
@@ -254,7 +318,9 @@ export async function renderLeadSchedule(
       const data = await response.json();
       const lead = Array.isArray(data) ? data[0] : data;
 
-      if (!isCurrent()) return;
+      if (!isCurrent()) {
+        return { state: "stopped" };
+      }
 
       const isEmptyResponse =
         lead === null ||
@@ -306,12 +372,24 @@ export async function renderLeadSchedule(
       }
 
       displayAppointment(lead);
+
+      if (appointmentFound === true) {
+        // Clear any previous "not found yet" or error message.
+        setRefreshStatus("");
+      }
+
+      return {
+        state:
+          appointmentFound === true
+            ? "found"
+            : "empty"
+      };
     } catch (error) {
       if (
         error.name === "AbortError" ||
         !isCurrent()
       ) {
-        return;
+        return { state: "stopped" };
       }
 
       console.error(
@@ -329,22 +407,88 @@ export async function renderLeadSchedule(
               "The lead-detail API/view must include the saved " +
               "scheduling fields."
             : "The saved schedule could not be checked. " +
-              "The tab will retry automatically."
+              "Click Refresh Appointment to try again."
         );
       } else {
-        // Preserve the last successfully loaded state.
-        setNote(
+        // Preserve the last successfully loaded state
+        // and its timezone while reporting the refresh error.
+        setNote(savedAppointmentNote);
+
+        setRefreshStatus(
           "Unable to refresh the schedule. " +
           "The last loaded information is still shown. " +
-          "The tab will retry automatically."
+          "Click Refresh Appointment to try again."
         );
       }
 
       updateBookingVisibility();
-    } finally {
-      loadingAppointment = false;
+
+      return {
+        state: "error",
+        code: error.code || ""
+      };
     }
   };
+
+  /* -------------------------------------------------------
+     SHARED LOAD / MANUAL REFRESH
+
+     Reuse an active request instead of starting overlapping
+     requests. This also lets the Refresh button await an
+     automatic check already in progress.
+  ------------------------------------------------------- */
+
+  const loadAppointment = async () => {
+    if (!isCurrent()) {
+      cleanup();
+      return { state: "stopped" };
+    }
+
+    if (appointmentRequest) {
+      return appointmentRequest;
+    }
+
+    appointmentRequest = fetchAndDisplayAppointment();
+
+    try {
+      return await appointmentRequest;
+    } finally {
+      appointmentRequest = null;
+    }
+  };
+
+  refreshButton.addEventListener("click", async () => {
+    if (!isCurrent() || refreshButton.disabled) return;
+
+    setRefreshing(true);
+    setRefreshStatus("Checking for your saved appointment…");
+
+    try {
+      const result = await loadAppointment();
+
+      if (!isCurrent()) return;
+
+      if (result.state === "found") {
+        setRefreshStatus("Appointment refreshed.");
+      } else if (result.state === "empty") {
+        setRefreshStatus(
+          "No appointment found yet. If you just booked, " +
+          "please wait a few seconds and click " +
+          "Refresh Appointment again."
+        );
+      } else if (result.state === "error") {
+        setRefreshStatus(
+          result.code === "missing_schedule_field"
+            ? "The lead API is not returning the saved schedule field."
+            : "Unable to refresh the appointment. Please try again."
+        );
+      }
+    } finally {
+      if (isCurrent()) {
+        setRefreshing(false);
+      }
+    }
+  });
 
   /* -------------------------------------------------------
      EXISTING GHL BOOKING CALENDAR
@@ -432,7 +576,11 @@ export async function renderLeadSchedule(
     }
 
     calendarMessage.textContent =
-      "Use the calendar below to book this lead's appointment.";
+      "Use the calendar below to book this lead's appointment. " +
+      "After the booking confirmation appears, click " +
+      "Refresh Appointment above to update the Portal. " +
+      "If it does not appear immediately, wait a few seconds " +
+      "and try again.";
 
     const wrapper = document.createElement("div");
     wrapper.className = "calendar-wrapper";
