@@ -273,6 +273,16 @@
         <div id="customerMessage" class="message"></div>
       </section>
 
+      <section
+        id="inspectionAppointmentSection"
+        aria-labelledby="inspectionAppointmentHeading"
+      >
+        <h2 id="inspectionAppointmentHeading">
+          Inspection Appointment
+        </h2>
+        <div id="inspectionAppointmentFields" class="grid"></div>
+      </section>
+
       <section id="servicesSection">
         <h2>Your Services</h2>
         <p id="serviceInstructions" class="muted"></p>
@@ -515,6 +525,38 @@
         note.textContent = "No information provided.";
         container.append(note);
       }
+    }
+
+    function renderInspectionAppointment() {
+      const container =
+        document.getElementById("inspectionAppointmentFields");
+
+      container.replaceChildren();
+
+      const datetime =
+        property.inspection_datetime === null ||
+        property.inspection_datetime === undefined
+          ? ""
+          : String(property.inspection_datetime).trim();
+
+      const timezone =
+        property.inspection_timezone === null ||
+        property.inspection_timezone === undefined
+          ? ""
+          : String(property.inspection_timezone).trim();
+
+      if (!datetime) {
+        const note = document.createElement("p");
+        note.className = "muted";
+        note.textContent = "Not yet scheduled.";
+        container.append(note);
+        return;
+      }
+
+      // Display saved appointment values as text.
+      // Do not parse dates or convert timezones.
+      addField(container, "Date and Time", datetime);
+      addField(container, "Timezone", timezone);
     }
 
     function lineTotalCents(line) {
@@ -815,6 +857,8 @@
         ["Square Feet", property.building_sq_feet],
         ["Exclusions", property.exclusions]
       ]);
+
+      renderInspectionAppointment();
 
       document.getElementById("customerMessage").textContent =
         quote.customer_message || "";
