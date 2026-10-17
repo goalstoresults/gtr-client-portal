@@ -41,7 +41,11 @@ export async function renderLeadSchedule(
   let stopped = false;
   let pollTimer = null;
   let loadingAppointment = false;
-  let hasDisplayedAppointment = false;
+
+  // null = not yet successfully determined
+  // false = no saved appointment
+  // true = saved appointment exists
+  let appointmentFound = null;
 
   const isCurrent = () =>
     !stopped &&
@@ -77,6 +81,8 @@ export async function renderLeadSchedule(
 
   /* -------------------------------------------------------
      SAVED APPOINTMENT SUMMARY
+
+     Always remains visible.
   ------------------------------------------------------- */
 
   const summary = document.createElement("div");
@@ -118,69 +124,108 @@ export async function renderLeadSchedule(
     appointmentNote.hidden = !text;
   };
 
+  /* -------------------------------------------------------
+     CRM MANAGEMENT MESSAGE
+  ------------------------------------------------------- */
+
+  const crmMessage = document.createElement("p");
+  crmMessage.className = "muted";
+  crmMessage.style.marginBottom = "16px";
+  crmMessage.textContent =
+    "To reschedule or cancel this appointment, please use " +
+    "the CRM and open the client's contact record to continue.";
+  crmMessage.hidden = true;
+
+  card.appendChild(crmMessage);
+
+  /* -------------------------------------------------------
+     BOOKING CALENDAR SECTION
+
+     Hide the entire section when an appointment exists.
+     Keep the iframe mounted so polling does not reload it.
+  ------------------------------------------------------- */
+
+  const bookingSection = document.createElement("div");
+  bookingSection.className = "schedule-booking-section";
+  bookingSection.hidden = true;
+
+  const calendarMessage = document.createElement("p");
+  calendarMessage.className = "muted";
+  calendarMessage.style.marginBottom = "16px";
+  calendarMessage.textContent = "Loading booking calendar…";
+
+  bookingSection.appendChild(calendarMessage);
+  card.appendChild(bookingSection);
+
+  const updateBookingVisibility = () => {
+    const showBooking = appointmentFound === false;
+    const showCrmMessage = appointmentFound === true;
+
+    // Set both hidden and display to avoid existing CSS
+    // accidentally overriding the hidden attribute.
+    bookingSection.hidden = !showBooking;
+    bookingSection.style.display =
+      showBooking ? "" : "none";
+
+    crmMessage.hidden = !showCrmMessage;
+    crmMessage.style.display =
+      showCrmMessage ? "" : "none";
+  };
+
+  updateBookingVisibility();
+
+  /* -------------------------------------------------------
+     DISPLAY SAVED APPOINTMENT
+
+     Display saved values as text.
+     No Date parsing.
+     No timezone interpretation.
+     No UTC conversion.
+  ------------------------------------------------------- */
+
   const showNoAppointment = () => {
-    hasDisplayedAppointment = false;
+    appointmentFound = false;
     appointmentText.textContent = "No appointment found.";
     setNote("");
+    updateBookingVisibility();
   };
 
   const displayAppointment = lead => {
-    const rawDatetime = lead?.inspection_datetime;
+    const rawDatetime = lead.inspection_datetime;
 
-    if (
-      rawDatetime === null ||
-      rawDatetime === undefined ||
-      String(rawDatetime).trim() === ""
-    ) {
+    const datetimeText =
+      rawDatetime === null || rawDatetime === undefined
+        ? ""
+        : String(rawDatetime).trim();
+
+    if (!datetimeText) {
       showNoAppointment();
       return;
     }
 
-    const date = new Date(rawDatetime);
+    const timezoneText =
+      lead.inspection_timezone === null ||
+      lead.inspection_timezone === undefined
+        ? ""
+        : String(lead.inspection_timezone).trim();
 
-    if (!Number.isFinite(date.getTime())) {
-      hasDisplayedAppointment = false;
-      appointmentText.textContent =
-        "The saved appointment date/time is invalid.";
-      setNote("");
-      return;
-    }
+    appointmentFound = true;
 
-    const timezone = lead.inspection_timezone || "UTC";
+    // textContent displays text without interpreting HTML.
+    appointmentText.textContent = datetimeText;
 
-    try {
-      const formatted = new Intl.DateTimeFormat("en-US", {
-        timeZone: timezone,
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-        timeZoneName: "short"
-      }).format(date);
+    setNote(
+      timezoneText
+        ? `Appointment timezone: ${timezoneText}`
+        : ""
+    );
 
-      appointmentText.textContent = formatted;
-      hasDisplayedAppointment = true;
-
-      setNote(
-        lead.inspection_timezone
-          ? `Appointment timezone: ${timezone}.`
-          : "Shown in UTC because the appointment timezone " +
-            "was not included in the lead response."
-      );
-    } catch (error) {
-      console.error(
-        "[Schedule Tab] Invalid appointment timezone:",
-        error
-      );
-
-      hasDisplayedAppointment = false;
-      appointmentText.textContent =
-        "The saved appointment timezone is invalid.";
-      setNote("");
-    }
+    updateBookingVisibility();
   };
+
+  /* -------------------------------------------------------
+     LOAD SAVED APPOINTMENT
+  ------------------------------------------------------- */
 
   const loadAppointment = async () => {
     if (!isCurrent()) {
@@ -221,8 +266,9 @@ export async function renderLeadSchedule(
         );
 
       if (isEmptyResponse) {
-        showNoAppointment();
-        return;
+        throw new Error(
+          "The lead API returned no matching lead."
+        );
       }
 
       if (
@@ -237,7 +283,26 @@ export async function renderLeadSchedule(
           String(leadId).toLowerCase() ||
         lead.project !== project
       ) {
-        throw new Error("The matching lead was not returned.");
+        throw new Error(
+          "The matching lead was not returned."
+        );
+      }
+
+      // Missing field is not the same as an empty field.
+      // An empty value means no appointment.
+      // A missing property means the read path is incomplete.
+      if (
+        !Object.prototype.hasOwnProperty.call(
+          lead,
+          "inspection_datetime"
+        )
+      ) {
+        const error = new Error(
+          "The lead API response is missing inspection_datetime."
+        );
+
+        error.code = "missing_schedule_field";
+        throw error;
       }
 
       displayAppointment(lead);
@@ -254,12 +319,28 @@ export async function renderLeadSchedule(
         error
       );
 
-      // Requested display fallback.
-      // Preserve an appointment already displayed successfully.
-      // Errors remain logged rather than shown in this panel.
-      if (!hasDisplayedAppointment) {
-        showNoAppointment();
+      if (appointmentFound === null) {
+        appointmentText.textContent =
+          "Unable to load the saved appointment.";
+
+        setNote(
+          error.code === "missing_schedule_field"
+            ? "The lead API is not returning inspection_datetime. " +
+              "The lead-detail API/view must include the saved " +
+              "scheduling fields."
+            : "The saved schedule could not be checked. " +
+              "The tab will retry automatically."
+        );
+      } else {
+        // Preserve the last successfully loaded state.
+        setNote(
+          "Unable to refresh the schedule. " +
+          "The last loaded information is still shown. " +
+          "The tab will retry automatically."
+        );
       }
+
+      updateBookingVisibility();
     } finally {
       loadingAppointment = false;
     }
@@ -268,13 +349,6 @@ export async function renderLeadSchedule(
   /* -------------------------------------------------------
      EXISTING GHL BOOKING CALENDAR
   ------------------------------------------------------- */
-
-  const calendarMessage = document.createElement("p");
-  calendarMessage.className = "muted";
-  calendarMessage.style.marginBottom = "16px";
-  calendarMessage.textContent = "Loading booking calendar…";
-
-  card.appendChild(calendarMessage);
 
   const loadCalendar = async () => {
     let scheduleConfig = null;
@@ -331,6 +405,7 @@ export async function renderLeadSchedule(
       calendarMessage.textContent = configFailed
         ? "Unable to load the booking calendar configuration."
         : "Scheduling is not configured for this project.";
+
       return;
     }
 
@@ -340,7 +415,9 @@ export async function renderLeadSchedule(
       calendarUrl = new URL(iframeSrc);
 
       if (calendarUrl.protocol !== "https:") {
-        throw new Error("Calendar URL must use HTTPS.");
+        throw new Error(
+          "Calendar URL must use HTTPS."
+        );
       }
     } catch (error) {
       console.error(
@@ -350,6 +427,7 @@ export async function renderLeadSchedule(
 
       calendarMessage.textContent =
         "The configured booking calendar URL is invalid.";
+
       return;
     }
 
@@ -368,7 +446,7 @@ export async function renderLeadSchedule(
     iframe.setAttribute("scrolling", "no");
 
     wrapper.appendChild(iframe);
-    card.appendChild(wrapper);
+    bookingSection.appendChild(wrapper);
 
     const embedScript = document.createElement("script");
     embedScript.src =
@@ -377,6 +455,10 @@ export async function renderLeadSchedule(
     embedScript.async = true;
 
     wrapper.appendChild(embedScript);
+
+    // Use the latest appointment state, regardless of
+    // which initial request completed first.
+    updateBookingVisibility();
   };
 
   /* -------------------------------------------------------
