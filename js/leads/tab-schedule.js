@@ -41,6 +41,7 @@ export async function renderLeadSchedule(
   let stopped = false;
   let pollTimer = null;
   let loadingAppointment = false;
+  let hasDisplayedAppointment = false;
 
   const isCurrent = () =>
     !stopped &&
@@ -102,6 +103,7 @@ export async function renderLeadSchedule(
   appointmentNote.className = "muted";
   appointmentNote.style.cssText =
     "margin:8px 0 0;font-size:13px;";
+  appointmentNote.hidden = true;
 
   summary.append(
     summaryHeading,
@@ -111,10 +113,15 @@ export async function renderLeadSchedule(
 
   card.appendChild(summary);
 
+  const setNote = text => {
+    appointmentNote.textContent = text;
+    appointmentNote.hidden = !text;
+  };
+
   const showNoAppointment = () => {
-    appointmentText.textContent = "No appointment scheduled yet";
-    appointmentNote.textContent =
-      "After booking, the saved appointment will appear here.";
+    hasDisplayedAppointment = false;
+    appointmentText.textContent = "No appointment found.";
+    setNote("");
   };
 
   const displayAppointment = lead => {
@@ -132,54 +139,46 @@ export async function renderLeadSchedule(
     const date = new Date(rawDatetime);
 
     if (!Number.isFinite(date.getTime())) {
+      hasDisplayedAppointment = false;
       appointmentText.textContent =
-        "The saved appointment date/time could not be displayed.";
-      appointmentNote.textContent =
-        "The saved value needs to be checked.";
+        "The saved appointment date/time is invalid.";
+      setNote("");
       return;
     }
 
-    const timezone = lead.inspection_timezone;
-
-    if (!timezone) {
-      appointmentText.textContent =
-        new Intl.DateTimeFormat("en-US", {
-          timeZone: "UTC",
-          weekday: "long",
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-          timeZoneName: "short"
-        }).format(date);
-
-      appointmentNote.textContent =
-        "Shown in UTC because the appointment timezone " +
-        "was not included in the lead response.";
-      return;
-    }
+    const timezone = lead.inspection_timezone || "UTC";
 
     try {
-      appointmentText.textContent =
-        new Intl.DateTimeFormat("en-US", {
-          timeZone: timezone,
-          weekday: "long",
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-          timeZoneName: "short"
-        }).format(date);
+      const formatted = new Intl.DateTimeFormat("en-US", {
+        timeZone: timezone,
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        timeZoneName: "short"
+      }).format(date);
 
-      appointmentNote.textContent =
-        `Appointment timezone: ${timezone}.`;
-    } catch {
+      appointmentText.textContent = formatted;
+      hasDisplayedAppointment = true;
+
+      setNote(
+        lead.inspection_timezone
+          ? `Appointment timezone: ${timezone}.`
+          : "Shown in UTC because the appointment timezone " +
+            "was not included in the lead response."
+      );
+    } catch (error) {
+      console.error(
+        "[Schedule Tab] Invalid appointment timezone:",
+        error
+      );
+
+      hasDisplayedAppointment = false;
       appointmentText.textContent =
-        "The appointment is saved, but its timezone is invalid.";
-      appointmentNote.textContent =
-        "Check the saved appointment timezone.";
+        "The saved appointment timezone is invalid.";
+      setNote("");
     }
   };
 
@@ -212,16 +211,16 @@ export async function renderLeadSchedule(
 
       if (!isCurrent()) return;
 
-      // A successful empty response has no appointment to display.
-      if (
+      const isEmptyResponse =
         lead === null ||
         lead === undefined ||
         (
           typeof lead === "object" &&
           !Array.isArray(lead) &&
           Object.keys(lead).length === 0
-        )
-      ) {
+        );
+
+      if (isEmptyResponse) {
         showNoAppointment();
         return;
       }
@@ -255,15 +254,12 @@ export async function renderLeadSchedule(
         error
       );
 
-      if (appointmentText.textContent === "Loading appointment…") {
-        appointmentText.textContent =
-          "Unable to check the saved appointment.";
+      // Requested display fallback.
+      // Preserve an appointment already displayed successfully.
+      // Errors remain logged rather than shown in this panel.
+      if (!hasDisplayedAppointment) {
+        showNoAppointment();
       }
-
-      appointmentNote.textContent =
-        "Unable to refresh the appointment. " +
-        "Any information shown above may be out of date. " +
-        "Retrying automatically.";
     } finally {
       loadingAppointment = false;
     }
@@ -322,7 +318,7 @@ export async function renderLeadSchedule(
 
     if (!isCurrent()) return;
 
-    // Keep the original CSI fallback for CSI only.
+    // Preserve the original CSI fallback for CSI only.
     const iframeSrc =
       scheduleConfig?.iframe_src ||
       (
