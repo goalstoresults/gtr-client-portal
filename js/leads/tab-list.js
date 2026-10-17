@@ -1,14 +1,36 @@
 // js/leads/tab-list.js
-// Lead List Tab — using project_pipeline_leads_view
+// Lead List with Entered Stage and inline status editing.
+
 import { escapeHtml, formatDateTime } from "../utilities.js";
+
+const LEADS_API_URL =
+  "https://leads-module.dennis-e64.workers.dev";
 
 const CSI_ISN_GATEWAY_URL =
   "https://csi-isn-gateway.dennis-e64.workers.dev";
+
+const LEAD_STATUSES = ["Open", "Won", "Lost"];
 
 export async function renderLeadsList(container, portalState) {
   let tableDiv = null;
 
   try {
+    /* -------------------------------------------------------
+       INTERNAL STATE
+    ------------------------------------------------------- */
+
+    const project = portalState.project;
+
+    let leads = [];
+    let currentSortField = "updated_at";
+    let currentSortDirection = "desc";
+
+    let editingLeadId = null;
+    let draftStatus = "";
+    let statusError = "";
+    let statusSaving = false;
+    let loading = false;
+
     /* -------------------------------------------------------
        RENDER FILTER BAR + TABLE SHELL
     ------------------------------------------------------- */
@@ -17,58 +39,149 @@ export async function renderLeadsList(container, portalState) {
       <section class="card">
         <h2>Leads</h2>
 
-        <!-- ROW 1: SEARCH INPUT -->
-        <div style="display:flex; align-items:flex-start; gap:20px; flex-wrap:wrap; margin-bottom:6px;">
+        <div style="
+          display:flex;
+          align-items:flex-start;
+          gap:20px;
+          flex-wrap:wrap;
+          margin-bottom:6px;
+        ">
           <label style="display:flex; flex-direction:column;">
-            <span>Search Lead / ${escapeHtml(portalState.contactLabel || "Contact")} / Status</span>
-            <input type="text" id="leadSearchInput" style="min-width:240px;">
-            <div style="font-size:0.75em; color:#666; margin-top:2px;">
+            <span>
+              Search Lead /
+              ${escapeHtml(portalState.contactLabel || "Contact")}
+              / Status
+            </span>
+
+            <input
+              type="text"
+              id="leadSearchInput"
+              style="min-width:240px;"
+            >
+
+            <div style="
+              font-size:0.75em;
+              color:#666;
+              margin-top:2px;
+            ">
               Tip: Leave blank for full list.
             </div>
           </label>
         </div>
 
-        <!-- ROW 2: BUTTONS -->
-        <div style="display:flex; gap:10px; margin-bottom:12px;">
-          <button id="btnApplyLeadFilter" class="secondary">Apply Filter</button>
-          <button id="btnClearLeadFilter" class="secondary">Clear Filter</button>
-          ${portalState.canEdit ? `<button id="btnAddLead" class="btn-primary">Add Lead</button>` : ``}
+        <div style="
+          display:flex;
+          gap:10px;
+          margin-bottom:12px;
+        ">
+          <button
+            type="button"
+            id="btnApplyLeadFilter"
+            class="secondary"
+          >
+            Apply Filter
+          </button>
+
+          <button
+            type="button"
+            id="btnClearLeadFilter"
+            class="secondary"
+          >
+            Clear Filter
+          </button>
+
+          ${
+            portalState.canEdit
+              ? `
+                <button
+                  type="button"
+                  id="btnAddLead"
+                  class="btn-primary"
+                >
+                  Add Lead
+                </button>
+              `
+              : ""
+          }
         </div>
+
+        <p
+          id="leadListMessage"
+          role="status"
+          aria-live="polite"
+          hidden
+        ></p>
 
         <div id="leadTable">(loading…)</div>
       </section>
     `;
+
+    const card = container.querySelector(".card");
 
     tableDiv = container.querySelector("#leadTable");
 
     const searchInput =
       container.querySelector("#leadSearchInput");
 
-    searchInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
+    const applyButton =
+      container.querySelector("#btnApplyLeadFilter");
 
-        container
-          .querySelector("#btnApplyLeadFilter")
-          .click();
+    const clearButton =
+      container.querySelector("#btnClearLeadFilter");
+
+    const addLeadButton =
+      container.querySelector("#btnAddLead");
+
+    const listMessage =
+      container.querySelector("#leadListMessage");
+
+    const isCurrent = () =>
+      card.isConnected &&
+      portalState.project === project;
+
+    /* -------------------------------------------------------
+       GENERAL HELPERS
+    ------------------------------------------------------- */
+
+    function safe(value) {
+      return escapeHtml(String(value ?? ""));
+    }
+
+    function canonicalStatus(value) {
+      const raw = String(value || "").trim().toLowerCase();
+
+      return LEAD_STATUSES.find(
+        status => status.toLowerCase() === raw
+      ) || "";
+    }
+
+    function displayStatus(value) {
+      return canonicalStatus(value) || String(value || "");
+    }
+
+    function showMessage(message, isError = false) {
+      listMessage.textContent = message;
+      listMessage.hidden = !message;
+      listMessage.style.color = isError ? "#b91c1c" : "";
+    }
+
+    function closeStatusEditor() {
+      editingLeadId = null;
+      draftStatus = "";
+      statusError = "";
+    }
+
+    function updateFilterControls() {
+      const disabled = loading || statusSaving;
+
+      searchInput.disabled = disabled;
+      applyButton.disabled = disabled;
+      clearButton.disabled = disabled;
+
+      if (addLeadButton) {
+        addLeadButton.disabled = disabled;
       }
-    });
-
-    /* -------------------------------------------------------
-       INTERNAL STATE
-    ------------------------------------------------------- */
-
-    let leads = [];
-    let currentSortField = null;
-    let currentSortDirection = "asc";
-
-    /* -------------------------------------------------------
-       TIMESTAMP HELPERS
-
-       Preserve explicit UTC offsets.
-       Retain the previous UTC interpretation for timestamps
-       that do not include an offset.
-    ------------------------------------------------------- */
+    }
 
     function timestampValue(value) {
       if (
@@ -96,7 +209,7 @@ export async function renderLeadsList(container, portalState) {
       const aTime = timestampValue(a);
       const bTime = timestampValue(b);
 
-      // Keep unknown/missing timestamps last in either direction.
+      // Unknown dates remain last in either direction.
       if (aTime === null && bTime === null) return 0;
       if (aTime === null) return 1;
       if (bTime === null) return -1;
@@ -106,26 +219,36 @@ export async function renderLeadsList(container, portalState) {
         : bTime - aTime;
     }
 
+    function renderDate(value, missingTitle = "") {
+      if (timestampValue(value) === null) {
+        return missingTitle
+          ? `<span title="${safe(missingTitle)}">—</span>`
+          : "—";
+      }
+
+      return safe(formatDateTime(value));
+    }
+
     /* -------------------------------------------------------
-       FETCH LEADS (FROM VIEW)
+       FETCH LEADS
     ------------------------------------------------------- */
 
     async function fetchLeads() {
       const url =
-        "https://leads-module.dennis-e64.workers.dev/leads/list" +
-        `?project=${encodeURIComponent(portalState.project)}`;
+        `${LEADS_API_URL}/leads/list` +
+        `?project=${encodeURIComponent(project)}`;
 
-      const res = await fetch(url, {
-        cache: "no-cache"
+      const response = await fetch(url, {
+        cache: "no-store"
       });
 
-      if (!res.ok) {
+      if (!response.ok) {
         throw new Error(
-          `Lead list request failed (HTTP ${res.status}).`
+          `Lead list request failed (HTTP ${response.status}).`
         );
       }
 
-      const data = await res.json();
+      const data = await response.json();
 
       if (!Array.isArray(data)) {
         throw new Error("Unexpected lead list response.");
@@ -135,379 +258,76 @@ export async function renderLeadsList(container, portalState) {
     }
 
     /* -------------------------------------------------------
-       LOAD DEFAULT (SORT BY UPDATED DESC)
+       LOAD DEFAULT / APPLY SEARCH
     ------------------------------------------------------- */
 
-    async function loadDefault() {
-      leads = await fetchLeads();
+    async function loadList(useSearch = false) {
+      if (loading || statusSaving || !isCurrent()) return;
 
-      currentSortField = "updated_at";
-      currentSortDirection = "desc";
+      const term = useSearch
+        ? searchInput.value.trim().toLowerCase()
+        : "";
 
-      renderTable();
-    }
-
-    /* -------------------------------------------------------
-       APPLY FILTER
-    ------------------------------------------------------- */
-
-    async function applyFilter() {
-      const term =
-        searchInput.value.trim().toLowerCase();
-
-      leads = await fetchLeads();
-
-      if (term !== "") {
-        leads = leads.filter(l =>
-          (l.lead_name || "").toLowerCase().includes(term) ||
-          (l.contact_search_name || "").toLowerCase().includes(term) ||
-          (l.status || "").toLowerCase().includes(term)
-        );
-      }
-
-      currentSortField = "lead_name";
-      currentSortDirection = "asc";
-
-      renderTable();
-    }
-
-    /* -------------------------------------------------------
-       RENDER TABLE
-    ------------------------------------------------------- */
-
-    function renderTable() {
-      const sorted = [...leads];
-
-      if (currentSortField) {
-        sorted.sort((a, b) => {
-          const timestampFields = [
-            "created_at",
-            "updated_at",
-            "current_stage_entered_at"
-          ];
-
-          if (timestampFields.includes(currentSortField)) {
-            return compareTimestamps(
-              a[currentSortField],
-              b[currentSortField],
-              currentSortDirection
-            );
-          }
-
-          const A =
-            String(a[currentSortField] || "").toLowerCase();
-
-          const B =
-            String(b[currentSortField] || "").toLowerCase();
-
-          return currentSortDirection === "asc"
-            ? A.localeCompare(B)
-            : B.localeCompare(A);
-        });
-      }
-
-      const headerText =
-        `<h4>Showing ${sorted.length} leads</h4>`;
-
-      tableDiv.innerHTML = `
-        ${headerText}
-        <table class="notes-table">
-          <thead>
-            <tr>
-              ${sortableHeader("lead_name", "Lead Name")}
-              ${sortableHeader("contact_search_name", portalState.contactLabel || "Contact")}
-              ${sortableHeader("stage_name", "Stage")}
-              ${sortableHeader("current_stage_entered_at", "Entered Stage")}
-              ${sortableHeader("status", "Status")}
-              ${sortableHeader("created_at", "Created")}
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${
-              sorted.length
-                ? sorted.map(renderRow).join("")
-                : `<tr><td colspan="7">(no leads found)</td></tr>`
-            }
-          </tbody>
-        </table>
-      `;
-
-      // Sorting handlers
-      tableDiv
-        .querySelectorAll("th.sortable")
-        .forEach(th => {
-          th.addEventListener("click", () => {
-            const field = th.dataset.field;
-
-            if (currentSortField === field) {
-              currentSortDirection =
-                currentSortDirection === "asc"
-                  ? "desc"
-                  : "asc";
-            } else {
-              currentSortField = field;
-              currentSortDirection = "asc";
-            }
-
-            renderTable();
-          });
-        });
-
-      // Row select → go to Details tab
-      tableDiv
-        .querySelectorAll(".btn-select-lead")
-        .forEach(btn => {
-          btn.addEventListener("click", () => {
-            const id = btn.dataset.id;
-            const name = btn.dataset.name;
-            const contact = btn.dataset.contact;
-
-            portalState.activeLeadId = id;
-            portalState.activeLeadName = name;
-            portalState.activeLeadContactName = contact;
-
-            localStorage.setItem("activeLeadId", id);
-            localStorage.setItem("activeLeadName", name);
-            localStorage.setItem(
-              "activeLeadContactName",
-              contact
-            );
-
-            const bar =
-              document.getElementById("lead-context-bar");
-
-            if (bar) {
-              bar.textContent =
-                `Lead: ${name} (${contact})`;
-
-              bar.style.display = "block";
-            }
-
-            const detailsBtn = document.querySelector(
-              '#leads-subtabs button[data-subtab="details"]'
-            );
-
-            if (detailsBtn) detailsBtn.click();
-          });
-        });
-
-      // "To ISN" transfer buttons
-      tableDiv
-        .querySelectorAll(".btn-to-isn")
-        .forEach(btn => {
-          btn.addEventListener(
-            "click",
-            () => handleTransferToIsn(btn)
-          );
-        });
-
-      // Delete lead buttons
-      tableDiv
-        .querySelectorAll(".btn-delete-lead")
-        .forEach(btn => {
-          btn.addEventListener(
-            "click",
-            () => handleDeleteLead(btn)
-          );
-        });
-    }
-
-    /* -------------------------------------------------------
-       TRANSFER TO ISN (CSI only)
-
-       Two-step chain: create/reuse the ISN client, then
-       create the ISN order using the returned isnClientId.
-    ------------------------------------------------------- */
-
-    async function handleTransferToIsn(btn) {
-      const leadId = btn.dataset.leadId;
-      const originalText = btn.textContent;
-
-      btn.disabled = true;
-      btn.textContent = "Sending…";
+      loading = true;
+      updateFilterControls();
+      showMessage("");
 
       try {
-        // Step 1: create or reuse the ISN client.
-        const clientRes = await fetch(
-          `${CSI_ISN_GATEWAY_URL}/lead/transfer-client`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              lead_id: leadId,
-              project: portalState.project,
-            }),
-          }
-        );
+        let loaded = await fetchLeads();
 
-        const clientData = await clientRes.json();
+        if (!isCurrent()) return;
 
-        if (!clientRes.ok || !clientData.success) {
-          console.error(
-            "[To ISN] Client transfer failed:",
-            clientData
+        if (term) {
+          loaded = loaded.filter(lead =>
+            String(lead.lead_name || "")
+              .toLowerCase()
+              .includes(term) ||
+            String(lead.contact_search_name || "")
+              .toLowerCase()
+              .includes(term) ||
+            String(lead.status || "")
+              .toLowerCase()
+              .includes(term)
           );
-
-          alert(
-            `Transfer to ISN failed (client step): ${clientData.error || "Unknown error"}`
-          );
-
-          btn.disabled = false;
-          btn.textContent = originalText;
-          return;
         }
 
-        // Step 2: create the ISN order.
-        btn.textContent = "Creating order…";
+        leads = loaded;
+        closeStatusEditor();
 
-        const orderRes = await fetch(
-          `${CSI_ISN_GATEWAY_URL}/order/create`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              lead_id: leadId,
-              isnClientId: clientData.isnClientId,
-              project: portalState.project,
-            }),
-          }
-        );
+        currentSortField = useSearch
+          ? "lead_name"
+          : "updated_at";
 
-        const orderData = await orderRes.json();
-
-        if (!orderRes.ok || !orderData.success) {
-          console.error(
-            "[To ISN] Order creation failed:",
-            orderData
-          );
-
-          alert(
-            `Client synced to ISN, but order creation failed: ${orderData.error || "Unknown error"}` +
-            (
-              orderData.unresolved
-                ? `\n\nMissing: ${orderData.unresolved.join(", ")}`
-                : ""
-            )
-          );
-
-          // Client sync succeeded, but order creation failed.
-          btn.disabled = false;
-          btn.textContent = "Retry Order";
-          return;
-        }
-
-        const orderDisplayNumber =
-          orderData.isnOrderOid ??
-          orderData.isn_order_oid ??
-          orderData.isnResponse?.oid ??
-          orderData.isnResponse?.order?.oid ??
-          orderData.isnOrderId;
-
-        btn.textContent =
-          `Order #${orderDisplayNumber} Created`;
-
-        btn.classList.add("btn-to-isn-done");
-      } catch (err) {
-        console.error(
-          "[To ISN] Network error:",
-          err
-        );
-
-        alert(
-          "Transfer to ISN failed — network error. Check console."
-        );
-
-        btn.disabled = false;
-        btn.textContent = originalText;
-      }
-    }
-
-    /* -------------------------------------------------------
-       DELETE LEAD
-    ------------------------------------------------------- */
-
-    async function handleDeleteLead(btn) {
-      const leadId = btn.dataset.id;
-      const leadName = btn.dataset.name;
-
-      const confirmed = confirm(
-        `Delete lead "${leadName}"? This cannot be undone.`
-      );
-
-      if (!confirmed) return;
-
-      btn.disabled = true;
-      btn.textContent = "Deleting…";
-
-      try {
-        const res = await fetch(
-          `https://leads-module.dennis-e64.workers.dev/leads/delete?id=${encodeURIComponent(leadId)}`,
-          {
-            method: "DELETE"
-          }
-        );
-
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-
-          alert(
-            `❌ Failed to delete lead: ${data.error || "Unknown error"}`
-          );
-
-          btn.disabled = false;
-          btn.textContent = "Delete";
-          return;
-        }
-
-        // Remove from local state and re-render.
-        leads = leads.filter(
-          l => l.lead_id !== leadId
-        );
+        currentSortDirection = useSearch
+          ? "asc"
+          : "desc";
 
         renderTable();
+      } catch (error) {
+        if (!isCurrent()) return;
 
-        // Clear the active lead context when appropriate.
-        if (portalState.activeLeadId === leadId) {
-          portalState.activeLeadId = null;
-          portalState.activeLeadName = "";
-          portalState.activeLeadContactName = "";
+        console.error("[Leads] Load failed:", error);
 
-          localStorage.removeItem("activeLeadId");
-          localStorage.removeItem("activeLeadName");
-          localStorage.removeItem(
-            "activeLeadContactName"
-          );
+        showMessage(
+          "Unable to load leads. Please try Apply Filter or Clear Filter again.",
+          true
+        );
 
-          const bar =
-            document.getElementById("lead-context-bar");
-
-          if (bar) {
-            bar.textContent = "No Lead Selected";
-            bar.style.display = "block";
-          }
+        if (!tableDiv.querySelector("table")) {
+          tableDiv.innerHTML =
+            `<p class="error">Error loading leads.</p>`;
         }
-      } catch (err) {
-        console.error(
-          "[Delete Lead] Network error:",
-          err
-        );
+      } finally {
+        loading = false;
 
-        alert(
-          "Delete failed — network error. Check console."
-        );
-
-        btn.disabled = false;
-        btn.textContent = "Delete";
+        if (isCurrent()) {
+          updateFilterControls();
+        }
       }
     }
 
     /* -------------------------------------------------------
-       HELPERS
+       SORTING HELPERS
     ------------------------------------------------------- */
 
     function sortableHeader(field, label) {
@@ -525,8 +345,10 @@ export async function renderLeadsList(container, portalState) {
 
       return `
         <th class="sortable" data-field="${field}">
-          ${escapeHtml(label)}
-          <span class="sort-arrows" style="margin-left:4px; font-size:0.8em;">
+          ${safe(label)}
+
+          <span class="sort-arrows"
+            style="margin-left:4px; font-size:0.8em;">
             <span>${up}</span>
             <span>${down}</span>
           </span>
@@ -534,106 +356,696 @@ export async function renderLeadsList(container, portalState) {
       `;
     }
 
-    function renderEnteredStage(value) {
-      const timestamp = timestampValue(value);
+    function sortedLeads() {
+      const sorted = [...leads];
 
-      if (timestamp === null) {
-        return `
-          <span title="No reliable stage-entry history is available.">—</span>
-        `;
-      }
+      const timestampFields = new Set([
+        "created_at",
+        "updated_at",
+        "current_stage_entered_at"
+      ]);
 
-      const fullDateTime = formatDateTime(value);
+      sorted.sort((a, b) => {
+        if (timestampFields.has(currentSortField)) {
+          return compareTimestamps(
+            a[currentSortField],
+            b[currentSortField],
+            currentSortDirection
+          );
+        }
 
-      return `
-        <span title="${escapeHtml(String(fullDateTime))}">
-          ${escapeHtml(String(fullDateTime))}
-        </span>
-      `;
+        const A =
+          String(a[currentSortField] || "").toLowerCase();
+
+        const B =
+          String(b[currentSortField] || "").toLowerCase();
+
+        return currentSortDirection === "asc"
+          ? A.localeCompare(B)
+          : B.localeCompare(A);
+      });
+
+      return sorted;
     }
 
     /* -------------------------------------------------------
-       RENDER ROW
+       INLINE STATUS EDITOR
     ------------------------------------------------------- */
 
-    function renderRow(l) {
-      const safeName =
-        escapeHtml(String(l.lead_name || ""));
+    function renderStatusEditor(lead) {
+      if (
+        editingLeadId !== String(lead.lead_id) ||
+        !portalState.canEdit
+      ) {
+        return "";
+      }
 
-      const safeContact =
-        escapeHtml(String(l.contact_search_name || ""));
-
-      const safeId =
-        escapeHtml(String(l.lead_id || ""));
-
-      const showToIsn =
-        (
-          l.stage_name === "Ready to Transfer" ||
-          l.stage_name === "Send to ISN"
-        ) &&
-        portalState.project === "csi";
-
-      const toIsnButton = showToIsn
-        ? `<button class="secondary btn-to-isn" data-lead-id="${safeId}">To ISN</button>`
+      const unknownOption = !draftStatus
+        ? `
+          <option value="" disabled selected>
+            Choose a status
+          </option>
+        `
         : "";
 
+      const options = LEAD_STATUSES.map(status => `
+        <option
+          value="${status}"
+          ${draftStatus === status ? "selected" : ""}
+        >
+          ${status}
+        </option>
+      `).join("");
+
       return `
-        <tr>
-          <td>${escapeHtml(l.lead_name || "")}</td>
-          <td>${escapeHtml(l.contact_search_name || "")}</td>
-          <td>${escapeHtml(l.stage_name || "")}</td>
-          <td>${renderEnteredStage(l.current_stage_entered_at)}</td>
-          <td>${escapeHtml(l.status || "")}</td>
-          <td>${formatDateTime(l.created_at)}</td>
-          <td>
-            <button class="btn-primary btn-select-lead"
-              data-id="${safeId}"
-              data-name="${safeName}"
-              data-contact="${safeContact}">
-              Select
-            </button>
-            ${toIsnButton}
-            ${portalState.deleteAllowed ? `
-              <button class="btn-danger btn-delete-lead"
-                data-id="${safeId}"
-                data-name="${safeName}">
-                Delete
-              </button>
-            ` : ``}
+        <tr class="inline-editor lead-status-editor">
+          <td colspan="7" style="
+            background:#fafafa;
+            border-top:1px solid #ddd;
+            padding:12px;
+          ">
+            <form class="lead-status-form">
+              <label style="
+                display:flex;
+                align-items:center;
+                gap:10px;
+                flex-wrap:wrap;
+                font-weight:bold;
+              ">
+                <span>Status</span>
+
+                <select
+                  class="edit-lead-status form-control"
+                  style="min-width:240px;"
+                  required
+                  ${statusSaving ? "disabled" : ""}
+                >
+                  ${unknownOption}
+                  ${options}
+                </select>
+              </label>
+
+              <p class="muted" style="
+                margin:8px 0 0;
+                font-size:13px;
+              ">
+                This updates the lead's status without deleting
+                the lead or changing its stage.
+              </p>
+
+              ${
+                statusError
+                  ? `
+                    <p role="alert" style="
+                      color:#b91c1c;
+                      margin:10px 0 0;
+                    ">
+                      ${safe(statusError)}
+                    </p>
+                  `
+                  : ""
+              }
+
+              <div style="
+                margin-top:12px;
+                display:flex;
+                gap:12px;
+              ">
+                <button
+                  type="submit"
+                  class="btn-primary save-lead-status"
+                  ${statusSaving ? "disabled" : ""}
+                >
+                  ${statusSaving ? "Saving…" : "Save"}
+                </button>
+
+                <button
+                  type="button"
+                  class="secondary cancel-lead-status"
+                  ${statusSaving ? "disabled" : ""}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </td>
         </tr>
       `;
     }
 
     /* -------------------------------------------------------
-       BUTTONS
+       RENDER LEAD ROW
     ------------------------------------------------------- */
 
-    container
-      .querySelector("#btnApplyLeadFilter")
-      .addEventListener("click", applyFilter);
+    function renderRow(lead) {
+      const id = safe(lead.lead_id);
+      const name = safe(lead.lead_name || "");
+      const contact = safe(lead.contact_search_name || "");
 
-    container
-      .querySelector("#btnClearLeadFilter")
-      .addEventListener("click", async () => {
-        searchInput.value = "";
-        await loadDefault();
+      const showToIsn =
+        project === "csi" &&
+        (
+          lead.stage_name === "Ready to Transfer" ||
+          lead.stage_name === "Send to ISN"
+        );
+
+      const isEditing =
+        editingLeadId === String(lead.lead_id);
+
+      return `
+        <tr data-id="${id}">
+          <td>${name}</td>
+          <td>${contact}</td>
+          <td>${safe(lead.stage_name || "")}</td>
+
+          <td>
+            ${renderDate(
+              lead.current_stage_entered_at,
+              "No reliable stage-entry history is available."
+            )}
+          </td>
+
+          <td>${safe(displayStatus(lead.status))}</td>
+
+          <td>${renderDate(lead.created_at)}</td>
+
+          <td>
+            <button
+              type="button"
+              class="btn-primary btn-select-lead"
+              data-id="${id}"
+              data-name="${name}"
+              data-contact="${contact}"
+              ${statusSaving ? "disabled" : ""}
+            >
+              Select
+            </button>
+
+            ${
+              showToIsn
+                ? `
+                  <button
+                    type="button"
+                    class="secondary btn-to-isn"
+                    data-lead-id="${id}"
+                    ${statusSaving ? "disabled" : ""}
+                  >
+                    To ISN
+                  </button>
+                `
+                : ""
+            }
+
+            ${
+              portalState.canEdit
+                ? `
+                  <button
+                    type="button"
+                    class="secondary btn-change-status"
+                    data-id="${id}"
+                    aria-expanded="${isEditing}"
+                    ${statusSaving ? "disabled" : ""}
+                  >
+                    Change Status
+                  </button>
+                `
+                : ""
+            }
+          </td>
+        </tr>
+
+        ${renderStatusEditor(lead)}
+      `;
+    }
+
+    /* -------------------------------------------------------
+       RENDER TABLE / ATTACH HANDLERS
+    ------------------------------------------------------- */
+
+    function renderTable() {
+      const sorted = sortedLeads();
+
+      tableDiv.innerHTML = `
+        <h4>Showing ${sorted.length} leads</h4>
+
+        <table class="notes-table">
+          <thead>
+            <tr>
+              ${sortableHeader("lead_name", "Lead Name")}
+              ${sortableHeader(
+                "contact_search_name",
+                portalState.contactLabel || "Contact"
+              )}
+              ${sortableHeader("stage_name", "Stage")}
+              ${sortableHeader(
+                "current_stage_entered_at",
+                "Entered Stage"
+              )}
+              ${sortableHeader("status", "Status")}
+              ${sortableHeader("created_at", "Created")}
+              <th>Actions</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${
+              sorted.length
+                ? sorted.map(renderRow).join("")
+                : `
+                  <tr>
+                    <td colspan="7">(no leads found)</td>
+                  </tr>
+                `
+            }
+          </tbody>
+        </table>
+      `;
+
+      // Sort columns.
+      tableDiv.querySelectorAll("th.sortable").forEach(th => {
+        th.addEventListener("click", () => {
+          if (statusSaving || loading) return;
+
+          const field = th.dataset.field;
+
+          if (currentSortField === field) {
+            currentSortDirection =
+              currentSortDirection === "asc"
+                ? "desc"
+                : "asc";
+          } else {
+            currentSortField = field;
+            currentSortDirection = "asc";
+          }
+
+          renderTable();
+        });
       });
 
-    const addLeadBtn =
-      container.querySelector("#btnAddLead");
+      // Select a lead.
+      tableDiv.querySelectorAll(".btn-select-lead").forEach(btn => {
+        btn.addEventListener("click", () => {
+          if (statusSaving) return;
 
-    if (addLeadBtn) {
-      addLeadBtn.addEventListener("click", () => {
+          const id = btn.dataset.id;
+          const name = btn.dataset.name;
+          const contact = btn.dataset.contact;
+
+          portalState.activeLeadId = id;
+          portalState.activeLeadName = name;
+          portalState.activeLeadContactName = contact;
+
+          localStorage.setItem("activeLeadId", id);
+          localStorage.setItem("activeLeadName", name);
+          localStorage.setItem("activeLeadContactName", contact);
+
+          const bar =
+            document.getElementById("lead-context-bar");
+
+          if (bar) {
+            bar.textContent = `Lead: ${name} (${contact})`;
+            bar.style.display = "block";
+          }
+
+          const detailsButton = document.querySelector(
+            '#leads-subtabs button[data-subtab="details"]'
+          );
+
+          if (detailsButton) detailsButton.click();
+        });
+      });
+
+      // Transfer to ISN.
+      tableDiv.querySelectorAll(".btn-to-isn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          if (statusSaving) return;
+          void handleTransferToIsn(btn);
+        });
+      });
+
+      // Expand/collapse the status editor.
+      tableDiv.querySelectorAll(".btn-change-status").forEach(btn => {
+        btn.addEventListener("click", () => {
+          if (
+            statusSaving ||
+            loading ||
+            !portalState.canEdit
+          ) {
+            return;
+          }
+
+          const id = btn.dataset.id;
+
+          if (editingLeadId === id) {
+            closeStatusEditor();
+            renderTable();
+            return;
+          }
+
+          const lead = leads.find(
+            item => String(item.lead_id) === id
+          );
+
+          if (!lead) return;
+
+          editingLeadId = id;
+          draftStatus = canonicalStatus(lead.status);
+          statusError = "";
+
+          renderTable();
+
+          tableDiv
+            .querySelector(".edit-lead-status")
+            ?.focus();
+        });
+      });
+
+      // Keep the dropdown selection in local draft state.
+      const statusSelect =
+        tableDiv.querySelector(".edit-lead-status");
+
+      if (statusSelect) {
+        statusSelect.addEventListener("change", () => {
+          draftStatus = statusSelect.value;
+          statusError = "";
+        });
+      }
+
+      // Cancel without saving.
+      const cancelButton =
+        tableDiv.querySelector(".cancel-lead-status");
+
+      if (cancelButton) {
+        cancelButton.addEventListener("click", () => {
+          if (statusSaving) return;
+
+          closeStatusEditor();
+          renderTable();
+        });
+      }
+
+      // Save the selected status.
+      const statusForm =
+        tableDiv.querySelector(".lead-status-form");
+
+      if (statusForm) {
+        statusForm.addEventListener("submit", event => {
+          event.preventDefault();
+          void saveLeadStatus();
+        });
+      }
+    }
+
+    /* -------------------------------------------------------
+       SAVE LEAD STATUS
+    ------------------------------------------------------- */
+
+    async function saveLeadStatus() {
+      if (
+        statusSaving ||
+        loading ||
+        !editingLeadId ||
+        !isCurrent()
+      ) {
+        return;
+      }
+
+      if (!portalState.canEdit) {
+        statusError =
+          "You do not have permission to change lead status.";
+
+        renderTable();
+        return;
+      }
+
+      const leadId = editingLeadId;
+      const nextStatus = draftStatus;
+
+      const lead = leads.find(
+        item => String(item.lead_id) === leadId
+      );
+
+      if (!lead) {
+        statusError =
+          "This lead could not be found. Reload the list.";
+
+        renderTable();
+        return;
+      }
+
+      if (!LEAD_STATUSES.includes(nextStatus)) {
+        statusError = "Choose a valid status.";
+        renderTable();
+        return;
+      }
+
+      // Do not send an unnecessary update.
+      if (canonicalStatus(lead.status) === nextStatus) {
+        closeStatusEditor();
+        renderTable();
+        return;
+      }
+
+      const leadName = lead.lead_name || "Lead";
+
+      statusSaving = true;
+      statusError = "";
+
+      showMessage("");
+      updateFilterControls();
+      renderTable();
+
+      try {
+        const response = await fetch(
+          `${LEADS_API_URL}/leads/update`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              id: leadId,
+              updates: {
+                status: nextStatus
+              }
+            })
+          }
+        );
+
+        const data =
+          await response.json().catch(() => null);
+
+        if (!response.ok) {
+          const detail =
+            typeof data?.error === "string"
+              ? ` ${data.error}`
+              : "";
+
+          throw new Error(
+            `The update could not be confirmed (HTTP ${response.status}).${detail} Reload the list before retrying.`
+          );
+        }
+
+        const savedLead =
+          Array.isArray(data) ? data[0] : null;
+
+        if (
+          !savedLead ||
+          String(savedLead.lead_id) !== leadId ||
+          savedLead.project !== project ||
+          canonicalStatus(savedLead.status) !== nextStatus
+        ) {
+          throw new Error(
+            "The server did not confirm the expected status. Reload the list before retrying."
+          );
+        }
+
+        if (!isCurrent()) return;
+
+        // Preserve fields supplied by the list view.
+        // In particular, do not replace stage-entry data.
+        leads = leads.map(item =>
+          String(item.lead_id) === leadId
+            ? {
+                ...item,
+                status: savedLead.status,
+                updated_at: savedLead.updated_at,
+                end_date: savedLead.end_date
+              }
+            : item
+        );
+
+        closeStatusEditor();
+
+        showMessage(
+          `${leadName}: status changed to ${nextStatus}.`
+        );
+      } catch (error) {
+        console.error("[Lead Status] Save failed:", error);
+
+        if (!isCurrent()) return;
+
+        statusError =
+          error.message || "Unable to save the status.";
+      } finally {
+        statusSaving = false;
+
+        if (isCurrent()) {
+          updateFilterControls();
+          renderTable();
+        }
+      }
+    }
+
+    /* -------------------------------------------------------
+       TRANSFER TO ISN (CSI ONLY)
+
+       Step 1: create/reuse the ISN client.
+       Step 2: create the order using the returned client ID.
+    ------------------------------------------------------- */
+
+    async function handleTransferToIsn(btn) {
+      const leadId = btn.dataset.leadId;
+      const originalText = btn.textContent;
+
+      btn.disabled = true;
+      btn.textContent = "Sending…";
+
+      try {
+        const clientResponse = await fetch(
+          `${CSI_ISN_GATEWAY_URL}/lead/transfer-client`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              lead_id: leadId,
+              project
+            })
+          }
+        );
+
+        const clientData = await clientResponse.json();
+
+        if (!clientResponse.ok || !clientData.success) {
+          console.error(
+            "[To ISN] Client transfer failed:",
+            clientData
+          );
+
+          alert(
+            `Transfer to ISN failed (client step): ${
+              clientData.error || "Unknown error"
+            }`
+          );
+
+          btn.disabled = false;
+          btn.textContent = originalText;
+          return;
+        }
+
+        btn.textContent = "Creating order…";
+
+        const orderResponse = await fetch(
+          `${CSI_ISN_GATEWAY_URL}/order/create`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              lead_id: leadId,
+              isnClientId: clientData.isnClientId,
+              project
+            })
+          }
+        );
+
+        const orderData = await orderResponse.json();
+
+        if (!orderResponse.ok || !orderData.success) {
+          console.error(
+            "[To ISN] Order creation failed:",
+            orderData
+          );
+
+          alert(
+            `Client synced to ISN, but order creation failed: ${
+              orderData.error || "Unknown error"
+            }` +
+            (
+              orderData.unresolved
+                ? `\n\nMissing: ${orderData.unresolved.join(", ")}`
+                : ""
+            )
+          );
+
+          btn.disabled = false;
+          btn.textContent = "Retry Order";
+          return;
+        }
+
+        const orderDisplayNumber =
+          orderData.isnOrderOid ??
+          orderData.isn_order_oid ??
+          orderData.isnResponse?.oid ??
+          orderData.isnResponse?.order?.oid ??
+          orderData.isnOrderId;
+
+        btn.textContent =
+          `Order #${orderDisplayNumber} Created`;
+
+        btn.classList.add("btn-to-isn-done");
+      } catch (error) {
+        console.error("[To ISN] Network error:", error);
+
+        alert(
+          "Transfer to ISN failed — network error. Check console."
+        );
+
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
+    }
+
+    /* -------------------------------------------------------
+       FILTER BUTTONS
+    ------------------------------------------------------- */
+
+    searchInput.addEventListener("keydown", event => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        void loadList(true);
+      }
+    });
+
+    applyButton.addEventListener("click", () => {
+      void loadList(true);
+    });
+
+    clearButton.addEventListener("click", () => {
+      if (loading || statusSaving) return;
+
+      searchInput.value = "";
+      void loadList(false);
+    });
+
+    /* -------------------------------------------------------
+       ADD LEAD
+    ------------------------------------------------------- */
+
+    if (addLeadButton) {
+      addLeadButton.addEventListener("click", () => {
+        if (loading || statusSaving) return;
+
         portalState.activeLeadId = null;
         portalState.activeLeadName = "";
         portalState.activeLeadContactName = "";
 
         localStorage.removeItem("activeLeadId");
         localStorage.removeItem("activeLeadName");
-        localStorage.removeItem(
-          "activeLeadContactName"
-        );
+        localStorage.removeItem("activeLeadContactName");
 
         const bar =
           document.getElementById("lead-context-bar");
@@ -643,11 +1055,11 @@ export async function renderLeadsList(container, portalState) {
           bar.style.display = "block";
         }
 
-        const contactBtn = document.querySelector(
+        const contactButton = document.querySelector(
           '#leads-subtabs button[data-subtab="contact"]'
         );
 
-        if (contactBtn) contactBtn.click();
+        if (contactButton) contactButton.click();
       });
     }
 
@@ -655,16 +1067,12 @@ export async function renderLeadsList(container, portalState) {
        INITIAL LOAD
     ------------------------------------------------------- */
 
-    await loadDefault();
-  } catch (err) {
-    if (tableDiv) {
-      tableDiv.innerHTML =
-        `<p class="error">Error loading leads.</p>`;
-    } else {
-      container.innerHTML =
-        `<p class="error">Error loading leads.</p>`;
-    }
+    await loadList(false);
+  } catch (error) {
+    console.error("[Leads] Error:", error);
 
-    console.error("[Leads] Error:", err);
+    const target = tableDiv || container;
+
+    target.innerHTML =
+      `<p class="error">Error loading leads.</p>`;
   }
-}
