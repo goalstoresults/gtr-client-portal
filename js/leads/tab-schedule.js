@@ -238,7 +238,7 @@ export async function renderLeadSchedule(
 
     try {
       const response = await fetch(
-        `/leads/get?id=${encodeURIComponent(leadId)}`,
+        `https://leads-module.dennis-e64.workers.dev/leads/get?id=${encodeURIComponent(leadId)}`,
         {
           cache: "no-store",
           signal: controller.signal
@@ -356,7 +356,7 @@ export async function renderLeadSchedule(
 
     try {
       const response = await fetch(
-        `/leads/config?project=${encodeURIComponent(project)}`,
+        `https://leads-module.dennis-e64.workers.dev/leads/config?project=${encodeURIComponent(project)}`,
         {
           cache: "no-store",
           signal: controller.signal
