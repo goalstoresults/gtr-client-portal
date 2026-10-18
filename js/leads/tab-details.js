@@ -66,7 +66,13 @@ export async function renderLeadDetails(container, portalState) {
   `.replace(/\s+/g, "");
 
   const leadRes = await fetch(leadUrl, { cache: "no-cache" });
-  const lead = await leadRes.json();
+  const leadData = await leadRes.json();
+  const lead = Array.isArray(leadData) ? leadData[0] : leadData;
+
+  if (!leadRes.ok || !lead || String(lead.lead_id) !== String(leadId) || lead.project !== project) {
+    container.innerHTML = `<section class="card"><h2>Lead Details</h2><p>Unable to load the matching lead.</p></section>`;
+    return;
+  }
 
   /* -------------------------------------------------------
      GROUP FIELDS BY SECTION
@@ -141,7 +147,7 @@ export async function renderLeadDetails(container, portalState) {
 
       const rows = fields
         .map(f => {
-          const value = lead[f.field_key] || "";
+          const value = String(lead[f.field_key] ?? "");
 
           // Lookup dropdown
           if (f.lookup_type) {
@@ -149,7 +155,7 @@ export async function renderLeadDetails(container, portalState) {
               .filter(l => l.lookup_type === f.lookup_type)
               .map(
                 l =>
-                  `<option value="${l.value}" ${
+                  `<option value="${escapeHtml(String(l.value))}" ${
                     l.value === value ? "selected" : ""
                   }>${escapeHtml(l.value)}</option>`
               )
@@ -158,7 +164,7 @@ export async function renderLeadDetails(container, portalState) {
             return `
               <label style="${fieldLabelStyle}">
                 <span style="${fieldLabelTextStyle}">${escapeHtml(f.label)}</span>
-                <select data-field="${f.field_key}" style="${fieldInputStyle}">
+                <select data-field="${escapeHtml(String(f.field_key))}" style="${fieldInputStyle}">
                   <option value="">-- select --</option>
                   ${options}
                 </select>
@@ -170,7 +176,7 @@ export async function renderLeadDetails(container, portalState) {
           return `
             <label style="${fieldLabelStyle}">
               <span style="${fieldLabelTextStyle}">${escapeHtml(f.label)}</span>
-              <input type="text" data-field="${f.field_key}" value="${escapeHtml(
+              <input type="text" data-field="${escapeHtml(String(f.field_key))}" value="${escapeHtml(
                 value
               )}" style="${fieldInputStyle}">
             </label>
@@ -190,13 +196,55 @@ export async function renderLeadDetails(container, portalState) {
   /* -------------------------------------------------------
      SAVE LOGIC
   ------------------------------------------------------- */
-  container.querySelector("#btnSaveLeadDetails").addEventListener("click", async () => {
+  const saveButton = container.querySelector("#btnSaveLeadDetails");
+  const card = container.querySelector(".card");
+  const canEdit = () => portalState.canEdit === true && portalState.isDemoAccount !== true;
+  const isCurrent = () => card.isConnected &&
+    portalState.project === project && portalState.activeLeadId === leadId;
+
+  const baseline = new Map();
+  formDiv.querySelectorAll("[data-field]").forEach(el => {
+    baseline.set(el.dataset.field, el.value);
+    el.disabled = !canEdit();
+  });
+  saveButton.disabled = !canEdit();
+  let saving = false;
+  let reloadRequired = false;
+
+  saveButton.addEventListener("click", async () => {
+    if (saving || reloadRequired || !canEdit() || !isCurrent()) return;
     const updates = {};
 
+    // Submit only changed controls. Ordinary saves must not reapply an
+    // old stage or clear an existing value absent from the lookup list.
     formDiv.querySelectorAll("[data-field]").forEach(el => {
-      const val = el.value;
-      updates[el.dataset.field] = val === "" ? null : val;   // ⭐ CHANGED
+      if (el.value !== baseline.get(el.dataset.field)) {
+        updates[el.dataset.field] = el.value === "" ? null : el.value;
+      }
     });
+
+    if (!Object.keys(updates).length) {
+      alert("No changes to save.");
+      return;
+    }
+
+    if (portalState.user_id) {
+      updates.updated_user_id = String(portalState.user_id);
+    }
+
+    const payload = {
+      id: leadId,
+      updates,
+      change_source: "lead_details"
+    };
+    if (Object.prototype.hasOwnProperty.call(lead, "updated_at")) {
+      payload.expected_updated_at = lead.updated_at;
+    }
+
+    saving = true;
+    saveButton.disabled = true;
+    saveButton.textContent = "Saving…";
+    formDiv.querySelectorAll("[data-field]").forEach(el => { el.disabled = true; });
 
     try {
       const res = await fetch(
@@ -204,25 +252,58 @@ export async function renderLeadDetails(container, portalState) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: leadId,
-            updates
-          })
+          body: JSON.stringify(payload)
         }
       );
-
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!isCurrent()) return;
 
       if (!res.ok) {
-        alert("❌ Failed to save lead details.");
-        console.error(data);
+        reloadRequired = res.status === 409 || data?.lead_saved === true;
+        const message = typeof data?.error === "string"
+          ? data.error : "Failed to save lead details. Reload before retrying.";
+        if (!reloadRequired && res.status >= 500) reloadRequired = true;
+        alert(message);
+        console.error("[Lead Details] Save failed", { status: res.status });
         return;
       }
 
+      const savedLead = Array.isArray(data) ? data[0] : null;
+      if (!savedLead || String(savedLead.lead_id) !== String(leadId) || savedLead.project !== project) {
+        reloadRequired = true;
+        throw new Error("The save response could not be verified. Reload Lead Details before retrying.");
+      }
+
+      Object.assign(lead, savedLead);
+      formDiv.querySelectorAll("[data-field]").forEach(el => {
+        const key = el.dataset.field;
+        if (Object.prototype.hasOwnProperty.call(savedLead, key)) {
+          el.value = String(savedLead[key] ?? "");
+        }
+        baseline.set(key, el.value);
+      });
+      if (Object.prototype.hasOwnProperty.call(updates, "lead_name")) {
+        portalState.activeLeadName = savedLead.lead_name || "";
+        localStorage.setItem("activeLeadName", portalState.activeLeadName);
+        const bar = document.getElementById("lead-context-bar");
+        if (bar) bar.textContent = `Lead: ${portalState.activeLeadName} (${portalState.activeLeadContactName || ""})`;
+      }
       alert("✅ Lead details saved.");
     } catch (err) {
-      alert("❌ Error saving lead details: " + err.message);
-      console.error(err);
+      reloadRequired = true;
+      if (isCurrent()) {
+        alert("Error confirming the save: " + err.message + " Reload Lead Details before retrying.");
+      }
+      console.error("[Lead Details] Save request failed:", err);
+    } finally {
+      saving = false;
+      if (isCurrent()) {
+        saveButton.disabled = !canEdit() || reloadRequired;
+        saveButton.textContent = reloadRequired ? "Reload Lead Details to Continue" : "Save Lead Details";
+        formDiv.querySelectorAll("[data-field]").forEach(el => {
+          el.disabled = !canEdit() || reloadRequired;
+        });
+      }
     }
   });
 
