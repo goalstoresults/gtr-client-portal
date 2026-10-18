@@ -1076,3 +1076,4 @@ export async function renderLeadsList(container, portalState) {
     target.innerHTML =
       `<p class="error">Error loading leads.</p>`;
   }
+}
