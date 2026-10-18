@@ -1030,4 +1030,60 @@ export async function renderLeadsList(container, portalState) {
       }
     });
 
-    applyButton.addEventList
+    applyButton.addEventListener("click", () => {
+      void loadList(true);
+    });
+
+    clearButton.addEventListener("click", () => {
+      if (loading || statusSaving) return;
+
+      searchInput.value = "";
+      void loadList(false);
+    });
+
+    /* -------------------------------------------------------
+       ADD LEAD
+    ------------------------------------------------------- */
+
+    if (addLeadButton) {
+      addLeadButton.addEventListener("click", () => {
+        if (loading || statusSaving) return;
+
+        portalState.activeLeadId = null;
+        portalState.activeLeadName = "";
+        portalState.activeLeadContactName = "";
+
+        localStorage.removeItem("activeLeadId");
+        localStorage.removeItem("activeLeadName");
+        localStorage.removeItem("activeLeadContactName");
+
+        const bar =
+          document.getElementById("lead-context-bar");
+
+        if (bar) {
+          bar.textContent = "No Lead Selected";
+          bar.style.display = "block";
+        }
+
+        const contactButton = document.querySelector(
+          '#leads-subtabs button[data-subtab="contact"]'
+        );
+
+        if (contactButton) contactButton.click();
+      });
+    }
+
+    /* -------------------------------------------------------
+       INITIAL LOAD
+    ------------------------------------------------------- */
+
+    await loadList(false);
+  } catch (error) {
+    console.error("[Leads] Error:", error);
+
+    const target = tableDiv || container;
+
+    target.innerHTML =
+      `<p class="error">Error loading leads.</p>`;
+  }
+}
