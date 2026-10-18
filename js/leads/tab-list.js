@@ -1,5 +1,6 @@
 // js/leads/tab-list.js
-// Lead List with Entered Stage and inline status editing.
+// Lead List with Entered Stage, inline status editing,
+// and full-admin Delete button.
 
 import { escapeHtml, formatDateTime } from "../utilities.js";
 
@@ -138,6 +139,11 @@ export async function renderLeadsList(container, portalState) {
     const isCurrent = () =>
       card.isConnected &&
       portalState.project === project;
+
+    const canDeleteLead = () =>
+      portalState.full_admin === true &&
+      portalState.canEdit === true &&
+      portalState.isDemoAccount !== true;
 
     /* -------------------------------------------------------
        GENERAL HELPERS
@@ -581,6 +587,21 @@ export async function renderLeadsList(container, portalState) {
                 `
                 : ""
             }
+
+            ${
+              canDeleteLead()
+                ? `
+                  <button
+                    type="button"
+                    class="btn-danger btn-delete-lead"
+                    data-id="${id}"
+                    ${statusSaving ? "disabled" : ""}
+                  >
+                    Delete
+                  </button>
+                `
+                : ""
+            }
           </td>
         </tr>
 
@@ -690,6 +711,13 @@ export async function renderLeadsList(container, portalState) {
         btn.addEventListener("click", () => {
           if (statusSaving) return;
           void handleTransferToIsn(btn);
+        });
+      });
+
+      // Delete buttons — visible only to permitted full admins.
+      tableDiv.querySelectorAll(".btn-delete-lead").forEach(btn => {
+        btn.addEventListener("click", () => {
+          void handleDeleteLead(btn);
         });
       });
 
@@ -897,6 +925,149 @@ export async function renderLeadsList(container, portalState) {
 
         statusError =
           error.message || "Unable to save the status.";
+      } finally {
+        statusSaving = false;
+
+        if (isCurrent()) {
+          updateFilterControls();
+          renderTable();
+        }
+      }
+    }
+
+    /* -------------------------------------------------------
+       DELETE LEAD — FULL ADMIN UI ONLY
+
+       Uses the existing delete API.
+       Server-side admin authorization must be enforced
+       separately by the Worker.
+
+       statusSaving is also used as the mutation lock
+       while deletion is in progress.
+    ------------------------------------------------------- */
+
+    async function handleDeleteLead(btn) {
+      if (
+        statusSaving ||
+        loading ||
+        !isCurrent() ||
+        !canDeleteLead()
+      ) {
+        return;
+      }
+
+      const leadId = btn.dataset.id;
+
+      const lead = leads.find(
+        item => String(item.lead_id) === String(leadId)
+      );
+
+      if (!lead) {
+        showMessage(
+          "This lead could not be found. Reload the list.",
+          true
+        );
+        return;
+      }
+
+      const leadName = lead.lead_name || "Unnamed lead";
+
+      const confirmed = window.confirm(
+        `Permanently delete lead "${leadName}"?\n\n` +
+        "This is intended for test or incorrectly created leads. " +
+        "This action cannot be undone."
+      );
+
+      if (!confirmed) return;
+
+      // Recheck permission and project before sending.
+      if (!isCurrent() || !canDeleteLead()) return;
+
+      closeStatusEditor();
+
+      statusSaving = true;
+
+      showMessage(`Deleting "${leadName}"…`);
+      updateFilterControls();
+      renderTable();
+
+      try {
+        const response = await fetch(
+          `${LEADS_API_URL}/leads/delete?id=${encodeURIComponent(leadId)}`,
+          {
+            method: "DELETE",
+            cache: "no-store"
+          }
+        );
+
+        const data =
+          await response.json().catch(() => null);
+
+        if (!response.ok) {
+          const detail =
+            typeof data?.error === "string"
+              ? ` ${data.error}`
+              : "";
+
+          throw new Error(
+            `Deletion could not be confirmed (HTTP ${response.status}).${detail} Reload the list before retrying.`
+          );
+        }
+
+        // The existing Worker returns the deleted records.
+        // Verify the exact lead before removing its local row.
+        const deletedLead = Array.isArray(data)
+          ? data.find(
+              item =>
+                String(item.lead_id) === String(leadId) &&
+                item.project === project
+            )
+          : null;
+
+        if (!deletedLead) {
+          throw new Error(
+            "The server did not confirm deletion of this lead. " +
+            "Reload the list before retrying."
+          );
+        }
+
+        if (!isCurrent()) return;
+
+        leads = leads.filter(
+          item => String(item.lead_id) !== String(leadId)
+        );
+
+        // Clear the context if the deleted lead was selected.
+        if (
+          String(portalState.activeLeadId) === String(leadId)
+        ) {
+          portalState.activeLeadId = null;
+          portalState.activeLeadName = "";
+          portalState.activeLeadContactName = "";
+
+          localStorage.removeItem("activeLeadId");
+          localStorage.removeItem("activeLeadName");
+          localStorage.removeItem("activeLeadContactName");
+
+          const bar =
+            document.getElementById("lead-context-bar");
+
+          if (bar) {
+            bar.textContent = "No Lead Selected";
+            bar.style.display = "block";
+          }
+        }
+
+        showMessage(`Deleted "${leadName}".`);
+      } catch (error) {
+        console.error("[Delete Lead] Failed:", error);
+
+        if (isCurrent()) {
+          showMessage(
+            error.message || "Unable to delete the lead.",
+            true
+          );
+        }
       } finally {
         statusSaving = false;
 
