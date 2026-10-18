@@ -220,13 +220,23 @@ export async function renderLeadsList(container, portalState) {
     }
 
     function renderDate(value, missingTitle = "") {
-      if (timestampValue(value) === null) {
+      // Use the same timestamp interpretation as sorting.
+      // Offset-free audit timestamps follow the existing
+      // UTC assumption in timestampValue().
+      const timestamp = timestampValue(value);
+
+      if (timestamp === null) {
         return missingTitle
           ? `<span title="${safe(missingTitle)}">—</span>`
           : "—";
       }
 
-      return safe(formatDateTime(value));
+      // Give the shared formatter an unambiguous timestamp.
+      // formatDateTime() displays it in America/New_York.
+      const normalizedValue =
+        new Date(timestamp).toISOString();
+
+      return safe(formatDateTime(normalizedValue));
     }
 
     /* -------------------------------------------------------
@@ -1020,60 +1030,4 @@ export async function renderLeadsList(container, portalState) {
       }
     });
 
-    applyButton.addEventListener("click", () => {
-      void loadList(true);
-    });
-
-    clearButton.addEventListener("click", () => {
-      if (loading || statusSaving) return;
-
-      searchInput.value = "";
-      void loadList(false);
-    });
-
-    /* -------------------------------------------------------
-       ADD LEAD
-    ------------------------------------------------------- */
-
-    if (addLeadButton) {
-      addLeadButton.addEventListener("click", () => {
-        if (loading || statusSaving) return;
-
-        portalState.activeLeadId = null;
-        portalState.activeLeadName = "";
-        portalState.activeLeadContactName = "";
-
-        localStorage.removeItem("activeLeadId");
-        localStorage.removeItem("activeLeadName");
-        localStorage.removeItem("activeLeadContactName");
-
-        const bar =
-          document.getElementById("lead-context-bar");
-
-        if (bar) {
-          bar.textContent = "No Lead Selected";
-          bar.style.display = "block";
-        }
-
-        const contactButton = document.querySelector(
-          '#leads-subtabs button[data-subtab="contact"]'
-        );
-
-        if (contactButton) contactButton.click();
-      });
-    }
-
-    /* -------------------------------------------------------
-       INITIAL LOAD
-    ------------------------------------------------------- */
-
-    await loadList(false);
-  } catch (error) {
-    console.error("[Leads] Error:", error);
-
-    const target = tableDiv || container;
-
-    target.innerHTML =
-      `<p class="error">Error loading leads.</p>`;
-  }
-}
+    applyButton.addEventList
