@@ -9,7 +9,7 @@ const LEADS_API_URL =
 const CSI_ISN_GATEWAY_URL =
   "https://csi-isn-gateway.dennis-e64.workers.dev";
 
-const LEAD_STATUSES = ["Open", "Won", "Lost"];
+const LEAD_STATUSES = ["Open", "Won", "Lost", "Abandoned"];
 
 export async function renderLeadsList(container, portalState) {
   let tableDiv = null;
