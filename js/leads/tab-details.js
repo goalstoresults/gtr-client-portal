@@ -1,6 +1,6 @@
 // js/leads/tab-details.js
 // Dynamic Lead Details — wired to /leads/get and /leads/update.
-// Dropdowns load active values directly by their configured lookup_type.
+// Dropdowns load active values by their configured lookup_type.
 
 import { escapeHtml } from "../utilities.js";
 
@@ -66,6 +66,7 @@ export async function renderLeadDetails(container, portalState) {
 
   let configured;
   let lead;
+
   const lookupsByType = new Map();
 
   try {
@@ -74,6 +75,7 @@ export async function renderLeadDetails(container, portalState) {
     ------------------------------------------------------- */
 
     const configUrl = new URL(`${LOOKUPS_BASE}/lead_fields`);
+
     configUrl.searchParams.set("project", project);
     configUrl.searchParams.set("_", String(Date.now()));
 
@@ -83,7 +85,9 @@ export async function renderLeadDetails(container, portalState) {
     );
 
     if (!Array.isArray(configData.rows)) {
-      throw new Error("Lead field configuration is not a valid list.");
+      throw new Error(
+        "Lead field configuration is not a valid list."
+      );
     }
 
     configured = configData.rows
@@ -109,7 +113,7 @@ export async function renderLeadDetails(container, portalState) {
     }
 
     /* -------------------------------------------------------
-       FETCH LOOKUPS DIRECTLY BY CONFIGURED TYPE
+       FETCH LOOKUPS BY CONFIGURED TYPE
     ------------------------------------------------------- */
 
     const lookupTypes = [
@@ -140,7 +144,9 @@ export async function renderLeadDetails(container, portalState) {
 
       const matchingRows = rows
         .filter(row => {
-          const rowType = String(row.lookup_type ?? "").trim();
+          const rowType = String(
+            row.lookup_type ?? ""
+          ).trim();
 
           return (
             rowType === lookupType &&
@@ -152,8 +158,13 @@ export async function renderLeadDetails(container, portalState) {
           const aSort = Number(a.sort_order);
           const bSort = Number(b.sort_order);
 
-          const aOrder = Number.isFinite(aSort) ? aSort : 999;
-          const bOrder = Number.isFinite(bSort) ? bSort : 999;
+          const aOrder = Number.isFinite(aSort)
+            ? aSort
+            : 999;
+
+          const bOrder = Number.isFinite(bSort)
+            ? bSort
+            : 999;
 
           return aOrder - bOrder;
         });
@@ -161,7 +172,10 @@ export async function renderLeadDetails(container, portalState) {
       const seenValues = new Set();
 
       const options = matchingRows.filter(row => {
-        if (row.value === null || row.value === undefined) {
+        if (
+          row.value === null ||
+          row.value === undefined
+        ) {
           return false;
         }
 
@@ -181,6 +195,7 @@ export async function renderLeadDetails(container, portalState) {
     ------------------------------------------------------- */
 
     const leadUrl = new URL(`${LEADS_BASE}/leads/get`);
+
     leadUrl.searchParams.set("id", leadId);
 
     const [leadData] = await Promise.all([
@@ -188,7 +203,9 @@ export async function renderLeadDetails(container, portalState) {
       Promise.all(lookupRequests)
     ]);
 
-    lead = Array.isArray(leadData) ? leadData[0] : leadData;
+    lead = Array.isArray(leadData)
+      ? leadData[0]
+      : leadData;
 
     if (!stillLoadingCurrentLead()) return;
 
@@ -197,7 +214,9 @@ export async function renderLeadDetails(container, portalState) {
       String(lead.lead_id) !== String(leadId) ||
       lead.project !== project
     ) {
-      throw new Error("Unable to load the matching lead.");
+      throw new Error(
+        "Unable to load the matching lead."
+      );
     }
   } catch (error) {
     if (!stillLoadingCurrentLead()) return;
@@ -205,11 +224,17 @@ export async function renderLeadDetails(container, portalState) {
     container.innerHTML = `
       <section class="card">
         <h2>Lead Details</h2>
-        <p>${escapeHtml(error.message || "Unable to load Lead Details.")}</p>
+        <p>${escapeHtml(
+          error.message || "Unable to load Lead Details."
+        )}</p>
       </section>
     `;
 
-    console.error("[Lead Details] Load failed:", error);
+    console.error(
+      "[Lead Details] Load failed:",
+      error
+    );
+
     return;
   }
 
@@ -247,7 +272,9 @@ export async function renderLeadDetails(container, portalState) {
     </section>
   `;
 
-  const formDiv = container.querySelector("#leadDetailsForm");
+  const formDiv = container.querySelector(
+    "#leadDetailsForm"
+  );
 
   /* -------------------------------------------------------
      LOCAL STYLES
@@ -287,13 +314,6 @@ export async function renderLeadDetails(container, portalState) {
     box-sizing:border-box;
   `.replace(/\s+/g, " ");
 
-  const lookupWarningStyle = `
-    display:block;
-    margin-top:5px;
-    color:#9a6700;
-    font-size:12px;
-  `.replace(/\s+/g, " ");
-
   /* -------------------------------------------------------
      BUILD FORM
   ------------------------------------------------------- */
@@ -308,7 +328,9 @@ export async function renderLeadDetails(container, portalState) {
 
       const rows = fields
         .map(field => {
-          const value = String(lead[field.field_key] ?? "");
+          const value = String(
+            lead[field.field_key] ?? ""
+          );
 
           if (field.lookup_type) {
             const lookupRows =
@@ -334,56 +356,40 @@ export async function renderLeadDetails(container, portalState) {
               })
               .join("");
 
-            // Preserve a saved value that is no longer available.
-            // It is not added as an editable lookup choice.
+            // Preserve an existing saved value without adding
+            // warning text or offering it as a new lookup choice.
             const savedValueOption = currentValueMissing
               ? `
                 <option
                   value="${escapeHtml(value)}"
                   selected
                   disabled
-                >${escapeHtml(value)} — saved value unavailable in lookup</option>
+                >${escapeHtml(value)}</option>
               `
               : "";
-
-            let warning = "";
-
-            if (currentValueMissing) {
-              warning = `
-                <span style="${lookupWarningStyle}">
-                  The saved value is not in the active
-                  "${escapeHtml(field.lookup_type)}" lookup.
-                  It will remain unchanged unless you select another value.
-                </span>
-              `;
-            } else if (!lookupRows.length) {
-              warning = `
-                <span style="${lookupWarningStyle}">
-                  No active values were returned for
-                  "${escapeHtml(field.lookup_type)}".
-                </span>
-              `;
-            }
 
             return `
               <label style="${fieldLabelStyle}">
                 <span style="${fieldLabelTextStyle}">
-                  ${escapeHtml(String(field.label || field.field_key))}
+                  ${escapeHtml(
+                    String(field.label || field.field_key)
+                  )}
                 </span>
 
                 <select
-                  data-field="${escapeHtml(String(field.field_key))}"
+                  data-field="${escapeHtml(
+                    String(field.field_key)
+                  )}"
                   style="${fieldInputStyle}"
                 >
-                  <option value="" ${value === "" ? "selected" : ""}>
-                    -- select --
-                  </option>
+                  <option
+                    value=""
+                    ${value === "" ? "selected" : ""}
+                  >-- select --</option>
 
                   ${savedValueOption}
                   ${options}
                 </select>
-
-                ${warning}
               </label>
             `;
           }
@@ -391,12 +397,16 @@ export async function renderLeadDetails(container, portalState) {
           return `
             <label style="${fieldLabelStyle}">
               <span style="${fieldLabelTextStyle}">
-                ${escapeHtml(String(field.label || field.field_key))}
+                ${escapeHtml(
+                  String(field.label || field.field_key)
+                )}
               </span>
 
               <input
                 type="text"
-                data-field="${escapeHtml(String(field.field_key))}"
+                data-field="${escapeHtml(
+                  String(field.field_key)
+                )}"
                 value="${escapeHtml(value)}"
                 style="${fieldInputStyle}"
               >
@@ -421,7 +431,10 @@ export async function renderLeadDetails(container, portalState) {
      SAVE LOGIC
   ------------------------------------------------------- */
 
-  const saveButton = container.querySelector("#btnSaveLeadDetails");
+  const saveButton = container.querySelector(
+    "#btnSaveLeadDetails"
+  );
+
   const card = container.querySelector(".card");
 
   const canEdit = () =>
@@ -435,10 +448,16 @@ export async function renderLeadDetails(container, portalState) {
 
   const baseline = new Map();
 
-  formDiv.querySelectorAll("[data-field]").forEach(element => {
-    baseline.set(element.dataset.field, element.value);
-    element.disabled = !canEdit();
-  });
+  formDiv
+    .querySelectorAll("[data-field]")
+    .forEach(element => {
+      baseline.set(
+        element.dataset.field,
+        element.value
+      );
+
+      element.disabled = !canEdit();
+    });
 
   saveButton.disabled = !canEdit();
 
@@ -458,14 +477,19 @@ export async function renderLeadDetails(container, portalState) {
     const updates = {};
 
     // Submit only changed controls.
-    formDiv.querySelectorAll("[data-field]").forEach(element => {
-      if (
-        element.value !== baseline.get(element.dataset.field)
-      ) {
-        updates[element.dataset.field] =
-          element.value === "" ? null : element.value;
-      }
-    });
+    formDiv
+      .querySelectorAll("[data-field]")
+      .forEach(element => {
+        if (
+          element.value !==
+          baseline.get(element.dataset.field)
+        ) {
+          updates[element.dataset.field] =
+            element.value === ""
+              ? null
+              : element.value;
+        }
+      });
 
     if (!Object.keys(updates).length) {
       alert("No changes to save.");
@@ -473,7 +497,9 @@ export async function renderLeadDetails(container, portalState) {
     }
 
     if (portalState.user_id) {
-      updates.updated_user_id = String(portalState.user_id);
+      updates.updated_user_id = String(
+        portalState.user_id
+      );
     }
 
     const payload = {
@@ -483,7 +509,10 @@ export async function renderLeadDetails(container, portalState) {
     };
 
     if (
-      Object.prototype.hasOwnProperty.call(lead, "updated_at")
+      Object.prototype.hasOwnProperty.call(
+        lead,
+        "updated_at"
+      )
     ) {
       payload.expected_updated_at = lead.updated_at;
     }
@@ -492,9 +521,11 @@ export async function renderLeadDetails(container, portalState) {
     saveButton.disabled = true;
     saveButton.textContent = "Saving…";
 
-    formDiv.querySelectorAll("[data-field]").forEach(element => {
-      element.disabled = true;
-    });
+    formDiv
+      .querySelectorAll("[data-field]")
+      .forEach(element => {
+        element.disabled = true;
+      });
 
     try {
       const response = await fetch(
@@ -508,7 +539,9 @@ export async function renderLeadDetails(container, portalState) {
         }
       );
 
-      const data = await response.json().catch(() => null);
+      const data = await response
+        .json()
+        .catch(() => null);
 
       if (!isCurrent()) return;
 
@@ -522,20 +555,26 @@ export async function renderLeadDetails(container, portalState) {
             ? data.error
             : "Failed to save lead details. Reload before retrying.";
 
-        if (!reloadRequired && response.status >= 500) {
+        if (
+          !reloadRequired &&
+          response.status >= 500
+        ) {
           reloadRequired = true;
         }
 
         alert(message);
 
-        console.error("[Lead Details] Save failed", {
-          status: response.status
-        });
+        console.error(
+          "[Lead Details] Save failed",
+          { status: response.status }
+        );
 
         return;
       }
 
-      const savedLead = Array.isArray(data) ? data[0] : null;
+      const savedLead = Array.isArray(data)
+        ? data[0]
+        : null;
 
       if (
         !savedLead ||
@@ -551,48 +590,66 @@ export async function renderLeadDetails(container, portalState) {
 
       Object.assign(lead, savedLead);
 
-      formDiv.querySelectorAll("[data-field]").forEach(element => {
-        const key = element.dataset.field;
+      formDiv
+        .querySelectorAll("[data-field]")
+        .forEach(element => {
+          const key = element.dataset.field;
 
-        if (
-          Object.prototype.hasOwnProperty.call(savedLead, key)
-        ) {
-          const savedValue = String(savedLead[key] ?? "");
-
-          if (element.tagName === "SELECT" && savedValue !== "") {
-            const hasOption = Array.from(element.options).some(
-              option => option.value === savedValue
+          if (
+            Object.prototype.hasOwnProperty.call(
+              savedLead,
+              key
+            )
+          ) {
+            const savedValue = String(
+              savedLead[key] ?? ""
             );
 
-            if (!hasOption) {
-              const option = document.createElement("option");
+            if (
+              element.tagName === "SELECT" &&
+              savedValue !== ""
+            ) {
+              const hasOption = Array.from(
+                element.options
+              ).some(
+                option => option.value === savedValue
+              );
 
-              option.value = savedValue;
-              option.textContent =
-                `${savedValue} — saved value unavailable in lookup`;
-              option.disabled = true;
+              if (!hasOption) {
+                const option =
+                  document.createElement("option");
 
-              element.appendChild(option);
+                option.value = savedValue;
+                option.textContent = savedValue;
+                option.disabled = true;
+
+                element.appendChild(option);
+              }
             }
+
+            element.value = savedValue;
           }
 
-          element.value = savedValue;
-        }
-
-        baseline.set(key, element.value);
-      });
+          baseline.set(key, element.value);
+        });
 
       if (
-        Object.prototype.hasOwnProperty.call(updates, "lead_name")
+        Object.prototype.hasOwnProperty.call(
+          updates,
+          "lead_name"
+        )
       ) {
-        portalState.activeLeadName = savedLead.lead_name || "";
+        portalState.activeLeadName =
+          savedLead.lead_name || "";
 
         localStorage.setItem(
           "activeLeadName",
           portalState.activeLeadName
         );
 
-        const bar = document.getElementById("lead-context-bar");
+        const bar = document.getElementById(
+          "lead-context-bar"
+        );
 
         if (bar) {
           bar.textContent =
@@ -621,15 +678,19 @@ export async function renderLeadDetails(container, portalState) {
       saving = false;
 
       if (isCurrent()) {
-        saveButton.disabled = !canEdit() || reloadRequired;
+        saveButton.disabled =
+          !canEdit() || reloadRequired;
 
         saveButton.textContent = reloadRequired
           ? "Reload Lead Details to Continue"
           : "Save Lead Details";
 
-        formDiv.querySelectorAll("[data-field]").forEach(element => {
-          element.disabled = !canEdit() || reloadRequired;
-        });
+        formDiv
+          .querySelectorAll("[data-field]")
+          .forEach(element => {
+            element.disabled =
+              !canEdit() || reloadRequired;
+          });
       }
     }
   });
