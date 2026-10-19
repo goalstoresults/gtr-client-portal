@@ -2,6 +2,7 @@
 // Lead List with Entered Stage and inline status editing.
 // Delete button temporarily commented out.
 // To ISN is hidden when stage_name is "Sent to ISN".
+// Successful ISN order creation updates the stage to "Sent to ISN".
 
 import { escapeHtml, formatDateTime } from "../utilities.js";
 
@@ -32,6 +33,10 @@ export async function renderLeadsList(container, portalState) {
     let statusError = "";
     let statusSaving = false;
     let loading = false;
+
+    // Keep uncertain/completed transfers from being resent
+    // by another table render during this list session.
+    const transferLocks = new Map();
 
     /* -------------------------------------------------------
        RENDER FILTER BAR + TABLE SHELL
@@ -528,6 +533,9 @@ export async function renderLeadsList(container, portalState) {
           lead.stage_name === "Send to ISN"
         );
 
+      const transferLock =
+        transferLocks.get(String(lead.lead_id));
+
       const isEditing =
         editingLeadId === String(lead.lead_id);
 
@@ -584,9 +592,13 @@ export async function renderLeadsList(container, portalState) {
                     type="button"
                     class="secondary btn-to-isn"
                     data-lead-id="${id}"
-                    ${statusSaving ? "disabled" : ""}
+                    ${
+                      statusSaving || transferLock
+                        ? "disabled"
+                        : ""
+                    }
                   >
-                    To ISN
+                    ${safe(transferLock || "To ISN")}
                   </button>
                 `
                 : ""
@@ -844,7 +856,6 @@ export async function renderLeadsList(container, portalState) {
         return;
       }
 
-      // Do not send an unnecessary update.
       if (canonicalStatus(lead.status) === nextStatus) {
         closeStatusEditor();
         renderTable();
@@ -907,8 +918,6 @@ export async function renderLeadsList(container, portalState) {
 
         if (!isCurrent()) return;
 
-        // Preserve fields supplied by the list view.
-        // In particular, do not replace stage-entry data.
         leads = leads.map(item =>
           String(item.lead_id) === leadId
             ? {
@@ -946,7 +955,6 @@ export async function renderLeadsList(container, portalState) {
        DELETE LEAD — RETAINED BUT NOT WIRED TO THE UI
 
        Delete button and event bindings are commented out.
-       Server-side authorization remains a separate concern.
     ------------------------------------------------------- */
 
     async function handleDeleteLead(btn) {
@@ -986,7 +994,6 @@ export async function renderLeadsList(container, portalState) {
       if (!isCurrent() || !canDeleteLead()) return;
 
       closeStatusEditor();
-
       statusSaving = true;
 
       showMessage(`Deleting "${leadName}"…`);
@@ -1081,28 +1088,66 @@ export async function renderLeadsList(container, portalState) {
        TRANSFER TO ISN (CSI ONLY)
 
        Step 1: create/reuse the ISN client.
-       Step 2: create the order using the returned client ID.
+       Step 2: create the ISN order.
+       Step 3: update the portal stage to Sent to ISN.
     ------------------------------------------------------- */
 
     async function handleTransferToIsn(btn) {
+      if (loading || statusSaving || !isCurrent()) return;
+
       const leadId = btn.dataset.leadId;
+
+      if (transferLocks.has(String(leadId))) return;
 
       const lead = leads.find(
         item => String(item.lead_id) === String(leadId)
       );
 
-      // Do not transfer a lead already marked Sent to ISN.
-      if (lead && isSentToIsn(lead)) {
+      if (!lead) {
+        showMessage(
+          "This lead could not be found. Reload the list.",
+          true
+        );
+        return;
+      }
+
+      if (isSentToIsn(lead)) {
         btn.hidden = true;
         return;
       }
 
-      const originalText = btn.textContent;
+      let orderCreated = false;
+      let orderRequestStarted = false;
+      let orderCreationRejected = false;
+      let stageUpdated = false;
 
-      btn.disabled = true;
-      btn.textContent = "Sending…";
+      closeStatusEditor();
+
+      statusSaving = true;
+      updateFilterControls();
+      renderTable();
+
+      const activeButton = Array.from(
+        tableDiv.querySelectorAll(".btn-to-isn")
+      ).find(
+        button =>
+          String(button.dataset.leadId) === String(leadId)
+      );
+
+      function setButtonText(text) {
+        if (activeButton?.isConnected) {
+          activeButton.textContent = text;
+        }
+      }
+
+      showMessage("");
+      setButtonText("Sending…");
 
       try {
+        /* ---------------------------------------------------
+           STEP 1: CREATE / REUSE ISN CLIENT
+        --------------------------------------------------- */
+
         const clientResponse = await fetch(
           `${CSI_ISN_GATEWAY_URL}/lead/transfer-client`,
           {
@@ -1117,26 +1162,27 @@ export async function renderLeadsList(container, portalState) {
           }
         );
 
-        const clientData = await clientResponse.json();
+        const clientData =
+          await clientResponse.json().catch(() => null);
 
-        if (!clientResponse.ok || !clientData.success) {
-          console.error(
-            "[To ISN] Client transfer failed:",
-            clientData
-          );
-
-          alert(
+        if (
+          !clientResponse.ok ||
+          clientData?.success !== true
+        ) {
+          throw new Error(
             `Transfer to ISN failed (client step): ${
-              clientData.error || "Unknown error"
+              clientData?.error ||
+              "The client sync could not be confirmed."
             }`
           );
-
-          btn.disabled = false;
-          btn.textContent = originalText;
-          return;
         }
 
-        btn.textContent = "Creating order…";
+        /* ---------------------------------------------------
+           STEP 2: CREATE ISN ORDER
+        --------------------------------------------------- */
+
+        setButtonText("Creating order…");
+        orderRequestStarted = true;
 
         const orderResponse = await fetch(
           `${CSI_ISN_GATEWAY_URL}/order/create`,
@@ -1153,29 +1199,27 @@ export async function renderLeadsList(container, portalState) {
           }
         );
 
-        const orderData = await orderResponse.json();
+        const orderData =
+          await orderResponse.json().catch(() => null);
 
-        if (!orderResponse.ok || !orderData.success) {
-          console.error(
-            "[To ISN] Order creation failed:",
-            orderData
+        if (
+          !orderResponse.ok ||
+          orderData?.success !== true
+        ) {
+          orderCreationRejected = true;
+
+          const missing = Array.isArray(orderData?.unresolved)
+            ? ` Missing: ${orderData.unresolved.join(", ")}.`
+            : "";
+
+          throw new Error(
+            `Client synced to ISN, but order creation was not confirmed: ${
+              orderData?.error || "Unknown error."
+            }${missing} Check ISN before attempting another transfer.`
           );
-
-          alert(
-            `Client synced to ISN, but order creation failed: ${
-              orderData.error || "Unknown error"
-            }` +
-            (
-              orderData.unresolved
-                ? `\n\nMissing: ${orderData.unresolved.join(", ")}`
-                : ""
-            )
-          );
-
-          btn.disabled = false;
-          btn.textContent = "Retry Order";
-          return;
         }
+
+        orderCreated = true;
 
         const orderDisplayNumber =
           orderData.isnOrderOid ??
@@ -1184,19 +1228,182 @@ export async function renderLeadsList(container, portalState) {
           orderData.isnResponse?.order?.oid ??
           orderData.isnOrderId;
 
-        btn.textContent =
-          `Order #${orderDisplayNumber} Created`;
+        const orderLabel =
+          orderDisplayNumber !== null &&
+          orderDisplayNumber !== undefined
+            ? `ISN order #${orderDisplayNumber}`
+            : "ISN order";
 
-        btn.classList.add("btn-to-isn-done");
-      } catch (error) {
-        console.error("[To ISN] Network error:", error);
+        /* ---------------------------------------------------
+           STEP 3: UPDATE PORTAL STAGE
+        --------------------------------------------------- */
 
-        alert(
-          "Transfer to ISN failed — network error. Check console."
+        setButtonText("Updating stage…");
+
+        const updates = {
+          stage_name: "Sent to ISN"
+        };
+
+        if (portalState.user_id) {
+          updates.updated_user_id =
+            String(portalState.user_id);
+        }
+
+        const stageResponse = await fetch(
+          `${LEADS_API_URL}/leads/update`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              id: leadId,
+              updates,
+              change_source: "isn_transfer"
+            })
+          }
         );
 
-        btn.disabled = false;
-        btn.textContent = originalText;
+        const stageData =
+          await stageResponse.json().catch(() => null);
+
+        const savedLead = Array.isArray(stageData)
+          ? stageData.find(
+              item =>
+                String(item.lead_id) === String(leadId) &&
+                item.project === project
+            )
+          : null;
+
+        if (
+          !stageResponse.ok ||
+          savedLead?.stage_name !== "Sent to ISN"
+        ) {
+          const detail =
+            typeof stageData?.error === "string"
+              ? ` ${stageData.error}`
+              : "";
+
+          throw new Error(
+            `${orderLabel} was created, but the portal stage update could not be confirmed.${detail} ` +
+            "Do not send this lead to ISN again. " +
+            'Reload the list; if needed, change its stage to "Sent to ISN" in Lead Details.'
+          );
+        }
+
+        stageUpdated = true;
+
+        if (!isCurrent()) return;
+
+        // Update the local row immediately.
+        leads = leads.map(item => {
+          if (
+            String(item.lead_id) !== String(leadId)
+          ) {
+            return item;
+          }
+
+          const updated = {
+            ...item,
+            stage_name: "Sent to ISN"
+          };
+
+          if (
+            Object.prototype.hasOwnProperty.call(
+              savedLead,
+              "updated_at"
+            )
+          ) {
+            updated.updated_at = savedLead.updated_at;
+          }
+
+          if (
+            Object.prototype.hasOwnProperty.call(
+              savedLead,
+              "current_stage_entered_at"
+            )
+          ) {
+            updated.current_stage_entered_at =
+              savedLead.current_stage_entered_at;
+          } else {
+            updated.current_stage_entered_at = null;
+          }
+
+          return updated;
+        });
+
+        showMessage(
+          `${orderLabel} created. Stage changed to Sent to ISN.`
+        );
+
+        // Refresh server-supplied stage-entry data.
+        // Keep the confirmed local stage if a stale response arrives.
+        try {
+          const refreshedLeads = await fetchLeads();
+
+          if (isCurrent()) {
+            leads = refreshedLeads.map(item => {
+              if (
+                String(item.lead_id) === String(leadId) &&
+                !isSentToIsn(item)
+              ) {
+                return (
+                  leads.find(
+                    existing =>
+                      String(existing.lead_id) ===
+                      String(leadId)
+                  ) || item
+                );
+              }
+
+              return item;
+            });
+          }
+        } catch (refreshError) {
+          console.error(
+            "[To ISN] Transfer succeeded; list refresh failed:",
+            refreshError
+          );
+        }
+      } catch (error) {
+        console.error("[To ISN] Transfer failed:", error);
+
+        if (isCurrent()) {
+          let message =
+            error.message ||
+            "Transfer to ISN could not be confirmed.";
+
+          if (
+            orderRequestStarted &&
+            !orderCreated &&
+            !orderCreationRejected
+          ) {
+            message =
+              "The ISN order request was sent, but its result could not be confirmed. " +
+              "Check ISN before trying again to avoid creating a duplicate order.";
+          }
+
+          showMessage(message, true);
+          alert(message);
+        }
+      } finally {
+        if (orderRequestStarted) {
+          transferLocks.set(
+            String(leadId),
+            stageUpdated
+              ? "Order Created"
+              : orderCreated
+                ? "Order Created — Check Stage"
+                : "Check ISN Before Retrying"
+          );
+        }
+
+        statusSaving = false;
+
+        if (isCurrent()) {
+          updateFilterControls();
+          renderTable();
+        }
       }
     }
 
