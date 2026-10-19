@@ -14,13 +14,13 @@
 <!-- iOS support -->
 <link rel="apple-touch-icon" href="/images/apple-touch-icon.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="mobile-web-app-capable" content="yes" />    
+<meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="RedUmbrella" />
 
 <!-- Favicon -->
 <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png" />
-<link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png" />    
+<link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png" />
 
 <!-- Dynamic manifest — carries the current ?project= into start_url so an
      installed icon always reopens directly to that client's project -->
@@ -40,7 +40,6 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
 
 <style>
 
@@ -238,9 +237,7 @@ import { loadLeadsTab } from "./js/leads.js";
 import { loadDashboardTab } from "./js/dashboard.js";
 import { loadJobsTab } from "./js/jobs.js";
 import { loadStaffFilterTab } from "./js/staff_filter.js";
-
-     
-
+import { loadStatsTab } from "./js/stats.js";
 
 /* ============================================================
 PORTAL STATE
@@ -256,8 +253,8 @@ const portalState = {
   isDemoAccount: false,
   canSeeFinancials: false,
   full_admin: false
-};     
-     
+};
+
 window.portalState = portalState;
 
 const loginForm = document.getElementById("loginForm");
@@ -294,7 +291,7 @@ TAB MAP
 ============================================================ */
 
 const tabMap = {
-"0": { label: "Dashboard", loader: loadDashboardTab },    
+"0": { label: "Dashboard", loader: loadDashboardTab },
 "1": { label: "Contacts", loader: loadContactsTab },
 "2": { label: "Financials", loader: loadFinancialsTab },
 "3": { label: "Notes", loader: loadNotesTab },
@@ -308,11 +305,12 @@ const tabMap = {
 "11": { label: "Pipeline", loader: loadPipelineTab },
 "12": { label: "Filter", loader: loadFilterTab },
 "13": { label: "Help", loader: loadHelpTab },
-"14": { label: "Leads", loader: loadLeadsTab },    
+"14": { label: "Leads", loader: loadLeadsTab },
 "15": { label: "Relationships", loader: loadRelationshipsTab },
 "16": { label: "Inspections", loader: loadInspectionsTab },
 "17": { label: "Jobs", loader: loadJobsTab },
-"18": { label: "Staff Filter", loader: loadStaffFilterTab }     
+"18": { label: "Staff Filter", loader: loadStaffFilterTab },
+"19": { label: "Stats", loader: loadStatsTab }
 };
 
 /* ============================================================
@@ -564,7 +562,7 @@ portalState.allowedTabs = result.allowed_tabs || [];
 portalState.deleteAllowed = result.delete_allowed === true;
 portalState.canEdit = result.can_edit === true;
 portalState.isDemoAccount = result.is_demo_account === true;
-portalState.canSeeFinancials = result.can_see_financials === true;     
+portalState.canSeeFinancials = result.can_see_financials === true;
 portalState.user_id = result.staff_id;
 portalState.full_admin = result.full_admin === true;
 portalState.task_manager = (result.task_manager || "").trim().toLowerCase();
@@ -611,8 +609,8 @@ tabContent.innerHTML =
 return;
 }
 
-console.log("DEBUG right before subHeader check:", portalState.isDemoAccount);     
-     
+console.log("DEBUG right before subHeader check:", portalState.isDemoAccount);
+
 if (portalState.isDemoAccount) {
   subHeader.innerHTML =
     `FREE DEMO Account &middot; Read Privileges Only &middot; ` +
@@ -622,7 +620,6 @@ if (portalState.isDemoAccount) {
   subHeader.textContent = match.display_name || "";
 }
 pageTitle.textContent = match.display_name || "";
-     
 
 const projectTabs = normalizeTabs(match.enabled_tabs);
 const staffTabs = portalState.allowedTabs || [];
@@ -703,7 +700,6 @@ await tab.loader({ portalState, tabContent });
 
 window.loadTab = loadTab;   // ⭐ ADD THIS — lets other modules trigger tab switches
 
-    
 /* ============================================================
 INITIALIZE — HANDLE ?project PARAM + IP CHECK
 ============================================================ */
@@ -742,7 +738,7 @@ if ('serviceWorker' in navigator) {
       .catch((err) => console.error('Service worker registration failed:', err));
   });
 }
-</script>    
+</script>
 
 </body>
 </html>
