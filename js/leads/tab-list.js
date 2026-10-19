@@ -1,6 +1,7 @@
 // js/leads/tab-list.js
-// Lead List with Entered Stage, inline status editing,
-// and full-admin Delete button.
+// Lead List with Entered Stage and inline status editing.
+// Delete button temporarily commented out.
+// To ISN is hidden when stage_name is "Sent to ISN".
 
 import { escapeHtml, formatDateTime } from "../utilities.js";
 
@@ -226,9 +227,6 @@ export async function renderLeadsList(container, portalState) {
     }
 
     function renderDate(value, missingTitle = "") {
-      // Use the same timestamp interpretation as sorting.
-      // Offset-free audit timestamps follow the existing
-      // UTC assumption in timestampValue().
       const timestamp = timestampValue(value);
 
       if (timestamp === null) {
@@ -237,12 +235,16 @@ export async function renderLeadsList(container, portalState) {
           : "—";
       }
 
-      // Give the shared formatter an unambiguous timestamp.
-      // formatDateTime() displays it in America/New_York.
       const normalizedValue =
         new Date(timestamp).toISOString();
 
       return safe(formatDateTime(normalizedValue));
+    }
+
+    function isSentToIsn(lead) {
+      return String(lead.stage_name || "")
+        .trim()
+        .toLowerCase() === "sent to isn";
     }
 
     /* -------------------------------------------------------
@@ -520,6 +522,7 @@ export async function renderLeadsList(container, portalState) {
 
       const showToIsn =
         project === "csi" &&
+        !isSentToIsn(lead) &&
         (
           lead.stage_name === "Ready to Transfer" ||
           lead.stage_name === "Send to ISN"
@@ -527,6 +530,23 @@ export async function renderLeadsList(container, portalState) {
 
       const isEditing =
         editingLeadId === String(lead.lead_id);
+
+      // DELETE BUTTON TEMPORARILY DISABLED FOR ALL USERS.
+      // Restore this block and its interpolation only when needed.
+      /*
+      const deleteButton = canDeleteLead()
+        ? `
+          <button
+            type="button"
+            class="btn-danger btn-delete-lead"
+            data-id="${id}"
+            ${statusSaving ? "disabled" : ""}
+          >
+            Delete
+          </button>
+        `
+        : "";
+      */
 
       return `
         <tr data-id="${id}">
@@ -583,21 +603,6 @@ export async function renderLeadsList(container, portalState) {
                     ${statusSaving ? "disabled" : ""}
                   >
                     Change Status
-                  </button>
-                `
-                : ""
-            }
-
-            ${
-              canDeleteLead()
-                ? `
-                  <button
-                    type="button"
-                    class="btn-danger btn-delete-lead"
-                    data-id="${id}"
-                    ${statusSaving ? "disabled" : ""}
-                  >
-                    Delete
                   </button>
                 `
                 : ""
@@ -714,12 +719,14 @@ export async function renderLeadsList(container, portalState) {
         });
       });
 
-      // Delete buttons — visible only to permitted full admins.
+      // DELETE BUTTON HANDLERS TEMPORARILY DISABLED.
+      /*
       tableDiv.querySelectorAll(".btn-delete-lead").forEach(btn => {
         btn.addEventListener("click", () => {
           void handleDeleteLead(btn);
         });
       });
+      */
 
       // Expand/collapse the status editor.
       tableDiv.querySelectorAll(".btn-change-status").forEach(btn => {
@@ -936,14 +943,10 @@ export async function renderLeadsList(container, portalState) {
     }
 
     /* -------------------------------------------------------
-       DELETE LEAD — FULL ADMIN UI ONLY
+       DELETE LEAD — RETAINED BUT NOT WIRED TO THE UI
 
-       Uses the existing delete API.
-       Server-side admin authorization must be enforced
-       separately by the Worker.
-
-       statusSaving is also used as the mutation lock
-       while deletion is in progress.
+       Delete button and event bindings are commented out.
+       Server-side authorization remains a separate concern.
     ------------------------------------------------------- */
 
     async function handleDeleteLead(btn) {
@@ -980,7 +983,6 @@ export async function renderLeadsList(container, portalState) {
 
       if (!confirmed) return;
 
-      // Recheck permission and project before sending.
       if (!isCurrent() || !canDeleteLead()) return;
 
       closeStatusEditor();
@@ -1014,8 +1016,6 @@ export async function renderLeadsList(container, portalState) {
           );
         }
 
-        // The existing Worker returns the deleted records.
-        // Verify the exact lead before removing its local row.
         const deletedLead = Array.isArray(data)
           ? data.find(
               item =>
@@ -1037,7 +1037,6 @@ export async function renderLeadsList(container, portalState) {
           item => String(item.lead_id) !== String(leadId)
         );
 
-        // Clear the context if the deleted lead was selected.
         if (
           String(portalState.activeLeadId) === String(leadId)
         ) {
@@ -1087,6 +1086,17 @@ export async function renderLeadsList(container, portalState) {
 
     async function handleTransferToIsn(btn) {
       const leadId = btn.dataset.leadId;
+
+      const lead = leads.find(
+        item => String(item.lead_id) === String(leadId)
+      );
+
+      // Do not transfer a lead already marked Sent to ISN.
+      if (lead && isSentToIsn(lead)) {
+        btn.hidden = true;
+        return;
+      }
+
       const originalText = btn.textContent;
 
       btn.disabled = true;
