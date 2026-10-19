@@ -1,7 +1,40 @@
 // js/leads/tab-details.js
-// Dynamic Lead Details — wired to backend /leads/get and /leads/update
+// Dynamic Lead Details — wired to /leads/get and /leads/update.
+// Dropdowns load active values directly by their configured lookup_type.
 
 import { escapeHtml } from "../utilities.js";
+
+const LOOKUPS_BASE = "https://lookups-module.dennis-e64.workers.dev";
+const LEADS_BASE = "https://leads-module.dennis-e64.workers.dev";
+
+async function fetchJson(url, description) {
+  const response = await fetch(url, {
+    cache: "no-store"
+  });
+
+  let data;
+
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error(`${description} returned an invalid response.`);
+  }
+
+  if (
+    !response.ok ||
+    data?.status === "error" ||
+    data?.success === false
+  ) {
+    const message =
+      typeof data?.error === "string"
+        ? data.error
+        : `Unable to load ${description}.`;
+
+    throw new Error(message);
+  }
+
+  return data;
+}
 
 export async function renderLeadDetails(container, portalState) {
   const leadId = portalState.activeLeadId;
@@ -17,84 +50,199 @@ export async function renderLeadDetails(container, portalState) {
     return;
   }
 
-  /* -------------------------------------------------------
-     FETCH CONFIGURED LEAD FIELDS (lead_tab = "details")
-  ------------------------------------------------------- */
-  const configUrl = `
-    https://lookups-module.dennis-e64.workers.dev/lead_fields?
-    project=${encodeURIComponent(project)}
-  `.replace(/\s+/g, "");
+  container.innerHTML = `
+    <section class="card">
+      <h2>Lead Details</h2>
+      <p>Loading lead details…</p>
+    </section>
+  `;
 
-  const configRes = await fetch(configUrl, { cache: "no-cache" });
-  const configData = await configRes.json();
+  const loadingCard = container.querySelector(".card");
 
-  const configured = Array.isArray(configData.rows)
-    ? configData.rows.filter(r => r.lead_tab === "details")
-    : [];
+  const stillLoadingCurrentLead = () =>
+    loadingCard.isConnected &&
+    portalState.project === project &&
+    portalState.activeLeadId === leadId;
 
-  if (!configured.length) {
+  let configured;
+  let lead;
+  const lookupsByType = new Map();
+
+  try {
+    /* -------------------------------------------------------
+       FETCH CONFIGURED LEAD FIELDS
+    ------------------------------------------------------- */
+
+    const configUrl = new URL(`${LOOKUPS_BASE}/lead_fields`);
+    configUrl.searchParams.set("project", project);
+    configUrl.searchParams.set("_", String(Date.now()));
+
+    const configData = await fetchJson(
+      configUrl.toString(),
+      "lead field configuration"
+    );
+
+    if (!Array.isArray(configData.rows)) {
+      throw new Error("Lead field configuration is not a valid list.");
+    }
+
+    configured = configData.rows
+      .filter(row => row.lead_tab === "details")
+      .map(row => ({
+        ...row,
+        lookup_type:
+          typeof row.lookup_type === "string"
+            ? row.lookup_type.trim()
+            : ""
+      }));
+
+    if (!stillLoadingCurrentLead()) return;
+
+    if (!configured.length) {
+      container.innerHTML = `
+        <section class="card">
+          <h2>Lead Details</h2>
+          <p>No fields configured in Setup → Lead Fields.</p>
+        </section>
+      `;
+      return;
+    }
+
+    /* -------------------------------------------------------
+       FETCH LOOKUPS DIRECTLY BY CONFIGURED TYPE
+    ------------------------------------------------------- */
+
+    const lookupTypes = [
+      ...new Set(
+        configured
+          .map(field => field.lookup_type)
+          .filter(Boolean)
+      )
+    ];
+
+    const lookupRequests = lookupTypes.map(async lookupType => {
+      const lookupUrl = new URL(`${LOOKUPS_BASE}/lookups`);
+
+      lookupUrl.searchParams.set("project", project);
+      lookupUrl.searchParams.set("lookup_type", lookupType);
+      lookupUrl.searchParams.set("_", String(Date.now()));
+
+      const rows = await fetchJson(
+        lookupUrl.toString(),
+        `lookup "${lookupType}"`
+      );
+
+      if (!Array.isArray(rows)) {
+        throw new Error(
+          `Lookup "${lookupType}" did not return a valid list.`
+        );
+      }
+
+      const matchingRows = rows
+        .filter(row => {
+          const rowType = String(row.lookup_type ?? "").trim();
+
+          return (
+            rowType === lookupType &&
+            row.project === project &&
+            row.is_active === true
+          );
+        })
+        .sort((a, b) => {
+          const aSort = Number(a.sort_order);
+          const bSort = Number(b.sort_order);
+
+          const aOrder = Number.isFinite(aSort) ? aSort : 999;
+          const bOrder = Number.isFinite(bSort) ? bSort : 999;
+
+          return aOrder - bOrder;
+        });
+
+      const seenValues = new Set();
+
+      const options = matchingRows.filter(row => {
+        if (row.value === null || row.value === undefined) {
+          return false;
+        }
+
+        const value = String(row.value);
+
+        if (seenValues.has(value)) return false;
+
+        seenValues.add(value);
+        return true;
+      });
+
+      lookupsByType.set(lookupType, options);
+    });
+
+    /* -------------------------------------------------------
+       FETCH LEAD RECORD
+    ------------------------------------------------------- */
+
+    const leadUrl = new URL(`${LEADS_BASE}/leads/get`);
+    leadUrl.searchParams.set("id", leadId);
+
+    const [leadData] = await Promise.all([
+      fetchJson(leadUrl.toString(), "lead"),
+      Promise.all(lookupRequests)
+    ]);
+
+    lead = Array.isArray(leadData) ? leadData[0] : leadData;
+
+    if (!stillLoadingCurrentLead()) return;
+
+    if (
+      !lead ||
+      String(lead.lead_id) !== String(leadId) ||
+      lead.project !== project
+    ) {
+      throw new Error("Unable to load the matching lead.");
+    }
+  } catch (error) {
+    if (!stillLoadingCurrentLead()) return;
+
     container.innerHTML = `
       <section class="card">
         <h2>Lead Details</h2>
-        <p>No fields configured in Setup → Lead Fields.</p>
+        <p>${escapeHtml(error.message || "Unable to load Lead Details.")}</p>
       </section>
     `;
-    return;
-  }
 
-  /* -------------------------------------------------------
-     FETCH LOOKUPS
-  ------------------------------------------------------- */
-  const lookupsUrl = `
-    https://lookups-module.dennis-e64.workers.dev/lookups/list?
-    project=${encodeURIComponent(project)}
-  `.replace(/\s+/g, "");
-
-  const lookupsRes = await fetch(lookupsUrl, { cache: "no-cache" });
-  const lookupsData = await lookupsRes.json();
-
-  const lookupGroups = Array.isArray(lookupsData.lookups)
-    ? lookupsData.lookups
-    : [];
-
-  /* -------------------------------------------------------
-     FETCH LEAD RECORD
-  ------------------------------------------------------- */
-  const leadUrl = `
-    https://leads-module.dennis-e64.workers.dev/leads/get?
-    id=${encodeURIComponent(leadId)}
-  `.replace(/\s+/g, "");
-
-  const leadRes = await fetch(leadUrl, { cache: "no-cache" });
-  const leadData = await leadRes.json();
-  const lead = Array.isArray(leadData) ? leadData[0] : leadData;
-
-  if (!leadRes.ok || !lead || String(lead.lead_id) !== String(leadId) || lead.project !== project) {
-    container.innerHTML = `<section class="card"><h2>Lead Details</h2><p>Unable to load the matching lead.</p></section>`;
+    console.error("[Lead Details] Load failed:", error);
     return;
   }
 
   /* -------------------------------------------------------
      GROUP FIELDS BY SECTION
   ------------------------------------------------------- */
-  const sections = {};
-  configured.forEach(f => {
-    const sec = f.section || "General";
-    if (!sections[sec]) sections[sec] = [];
-    sections[sec].push(f);
+
+  const sections = new Map();
+
+  configured.forEach(field => {
+    const section = field.section || "General";
+
+    if (!sections.has(section)) {
+      sections.set(section, []);
+    }
+
+    sections.get(section).push(field);
   });
 
   /* -------------------------------------------------------
      RENDER UI
   ------------------------------------------------------- */
+
   container.innerHTML = `
     <section class="card">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
         <h2 style="margin:0;">Lead Details</h2>
+
         <button id="btnSaveLeadDetails" class="btn-primary">
           Save Lead Details
         </button>
       </div>
+
       <div id="leadDetailsForm"></div>
     </section>
   `;
@@ -102,8 +250,9 @@ export async function renderLeadDetails(container, portalState) {
   const formDiv = container.querySelector("#leadDetailsForm");
 
   /* -------------------------------------------------------
-     STYLE TOKENS (kept local so this file stays drop-in)
+     LOCAL STYLES
   ------------------------------------------------------- */
+
   const sectionHeaderStyle = `
     background:#eef2f6;
     color:#3d4a5c;
@@ -138,47 +287,119 @@ export async function renderLeadDetails(container, portalState) {
     box-sizing:border-box;
   `.replace(/\s+/g, " ");
 
+  const lookupWarningStyle = `
+    display:block;
+    margin-top:5px;
+    color:#9a6700;
+    font-size:12px;
+  `.replace(/\s+/g, " ");
+
   /* -------------------------------------------------------
-     BUILD FORM (dynamic sections + fields)
+     BUILD FORM
   ------------------------------------------------------- */
-  formDiv.innerHTML = Object.keys(sections)
-    .map(sectionName => {
-      const fields = sections[sectionName].sort((a, b) => a.sort_order - b.sort_order);
+
+  formDiv.innerHTML = Array.from(sections.entries())
+    .map(([sectionName, sectionFields]) => {
+      const fields = [...sectionFields].sort(
+        (a, b) =>
+          (Number(a.sort_order) || 0) -
+          (Number(b.sort_order) || 0)
+      );
 
       const rows = fields
-        .map(f => {
-          const value = String(lead[f.field_key] ?? "");
+        .map(field => {
+          const value = String(lead[field.field_key] ?? "");
 
-          // Lookup dropdown
-          if (f.lookup_type) {
-            const options = lookupGroups
-              .filter(l => l.lookup_type === f.lookup_type)
-              .map(
-                l =>
-                  `<option value="${escapeHtml(String(l.value))}" ${
-                    l.value === value ? "selected" : ""
-                  }>${escapeHtml(l.value)}</option>`
-              )
+          if (field.lookup_type) {
+            const lookupRows =
+              lookupsByType.get(field.lookup_type) || [];
+
+            const hasCurrentValue = lookupRows.some(
+              row => String(row.value) === value
+            );
+
+            const currentValueMissing =
+              value !== "" && !hasCurrentValue;
+
+            const options = lookupRows
+              .map(row => {
+                const optionValue = String(row.value);
+
+                return `
+                  <option
+                    value="${escapeHtml(optionValue)}"
+                    ${optionValue === value ? "selected" : ""}
+                  >${escapeHtml(optionValue)}</option>
+                `;
+              })
               .join("");
+
+            // Preserve a saved value that is no longer available.
+            // It is not added as an editable lookup choice.
+            const savedValueOption = currentValueMissing
+              ? `
+                <option
+                  value="${escapeHtml(value)}"
+                  selected
+                  disabled
+                >${escapeHtml(value)} — saved value unavailable in lookup</option>
+              `
+              : "";
+
+            let warning = "";
+
+            if (currentValueMissing) {
+              warning = `
+                <span style="${lookupWarningStyle}">
+                  The saved value is not in the active
+                  "${escapeHtml(field.lookup_type)}" lookup.
+                  It will remain unchanged unless you select another value.
+                </span>
+              `;
+            } else if (!lookupRows.length) {
+              warning = `
+                <span style="${lookupWarningStyle}">
+                  No active values were returned for
+                  "${escapeHtml(field.lookup_type)}".
+                </span>
+              `;
+            }
 
             return `
               <label style="${fieldLabelStyle}">
-                <span style="${fieldLabelTextStyle}">${escapeHtml(f.label)}</span>
-                <select data-field="${escapeHtml(String(f.field_key))}" style="${fieldInputStyle}">
-                  <option value="">-- select --</option>
+                <span style="${fieldLabelTextStyle}">
+                  ${escapeHtml(String(field.label || field.field_key))}
+                </span>
+
+                <select
+                  data-field="${escapeHtml(String(field.field_key))}"
+                  style="${fieldInputStyle}"
+                >
+                  <option value="" ${value === "" ? "selected" : ""}>
+                    -- select --
+                  </option>
+
+                  ${savedValueOption}
                   ${options}
                 </select>
+
+                ${warning}
               </label>
             `;
           }
 
-          // Text input
           return `
             <label style="${fieldLabelStyle}">
-              <span style="${fieldLabelTextStyle}">${escapeHtml(f.label)}</span>
-              <input type="text" data-field="${escapeHtml(String(f.field_key))}" value="${escapeHtml(
-                value
-              )}" style="${fieldInputStyle}">
+              <span style="${fieldLabelTextStyle}">
+                ${escapeHtml(String(field.label || field.field_key))}
+              </span>
+
+              <input
+                type="text"
+                data-field="${escapeHtml(String(field.field_key))}"
+                value="${escapeHtml(value)}"
+                style="${fieldInputStyle}"
+              >
             </label>
           `;
         })
@@ -186,7 +407,10 @@ export async function renderLeadDetails(container, portalState) {
 
       return `
         <div style="margin-bottom:32px;">
-          <h3 style="${sectionHeaderStyle}">${escapeHtml(sectionName)}</h3>
+          <h3 style="${sectionHeaderStyle}">
+            ${escapeHtml(String(sectionName))}
+          </h3>
+
           ${rows}
         </div>
       `;
@@ -196,30 +420,50 @@ export async function renderLeadDetails(container, portalState) {
   /* -------------------------------------------------------
      SAVE LOGIC
   ------------------------------------------------------- */
+
   const saveButton = container.querySelector("#btnSaveLeadDetails");
   const card = container.querySelector(".card");
-  const canEdit = () => portalState.canEdit === true && portalState.isDemoAccount !== true;
-  const isCurrent = () => card.isConnected &&
-    portalState.project === project && portalState.activeLeadId === leadId;
+
+  const canEdit = () =>
+    portalState.canEdit === true &&
+    portalState.isDemoAccount !== true;
+
+  const isCurrent = () =>
+    card.isConnected &&
+    portalState.project === project &&
+    portalState.activeLeadId === leadId;
 
   const baseline = new Map();
-  formDiv.querySelectorAll("[data-field]").forEach(el => {
-    baseline.set(el.dataset.field, el.value);
-    el.disabled = !canEdit();
+
+  formDiv.querySelectorAll("[data-field]").forEach(element => {
+    baseline.set(element.dataset.field, element.value);
+    element.disabled = !canEdit();
   });
+
   saveButton.disabled = !canEdit();
+
   let saving = false;
   let reloadRequired = false;
 
   saveButton.addEventListener("click", async () => {
-    if (saving || reloadRequired || !canEdit() || !isCurrent()) return;
+    if (
+      saving ||
+      reloadRequired ||
+      !canEdit() ||
+      !isCurrent()
+    ) {
+      return;
+    }
+
     const updates = {};
 
-    // Submit only changed controls. Ordinary saves must not reapply an
-    // old stage or clear an existing value absent from the lookup list.
-    formDiv.querySelectorAll("[data-field]").forEach(el => {
-      if (el.value !== baseline.get(el.dataset.field)) {
-        updates[el.dataset.field] = el.value === "" ? null : el.value;
+    // Submit only changed controls.
+    formDiv.querySelectorAll("[data-field]").forEach(element => {
+      if (
+        element.value !== baseline.get(element.dataset.field)
+      ) {
+        updates[element.dataset.field] =
+          element.value === "" ? null : element.value;
       }
     });
 
@@ -237,74 +481,156 @@ export async function renderLeadDetails(container, portalState) {
       updates,
       change_source: "lead_details"
     };
-    if (Object.prototype.hasOwnProperty.call(lead, "updated_at")) {
+
+    if (
+      Object.prototype.hasOwnProperty.call(lead, "updated_at")
+    ) {
       payload.expected_updated_at = lead.updated_at;
     }
 
     saving = true;
     saveButton.disabled = true;
     saveButton.textContent = "Saving…";
-    formDiv.querySelectorAll("[data-field]").forEach(el => { el.disabled = true; });
+
+    formDiv.querySelectorAll("[data-field]").forEach(element => {
+      element.disabled = true;
+    });
 
     try {
-      const res = await fetch(
-        "https://leads-module.dennis-e64.workers.dev/leads/update",
+      const response = await fetch(
+        `${LEADS_BASE}/leads/update`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json"
+          },
           body: JSON.stringify(payload)
         }
       );
-      const data = await res.json().catch(() => null);
+
+      const data = await response.json().catch(() => null);
+
       if (!isCurrent()) return;
 
-      if (!res.ok) {
-        reloadRequired = res.status === 409 || data?.lead_saved === true;
-        const message = typeof data?.error === "string"
-          ? data.error : "Failed to save lead details. Reload before retrying.";
-        if (!reloadRequired && res.status >= 500) reloadRequired = true;
+      if (!response.ok) {
+        reloadRequired =
+          response.status === 409 ||
+          data?.lead_saved === true;
+
+        const message =
+          typeof data?.error === "string"
+            ? data.error
+            : "Failed to save lead details. Reload before retrying.";
+
+        if (!reloadRequired && response.status >= 500) {
+          reloadRequired = true;
+        }
+
         alert(message);
-        console.error("[Lead Details] Save failed", { status: res.status });
+
+        console.error("[Lead Details] Save failed", {
+          status: response.status
+        });
+
         return;
       }
 
       const savedLead = Array.isArray(data) ? data[0] : null;
-      if (!savedLead || String(savedLead.lead_id) !== String(leadId) || savedLead.project !== project) {
+
+      if (
+        !savedLead ||
+        String(savedLead.lead_id) !== String(leadId) ||
+        savedLead.project !== project
+      ) {
         reloadRequired = true;
-        throw new Error("The save response could not be verified. Reload Lead Details before retrying.");
+
+        throw new Error(
+          "The save response could not be verified. Reload Lead Details before retrying."
+        );
       }
 
       Object.assign(lead, savedLead);
-      formDiv.querySelectorAll("[data-field]").forEach(el => {
-        const key = el.dataset.field;
-        if (Object.prototype.hasOwnProperty.call(savedLead, key)) {
-          el.value = String(savedLead[key] ?? "");
+
+      formDiv.querySelectorAll("[data-field]").forEach(element => {
+        const key = element.dataset.field;
+
+        if (
+          Object.prototype.hasOwnProperty.call(savedLead, key)
+        ) {
+          const savedValue = String(savedLead[key] ?? "");
+
+          if (element.tagName === "SELECT" && savedValue !== "") {
+            const hasOption = Array.from(element.options).some(
+              option => option.value === savedValue
+            );
+
+            if (!hasOption) {
+              const option = document.createElement("option");
+
+              option.value = savedValue;
+              option.textContent =
+                `${savedValue} — saved value unavailable in lookup`;
+              option.disabled = true;
+
+              element.appendChild(option);
+            }
+          }
+
+          element.value = savedValue;
         }
-        baseline.set(key, el.value);
+
+        baseline.set(key, element.value);
       });
-      if (Object.prototype.hasOwnProperty.call(updates, "lead_name")) {
+
+      if (
+        Object.prototype.hasOwnProperty.call(updates, "lead_name")
+      ) {
         portalState.activeLeadName = savedLead.lead_name || "";
-        localStorage.setItem("activeLeadName", portalState.activeLeadName);
+
+        localStorage.setItem(
+          "activeLeadName",
+          portalState.activeLeadName
+        );
+
         const bar = document.getElementById("lead-context-bar");
-        if (bar) bar.textContent = `Lead: ${portalState.activeLeadName} (${portalState.activeLeadContactName || ""})`;
+
+        if (bar) {
+          bar.textContent =
+            `Lead: ${portalState.activeLeadName} ` +
+            `(${portalState.activeLeadContactName || ""})`;
+        }
       }
+
       alert("✅ Lead details saved.");
-    } catch (err) {
+    } catch (error) {
       reloadRequired = true;
+
       if (isCurrent()) {
-        alert("Error confirming the save: " + err.message + " Reload Lead Details before retrying.");
+        alert(
+          "Error confirming the save: " +
+          error.message +
+          " Reload Lead Details before retrying."
+        );
       }
-      console.error("[Lead Details] Save request failed:", err);
+
+      console.error(
+        "[Lead Details] Save request failed:",
+        error
+      );
     } finally {
       saving = false;
+
       if (isCurrent()) {
         saveButton.disabled = !canEdit() || reloadRequired;
-        saveButton.textContent = reloadRequired ? "Reload Lead Details to Continue" : "Save Lead Details";
-        formDiv.querySelectorAll("[data-field]").forEach(el => {
-          el.disabled = !canEdit() || reloadRequired;
+
+        saveButton.textContent = reloadRequired
+          ? "Reload Lead Details to Continue"
+          : "Save Lead Details";
+
+        formDiv.querySelectorAll("[data-field]").forEach(element => {
+          element.disabled = !canEdit() || reloadRequired;
         });
       }
     }
   });
-
 }
