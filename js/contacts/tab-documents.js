@@ -325,12 +325,28 @@ export async function renderContactDocuments(container, portalState) {
 
     /* -------------------------------------------------------
        RENDER TABLE
+       Replaces the Status column with a clickable link column.
+       The link is the same branded URL saved into GHL's
+       loa_pdf_link field, so staff see exactly what the
+       customer would see in their email.
     ------------------------------------------------------- */
     const rows = docs.map(d => `
       <tr>
         <td>${escapeHtml(d.title || d.file_name || "")}</td>
         <td>${escapeHtml(d.description || "")}</td>
-        <td>${escapeHtml(formatStatus(d.status))}</td>
+        <td>
+          ${
+            d.public_token
+              ? `<a href="${GHL_SYNC_BASE}/${encodeURIComponent(d.public_token)}"
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     title="Open the branded PDF link in a new tab"
+                     style="color:#1a73e8; text-decoration:underline;">
+                     View PDF
+                   </a>`
+              : `<span style="color:#888;">—</span>`
+          }
+        </td>
         <td>${formatDateTime(d.created_at)}</td>
         <td style="white-space:nowrap;">
           <button class="btn-primary btn-download" data-id="${d.id}">Download</button>
@@ -348,7 +364,7 @@ export async function renderContactDocuments(container, portalState) {
           <tr>
             <th>Name</th>
             <th>Description</th>
-            <th>Status</th>
+            <th>Link</th>
             <th>Date</th>
             <th>Actions</th>
           </tr>
