@@ -7,6 +7,10 @@ import { escapeHtml, formatDateTime } from "../utilities.js";
 // Client API worker (has /api/contact_documents)
 const API_BASE = "https://client-portal-api.dennis-e64.workers.dev";
 
+// Branded route assigned to the portal-to-ghl-sync Worker.
+// That Worker must handle POST /loa/update-loa-pdf-link.
+const GHL_SYNC_BASE = "https://gtr-tools.com/loa";
+
 /* -------------------------------------------------------
    MAIN ENTRY: Render Contact Documents
 ------------------------------------------------------- */
@@ -69,6 +73,8 @@ export async function renderContactDocuments(container, portalState) {
   const cancelBtn = container.querySelector("#cancelUploadPdf");
   const uploadMessage = container.querySelector("#uploadPdfMessage");
 
+  let uploadInProgress = false;
+
   showUploadBtn.addEventListener("click", () => {
     uploadForm.hidden = false;
     showUploadBtn.hidden = true;
@@ -76,6 +82,8 @@ export async function renderContactDocuments(container, portalState) {
   });
 
   cancelBtn.addEventListener("click", () => {
+    if (uploadInProgress) return;
+
     uploadForm.reset();
     uploadMessage.textContent = "";
     uploadForm.hidden = true;
@@ -85,6 +93,8 @@ export async function renderContactDocuments(container, portalState) {
   uploadForm.addEventListener("submit", async event => {
     event.preventDefault();
 
+    if (uploadInProgress) return;
+
     const file = fileInput.files[0];
 
     if (!file || !/\.pdf$/i.test(file.name)) {
@@ -92,53 +102,199 @@ export async function renderContactDocuments(container, portalState) {
       return;
     }
 
+    if (!portalState.project) {
+      uploadMessage.textContent =
+        "Missing project. Reload the portal before uploading.";
+      return;
+    }
+
+    const project = portalState.project;
+    const syncEndpoint =
+      `${GHL_SYNC_BASE.replace(/\/+$/, "")}/update-loa-pdf-link`;
+
+    // Do not redraw another contact if the user switches tabs
+    // or selects a different contact while these requests run.
+    const stillViewingThisContact = () =>
+      portalState.selectedContactId === contactId &&
+      portalState.project === project &&
+      container.contains(uploadForm);
+
+    uploadInProgress = true;
     uploadBtn.disabled = true;
     cancelBtn.disabled = true;
     fileInput.disabled = true;
     uploadBtn.textContent = "Uploading…";
-    uploadMessage.textContent = "";
+    uploadMessage.textContent = "Uploading and saving the PDF…";
+
+    let pdfSaved = false;
+    let saveUncertain = false;
+    let phase = "upload";
 
     try {
+      /* ---------------------------------------------------
+         CALL 1: CLIENT API
+         Upload PDF + save document row + return PDF URL
+
+         No GHL update occurs in client-portal-api.
+      --------------------------------------------------- */
       const formData = new FormData();
-      formData.append("project", portalState.project);
+      formData.append("project", project);
       formData.append("contact_id", contactId);
       formData.append("file", file);
 
-      const uploadRes = await fetch(
-        `${API_BASE}/api/contact_documents/upload`,
-        {
-          method: "POST",
-          body: formData
-        }
-      );
+      let uploadRes;
 
-      const result = await uploadRes.json();
+      try {
+        uploadRes = await fetch(
+          `${API_BASE}/api/contact_documents/upload`,
+          {
+            method: "POST",
+            body: formData
+          }
+        );
+      } catch (error) {
+        // A lost response does not prove the file was not saved.
+        saveUncertain = true;
+        throw error;
+      }
 
-      if (!uploadRes.ok || !result.success) {
+      let result;
+
+      try {
+        result = await uploadRes.json();
+      } catch {
+        saveUncertain = true;
+        throw new Error("The upload response could not be read.");
+      }
+
+      if (!uploadRes.ok || !result?.success) {
+        pdfSaved = result?.uploaded === true;
+        saveUncertain =
+          result?.save_uncertain === true ||
+          (uploadRes.ok && !result?.success);
+
         throw new Error(
-          [result?.error || `HTTP ${uploadRes.status}`, result?.detail]
+          [
+            result?.error || `HTTP ${uploadRes.status}`,
+            result?.detail
+          ]
             .filter(Boolean)
             .join(" — ")
         );
       }
 
-      // The backend returns ghl_sync.success=false if the PDF
-      // saved successfully but the server-to-server GHL update failed.
-      if (result.ghl_sync?.success === false) {
-        alert(
-          "The PDF was uploaded, but the GHL link update failed. " +
-          "Do not upload the PDF again.\n\n" +
-          (result.ghl_sync.error || "Check the backend sync result.")
+      pdfSaved = true;
+      phase = "sync";
+
+      const documentId = result.document?.id;
+      const pdfUrl = result.pdf_url;
+
+      if (!documentId || !pdfUrl) {
+        throw new Error(
+          "The upload succeeded, but its response did not include " +
+          "the saved document ID and PDF URL."
         );
       }
 
-      // Reload the existing document grid.
-      await renderContactDocuments(container, portalState);
-    } catch (err) {
-      console.error("[Documents] Upload failed:", err);
+      /* ---------------------------------------------------
+         CALL 2: GHL SYNC WORKER
+         Branded endpoint:
+         https://gtr-tools.com/loa/update-loa-pdf-link
+
+         Updates the contact's loa_pdf_link field.
+      --------------------------------------------------- */
+      uploadBtn.textContent = "Updating GHL…";
       uploadMessage.textContent =
-        `Upload failed: ${err.message || "Unknown error"}`;
+        "PDF saved. Updating the contact's GHL PDF link…";
+
+      const syncRes = await fetch(syncEndpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          project,
+          contact_id: contactId,
+          document_id: documentId,
+          pdf_url: pdfUrl
+        })
+      });
+
+      let syncResult;
+
+      try {
+        syncResult = await syncRes.json();
+      } catch {
+        throw new Error(
+          "The GHL update response could not be read. " +
+          "The update may have completed, but was not confirmed."
+        );
+      }
+
+      if (!syncRes.ok || !syncResult?.success) {
+        throw new Error(
+          [
+            syncResult?.error || `HTTP ${syncRes.status}`,
+            syncResult?.detail
+          ]
+            .filter(Boolean)
+            .join(" — ")
+        );
+      }
+
+      /* ---------------------------------------------------
+         BOTH CALLS COMPLETE: REFRESH DOCUMENT TABLE
+      --------------------------------------------------- */
+      phase = "refresh";
+      uploadMessage.textContent =
+        "PDF saved and GHL link updated. Refreshing documents…";
+
+      if (stillViewingThisContact()) {
+        await renderContactDocuments(container, portalState);
+      }
+    } catch (err) {
+      console.error(`[Documents] ${phase} failed:`, err);
+
+      if (pdfSaved) {
+        const message = phase === "refresh"
+          ? (
+              "The PDF was saved and the GHL link was updated, " +
+              "but refreshing the document table failed.\n\n" +
+              "Do not upload the PDF again.\n\n" +
+              (err.message || "Unknown error")
+            )
+          : (
+              "The PDF is already saved in the portal, but the GHL " +
+              "link update was not confirmed.\n\n" +
+              "Do not upload the PDF again.\n\n" +
+              (err.message || "Unknown error")
+            );
+
+        alert(message);
+
+        // Refresh even when the separate GHL update fails,
+        // because the PDF and document row are already saved.
+        if (stillViewingThisContact()) {
+          await renderContactDocuments(container, portalState);
+        }
+      } else if (saveUncertain) {
+        alert(
+          "The PDF upload could not be confirmed. It may already " +
+          "have been saved.\n\n" +
+          "Check the document table before uploading again. " +
+          "The GHL update was not started.\n\n" +
+          (err.message || "Unknown error")
+        );
+
+        if (stillViewingThisContact()) {
+          await renderContactDocuments(container, portalState);
+        }
+      } else {
+        uploadMessage.textContent =
+          `Upload failed: ${err.message || "Unknown error"}`;
+      }
     } finally {
+      uploadInProgress = false;
       uploadBtn.disabled = false;
       cancelBtn.disabled = false;
       fileInput.disabled = false;
@@ -155,7 +311,10 @@ export async function renderContactDocuments(container, portalState) {
       contact_id: contactId
     });
 
-    const res = await fetch(`${API_BASE}/api/contact_documents?${params}`, { cache: "no-cache" });
+    const res = await fetch(
+      `${API_BASE}/api/contact_documents?${params}`,
+      { cache: "no-cache" }
+    );
     const data = await res.json();
 
     if (!res.ok) {
@@ -271,7 +430,14 @@ export async function renderContactDocuments(container, portalState) {
           const result = await delRes.json().catch(() => ({}));
 
           if (!delRes.ok || !result.success) {
-            throw new Error([result?.error || `HTTP ${delRes.status}`, result?.detail].filter(Boolean).join(" — "));
+            throw new Error(
+              [
+                result?.error || `HTTP ${delRes.status}`,
+                result?.detail
+              ]
+                .filter(Boolean)
+                .join(" — ")
+            );
           }
 
           // Reload the grid
