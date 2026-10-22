@@ -5,6 +5,25 @@
 import { escapeHtml, formatDateTime } from "../utilities.js";
 
 /* -------------------------------------------------------
+REMOVE UNRESOLVED EMAIL SIGNATURE IMAGES BEFORE RENDERING
+------------------------------------------------------- */
+
+function removeCidImages(html) {
+    const template = document.createElement("template");
+    template.innerHTML = String(html ?? "");
+
+    template.content.querySelectorAll("img").forEach(img => {
+        const src = (img.getAttribute("src") || "").trim();
+
+        if (/^cid:/i.test(src)) {
+            img.remove();
+        }
+    });
+
+    return template.innerHTML;
+}
+
+/* -------------------------------------------------------
 MAIN ENTRY: Render Contact Notes
 ------------------------------------------------------- */
 
@@ -65,9 +84,9 @@ export async function renderContactNotes(container, portalState, contactId) {
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <h2>Notes</h2>
 
-      ${portalState.canEdit
-        ? `<button id="contactAddNoteBtn" class="btn-primary">+ Add Note</button>`
-        : ``}
+                ${portalState.canEdit
+                    ? `<button id="contactAddNoteBtn" class="btn-primary">+ Add Note</button>`
+                    : ``}
             </div>
 
             <!-- FILTER BAR -->
@@ -121,16 +140,16 @@ export async function renderContactNotes(container, portalState, contactId) {
                                     <div style="margin-top:8px;"><strong>Raw Text:</strong></div>
 
                                     ${
-                                        /<(p|div|br|ul|ol|li|strong|em|span|html|body|a)(\s|>)/i.test(n.raw_text)
-                                        ? `<div class="html-note-block">${n.raw_text}</div>`
-                                        : `<div class="raw-text-block">${n.raw_text}</div>`
+                                        /<\/?[a-z][^>]*>/i.test(String(n.raw_text ?? ""))
+                                        ? `<div class="html-note-block">${removeCidImages(n.raw_text)}</div>`
+                                        : `<div class="raw-text-block">${escapeHtml(String(n.raw_text ?? ""))}</div>`
                                     }
-                                    
+
                                     ${portalState.canEdit
                                     ? `<button class="btn-primary btn-review-note" data-id="${n.id}" style="margin-top:8px; margin-right:8px;">Review Note
                                     </button>`
                                     : ``}
-                                    
+
                                     ${
                                         portalState.deleteAllowed
                                         ? `<button class="btn-danger btn-delete-note" data-id="${n.id}" style="margin-top:8px;">Delete Note</button>`
