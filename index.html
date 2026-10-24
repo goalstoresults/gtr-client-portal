@@ -238,6 +238,7 @@ import { loadDashboardTab } from "./js/dashboard.js";
 import { loadJobsTab } from "./js/jobs.js";
 import { loadStaffFilterTab } from "./js/staff_filter.js";
 import { loadStatsTab } from "./js/stats.js";
+import { loadSummaryTab } from "./js/summary.js";
 
 /* ============================================================
 PORTAL STATE
@@ -252,7 +253,10 @@ const portalState = {
   canEdit: false,
   isDemoAccount: false,
   canSeeFinancials: false,
-  full_admin: false
+  full_admin: false,
+  notes_summary_enabled: false,
+  can_view_notes_summary: false,
+  can_generate_notes_summary: false
 };
 
 window.portalState = portalState;
@@ -310,7 +314,8 @@ const tabMap = {
 "16": { label: "Inspections", loader: loadInspectionsTab },
 "17": { label: "Jobs", loader: loadJobsTab },
 "18": { label: "Staff Filter", loader: loadStaffFilterTab },
-"19": { label: "Stats", loader: loadStatsTab }
+"19": { label: "Stats", loader: loadStatsTab },
+"20": { label: "Summary", loader: loadSummaryTab }
 };
 
 /* ============================================================
@@ -569,6 +574,12 @@ portalState.task_manager = (result.task_manager || "").trim().toLowerCase();
 portalState.notesFilterDate = null;
 portalState.notesFilterSubject = null;
 
+portalState.can_view_notes_summary =
+  result.can_view_notes_summary === true;
+
+portalState.can_generate_notes_summary =
+  result.can_generate_notes_summary === true;
+
 portalState.staffName = result.staff_name || "";
 portalState.firstName = result.first_name || "";
 portalState.lastName = result.last_name || "";
@@ -621,6 +632,9 @@ if (portalState.isDemoAccount) {
 }
 pageTitle.textContent = match.display_name || "";
 
+portalState.notes_summary_enabled =
+  match.notes_summary_enabled === true;
+
 const projectTabs = normalizeTabs(match.enabled_tabs);
 const staffTabs = portalState.allowedTabs || [];
 const finalTabs = projectTabs.filter(t => staffTabs.includes(t));
@@ -658,6 +672,15 @@ function renderTabs(enabledTabs) {
 tabs.innerHTML = enabledTabs
 .map(tabId => {
 if (!tabMap[tabId]) return "";
+
+if (
+String(tabId) === "20" &&
+(
+!portalState.notes_summary_enabled ||
+!portalState.can_view_notes_summary
+)
+) return "";
+
 const isHelp = tabMap[tabId].label === "Help";
 return `
 <button data-tab="${tabId}" class="${isHelp ? "nav-help" : ""}">
@@ -673,6 +696,14 @@ btn.addEventListener("click", () => loadTab(btn.dataset.tab));
 }
 
 async function loadTab(tabId) {
+
+if (
+String(tabId) === "20" &&
+(
+!portalState.notes_summary_enabled ||
+!portalState.can_view_notes_summary
+)
+) return;
 
 document.querySelectorAll("#tabs button")
 .forEach(btn => btn.classList.remove("active"));
