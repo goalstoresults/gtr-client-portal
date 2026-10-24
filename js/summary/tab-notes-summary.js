@@ -10,7 +10,6 @@ const CONTACTS_API =
     "https://contacts-module.dennis-e64.workers.dev";
 
 const SUMMARY_PAGE_SIZE = 25;
-
 const activeSummaryViews = new WeakMap();
 
 /* -------------------------------------------------------
@@ -36,12 +35,14 @@ export async function renderNotesSummary(container, portalState) {
         activeSummaryViews.get(container) === view
         && (!view.root || container.contains(view.root));
 
-    // Generation controls follow the existing portal permission.
-    // Staff details sent during generation are attribution only.
+    // Uses the existing portal generation permission.
+    // Identity fields are attribution only; no staff lookup here.
     const canGenerate =
         portalState.can_generate_notes_summary === true;
 
     const project = portalState.project;
+    const timeZone =
+        Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
     const identity = {
         user_id: portalState.user_id ?? "",
@@ -52,133 +53,155 @@ export async function renderNotesSummary(container, portalState) {
     };
 
     let contacts = [];
-    let savedRows = [];
     let selectedContact = null;
-    let selectedContactHasNotes = false;
-    let checkingNotes = false;
+    let notes = [];
+    let previewCriteria = null;
+    let previewLoading = false;
+    let generating = false;
+    let savedRows = [];
     let offset = 0;
     let hasMore = false;
-    let listRequestNumber = 0;
-    let reportRequestNumber = 0;
     let searchRequestNumber = 0;
     let notesRequestNumber = 0;
-    let generating = false;
+    let listRequestNumber = 0;
+    let reportRequestNumber = 0;
 
+    const selectedNoteIds = new Set();
     const knownContacts = new Map();
 
     container.innerHTML = `
         <section class="card">
             <h2>Notes Summary</h2>
-
             <p>
-                Generate a contact summary for a selected period,
-                or open an existing saved summary below.
+                Find a contact, choose the date range, and load the notes.
+                Review your selections before generating the summary.
             </p>
 
-            ${
-                canGenerate
-                ? `
-                    <section class="card" style="margin:12px 0 16px;">
-                        <h3>Find Contact</h3>
-
-                        <div class="row" style="gap:12px; margin-bottom:12px;">
-                            <input
-                                type="text"
-                                data-summary="search"
-                                placeholder="Search name, business, or email"
-                                style="flex:1; min-width:180px;"
-                            >
-                            <button
-                                type="button"
-                                class="btn-primary"
-                                data-summary="find"
-                            >
-                                Find
-                            </button>
-                        </div>
-
-                        <div
-                            data-summary="search-results"
-                            class="muted"
-                            role="status"
-                            aria-live="polite"
-                            style="overflow-x:auto;"
+            ${canGenerate ? `
+                <section class="card" style="margin:12px 0 16px;">
+                    <h3>Find Contact</h3>
+                    <div class="row" style="gap:12px; margin-bottom:12px;">
+                        <input
+                            type="text"
+                            data-summary="search"
+                            placeholder="Search name, business, or email"
+                            style="flex:1; min-width:180px;"
                         >
-                            Enter criteria and click Find,
-                            or leave blank and click Find to list all contacts.
-                        </div>
-                    </section>
-
-                    <div
-                        data-summary="selected-contact"
-                        style="margin-bottom:12px;"
-                    >
-                        No contact selected.
+                        <button
+                            type="button"
+                            class="btn-primary"
+                            data-summary="find"
+                        >Find</button>
                     </div>
-
                     <div
-                        data-summary="notes-status"
+                        data-summary="search-results"
+                        class="muted"
                         role="status"
                         aria-live="polite"
-                        style="margin-bottom:12px;"
-                    ></div>
-
-                    <div style="
-                        display:flex;
-                        align-items:flex-start;
-                        gap:20px;
-                        flex-wrap:wrap;
-                        margin:12px 0;
-                    ">
-                        <label style="
-                            display:flex;
-                            flex-direction:column;
-                        ">
-                            <span>From</span>
-                            <input
-                                type="date"
-                                data-summary="from"
-                                style="min-width:160px;"
-                                disabled
-                            >
-                        </label>
-
-                        <label style="
-                            display:flex;
-                            flex-direction:column;
-                        ">
-                            <span>To</span>
-                            <input
-                                type="date"
-                                data-summary="to"
-                                style="min-width:160px;"
-                                disabled
-                            >
-                        </label>
+                        style="overflow-x:auto;"
+                    >
+                        Enter criteria and click Find,
+                        or leave blank and click Find to list all contacts.
                     </div>
+                </section>
 
-                    <p style="margin:8px 0;">
-                        Date range timezone:
-                        <span data-summary="timezone"></span>
-                    </p>
+                <div
+                    data-summary="selected-contact"
+                    style="margin-bottom:12px;"
+                >No contact selected.</div>
 
+                <div style="
+                    display:flex;
+                    align-items:flex-end;
+                    gap:20px;
+                    flex-wrap:wrap;
+                    margin:12px 0;
+                ">
+                    <label style="display:flex; flex-direction:column;">
+                        <span>From</span>
+                        <input
+                            type="date"
+                            data-summary="from"
+                            style="min-width:160px;"
+                            disabled
+                        >
+                    </label>
+                    <label style="display:flex; flex-direction:column;">
+                        <span>To</span>
+                        <input
+                            type="date"
+                            data-summary="to"
+                            style="min-width:160px;"
+                            disabled
+                        >
+                    </label>
                     <button
                         type="button"
-                        class="btn-primary"
-                        data-summary="generate"
+                        class="btn-secondary"
+                        data-summary="load-notes"
                         disabled
-                    >
-                        Generate Summary
-                    </button>
-                `
-                : `
-                    <p>
-                        You can view saved summaries.
-                        Generating new summaries requires
-                        generation permission.
-                    </p>
-                `
-            }
+                        style="background-color:#999; color:#fff; cursor:not-allowed; opacity:0.65;"
+                    >Load Notes</button>
+                </div>
+
+                <p style="margin:8px 0;">
+                    Date range timezone:
+                    <span data-summary="timezone"></span>
+                </p>
+
+                <div
+                    data-summary="notes-status"
+                    role="status"
+                    aria-live="polite"
+                    style="margin:12px 0;"
+                >Select a contact and date range, then click Load Notes.</div>
+
+                <div data-summary="notes-preview" style="display:none;">
+                    <div class="row" style="gap:12px; margin:12px 0;">
+                        <button
+                            type="button"
+                            class="btn-secondary"
+                            data-summary="select-all"
+                        >Select All</button>
+                        <button
+                            type="button"
+                            class="btn-secondary"
+                            data-summary="clear-all"
+                        >Clear All</button>
+                        <span
+                            data-summary="selection-count"
+                            role="status"
+                            aria-live="polite"
+                        ></span>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table class="notes-table">
+                            <thead>
+                                <tr>
+                                    <th>Select</th>
+                                    <th>Note Date</th>
+                                    <th>Subject</th>
+                                    <th>Note</th>
+                                </tr>
+                            </thead>
+                            <tbody data-summary="note-rows"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <button
+                    type="button"
+                    class="btn-secondary"
+                    data-summary="generate"
+                    disabled
+                    style="margin-top:12px; background-color:#999; color:#fff; cursor:not-allowed; opacity:0.65;"
+                >Generate Summary</button>
+            ` : `
+                <p>
+                    You can view saved summaries.
+                    Generating new summaries requires generation permission.
+                </p>
+            `}
 
             <div
                 data-summary="message"
@@ -197,15 +220,10 @@ export async function renderNotesSummary(container, portalState) {
                 flex-wrap:wrap;
             ">
                 <h2>Saved Notes Summaries</h2>
-
-                <button
-                    class="btn-secondary"
-                    data-summary="refresh"
-                >
+                <button class="btn-secondary" data-summary="refresh">
                     Refresh List
                 </button>
             </div>
-
             <div style="
                 display:flex;
                 align-items:flex-end;
@@ -213,31 +231,21 @@ export async function renderNotesSummary(container, portalState) {
                 flex-wrap:wrap;
                 margin:12px 0;
             ">
-                <label style="
-                    display:flex;
-                    flex-direction:column;
-                    min-width:240px;
-                ">
+                <label style="display:flex; flex-direction:column; min-width:240px;">
                     <span>Filter by Contact</span>
                     <select data-summary="filter">
                         <option value="">All Contacts</option>
                     </select>
                 </label>
-
-                <button
-                    class="btn-secondary"
-                    data-summary="clear-filter"
-                >
+                <button class="btn-secondary" data-summary="clear-filter">
                     Clear Filter
                 </button>
             </div>
-
             <div
                 data-summary="list-message"
                 role="status"
                 style="margin-bottom:8px;"
             ></div>
-
             <div style="overflow-x:auto;">
                 <table class="notes-table">
                     <thead>
@@ -251,45 +259,22 @@ export async function renderNotesSummary(container, portalState) {
                         </tr>
                     </thead>
                     <tbody data-summary="rows">
-                        <tr>
-                            <td colspan="6">
-                                Loading saved summaries…
-                            </td>
-                        </tr>
+                        <tr><td colspan="6">Loading saved summaries…</td></tr>
                     </tbody>
                 </table>
             </div>
-
-            <div style="
-                display:flex;
-                align-items:center;
-                gap:12px;
-                margin-top:12px;
-            ">
-                <button
-                    class="btn-secondary"
-                    data-summary="previous"
-                    disabled
-                >
+            <div style="display:flex; align-items:center; gap:12px; margin-top:12px;">
+                <button class="btn-secondary" data-summary="previous" disabled>
                     Previous
                 </button>
-
                 <span data-summary="page"></span>
-
-                <button
-                    class="btn-secondary"
-                    data-summary="next"
-                    disabled
-                >
+                <button class="btn-secondary" data-summary="next" disabled>
                     Next
                 </button>
             </div>
         </section>
 
-        <div
-            data-summary="report"
-            style="margin-top:16px;"
-        ></div>
+        <div data-summary="report" style="margin-top:16px;"></div>
     `;
 
     const find = name =>
@@ -299,9 +284,15 @@ export async function renderNotesSummary(container, portalState) {
     const findButton = find("find");
     const searchResults = find("search-results");
     const selectedContactDisplay = find("selected-contact");
-    const notesStatus = find("notes-status");
     const fromInput = find("from");
     const toInput = find("to");
+    const loadNotesButton = find("load-notes");
+    const notesStatus = find("notes-status");
+    const preview = find("notes-preview");
+    const noteRows = find("note-rows");
+    const selectAllButton = find("select-all");
+    const clearAllButton = find("clear-all");
+    const selectionCount = find("selection-count");
     const generateButton = find("generate");
     const filterSelect = find("filter");
     const message = find("message");
@@ -313,106 +304,112 @@ export async function renderNotesSummary(container, portalState) {
 
     view.root = message;
 
-    const timeZone =
-        Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-
     if (canGenerate) {
         find("timezone").textContent = timeZone;
-        generateButton.addEventListener("click", generateSummary);
         findButton.addEventListener("click", findContacts);
-
         searchInput.addEventListener("keydown", event => {
             if (event.key === "Enter") {
                 event.preventDefault();
                 findContacts();
             }
         });
-
         searchResults.addEventListener("click", event => {
             const button = event.target.closest("[data-select-contact]");
             if (!button || generating) return;
-
             const contact = contacts.find(item =>
                 String(item.contact_id) === button.dataset.selectContact
             );
-
             if (contact) selectContact(contact);
         });
+
+        [fromInput, toInput].forEach(input => {
+            input.addEventListener("input", dateRangeChanged);
+            input.addEventListener("change", dateRangeChanged);
+        });
+
+        loadNotesButton.addEventListener("click", loadNotes);
+        generateButton.addEventListener("click", generateSummary);
+
+        selectAllButton.addEventListener("click", () => {
+            if (generating || previewLoading) return;
+            notes.forEach(note => {
+                if (noteCanBeSelected(note)) {
+                    selectedNoteIds.add(String(note.id));
+                }
+            });
+            syncNoteCheckboxes();
+            updateControls();
+        });
+
+        clearAllButton.addEventListener("click", () => {
+            if (generating || previewLoading) return;
+            selectedNoteIds.clear();
+            syncNoteCheckboxes();
+            updateControls();
+        });
+
+        noteRows.addEventListener("change", event => {
+            const checkbox = event.target.closest("[data-note-index]");
+            if (!checkbox || generating || previewLoading) return;
+            const note = notes[Number(checkbox.dataset.noteIndex)];
+            if (!note || !noteCanBeSelected(note)) return;
+            const id = String(note.id);
+            if (checkbox.checked) selectedNoteIds.add(id);
+            else selectedNoteIds.delete(id);
+            updateControls();
+        });
+
+        updateControls();
     }
 
-    find("refresh").addEventListener("click", () => {
-        loadSavedSummaries();
-    });
-
+    find("refresh").addEventListener("click", () => loadSavedSummaries());
     filterSelect.addEventListener("change", () => {
         offset = 0;
         loadSavedSummaries();
     });
-
     find("clear-filter").addEventListener("click", () => {
         filterSelect.value = "";
         offset = 0;
         loadSavedSummaries();
     });
-
     previousButton.addEventListener("click", () => {
         offset = Math.max(0, offset - SUMMARY_PAGE_SIZE);
         loadSavedSummaries();
     });
-
     nextButton.addEventListener("click", () => {
         if (!hasMore) return;
         offset += SUMMARY_PAGE_SIZE;
         loadSavedSummaries();
     });
-
     rowsContainer.addEventListener("click", event => {
         const button = event.target.closest("[data-view-summary]");
-        if (!button) return;
-
-        const id = button.dataset.viewSummary;
-        openSavedSummary(id);
+        if (button) openSavedSummary(button.dataset.viewSummary);
     });
 
     /* -------------------------------------------------------
-    FIND CONTACTS — BLANK CRITERIA RETURNS ALL PROJECT CONTACTS
+    FIND CONTACTS
     ------------------------------------------------------- */
 
     async function findContacts() {
         if (!canGenerate || generating) return;
-
         const requestNumber = ++searchRequestNumber;
-        const term = searchInput.value.trim();
-
         findButton.disabled = true;
         findButton.textContent = "Finding…";
         searchResults.textContent = "Searching…";
 
         try {
-            const data = await summaryApi(
-                "/notes_summary/contacts",
-                {
-                    project,
-                    search: term
-                }
-            );
-
-            if (
-                !isCurrentView()
-                || requestNumber !== searchRequestNumber
-            ) {
-                return;
-            }
-
+            const data = await summaryApi("/notes_summary/contacts", {
+                project,
+                search: searchInput.value.trim()
+            });
+            if (!isCurrentView() || requestNumber !== searchRequestNumber) return;
             contacts = Array.isArray(data.rows) ? data.rows : [];
-
             contacts.forEach(contact => {
                 knownContacts.set(
                     String(contact.contact_id),
                     contact.contact_name || contact.contact_id
                 );
             });
-
             updateContactFilter();
 
             if (!contacts.length) {
@@ -422,18 +419,13 @@ export async function renderNotesSummary(container, portalState) {
 
             searchResults.innerHTML = `
                 <div style="margin-bottom:8px;">
-                    ${h(contacts.length)} contacts found.
-                    Select a contact below.
+                    ${h(contacts.length)} contacts found. Select a contact below.
                 </div>
-
                 <table class="notes-table">
                     <thead>
                         <tr>
-                            <th>Contact</th>
-                            <th>Business</th>
-                            <th>Email</th>
-                            <th>Type</th>
-                            <th>Action</th>
+                            <th>Contact</th><th>Business</th><th>Email</th>
+                            <th>Type</th><th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -449,9 +441,7 @@ export async function renderNotesSummary(container, portalState) {
                                         class="btn-secondary"
                                         data-select-contact="${h(contact.contact_id)}"
                                         ${generating ? "disabled" : ""}
-                                    >
-                                        Select
-                                    </button>
+                                    >Select</button>
                                 </td>
                             </tr>
                         `).join("")}
@@ -459,139 +449,271 @@ export async function renderNotesSummary(container, portalState) {
                 </table>
             `;
         } catch (error) {
-            if (
-                !isCurrentView()
-                || requestNumber !== searchRequestNumber
-            ) {
-                return;
-            }
-
+            if (!isCurrentView() || requestNumber !== searchRequestNumber) return;
             searchResults.textContent = error.message;
         } finally {
-            if (
-                isCurrentView()
-                && requestNumber === searchRequestNumber
-            ) {
-                findButton.disabled = generating;
+            if (isCurrentView() && requestNumber === searchRequestNumber) {
                 findButton.textContent = "Find";
+                findButton.disabled = generating;
             }
         }
     }
 
-    /* -------------------------------------------------------
-    SELECT CONTACT AND CHECK FOR ATTACHED NOTES
-    ------------------------------------------------------- */
-
-    async function selectContact(contact) {
+    function selectContact(contact) {
         if (generating) return;
-
-        const requestNumber = ++notesRequestNumber;
-
         selectedContact = contact;
-        selectedContactHasNotes = false;
-        checkingNotes = true;
-
         selectedContactDisplay.textContent =
             `Selected Contact: ${contact.contact_name || contact.contact_id}`
             + (contact.email ? ` (${contact.email})` : "");
+        resetPreview("Choose the date range, then click Load Notes.");
+    }
 
-        notesStatus.textContent = "Checking notes for this contact…";
+    function dateRangeChanged() {
+        if (generating) return;
+        resetPreview("Date range changed. Click Load Notes to retrieve the matching notes.");
+    }
+
+    function resetPreview(status) {
+        ++notesRequestNumber;
+        notes = [];
+        selectedNoteIds.clear();
+        previewCriteria = null;
+        previewLoading = false;
+        preview.style.display = "none";
+        noteRows.innerHTML = "";
+        notesStatus.textContent = status;
         message.textContent = "";
-        updateGenerationControls();
+        loadNotesButton.textContent = "Load Notes";
+        updateControls();
+    }
+
+    function currentCriteria() {
+        return {
+            contact_id: String(selectedContact?.contact_id ?? ""),
+            from: fromInput.value,
+            to: toInput.value,
+            time_zone: timeZone
+        };
+    }
+
+    function previewMatchesCriteria() {
+        if (!previewCriteria) return false;
+        const current = currentCriteria();
+        return Object.keys(current).every(key =>
+            current[key] === previewCriteria[key]
+        );
+    }
+
+    /* -------------------------------------------------------
+    LOAD NOTES FOR THE SELECTED CONTACT AND DATE RANGE
+
+    Backend contract:
+    GET /notes_summary/notes
+        ?project=&contact_id=&from=&to=&time_zone=
+    Response: { status: "ok", rows: [...original notes], message? }
+    Each row includes id, note_date, subject and raw_text/note_text.
+    The backend returns all matching rows, not a truncated page.
+    ------------------------------------------------------- */
+
+    async function loadNotes() {
+        if (!canGenerate || generating || previewLoading) return;
+        const criteria = currentCriteria();
+        if (!criteria.contact_id) {
+            notesStatus.textContent = "Select a contact first.";
+            return;
+        }
+        if (!criteria.from || !criteria.to) {
+            notesStatus.textContent = "Select both From and To dates.";
+            return;
+        }
+        if (criteria.from > criteria.to) {
+            notesStatus.textContent = "From date must not be later than To date.";
+            return;
+        }
+
+        resetPreview("Loading notes for the selected date range…");
+        const requestNumber = ++notesRequestNumber;
+        previewLoading = true;
+        loadNotesButton.textContent = "Loading…";
+        updateControls();
 
         try {
-            const data = await summaryApi(
-                "/notes_summary/contact-notes",
-                {
-                    project,
-                    contact_id: contact.contact_id
+            const data = await summaryApi("/notes_summary/notes", {
+                project,
+                ...criteria
+            });
+            if (!isCurrentView() || requestNumber !== notesRequestNumber) return;
+            if (!Array.isArray(data.rows)) {
+                throw new Error("The server did not return a notes list.");
+            }
+
+            notes = data.rows;
+            previewCriteria = criteria;
+            selectedNoteIds.clear();
+            notes.forEach(note => {
+                if (noteCanBeSelected(note)) {
+                    selectedNoteIds.add(String(note.id));
                 }
-            );
+            });
 
-            if (
-                !isCurrentView()
-                || requestNumber !== notesRequestNumber
-            ) {
+            if (!notes.length) {
+                notesStatus.textContent = data.message
+                    || "No notes found for this contact in the selected date range.";
+                preview.style.display = "none";
                 return;
             }
 
-            selectedContactHasNotes = data.has_notes === true;
-            notesStatus.textContent = selectedContactHasNotes
-                ? "Notes found for this contact. Select the date range below."
-                : "No notes found for this contact.";
+            renderNotesPreview();
+            preview.style.display = "block";
+            const usableCount = notes.filter(noteCanBeSelected).length;
+            notesStatus.textContent = usableCount
+                ? "Review the notes below. All usable notes are selected; uncheck any you want to exclude."
+                : "Notes were found, but none have original note text available for a summary.";
         } catch (error) {
-            if (
-                !isCurrentView()
-                || requestNumber !== notesRequestNumber
-            ) {
-                return;
-            }
-
-            selectedContactHasNotes = false;
+            if (!isCurrentView() || requestNumber !== notesRequestNumber) return;
+            notes = [];
+            selectedNoteIds.clear();
+            previewCriteria = null;
+            preview.style.display = "none";
             notesStatus.textContent = error.message;
         } finally {
-            if (
-                isCurrentView()
-                && requestNumber === notesRequestNumber
-            ) {
-                checkingNotes = false;
-                updateGenerationControls();
+            if (isCurrentView() && requestNumber === notesRequestNumber) {
+                previewLoading = false;
+                loadNotesButton.textContent = "Load Notes";
+                updateControls();
             }
         }
     }
 
-    function updateGenerationControls() {
+    function originalNoteText(note) {
+        const raw = typeof note.raw_text === "string" ? note.raw_text.trim() : "";
+        const text = typeof note.note_text === "string" ? note.note_text.trim() : "";
+        return raw || text;
+    }
+
+    function noteCanBeSelected(note) {
+        return note.id !== undefined && note.id !== null
+            && String(note.id).trim() !== ""
+            && originalNoteText(note).length > 0;
+    }
+
+    function renderNotesPreview() {
+        noteRows.innerHTML = notes.map((note, index) => {
+            const usable = noteCanBeSelected(note);
+            const content = originalNoteText(note);
+            return `
+                <tr>
+                    <td>
+                        <input
+                            type="checkbox"
+                            data-note-index="${index}"
+                            aria-label="Include ${h(note.subject || "Untitled note")} in summary"
+                            ${usable && selectedNoteIds.has(String(note.id)) ? "checked" : ""}
+                            ${!usable || generating ? "disabled" : ""}
+                        >
+                    </td>
+                    <td>${displayDateTime(note.note_date)}</td>
+                    <td>${h(note.subject || "Untitled")}</td>
+                    <td>
+                        ${content ? `
+                            <details>
+                                <summary style="cursor:pointer;">Expand Note</summary>
+                                <div style="margin-top:8px;">
+                                    From: ${h(note.from_name || "Not recorded")}
+                                    ${note.from_email ? `(${h(note.from_email)})` : ""}
+                                </div>
+                                <div style="margin-top:8px; white-space:pre-wrap; overflow-wrap:anywhere;">${h(content)}</div>
+                            </details>
+                        ` : `<span class="muted">No original note text available.</span>`}
+                        ${content && !usable ? `
+                            <div class="muted">This note has no usable ID and cannot be selected.</div>
+                        ` : ""}
+                    </td>
+                </tr>
+            `;
+        }).join("");
+    }
+
+    function syncNoteCheckboxes() {
+        noteRows.querySelectorAll("[data-note-index]").forEach(checkbox => {
+            const note = notes[Number(checkbox.dataset.noteIndex)];
+            checkbox.checked = !!note && noteCanBeSelected(note)
+                && selectedNoteIds.has(String(note.id));
+        });
+    }
+
+    function setActionButton(button, enabled) {
+        button.disabled = !enabled;
+        button.className = enabled ? "btn-primary" : "btn-secondary";
+        button.style.backgroundColor = enabled ? "" : "#999";
+        button.style.color = enabled ? "" : "#fff";
+        button.style.cursor = enabled ? "" : "not-allowed";
+        button.style.opacity = enabled ? "" : "0.65";
+    }
+
+    function updateControls() {
         if (!canGenerate) return;
+        const criteria = currentCriteria();
+        const validRange = !!criteria.from && !!criteria.to
+            && criteria.from <= criteria.to;
+        const hasContact = !!criteria.contact_id;
+        const selectionReady = previewMatchesCriteria()
+            && selectedNoteIds.size > 0;
 
-        const ready = selectedContact
-            && selectedContactHasNotes
-            && !checkingNotes
-            && !generating;
+        setActionButton(
+            generateButton,
+            selectionReady && !previewLoading && !generating
+        );
+        setActionButton(
+            loadNotesButton,
+            hasContact && validRange && !previewLoading && !generating
+        );
 
-        generateButton.disabled = !ready;
-        fromInput.disabled = !ready;
-        toInput.disabled = !ready;
+        fromInput.disabled = !hasContact || generating;
+        toInput.disabled = !hasContact || generating;
         searchInput.disabled = generating;
         findButton.disabled = generating;
+        selectAllButton.disabled = generating || previewLoading
+            || !notes.some(noteCanBeSelected);
+        clearAllButton.disabled = generating || previewLoading
+            || selectedNoteIds.size === 0;
+
+        selectionCount.textContent = `${selectedNoteIds.size} of ${notes.length} notes selected.`;
 
         searchResults.querySelectorAll("[data-select-contact]")
-            .forEach(button => {
-                button.disabled = generating;
-            });
+            .forEach(button => { button.disabled = generating; });
+        noteRows.querySelectorAll("[data-note-index]").forEach(checkbox => {
+            const note = notes[Number(checkbox.dataset.noteIndex)];
+            checkbox.disabled = generating || previewLoading
+                || !note || !noteCanBeSelected(note);
+        });
     }
+
+    /* -------------------------------------------------------
+    SAVED SUMMARY CONTACT FILTER
+    ------------------------------------------------------- */
 
     function updateContactFilter() {
         const selected = filterSelect.value;
         const currentOption = filterSelect.options[filterSelect.selectedIndex];
         const selectedName = currentOption?.textContent || selected;
-
         savedRows.forEach(row => {
             knownContacts.set(
                 String(row.contact_id),
                 row.contact_name || row.contact_id
             );
         });
-
         if (selected && !knownContacts.has(selected)) {
             knownContacts.set(selected, selectedName);
         }
-
         filterSelect.innerHTML = `
             <option value="">All Contacts</option>
-            ${
-                [...knownContacts.entries()]
-                    .sort((a, b) =>
-                        String(a[1]).localeCompare(String(b[1]))
-                    )
-                    .map(([id, name]) => `
-                        <option value="${h(id)}">
-                            ${h(name)}
-                        </option>
-                    `)
-                    .join("")
-            }
+            ${[...knownContacts.entries()]
+                .sort((a, b) => String(a[1]).localeCompare(String(b[1])))
+                .map(([id, name]) => `
+                    <option value="${h(id)}">${h(name)}</option>
+                `).join("")}
         `;
-
         filterSelect.value = selected;
     }
 
@@ -601,101 +723,49 @@ export async function renderNotesSummary(container, portalState) {
 
     async function loadSavedSummaries() {
         const requestNumber = ++listRequestNumber;
-
         listMessage.textContent = "Loading saved summaries…";
         previousButton.disabled = true;
         nextButton.disabled = true;
-
         try {
-            const data = await summaryApi(
-                "/notes_summary/list",
-                {
-                    project,
-                    contact_id: filterSelect.value,
-                    limit: SUMMARY_PAGE_SIZE,
-                    offset
-                }
-            );
-
-            if (
-                !isCurrentView()
-                || requestNumber !== listRequestNumber
-            ) {
-                return;
-            }
-
+            const data = await summaryApi("/notes_summary/list", {
+                project,
+                contact_id: filterSelect.value,
+                limit: SUMMARY_PAGE_SIZE,
+                offset
+            });
+            if (!isCurrentView() || requestNumber !== listRequestNumber) return;
             savedRows = Array.isArray(data.rows) ? data.rows : [];
             hasMore = data.has_more === true;
-
             updateContactFilter();
-
             rowsContainer.innerHTML = savedRows.length
                 ? savedRows.map(row => `
                     <tr>
                         <td>${h(row.contact_name)}</td>
-
                         <td>
-                            ${h(row.date_from)}
-                            to
-                            ${h(row.date_to)}
-                            <br>
+                            ${h(row.date_from)} to ${h(row.date_to)}<br>
                             <small>${h(row.time_zone)}</small>
                         </td>
-
                         <td>${displayDateTime(row.generated_at)}</td>
-
-                        <td>
-                            ${h(
-                                row.generated_by_name
-                                || row.generated_by_email
-                                || "Not recorded"
-                            )}
-                        </td>
-
+                        <td>${h(row.generated_by_name || row.generated_by_email || "Not recorded")}</td>
                         <td>${h(row.source_notes_count)}</td>
-
                         <td>
-                            <button
-                                class="btn-secondary"
-                                data-view-summary="${h(row.id)}"
-                            >
+                            <button class="btn-secondary" data-view-summary="${h(row.id)}">
                                 View
                             </button>
                         </td>
                     </tr>
                 `).join("")
-                : `
-                    <tr>
-                        <td colspan="6">
-                            No saved summaries found.
-                        </td>
-                    </tr>
-                `;
-
+                : `<tr><td colspan="6">No saved summaries found.</td></tr>`;
             listMessage.textContent = "";
-
             find("page").textContent = savedRows.length
-                ? `Showing ${offset + 1}–${offset + savedRows.length}`
-                : "";
-
+                ? `Showing ${offset + 1}–${offset + savedRows.length}` : "";
             previousButton.disabled = offset === 0;
             nextButton.disabled = !hasMore;
         } catch (error) {
-            if (
-                !isCurrentView()
-                || requestNumber !== listRequestNumber
-            ) {
-                return;
-            }
-
+            if (!isCurrentView() || requestNumber !== listRequestNumber) return;
             rowsContainer.innerHTML = `
-                <tr>
-                    <td colspan="6">
-                        Unable to load saved summaries.
-                    </td>
-                </tr>
+                <tr><td colspan="6">Unable to load saved summaries.</td></tr>
             `;
-
             find("page").textContent = "";
             listMessage.textContent = error.message;
             previousButton.disabled = offset === 0;
@@ -709,107 +779,70 @@ export async function renderNotesSummary(container, portalState) {
 
     async function openSavedSummary(id) {
         const requestNumber = ++reportRequestNumber;
-
         message.textContent = "Opening saved summary…";
-
         try {
             const data = await summaryApi(
-                `/notes_summary/${encodeURIComponent(id)}`,
-                { project }
+                `/notes_summary/${encodeURIComponent(id)}`, { project }
             );
-
-            if (
-                !isCurrentView()
-                || requestNumber !== reportRequestNumber
-            ) {
-                return;
-            }
-
-            if (!data.summary) {
-                throw new Error("Saved summary was not returned.");
-            }
-
+            if (!isCurrentView() || requestNumber !== reportRequestNumber) return;
+            if (!data.summary) throw new Error("Saved summary was not returned.");
             renderSummaryReport(reportContainer, data.summary);
             message.textContent = "";
-
-            reportContainer.scrollIntoView({
-                behavior: "smooth",
-                block: "start"
-            });
+            reportContainer.scrollIntoView({ behavior: "smooth", block: "start" });
         } catch (error) {
-            if (
-                !isCurrentView()
-                || requestNumber !== reportRequestNumber
-            ) {
-                return;
-            }
-
+            if (!isCurrentView() || requestNumber !== reportRequestNumber) return;
             message.textContent = error.message;
         }
     }
 
     /* -------------------------------------------------------
-    GENERATE AND SAVE A NEW SUMMARY
+    GENERATE FROM SELECTED NOTES ONLY
+
+    Backend must require and validate selected_note_ids against
+    this project, contact and date range. It must NOT ignore the
+    selection and regenerate from every note in the period.
     ------------------------------------------------------- */
 
     async function generateSummary() {
-        if (!canGenerate || generating || checkingNotes) return;
-
-        const contactId = selectedContact?.contact_id;
-        const from = fromInput.value;
-        const to = toInput.value;
-
-        if (!contactId) {
-            message.textContent = "Select a contact first.";
+        if (!canGenerate || generating || previewLoading) return;
+        if (!previewMatchesCriteria()) {
+            message.textContent = "Load notes for the current contact and date range first.";
+            return;
+        }
+        const selectedIds = notes
+            .filter(note => noteCanBeSelected(note)
+                && selectedNoteIds.has(String(note.id)))
+            .map(note => note.id);
+        if (!selectedIds.length) {
+            message.textContent = "Select at least one note to generate a summary.";
             return;
         }
 
-        if (!selectedContactHasNotes) {
-            message.textContent = "No notes found for this contact.";
-            return;
-        }
-
-        if (!from || !to) {
-            message.textContent = "Select both From and To dates.";
-            return;
-        }
-
-        if (from > to) {
-            message.textContent =
-                "From date must not be later than To date.";
-            return;
-        }
-
-        generating = true;
-        updateGenerationControls();
-        generateButton.textContent = "Generating…";
-
+        const criteria = { ...previewCriteria };
+        const excludedIds = notes
+            .filter(note => !selectedNoteIds.has(String(note.id)))
+            .map(note => note.id)
+            .filter(id => id !== null && id !== undefined);
         const requestNumber = ++reportRequestNumber;
-
-        message.textContent =
-            "Generating and saving the summary. Please wait…";
+        generating = true;
+        generateButton.textContent = "Generating…";
+        updateControls();
+        message.textContent = "Generating and saving the summary from the selected notes. Please wait…";
 
         try {
-            const data = await summaryApi(
-                "/notes_history/period-summary",
-                null,
-                {
-                    project,
-                    ...identity,
-                    contact_id: contactId,
-                    from,
-                    to,
-                    time_zone: timeZone
-                }
-            );
-
+            const data = await summaryApi("/notes_history/period-summary", null, {
+                project,
+                ...identity,
+                ...criteria,
+                selected_note_ids: selectedIds,
+                excluded_note_ids: excludedIds
+            });
             if (!isCurrentView()) return;
-
             if (!data.report) {
                 if (requestNumber === reportRequestNumber) {
                     reportContainer.innerHTML = "";
                     message.textContent = data.message
-                        || "No notes found for this contact in the selected date range.";
+                        || "No usable selected notes were available for this summary.";
                 }
                 return;
             }
@@ -822,40 +855,26 @@ export async function renderNotesSummary(container, portalState) {
                     generated_by_name: identity.user_name,
                     generated_by_email: identity.user_email
                 });
-
                 message.textContent = data.saved
                     ? "Summary generated and saved."
                     : "Summary generated, but saving was not confirmed.";
-
-                if (data.usage_warning) {
-                    message.textContent += `\n${data.usage_warning}`;
-                }
+                if (data.usage_warning) message.textContent += `\n${data.usage_warning}`;
             }
-
-            // Keep the saved-list filter independent of the
-            // generation contact selection.
             offset = 0;
             await loadSavedSummaries();
-
         } catch (error) {
-            if (
-                !isCurrentView()
-                || requestNumber !== reportRequestNumber
-            ) return;
+            if (!isCurrentView() || requestNumber !== reportRequestNumber) return;
             message.textContent = error.message;
-
         } finally {
             generating = false;
-
             if (isCurrentView()) {
                 generateButton.textContent = "Generate Summary";
-                updateGenerationControls();
+                updateControls();
             }
         }
     }
 
-    // Contacts are searched only when Find is clicked.
-    // Saved summaries still load immediately for the project.
+    // No automatic contact search or note loading.
     await loadSavedSummaries();
 }
 
@@ -865,50 +884,30 @@ API REQUESTS
 
 async function summaryApi(path, query = null, body = null) {
     const url = new URL(`${CONTACTS_API}${path}`);
-
     if (query) {
         Object.entries(query).forEach(([key, value]) => {
-            if (
-                value !== undefined
-                && value !== null
-                && value !== ""
-            ) {
+            if (value !== undefined && value !== null && value !== "") {
                 url.searchParams.set(key, String(value));
             }
         });
     }
-
     const response = await fetch(url.toString(), {
         method: body ? "POST" : "GET",
         cache: "no-cache",
-        ...(body
-            ? {
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(body)
-            }
-            : {})
+        ...(body ? {
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        } : {})
     });
-
     let data;
-
-    try {
-        data = await response.json();
-    } catch {
-        throw new Error(
-            `The server returned an invalid response (${response.status}).`
-        );
+    try { data = await response.json(); }
+    catch {
+        throw new Error(`The server returned an invalid response (${response.status}).`);
     }
-
     if (!response.ok || data?.status === "error") {
-        throw new Error(
-            typeof data?.error === "string"
-                ? data.error
-                : `Request failed (${response.status}).`
-        );
+        throw new Error(typeof data?.error === "string"
+            ? data.error : `Request failed (${response.status}).`);
     }
-
     return data;
 }
 
