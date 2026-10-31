@@ -291,6 +291,276 @@ let umbrellaAttempts = 0;
 let pendingLoginContext = null;
 
 /* ============================================================
+PORTAL ENTRY AUTHENTICATION — FIRST GATE ONLY
+
+The backend decides which projects require verification.
+No contact, lead, or other data-request code is changed here.
+============================================================ */
+
+const PORTAL_AUTH_API =
+  "https://client-portal-api.dennis-e64.workers.dev/api/portal_auth";
+
+const PORTAL_AUTH_STORAGE_KEY = "redumbrella.portal.auth.v1";
+
+let portalAuthMemory = {};
+let portalAuthBusy = false;
+
+function readPortalAuthSessions() {
+
+  try {
+    const raw = localStorage.getItem(PORTAL_AUTH_STORAGE_KEY);
+    const sessions = raw ? JSON.parse(raw) : portalAuthMemory;
+
+    if (
+      !sessions ||
+      typeof sessions !== "object" ||
+      Array.isArray(sessions)
+    ) {
+      return {};
+    }
+
+    return sessions;
+
+  } catch (err) {
+    return portalAuthMemory;
+  }
+
+}
+
+function portalAuthSessionKey(project, email) {
+
+  return (
+    String(project).trim().toLowerCase() +
+    "|" +
+    String(email).trim().toLowerCase()
+  );
+
+}
+
+function savePortalAuthSession(session) {
+
+  const sessions = readPortalAuthSessions();
+  const now = Date.now();
+
+  // Remove locally stored sessions past their absolute maximum.
+  for (const key of Object.keys(sessions)) {
+    const expiry = Date.parse(sessions[key]?.absolute_expires_at || "");
+
+    if (!Number.isFinite(expiry) || expiry <= now) {
+      delete sessions[key];
+    }
+  }
+
+  const key = portalAuthSessionKey(session.project, session.email);
+
+  sessions[key] = {
+    project: session.project,
+    email: session.email,
+    token: session.token,
+    absolute_expires_at: session.absolute_expires_at
+  };
+
+  portalAuthMemory = sessions;
+
+  try {
+    localStorage.setItem(
+      PORTAL_AUTH_STORAGE_KEY,
+      JSON.stringify(sessions)
+    );
+  } catch (err) {
+    // Verification still works for this page if storage is unavailable.
+    console.warn("Portal session could not be remembered in this browser.");
+  }
+
+}
+
+function removePortalAuthSession(project, email) {
+
+  const sessions = readPortalAuthSessions();
+  delete sessions[portalAuthSessionKey(project, email)];
+  portalAuthMemory = sessions;
+
+  try {
+    localStorage.setItem(
+      PORTAL_AUTH_STORAGE_KEY,
+      JSON.stringify(sessions)
+    );
+  } catch (err) {
+    // Retain the in-memory result when browser storage is unavailable.
+  }
+
+}
+
+async function portalAuthRequest(action, body, token = "") {
+
+  const headers = {
+    "Content-Type": "application/json"
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${PORTAL_AUTH_API}/${action}`, {
+    method: "POST",
+    cache: "no-store",
+    headers,
+    body: JSON.stringify(body)
+  });
+
+  let result;
+
+  try {
+    result = await response.json();
+  } catch (err) {
+    throw new Error("The sign-in service returned an invalid response.");
+  }
+
+  if (!response.ok || result.success === false) {
+    throw new Error(
+      result.error || "Unable to complete sign-in. Please try again."
+    );
+  }
+
+  return result;
+
+}
+
+function showPortalAuthNotice(message) {
+
+  let notice = document.getElementById("portalAuthNotice");
+
+  if (!notice) {
+    notice = document.createElement("div");
+    notice.id = "portalAuthNotice";
+    notice.style.maxWidth = "420px";
+    notice.style.margin = "30px auto";
+    notice.style.padding = "20px";
+    notice.style.textAlign = "center";
+    notice.style.border = "1px solid #ddd";
+    notice.style.borderRadius = "8px";
+    notice.setAttribute("role", "status");
+    loginForm.after(notice);
+  }
+
+  notice.replaceChildren();
+
+  const heading = document.createElement("h3");
+  heading.textContent = "Check your email";
+  notice.appendChild(heading);
+
+  const description = document.createElement("p");
+  description.textContent = message;
+  notice.appendChild(description);
+
+  const instruction = document.createElement("p");
+  instruction.textContent =
+    "Open the sign-in link in the email to enter the portal. " +
+    "You may close this tab after opening the link.";
+  notice.appendChild(instruction);
+
+  const backButton = document.createElement("button");
+  backButton.type = "button";
+  backButton.textContent = "Back to login";
+
+  backButton.addEventListener("click", () => {
+    notice.remove();
+    loginForm.style.display = "block";
+    emailInput.disabled = false;
+    loginBtn.disabled = false;
+    projectInput.disabled = false;
+    errorBox.textContent = "";
+    pendingLoginContext = null;
+  });
+
+  notice.appendChild(backButton);
+
+}
+
+async function ensurePortalEntrySession(project, email) {
+
+  const authProject = String(project).trim().toLowerCase();
+  const authEmail = String(email).trim().toLowerCase();
+
+  const sessions = readPortalAuthSessions();
+  const session = sessions[portalAuthSessionKey(authProject, authEmail)];
+
+  const status = await portalAuthRequest("status", {
+    project: authProject,
+    email: authEmail
+  }, session?.token || "");
+
+  // The backend controls test scope. No frontend-only bypass setting.
+  if (status.required === false) {
+    return true;
+  }
+
+  if (status.required === true && status.valid === true) {
+    return true;
+  }
+
+  if (status.required !== true || status.valid !== false) {
+    throw new Error("Unexpected sign-in response. Please try again.");
+  }
+
+  removePortalAuthSession(authProject, authEmail);
+
+  const emailResult = await portalAuthRequest("request", {
+    project: authProject,
+    email: authEmail
+  });
+
+  // The test scope may have changed between these two requests.
+  if (emailResult.required === false) {
+    return true;
+  }
+
+  if (emailResult.sent !== true) {
+    throw new Error("Unable to send your sign-in link. Please try again.");
+  }
+
+  showPortalAuthNotice(
+    emailResult.message ||
+    "Check your email for your sign-in link. It expires in 15 minutes."
+  );
+
+  return false;
+
+}
+
+async function verifyPortalEmailReturn() {
+
+  const fragment = new URLSearchParams(window.location.hash.slice(1));
+  const token = fragment.get("portal_auth");
+
+  if (!token) {
+    return null;
+  }
+
+  // Remove the email credential from the address bar before verification.
+  history.replaceState(
+    null,
+    "",
+    window.location.pathname + window.location.search
+  );
+
+  const verified = await portalAuthRequest("verify", { token });
+
+  if (
+    verified.verified !== true ||
+    !verified.token ||
+    !verified.project ||
+    !verified.email
+  ) {
+    throw new Error("Unable to verify this sign-in link.");
+  }
+
+  savePortalAuthSession(verified);
+  return verified;
+
+}
+
+/* ============================================================
 TAB MAP
 ============================================================ */
 
@@ -511,11 +781,53 @@ async function handleUmbrellaClick(clickedPos, correctPos) {
 
 if (clickedPos === correctPos) {
 
-umbrellaChallenge.style.display = "none";
-loginForm.style.display = "none";
+  if (!pendingLoginContext || portalAuthBusy) {
+    return;
+  }
 
-completeLoginAfterSecurity(pendingLoginContext);
-return;
+  portalAuthBusy = true;
+  umbrellaGrid.style.pointerEvents = "none";
+  umbrellaInstruction.textContent = "Checking your sign-in…";
+
+  try {
+
+    const { project, email } = pendingLoginContext;
+    const canContinue = await ensurePortalEntrySession(project, email);
+
+    if (!canContinue) {
+      umbrellaChallenge.style.display = "none";
+      loginForm.style.display = "none";
+      return;
+    }
+
+    umbrellaChallenge.style.display = "none";
+    loginForm.style.display = "none";
+
+    completeLoginAfterSecurity(pendingLoginContext);
+
+  } catch (err) {
+
+    console.error("[Portal entry auth]", err);
+
+    // Do not open the portal if the authentication check fails.
+    umbrellaChallenge.style.display = "none";
+    loginForm.style.display = "block";
+
+    emailInput.disabled = false;
+    loginBtn.disabled = false;
+    projectInput.disabled = false;
+
+    errorBox.textContent =
+      err.message || "Unable to verify your sign-in. Please try again.";
+
+  } finally {
+
+    portalAuthBusy = false;
+    umbrellaGrid.style.pointerEvents = "";
+
+  }
+
+  return;
 }
 
 umbrellaAttempts++;
@@ -735,27 +1047,144 @@ window.loadTab = loadTab;   // ⭐ ADD THIS — lets other modules trigger tab s
 INITIALIZE — HANDLE ?project PARAM + IP CHECK
 ============================================================ */
 
-window.addEventListener("DOMContentLoaded", () => {
+window.addEventListener("DOMContentLoaded", async () => {
 
-const urlParams = new URLSearchParams(window.location.search);
-const projectParam = urlParams.get("project");
+  const urlParams = new URLSearchParams(window.location.search);
+  const projectParam = urlParams.get("project");
 
-if (!projectParam) {
-// No project in URL — show error, never show a blank/guessable login form
-noProjectError.style.display = "block";
-return;
-}
+  if (!projectParam) {
+    // Keep the existing rule: a project is required in the portal URL.
+    noProjectError.style.display = "block";
+    return;
+  }
 
-if (projectParam.toLowerCase() === "gtr") {
-// Your own testing project — show the field, pre-filled, editable
-projectInput.value = projectParam;
-} else {
-// Real client project — hide the field like before, just use the param
-projectInput.value = projectParam;
-projectFieldBlock.style.display = "none";
-}
+  if (projectParam.toLowerCase() === "gtr") {
+    // Keep your editable project field for GTR testing.
+    projectInput.value = projectParam;
+  } else {
+    // Keep the project field hidden for other projects.
+    projectInput.value = projectParam;
+    projectFieldBlock.style.display = "none";
+  }
 
-checkIpLockout();
+  const fragment = new URLSearchParams(window.location.hash.slice(1));
+  const hasEmailLink = fragment.has("portal_auth");
+
+  if (hasEmailLink) {
+    emailInput.disabled = true;
+    loginBtn.disabled = true;
+    projectInput.disabled = true;
+  }
+
+  await checkIpLockout();
+
+  // Existing lockout logic leaves the login form hidden when blocked.
+  if (loginForm.style.display !== "block") {
+    return;
+  }
+
+  if (!hasEmailLink) {
+    return;
+  }
+
+  errorBox.textContent = "Verifying your sign-in link…";
+
+  try {
+
+    const verified = await verifyPortalEmailReturn();
+
+    if (!verified) {
+      throw new Error("No sign-in token was found. Request a new link.");
+    }
+
+    // Trust the verified link's database identity, not URL parameters.
+    const verifiedProject = String(verified.project);
+    const verifiedEmail = String(verified.email);
+
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.set("project", verifiedProject);
+    cleanUrl.hash = "";
+
+    history.replaceState(null, "", cleanUrl);
+
+    projectInput.value = verifiedProject;
+    emailInput.value = verifiedEmail;
+
+    projectFieldBlock.style.display =
+      verifiedProject.toLowerCase() === "gtr" ? "" : "none";
+
+    // Load current staff permissions after successful email verification.
+    const response = await fetch(
+      "https://client-portal-api.dennis-e64.workers.dev/api/check_staff",
+      {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project: verifiedProject,
+          email: verifiedEmail
+        })
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Unable to load your portal permissions.");
+    }
+
+    const result = await response.json();
+
+    if (!result.valid) {
+      removePortalAuthSession(verifiedProject, verifiedEmail);
+      throw new Error("Your email is no longer authorized for this project.");
+    }
+
+    // Logging failure must not block an otherwise valid email sign-in.
+    try {
+      await fetch(
+        "https://client-portal-api.dennis-e64.workers.dev/api/log_portal_login",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project: verifiedProject,
+            email: verifiedEmail,
+            status: "success",
+            reason: "Email link verified",
+            userAgent: navigator.userAgent
+          })
+        }
+      );
+    } catch (logError) {
+      console.error("Unable to log verified sign-in:", logError);
+    }
+
+    pendingLoginContext = {
+      project: verifiedProject,
+      email: verifiedEmail,
+      result
+    };
+
+    loginForm.style.display = "none";
+    umbrellaChallenge.style.display = "none";
+    errorBox.textContent = "";
+
+    completeLoginAfterSecurity(pendingLoginContext);
+
+  } catch (err) {
+
+    console.error("[Portal email return]", err);
+
+    loginForm.style.display = "block";
+    errorBox.textContent =
+      err.message || "Sign-in failed. Please request a new email link.";
+
+  } finally {
+
+    emailInput.disabled = false;
+    loginBtn.disabled = false;
+    projectInput.disabled = false;
+
+  }
 
 });
 
