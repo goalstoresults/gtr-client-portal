@@ -274,7 +274,8 @@ let pendingLoginContext = null;
 /* ============================================================
 PORTAL ENTRY AUTHENTICATION
 
-All projects require the backend's verified-session gate.
+The backend decides whether a project requires email verification
+or is listed in its AUTH_BYPASS_PROJECTS setting.
 No contact, lead, or other data-request code is changed here.
 ============================================================ */
 
@@ -474,6 +475,16 @@ async function ensurePortalEntrySession(project, email) {
     email: authEmail
   }, session?.token || "");
 
+  // The backend explicitly lists this project as an email-verification bypass.
+  // The menu request still checks the registered staff member and permissions.
+  if (
+    status.required === false &&
+    status.bypassed === true &&
+    status.valid === true
+  ) {
+    return true;
+  }
+
   if (status.required === true && status.valid === true) {
     return true;
   }
@@ -488,6 +499,15 @@ async function ensurePortalEntrySession(project, email) {
     project: authProject,
     email: authEmail
   });
+
+  // The backend bypass setting may have changed between these requests.
+  if (
+    emailResult.required === false &&
+    emailResult.bypassed === true &&
+    emailResult.valid === true
+  ) {
+    return true;
+  }
 
   if (emailResult.required !== true || emailResult.sent !== true) {
     throw new Error("Unable to send your sign-in link. Please try again.");
@@ -927,17 +947,15 @@ async function loadPortalConfig(projectName, email) {
   const sessions = readPortalAuthSessions();
   const session = sessions[portalAuthSessionKey(projectName, email)];
 
-  if (!session || !session.token) {
-    throw new Error("Please verify your email before opening the portal.");
-  }
-
+  // A remembered token is sent when available. The backend decides whether
+  // it is required; projects in AUTH_BYPASS_PROJECTS do not need one.
   let menu;
 
   try {
     menu = await portalAuthRequest("menu", {
       project: String(projectName).trim().toLowerCase(),
       email: String(email).trim().toLowerCase()
-    }, session.token);
+    }, session?.token || "");
   } catch (err) {
     if (err.status === 401 || err.status === 403) {
       removePortalAuthSession(projectName, email);
@@ -1029,7 +1047,7 @@ function renderTabs(menuTabs) {
     });
 
     tabs.appendChild(button);
-    tabs.appendChild(document.createTextNode(" "));   
+    tabs.appendChild(document.createTextNode(" "));
   }
 
 }
