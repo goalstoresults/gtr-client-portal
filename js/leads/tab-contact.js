@@ -78,7 +78,7 @@ function renderAgentPicker({ container, project, label, agent, onChange }) {
     resultsDiv.textContent = "Searching…";
 
     const url = `
-      [https://contacts-module.dennis-e64.workers.dev/contacts/search?](https://contacts-module.dennis-e64.workers.dev/contacts/search?)
+      https://contacts-module.dennis-e64.workers.dev/contacts/search?
       project=${encodeURIComponent(project)}&
       contact_type=Agent&
       search=${encodeURIComponent(term)}
@@ -249,7 +249,7 @@ export async function renderLeadContact(container, portalState, { tabLabel }) {
   ============================================================ */
 
   const configUrl = `
-    [https://lookups-module.dennis-e64.workers.dev/lead_fields?](https://lookups-module.dennis-e64.workers.dev/lead_fields?)
+    https://lookups-module.dennis-e64.workers.dev/lead_fields?
     project=${encodeURIComponent(portalState.project)}
   `.replace(/\s+/g, "");
 
@@ -265,7 +265,7 @@ export async function renderLeadContact(container, portalState, { tabLabel }) {
   ============================================================ */
 
   const lookupsUrl = `
-    [https://lookups-module.dennis-e64.workers.dev/lookups/list?](https://lookups-module.dennis-e64.workers.dev/lookups/list?)
+    https://lookups-module.dennis-e64.workers.dev/lookups/list?
     project=${encodeURIComponent(portalState.project)}
   `.replace(/\s+/g, "");
 
@@ -436,7 +436,7 @@ if (portalState.project === "csi") {
     const encoded = encodeURIComponent(`*${term}*`);
 
     const url = `
-      [https://client-portal-api.dennis-e64.workers.dev/api/contacts?](https://client-portal-api.dennis-e64.workers.dev/api/contacts?)
+      https://client-portal-api.dennis-e64.workers.dev/api/contacts?
       project=${portalState.project}&
       or=(
         first_name.ilike.${encoded},
@@ -895,20 +895,6 @@ async function saveContact(existing, portalState, tabLabel) {
     home_phone: document.getElementById("cf_home").value.trim(),
     mobile_phone: document.getElementById("cf_cell").value.trim()
   };
-
-  const missingFields = [];
-
-  if (!payload.first_name) missingFields.push("First Name");
-  if (!payload.last_name) missingFields.push("Last Name");
-  if (!payload.email) missingFields.push("Email Address");
-
-  if (missingFields.length > 0) {
-    alert(
-      "Please fill in the following required fields:\n\n" +
-      missingFields.join("\n")
-    );
-    return;
-  }
 
   try {
     let res, data;
