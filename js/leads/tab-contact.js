@@ -78,7 +78,7 @@ function renderAgentPicker({ container, project, label, agent, onChange }) {
     resultsDiv.textContent = "Searching…";
 
     const url = `
-      [https://contacts-module.dennis-e64.workers.dev/contacts/search?](https://contacts-module.dennis-e64.workers.dev/contacts/search?)
+      https://contacts-module.dennis-e64.workers.dev/contacts/search?
       project=${encodeURIComponent(project)}&
       contact_type=Agent&
       search=${encodeURIComponent(term)}
@@ -117,6 +117,7 @@ function renderAgentPicker({ container, project, label, agent, onChange }) {
               data-id="${escapeHtml(a.contact_id || "")}"
               data-first-name="${escapeHtml(a.first_name || "")}"
               data-last-name="${escapeHtml(a.last_name || "")}"
+}"
             >
               <strong>
                 ${escapeHtml(a.first_name || "")}
@@ -245,7 +246,7 @@ export async function renderLeadContact(container, portalState, { tabLabel }) {
   ============================================================ */
 
   const configUrl = `
-    [https://lookups-module.dennis-e64.workers.dev/lead_fields?](https://lookups-module.dennis-e64.workers.dev/lead_fields?)
+    https://lookups-module.dennis-e64.workers.dev/lead_fields?
     project=${encodeURIComponent(portalState.project)}
   `.replace(/\s+/g, "");
 
@@ -261,7 +262,7 @@ export async function renderLeadContact(container, portalState, { tabLabel }) {
   ============================================================ */
 
   const lookupsUrl = `
-    [https://lookups-module.dennis-e64.workers.dev/lookups/list?](https://lookups-module.dennis-e64.workers.dev/lookups/list?)
+    https://lookups-module.dennis-e64.workers.dev/lookups/list?
     project=${encodeURIComponent(portalState.project)}
   `.replace(/\s+/g, "");
 
@@ -431,7 +432,7 @@ if (portalState.project === "csi") {
     const encoded = encodeURIComponent(`*${term}*`);
 
     const url = `
-      [https://client-portal-api.dennis-e64.workers.dev/api/contacts?](https://client-portal-api.dennis-e64.workers.dev/api/contacts?)
+      https://client-portal-api.dennis-e64.workers.dev/api/contacts?
       project=${portalState.project}&
       or=(
         first_name.ilike.${encoded},
