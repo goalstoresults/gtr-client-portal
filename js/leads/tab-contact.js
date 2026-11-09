@@ -78,7 +78,7 @@ function renderAgentPicker({ container, project, label, agent, onChange }) {
     resultsDiv.textContent = "Searching…";
 
     const url = `
-      https://contacts-module.dennis-e64.workers.dev/contacts/search?
+      [https://contacts-module.dennis-e64.workers.dev/contacts/search?](https://contacts-module.dennis-e64.workers.dev/contacts/search?)
       project=${encodeURIComponent(project)}&
       contact_type=Agent&
       search=${encodeURIComponent(term)}
@@ -182,10 +182,6 @@ export async function renderLeadContact(container, portalState, { tabLabel }) {
     <section class="card">
       <h2>${escapeHtml(tabLabel)}</h2>
 
-      <div style="margin-bottom:16px;">
-        <button id="btnCreateLeadTop" class="btn-primary">Create Lead</button>
-      </div>
-
       <div class="row" style="gap:12px; margin-bottom:16px;">
         <input id="contactSearchInput" placeholder="Search name, business, or email" style="flex:1;">
         <button id="btnFindContact" class="btn-secondary">Find</button>
@@ -198,16 +194,17 @@ export async function renderLeadContact(container, portalState, { tabLabel }) {
 
       <div id="contactFormArea" style="display:none;"></div>
 
-      <div id="leadCreationArea" style="display:none; margin-top:20px;">
+      <div id="leadCreationArea" style="display:block; margin-top:20px;">
         <h3 id="leadAreaTitle">Create Lead</h3>
         <div id="leadFieldsForm"></div>
-        <button id="btnCreateLead" class="btn-primary" style="margin-top:16px;">
-          Create Lead
-        </button>
       </div>
 
       <div id="buyersAgentArea" style="margin-top:30px;"></div>
       <div id="sellersAgentArea" style="margin-top:16px;"></div>
+
+      <button id="btnCreateLead" class="btn-primary" style="margin-top:16px;">
+        Create Lead
+      </button>
     </section>
   `;
 
@@ -221,12 +218,11 @@ export async function renderLeadContact(container, portalState, { tabLabel }) {
   const leadAreaTitle = document.getElementById("leadAreaTitle");
   const leadFieldsForm = document.getElementById("leadFieldsForm");
   const createLeadBtn = document.getElementById("btnCreateLead");
-  const createLeadBtnTop = document.getElementById("btnCreateLeadTop");
   const buyersAgentContainer = document.getElementById("buyersAgentArea");
   const sellersAgentContainer = document.getElementById("sellersAgentArea");
 
   formArea.style.display = "none";
-  leadArea.style.display = "none";
+  leadArea.style.display = "block";
 
   let isEditingExistingLead = false;
   let lead = {};
@@ -249,7 +245,7 @@ export async function renderLeadContact(container, portalState, { tabLabel }) {
   ============================================================ */
 
   const configUrl = `
-    https://lookups-module.dennis-e64.workers.dev/lead_fields?
+    [https://lookups-module.dennis-e64.workers.dev/lead_fields?](https://lookups-module.dennis-e64.workers.dev/lead_fields?)
     project=${encodeURIComponent(portalState.project)}
   `.replace(/\s+/g, "");
 
@@ -265,7 +261,7 @@ export async function renderLeadContact(container, portalState, { tabLabel }) {
   ============================================================ */
 
   const lookupsUrl = `
-    https://lookups-module.dennis-e64.workers.dev/lookups/list?
+    [https://lookups-module.dennis-e64.workers.dev/lookups/list?](https://lookups-module.dennis-e64.workers.dev/lookups/list?)
     project=${encodeURIComponent(portalState.project)}
   `.replace(/\s+/g, "");
 
@@ -338,7 +334,6 @@ export async function renderLeadContact(container, portalState, { tabLabel }) {
 
       leadAreaTitle.textContent = `${escapeHtml(tabLabel)} Info`;
       createLeadBtn.textContent = "Update Lead";
-      createLeadBtnTop.textContent = "Update Lead";
       leadArea.style.display = "block";
 
       renderLeadFields(lead);
@@ -436,7 +431,7 @@ if (portalState.project === "csi") {
     const encoded = encodeURIComponent(`*${term}*`);
 
     const url = `
-      https://client-portal-api.dennis-e64.workers.dev/api/contacts?
+      [https://client-portal-api.dennis-e64.workers.dev/api/contacts?](https://client-portal-api.dennis-e64.workers.dev/api/contacts?)
       project=${portalState.project}&
       or=(
         first_name.ilike.${encoded},
@@ -721,7 +716,6 @@ if (portalState.project === "csi") {
 }
 
   createLeadBtn.addEventListener("click", saveLead);
-  createLeadBtnTop.addEventListener("click", saveLead);
 }
 
 /* ============================================================
