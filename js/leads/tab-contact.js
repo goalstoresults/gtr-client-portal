@@ -896,6 +896,20 @@ async function saveContact(existing, portalState, tabLabel) {
     mobile_phone: document.getElementById("cf_cell").value.trim()
   };
 
+  const missingFields = [];
+
+  if (!payload.first_name) missingFields.push("First Name");
+  if (!payload.last_name) missingFields.push("Last Name");
+  if (!payload.email) missingFields.push("Email Address");
+
+  if (missingFields.length > 0) {
+    alert(
+      "Please fill in the following required fields:\n\n" +
+      missingFields.join("\n")
+    );
+    return;
+  }
+
   try {
     let res, data;
     if (existing) {
