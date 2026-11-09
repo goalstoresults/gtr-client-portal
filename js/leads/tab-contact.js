@@ -954,4 +954,10 @@ async function saveContact(existing, portalState, tabLabel) {
 
     const resultsDiv = document.getElementById("contactSearchResults");
     if (resultsDiv) {
-      resultsDiv.innerHTML = `<div class="muted">Selected: ${escapeHtml(payload.first_name)}
+      resultsDiv.innerHTML = `<div class="muted">Selected: ${escapeHtml(payload.first_name)} ${escapeHtml(payload.last_name)}</div>`;
+    }
+  } catch (err) {
+    alert(`Error saving ${tabLabel}: ` + err.message);
+    console.error(err);
+  }
+}
