@@ -1,56 +1,74 @@
-// js/contacts.js v2.2
+// js/contacts.js v2.3
 
 import { renderAddContactForm } from "./contacts/tab-add.js";
 import { renderContactList } from "./contacts/tab-list.js";
 import { renderContactDetails } from "./contacts/tab-details.js";
 import { renderContactRelationships } from "./contacts/tab-relationships.js";
 import { renderContactNotes } from "./contacts/tab-notes.js";
-import { renderContactServicesTab } from "./contacts/tab-services.js";   
+import { renderContactServicesTab } from "./contacts/tab-services.js";
 import { renderContactTimeline } from "./contacts/tab-timeline.js";
-import { renderContactDocuments } from "./contacts/tab-documents.js";  // ⭐ NEW IMPORT
-
+import { renderContactDocuments } from "./contacts/tab-documents.js";
+import { renderContactOnboarding } from "./contacts/tab-onboarding.js";
 
 export async function loadContactsTab({ portalState, tabContent }) {
   // Load base HTML template
   const res = await fetch("./components/contacts.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
 
-  // 🔧 Inject contact context bar
+  // Inject contact context bar
   let contextBar = document.getElementById("contact-context-bar");
+
   if (!contextBar) {
     contextBar = document.createElement("div");
     contextBar.id = "contact-context-bar";
     contextBar.className = "contact-context-bar";
     tabContent.prepend(contextBar);
   }
+
   contextBar.textContent = portalState.selectedContactName
     ? `Contact: ${portalState.selectedContactName}`
     : "No contact selected";
 
   const content = tabContent.querySelector("#contactsContent");
+
+  // Onboarding is available only for NYFO
+  const onboardingEnabled = portalState.project === "nyfo";
+
+  const onboardingBtn = tabContent.querySelector(
+    '#contacts-subtabs button[data-subtab="onboarding"]'
+  );
+
+  if (onboardingBtn) {
+    if (onboardingEnabled) {
+      onboardingBtn.hidden = false;
+    } else {
+      onboardingBtn.remove();
+    }
+  }
+
   const buttons = tabContent.querySelectorAll("#contacts-subtabs button");
 
-  // ⭐ DETERMINE IF OPERATIONS (TAB 9) IS ENABLED
+  // Determine if Operations (Tab 9) is enabled
   const enabledTabs = portalState.enabled_tabs || [];
   const operationsEnabled = enabledTabs.includes("9");
 
   console.log("CONTACTS: enabled_tabs =", enabledTabs);
   console.log("CONTACTS: operationsEnabled =", operationsEnabled);
 
-  // ⭐ FIND SERVICES BUTTON SAFELY
+  // Find Services button safely
   const servicesBtn = tabContent.querySelector(
     '#contacts-subtabs button[data-subtab="services"]'
   );
 
   console.log("CONTACTS: servicesBtn found =", !!servicesBtn);
 
-  // ⭐ REMOVE SERVICES TAB IF OPERATIONS IS NOT ENABLED
+  // Remove Services tab if Operations is not enabled
   if (!operationsEnabled && servicesBtn) {
     console.log("CONTACTS: Removing Services tab (Operations disabled)");
     servicesBtn.remove();
   }
 
-  // ⭐ SUBTAB ROUTER
+  // Subtab router
   buttons.forEach(btn => {
     btn.addEventListener("click", async () => {
       buttons.forEach(b => b.classList.remove("active"));
@@ -58,7 +76,7 @@ export async function loadContactsTab({ portalState, tabContent }) {
 
       const subtab = btn.dataset.subtab;
 
-      // ⭐ BLOCK ROUTING TO SERVICES IF OPERATIONS IS DISABLED
+      // Block routing to Services if Operations is disabled
       if (subtab === "services" && !operationsEnabled) {
         content.innerHTML = `
           <section class="card">
@@ -80,7 +98,11 @@ export async function loadContactsTab({ portalState, tabContent }) {
 
         case "details":
           if (portalState.selectedContactId) {
-            await renderContactDetails(content, portalState, portalState.selectedContactId);
+            await renderContactDetails(
+              content,
+              portalState,
+              portalState.selectedContactId
+            );
           } else {
             content.innerHTML = `
               <section class="card">
@@ -93,7 +115,11 @@ export async function loadContactsTab({ portalState, tabContent }) {
 
         case "relationships":
           if (portalState.selectedContactId) {
-            await renderContactRelationships(content, portalState, portalState.selectedContactId);
+            await renderContactRelationships(
+              content,
+              portalState,
+              portalState.selectedContactId
+            );
           } else {
             content.innerHTML = `
               <section class="card">
@@ -106,7 +132,11 @@ export async function loadContactsTab({ portalState, tabContent }) {
 
         case "notes":
           if (portalState.selectedContactId) {
-            await renderContactNotes(content, portalState, portalState.selectedContactId);
+            await renderContactNotes(
+              content,
+              portalState,
+              portalState.selectedContactId
+            );
           } else {
             content.innerHTML = `
               <section class="card">
@@ -119,7 +149,11 @@ export async function loadContactsTab({ portalState, tabContent }) {
 
         case "timeline":
           if (portalState.selectedContactId) {
-            await renderContactTimeline(content, portalState, portalState.selectedContactId);
+            await renderContactTimeline(
+              content,
+              portalState,
+              portalState.selectedContactId
+            );
           } else {
             content.innerHTML = `
               <section class="card">
@@ -130,7 +164,7 @@ export async function loadContactsTab({ portalState, tabContent }) {
           }
           break;
 
-        // ⭐ NEW DOCUMENTS SUBTAB
+        // Documents subtab
         case "documents":
           if (portalState.selectedContactId) {
             await renderContactDocuments(content, portalState);
@@ -144,7 +178,22 @@ export async function loadContactsTab({ portalState, tabContent }) {
           }
           break;
 
-        // ⭐ NEW SERVICES SUBTAB
+        // Onboarding subtab — NYFO only
+        case "onboarding":
+          if (!onboardingEnabled) {
+            content.innerHTML = `
+              <section class="card">
+                <h2>Onboarding</h2>
+                <p>Onboarding is available only for NYFO.</p>
+              </section>
+            `;
+            break;
+          }
+
+          await renderContactOnboarding(content, portalState);
+          break;
+
+        // Services subtab
         case "services":
           await renderContactServicesTab(content, portalState);
           break;
@@ -159,8 +208,11 @@ export async function loadContactsTab({ portalState, tabContent }) {
     });
   });
 
-  // ⭐ DEFAULT TO LIST VIEW
-  const defaultBtn = tabContent.querySelector('#contacts-subtabs button[data-subtab="list"]');
+  // Default to List view
+  const defaultBtn = tabContent.querySelector(
+    '#contacts-subtabs button[data-subtab="list"]'
+  );
+
   if (defaultBtn) {
     defaultBtn.classList.add("active");
     await renderContactList(content, portalState);
