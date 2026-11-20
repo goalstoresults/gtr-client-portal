@@ -1,19 +1,28 @@
 // financials.js
-// Main controller for the Financials module
+// Main controller for the Financials module.
 
 import { renderFinancialAdd } from "./financials/tab-add.js";
 import { renderFinancialList } from "./financials/tab-list.js";
 import { renderFinancialSummary } from "./financials/tab-summary.js";
 import { loadRevenueTab } from "./operations/revenue.js";
 
+export async function loadFinancialsTab({
+  portalState,
+  tabContent
+}) {
+  // Load base HTML template.
+  const res = await fetch(
+    "./components/financials.html",
+    { cache: "no-cache" }
+  );
 
-export async function loadFinancialsTab({ portalState, tabContent }) {
-  // Load base HTML template
-  const res = await fetch("./components/financials.html", { cache: "no-cache" });
   tabContent.innerHTML = await res.text();
 
-  // Inject context bar
-  let contextBar = document.getElementById("financials-context-bar");
+  // Inject context bar.
+  let contextBar = document.getElementById(
+    "financials-context-bar"
+  );
+
   if (!contextBar) {
     contextBar = document.createElement("div");
     contextBar.id = "financials-context-bar";
@@ -25,37 +34,66 @@ export async function loadFinancialsTab({ portalState, tabContent }) {
     ? `Contact: ${portalState.selectedContactName}`
     : "No contact selected";
 
-  const content = tabContent.querySelector("#financialsContent");
-  const buttons = tabContent.querySelectorAll("#financials-subtabs button");
+  const content = tabContent.querySelector(
+    "#financialsContent"
+  );
 
-  // Wire subtab buttons
-  buttons.forEach(btn => {
+  const buttons = tabContent.querySelectorAll(
+    "#financials-subtabs button"
+  );
+
+  // Wire subtab buttons.
+  buttons.forEach((btn) => {
     btn.addEventListener("click", async () => {
-      buttons.forEach(b => b.classList.remove("active"));
+      buttons.forEach((b) => {
+        b.classList.remove("active");
+      });
+
       btn.classList.add("active");
 
       const subtab = btn.dataset.subtab;
 
       if (subtab === "add") {
-        await renderFinancialAdd(content, portalState);
+        // SNF uses its preserved staging frontend.
+        // Other projects use the original/non-SNF module.
+        const stagingVariant =
+          portalState.project === "snf"
+            ? "snf"
+            : "standard";
+
+        await renderFinancialAdd(
+          content,
+          portalState,
+          { stagingVariant }
+        );
+
         return;
       }
 
       if (subtab === "list") {
-        await renderFinancialList(content, portalState);
+        await renderFinancialList(
+          content,
+          portalState
+        );
         return;
       }
 
       if (subtab === "summary") {
-        await renderFinancialSummary(content, portalState);
+        await renderFinancialSummary(
+          content,
+          portalState
+        );
         return;
       }
 
       if (subtab === "revenue") {
-        await loadRevenueTab({ portalState, content });
+        await loadRevenueTab({
+          portalState,
+          content
+        });
         return;
       }
-    
+
       content.innerHTML = `
         <section class="card">
           <p>Select a subtab to begin.</p>
@@ -64,13 +102,17 @@ export async function loadFinancialsTab({ portalState, tabContent }) {
     });
   });
 
-  // Default to List view
+  // Default to List view.
   const defaultBtn = tabContent.querySelector(
     '#financials-subtabs button[data-subtab="list"]'
   );
 
   if (defaultBtn) {
     defaultBtn.classList.add("active");
-    await renderFinancialList(content, portalState);
+
+    await renderFinancialList(
+      content,
+      portalState
+    );
   }
 }
