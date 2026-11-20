@@ -125,6 +125,10 @@ export async function renderFinancialAdd(
         : "standard"
     );
 
+  const isSnf =
+    portalState.project === "snf" ||
+    stagingVariant === "snf";
+
   // Activate the correct staging handlers before rendering
   // or wiring buttons that use them.
   await activateStagingModule(stagingVariant);
@@ -153,8 +157,21 @@ export async function renderFinancialAdd(
         id="btnAddBulk"
         class="btn-secondary"
       >
-        Add Bulk
+        ${isSnf ? "Add Bulk" : "Import CSV"}
       </button>
+
+      ${
+        !isSnf
+          ? `
+            <button
+              id="btnImportQuickBooks"
+              class="btn-primary"
+            >
+              Import QuickBooks CSV
+            </button>
+          `
+          : ""
+      }
     </div>
 
     <div
@@ -191,7 +208,7 @@ export async function renderFinancialAdd(
       window.loadStagingData();
     });
 
-  // Wire bulk upload button.
+  // Wire existing generic bulk upload button.
   container
     .querySelector("#btnAddBulk")
     .addEventListener("click", () => {
@@ -203,6 +220,26 @@ export async function renderFinancialAdd(
         alert("Bulk upload modal not available.");
       }
     });
+
+  // QuickBooks import is available only on the non-SNF screen.
+  const quickBooksBtn = container.querySelector(
+    "#btnImportQuickBooks"
+  );
+
+  if (quickBooksBtn) {
+    quickBooksBtn.addEventListener("click", () => {
+      if (
+        typeof window.showQuickBooksUploadModal === "function"
+      ) {
+        window.showQuickBooksUploadModal();
+      } else {
+        alert(
+          "The QuickBooks import button is ready. " +
+          "The QuickBooks upload popup is not connected yet."
+        );
+      }
+    });
+  }
 }
 
 /* =========================================================
