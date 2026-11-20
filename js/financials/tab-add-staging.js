@@ -686,3 +686,394 @@ function renderStagingActionButton(row) {
       return "";
   }
 }
+
+/* =========================================================
+   QUICKBOOKS CSV UPLOAD — NON-SNF ONLY
+
+   Required backend route:
+   POST /staging/quickbooks-upload?project=...
+
+   Uploads into staging only.
+   Does not populate contacts or insert final revenue.
+========================================================= */
+
+window.showQuickBooksUploadModal = function () {
+  const project = window.portalState?.project;
+
+  if (!project) {
+    alert("No project selected.");
+    return;
+  }
+
+  if (project === "snf") {
+    alert("QuickBooks CSV import is not available for SNF.");
+    return;
+  }
+
+  if (!window.portalState?.canEdit) {
+    alert("You do not have permission to import financial data.");
+    return;
+  }
+
+  // Avoid opening multiple copies.
+  const existing = document.getElementById(
+    "quickBooksUploadModal"
+  );
+
+  if (existing) {
+    existing.querySelector("#quickBooksCsvFile")?.focus();
+    return;
+  }
+
+  const modal = document.createElement("div");
+
+  modal.id = "quickBooksUploadModal";
+
+  modal.style.cssText = `
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.4);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:16px;
+    box-sizing:border-box;
+    z-index:9999;
+  `;
+
+  modal.innerHTML = `
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="quickBooksUploadTitle"
+      style="
+        background:white;
+        padding:24px;
+        width:520px;
+        max-width:100%;
+        max-height:90vh;
+        overflow:auto;
+        border-radius:6px;
+        box-sizing:border-box;
+      "
+    >
+      <h3
+        id="quickBooksUploadTitle"
+        style="margin:0 0 12px;"
+      >
+        Import QuickBooks Invoices
+      </h3>
+
+      <p style="margin:0 0 12px;">
+        Select the CSV exported from QuickBooks’
+        “Invoice List by Date” report.
+      </p>
+
+      <p style="margin:0 0 16px; color:#555;">
+        Upload the original export. Do not remove report
+        headings, totals, or extra columns.
+      </p>
+
+      <label
+        for="quickBooksCsvFile"
+        style="display:block; margin-bottom:6px;"
+      >
+        QuickBooks CSV file
+      </label>
+
+      <input
+        type="file"
+        id="quickBooksCsvFile"
+        accept=".csv"
+        style="
+          display:block;
+          width:100%;
+          box-sizing:border-box;
+        "
+      />
+
+      <p
+        style="
+          margin:14px 0 0;
+          font-size:0.9em;
+          color:#555;
+        "
+      >
+        This uploads invoices to the review area only.
+        It does not add contacts or insert final
+        financial records.
+      </p>
+
+      <div
+        id="quickBooksUploadStatus"
+        role="status"
+        aria-live="polite"
+        style="
+          margin-top:14px;
+          white-space:pre-wrap;
+          overflow-wrap:anywhere;
+        "
+      ></div>
+
+      <div
+        style="
+          margin-top:20px;
+          display:flex;
+          justify-content:flex-end;
+          gap:10px;
+        "
+      >
+        <button
+          id="quickBooksCancel"
+          type="button"
+        >
+          Cancel
+        </button>
+
+        <button
+          id="quickBooksUpload"
+          type="button"
+          class="btn-primary"
+        >
+          Upload to Review
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const fileInput = modal.querySelector(
+    "#quickBooksCsvFile"
+  );
+
+  const cancelBtn = modal.querySelector(
+    "#quickBooksCancel"
+  );
+
+  const uploadBtn = modal.querySelector(
+    "#quickBooksUpload"
+  );
+
+  const statusEl = modal.querySelector(
+    "#quickBooksUploadStatus"
+  );
+
+  let uploading = false;
+  const previousFocus = document.activeElement;
+
+  function closeModal() {
+    if (uploading) {
+      return;
+    }
+
+    document.removeEventListener(
+      "keydown",
+      handleKeyDown
+    );
+
+    modal.remove();
+
+    if (previousFocus?.isConnected) {
+      previousFocus.focus();
+    }
+  }
+
+  function handleKeyDown(event) {
+    if (event.key === "Escape") {
+      closeModal();
+    }
+  }
+
+  function showStatus(message, isError = false) {
+    statusEl.textContent = message;
+    statusEl.style.color = isError
+      ? "#b00020"
+      : "#555";
+  }
+
+  cancelBtn.addEventListener("click", closeModal);
+
+  document.addEventListener(
+    "keydown",
+    handleKeyDown
+  );
+
+  fileInput.focus();
+
+  uploadBtn.addEventListener("click", async () => {
+    if (uploading) {
+      return;
+    }
+
+    // Do not upload into a project that changed
+    // while this popup was open.
+    if (window.portalState?.project !== project) {
+      showStatus(
+        "The selected project changed. Close this popup " +
+        "and reopen QuickBooks import.",
+        true
+      );
+      return;
+    }
+
+    if (!window.portalState?.canEdit) {
+      showStatus(
+        "You do not have permission to import financial data.",
+        true
+      );
+      return;
+    }
+
+    const file = fileInput.files?.[0];
+
+    if (!file) {
+      showStatus("Please select a CSV file.", true);
+      return;
+    }
+
+    if (!/\.csv$/i.test(file.name)) {
+      showStatus(
+        "Please select a file ending in .csv.",
+        true
+      );
+      return;
+    }
+
+    uploading = true;
+    uploadBtn.disabled = true;
+    cancelBtn.disabled = true;
+    fileInput.disabled = true;
+    uploadBtn.textContent = "Uploading...";
+
+    let uploaded = false;
+
+    try {
+      showStatus("Reading QuickBooks CSV...");
+
+      const csvText = await file.text();
+
+      if (!csvText.trim()) {
+        throw new Error("The selected CSV file is empty.");
+      }
+
+      showStatus(
+        "Uploading invoices to the review area..."
+      );
+
+      const res = await fetch(
+        `https://financials-module.dennis-e64.workers.dev/staging/quickbooks-upload?project=${encodeURIComponent(
+          project
+        )}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/csv"
+          },
+          body: csvText
+        }
+      );
+
+      const responseText = await res.text();
+
+      let data = null;
+
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        // Preserve the HTTP error even if it is not JSON.
+      }
+
+      if (!res.ok) {
+        console.error(
+          "QuickBooks upload failed:",
+          res.status,
+          responseText
+        );
+
+        if (res.status === 404) {
+          throw new Error(
+            "The QuickBooks upload endpoint returned 404. " +
+            "Confirm that /staging/quickbooks-upload " +
+            "has been added and deployed in financials-module."
+          );
+        }
+
+        const backendMessage =
+          typeof data?.error === "string"
+            ? data.error
+            : typeof data?.message === "string"
+              ? data.message
+              : `Upload failed (${res.status}).`;
+
+        throw new Error(backendMessage);
+      }
+
+      uploaded = true;
+
+      // Avoid refreshing another project's screen.
+      if (window.portalState?.project !== project) {
+        showStatus(
+          "Upload completed for the original project. " +
+          "Return to that project to review the invoices."
+        );
+        return;
+      }
+
+      showStatus(
+        "Upload complete. Refreshing the review area..."
+      );
+
+      try {
+        if (
+          typeof window.loadStagingData !== "function"
+        ) {
+          throw new Error(
+            "The staging refresh function is unavailable."
+          );
+        }
+
+        await window.loadStagingData();
+
+        showStatus(
+          "Upload complete. The staging refresh was requested. " +
+          "Close this popup to review the invoices."
+        );
+      } catch (refreshError) {
+        console.error(
+          "QuickBooks staging refresh failed:",
+          refreshError
+        );
+
+        showStatus(
+          "Upload succeeded, but the review area could not " +
+          "refresh. Close this popup and click Review Bulk Data. " +
+          "Do not upload the file again.",
+          true
+        );
+      }
+    } catch (err) {
+      console.error("QuickBooks upload error:", err);
+
+      showStatus(
+        err.message || "QuickBooks upload failed.",
+        true
+      );
+    } finally {
+      uploading = false;
+      cancelBtn.disabled = false;
+
+      if (uploaded) {
+        // Prevent accidental re-upload after success.
+        uploadBtn.disabled = true;
+        uploadBtn.textContent = "Uploaded";
+        fileInput.disabled = true;
+        cancelBtn.textContent = "Close";
+      } else {
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = "Upload to Review";
+        fileInput.disabled = false;
+      }
+    }
+  });
+};
