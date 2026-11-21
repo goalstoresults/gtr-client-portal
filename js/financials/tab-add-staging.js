@@ -31,7 +31,8 @@ function getStagingState(project = getProject()) {
       total: 0,
       openRowId: null,
       contactSearch: "",
-      defaultContactType: ""
+      defaultContactType: "",
+      matchedExpanded: false
     });
   }
 
@@ -394,7 +395,7 @@ function getRunSummary(state) {
    POPULATE ALL / RETRY MATCHING
 
    Uses a snapshot independent of the grid filter.
-   Processes up to 25 invoices per backend request.
+   Processes up to 5 invoices per backend request.
 ========================================================= */
 
 async function runPopulateAll(onlyIds = null) {
@@ -463,7 +464,7 @@ async function runPopulateAll(onlyIds = null) {
 
     if (!ids.length) {
       state.message =
-        "There are no pending staging invoices to populate.";
+        "There are no pending staging invoices to match.";
       return;
     }
 
@@ -487,7 +488,7 @@ async function runPopulateAll(onlyIds = null) {
       );
 
       state.message =
-        `Populating invoices ${offset + 1}–` +
+        `Matching invoices ${offset + 1}–` +
         `${offset + batchIds.length} of ${ids.length}...`;
 
       renderStagingGrid();
@@ -738,7 +739,7 @@ function renderStagingGrid() {
     `;
   }).join("");
 
-  const rowsHtml = rows.map((row, index) => {
+  const renderRows = (groupRows) => groupRows.map((row, index) => {
     const id = escapeHtml(String(row.id));
     const result = getRowResult(row, state);
     const imported =
@@ -871,229 +872,142 @@ function renderStagingGrid() {
     `;
   }).join("");
 
-  container.innerHTML = `
-    <section
-      class="card"
-      style="margin-bottom:16px;"
-    >
-      <h3 style="margin-top:0;">
-        Review Imported Invoices
-      </h3>
-
-      <div
-        style="
-          display:flex;
-          gap:12px;
-          align-items:center;
-          flex-wrap:wrap;
-          margin-bottom:12px;
-        "
-      >
-        <label for="defaultNewContactType">
-          Default type for new contacts:
-        </label>
-
-        <select
-          id="defaultNewContactType"
-          disabled
-          title="Lookup connection will be enabled in the contact-creation step."
-          style="padding:4px 6px;"
-        >
-          <option value="">
-            Contact types — connection pending
-          </option>
-        </select>
-      </div>
-
-      <p style="margin:0 0 12px; color:#555;">
-        The default will apply only to new contacts.
-        Existing contact types will not be changed.
-      </p>
-
-      <div
-        style="
-          display:flex;
-          gap:12px;
-          align-items:center;
-          flex-wrap:wrap;
-        "
-      >
-        ${
-          canEdit
-            ? `
-              <button
-                id="btnPopulateAll"
-                type="button"
-                class="btn-primary"
-                ${state.busy ? "disabled" : ""}
-              >
-                ${
-                  state.busy
-                    ? "Populating..."
-                    : "Populate All"
-                }
-              </button>
-            `
-            : ""
-        }
-
-        <button
-          id="btnInsertReady"
-          type="button"
-          class="btn-secondary"
-          disabled
-          title="Bulk insertion will be enabled after matching and contact resolution are tested."
-        >
-          Insert Ready Rows
-        </button>
-
-        <button
-          id="refreshStagingGrid"
-          type="button"
-          class="btn-primary"
-          ${state.busy ? "disabled" : ""}
-        >
-          Refresh Grid
-        </button>
-      </div>
-
-      <p style="margin:12px 0 0; color:#555;">
-        Populate All checks every pending staging invoice
-        in this project, regardless of the filter below.
-        It does not create contacts or insert final revenue.
-      </p>
-
-      <div
-        role="status"
-        aria-live="polite"
-        style="
-          margin-top:12px;
-          white-space:pre-wrap;
-        "
-      >${escapeHtml(state.message)}</div>
-
-      ${
-        state.error
-          ? `
-            <div
-              role="alert"
-              style="
-                margin-top:12px;
-                color:#b00020;
-                white-space:pre-wrap;
-              "
-            >${escapeHtml(state.error)}</div>
-          `
-          : ""
-      }
-
-      ${
-        summary.checked
-          ? `
-            <div
-              style="
-                display:flex;
-                gap:16px;
-                flex-wrap:wrap;
-                margin-top:12px;
-              "
-            >
-              <span>
-                Checked this session: ${summary.checked}
-              </span>
-              <span>
-                Matched and prepared: ${summary.resolved}
-              </span>
-              <span>
-                Need contact choice: ${summary.choices}
-              </span>
-              <span>
-                No matches: ${summary.noMatches}
-              </span>
-              <span>
-                Errors: ${summary.errors}
-              </span>
-              <span>
-                Already imported: ${summary.skipped}
-              </span>
-            </div>
-          `
-          : ""
-      }
-
-      <p
-        style="
-          margin:12px 0 0;
-          color:#666;
-          font-size:0.9em;
-        "
-      >
-        Matching summaries and candidate lists are held
-        in this browser session. Run Populate All again
-        after a page reload to rebuild them.
-      </p>
-    </section>
-
-    <div
-      style="
-        margin-bottom:10px;
-        display:flex;
-        gap:12px;
-        align-items:center;
-        flex-wrap:wrap;
-      "
-    >
-      <label for="stagingFilter">Show:</label>
-
-      <select
-        id="stagingFilter"
-        style="padding:4px 6px;"
-        ${state.busy ? "disabled" : ""}
-      >
-        <option value="">All (except imported)</option>
-        <option value="uploaded">Uploaded / unresolved</option>
-        <option value="matched">Matched — self-referral fallback</option>
-        <option value="ready">Matched with referral</option>
-        <option value="error">Error</option>
-        <option value="imported">Imported</option>
-        <option value="missing_contact">Missing Contact</option>
-        <option value="missing_referral">Missing Referral</option>
-        <option value="needs_review">Needs Review</option>
-      </select>
-
-      <span style="color:#555;">
-        ${rows.length} row(s) loaded in this grid
-      </span>
-    </div>
-
+  const importedRows = rows.filter((row) =>
+    row.status === "imported" ||
+    getRowResult(row, state)?.outcome === "already_imported"
+  );
+  const pendingRows = rows.filter((row) => !importedRows.includes(row));
+  const matchedRows = pendingRows.filter((row) => isRowPrepared(row, state));
+  const reviewRows = pendingRows.filter((row) => !isRowPrepared(row, state));
+  const tableFor = (groupRows, emptyMessage) => `
     <div style="overflow-x:auto;">
-      <table
-        class="notes-table"
-        style="
-          width:100%;
-          border-collapse:collapse;
-          margin-top:12px;
-        "
-      >
-        <thead>
-          <tr>${headerHtml}</tr>
-        </thead>
-
-        <tbody>
-          ${
-            rowsHtml ||
-            `
-              <tr>
-                <td colspan="9" style="padding:16px;">
-                  No staging rows found for this filter.
-                </td>
-              </tr>
-            `
-          }
-        </tbody>
+      <table class="notes-table" style="width:100%;border-collapse:collapse;margin-top:12px;">
+        <thead><tr>${headerHtml}</tr></thead>
+        <tbody>${renderRows(groupRows) || `<tr><td colspan="9" style="padding:16px;">${escapeHtml(emptyMessage)}</td></tr>`}</tbody>
       </table>
     </div>
   `;
+
+  container.innerHTML = `
+    <section class="card" aria-labelledby="stagingImportHeading" style="padding:20px;margin-bottom:20px;">
+      <h3 id="stagingImportHeading" style="margin:0 0 8px;">Step 1: Import File</h3>
+      <p style="margin:0 0 16px;color:#555;">Upload your invoice file and review the imported data.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+        ${canEdit ? `
+          <button id="stagingImportQuickBooks" type="button" class="btn-primary" ${state.busy ? "disabled" : ""}>Import QuickBooks File</button>
+          <button id="stagingImportCsv" type="button" class="btn-secondary" ${state.busy ? "disabled" : ""}>Import CSV</button>
+        ` : ""}
+        <button id="stagingReviewBulk" type="button" class="btn-secondary" ${state.busy ? "disabled" : ""}>Review Bulk Data</button>
+      </div>
+      <p style="margin:12px 0 0;color:#666;font-size:0.9em;">QuickBooks: upload the original Invoice List by Date CSV. Import CSV: upload a prepared file. Uploading adds invoices to staging only.</p>
+    </section>
+
+    <section class="card" aria-labelledby="stagingMatchHeading" style="padding:20px;margin-bottom:20px;">
+      <h3 id="stagingMatchHeading" style="margin:0 0 8px;">Step 2: Match Contacts</h3>
+      <p style="margin:0 0 16px;color:#555;">Find the contact associated with each imported invoice, then review anything that needs attention.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+        ${canEdit ? `
+          <button id="btnPopulateAll" type="button" class="btn-primary" ${state.busy ? "disabled" : ""}>${state.busy ? "Working..." : "Match All Contacts"}</button>
+        ` : ""}
+        <button id="refreshStagingGrid" type="button" class="btn-secondary" ${state.busy ? "disabled" : ""}>Refresh Grid</button>
+      </div>
+      <p style="margin:12px 0;color:#555;font-size:0.9em;">Match All Contacts checks every pending invoice in this project, regardless of the selected filter. It does not create contacts or add final financial records.</p>
+      <div role="status" aria-live="polite" style="white-space:pre-wrap;">${escapeHtml(state.message)}</div>
+      ${state.error ? `<div role="alert" style="margin-top:12px;color:#b00020;white-space:pre-wrap;">${escapeHtml(state.error)}</div>` : ""}
+      ${summary.checked ? `
+        <div style="display:flex;gap:16px;flex-wrap:wrap;padding:12px;margin-top:12px;background:#f4f7fa;border-radius:6px;">
+          <span>Checked this session: ${summary.checked}</span>
+          <span>Matched: ${summary.resolved}</span>
+          <span>Need contact choice: ${summary.choices}</span>
+          <span>No matches: ${summary.noMatches}</span>
+          <span>Errors: ${summary.errors}</span>
+          <span>Already imported: ${summary.skipped}</span>
+        </div>
+      ` : `<p style="margin:12px 0;color:#666;">Run Match All Contacts to check your pending invoices.</p>`}
+      <p style="margin:12px 0;color:#666;font-size:0.9em;">Matching summaries and suggestions are held in this browser session. After a page reload, run Match All Contacts again to rebuild them.</p>
+
+      <details style="margin:16px 0;">
+        <summary>New contact settings — not enabled yet</summary>
+        <div style="margin-top:12px;">
+          <label for="defaultNewContactType">Default type for new contacts:</label>
+          <select id="defaultNewContactType" disabled title="Contact-type lookup is not connected yet." style="padding:4px 6px;">
+            <option value="">Contact types — connection pending</option>
+          </select>
+          <p style="color:#666;font-size:0.9em;">This setting will apply only to new contacts. Existing contact types will not be changed.</p>
+        </div>
+      </details>
+
+      <div style="border-top:1px solid #ddd;padding-top:16px;margin-top:16px;">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
+          <label for="stagingFilter">Show:</label>
+          <select id="stagingFilter" style="padding:4px 6px;" ${state.busy ? "disabled" : ""}>
+            <option value="">All (except imported)</option>
+            <option value="uploaded">Uploaded / unresolved</option>
+            <option value="matched">Matched — self-referral fallback</option>
+            <option value="ready">Matched with referral</option>
+            <option value="error">Error</option>
+            <option value="imported">Imported</option>
+            <option value="missing_contact">Missing Contact</option>
+            <option value="missing_referral">Missing Referral</option>
+            <option value="needs_review">Needs Review</option>
+          </select>
+          <span style="color:#666;">${rows.length} invoice(s) loaded for this filter</span>
+        </div>
+        <div id="stagingNeedsReview">
+          <h4 style="margin:0 0 8px;">Needs Review — ${reviewRows.length}</h4>
+          <p style="margin:0;color:#666;font-size:0.9em;">Includes invoices not checked yet and invoices requiring a correction or contact review. Counts below apply to the selected filter.</p>
+          ${tableFor(reviewRows, rows.length ? "No invoices need review in this filter." : "No staging invoices found for this filter.")}
+        </div>
+        <details id="stagingMatchedGroup" style="margin-top:20px;" ${state.matchedExpanded ? "open" : ""}>
+          <summary style="cursor:pointer;">Matched — ${matchedRows.length}</summary>
+          ${tableFor(matchedRows, "No checked and prepared invoices in this filter.")}
+        </details>
+        ${importedRows.length ? `
+          <details style="margin-top:20px;" open>
+            <summary>Imported — ${importedRows.length}</summary>
+            ${tableFor(importedRows, "No imported invoices in this filter.")}
+          </details>
+        ` : ""}
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="stagingFinishHeading" style="padding:20px;margin-bottom:20px;">
+      <h3 id="stagingFinishHeading" style="margin:0 0 8px;">Step 3: Review &amp; Finish</h3>
+      <p style="margin:0 0 16px;color:#555;">Review matched invoices before adding them to your final records.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+        <button id="stagingReviewReady" type="button" class="btn-secondary" ${state.busy ? "disabled" : ""}>Review Ready Invoices</button>
+        <button id="btnInsertReady" type="button" class="btn-primary" disabled title="Final insertion remains disabled while matching and contact resolution are tested.">Add Ready Invoices</button>
+      </div>
+      <p style="margin:12px 0 0;color:#666;font-size:0.9em;">Final insertion is not enabled yet. Review Ready Invoices displays the matched group above; it does not insert anything.</p>
+    </section>
+  `;
+
+  container.querySelector("#stagingImportQuickBooks")?.addEventListener("click", () => window.showQuickBooksUploadModal());
+  container.querySelector("#stagingImportCsv")?.addEventListener("click", () => window.showBulkUploadModal());
+  container.querySelector("#stagingReviewBulk").addEventListener("click", () => window.reviewBulkData());
+  const matchedGroup = container.querySelector("#stagingMatchedGroup");
+  matchedGroup.addEventListener("toggle", () => {
+    if (matchedGroup.isConnected) state.matchedExpanded = matchedGroup.open;
+  });
+  container.querySelector("#stagingReviewReady").addEventListener("click", async () => {
+    if (state.busy) return;
+    state.matchedExpanded = true;
+    if (state.filter) {
+      state.filter = "";
+      container.querySelector("#stagingFilter").value = "";
+      try {
+        await loadStagingData();
+      } catch (err) {
+        console.error("Ready invoice review failed:", err);
+        return;
+      }
+    } else {
+      renderStagingGrid();
+    }
+    if (isCurrentGrid(project, container)) {
+      container.querySelector("#stagingMatchedGroup")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  });
 
   container.querySelector(
     "#stagingFilter"
@@ -1246,7 +1160,7 @@ function renderReviewEditor(row, state, canEdit) {
           ${escapeHtml(
             result?.message ||
             row.error_message ||
-            "Run Populate All or Retry Matching to check this invoice."
+            "Run Match All Contacts or Retry Matching to check this invoice."
           )}
         </p>
 
@@ -1370,7 +1284,7 @@ function renderReviewEditor(row, state, canEdit) {
 
           <p style="color:#555;">
             The review default will be preselected,
-            with an override for this customer.
+            with an override for this contact.
             Contact creation will be connected after
             matching is tested.
           </p>
@@ -1674,7 +1588,7 @@ window.saveEdit = async function (id) {
     state.openRowId = null;
 
     state.message =
-      "Invoice saved. Retry matching or run Populate All.";
+      "Invoice saved. Retry matching or run Match All Contacts.";
 
     if (isCurrentGrid(project, container)) {
       await loadStagingData();
@@ -2127,7 +2041,7 @@ function openStagingUploadModal(kind) {
       state.filter = "";
       state.error = "";
       state.message =
-        "Upload complete. Run Populate All to prepare the invoices.";
+        "Upload complete. Run Match All Contacts to prepare the invoices.";
 
       const filterEl = document.getElementById(
         "stagingFilter"
@@ -2153,7 +2067,7 @@ function openStagingUploadModal(kind) {
               ? "Upload complete."
               : `${count} invoice(s) uploaded.`
           ) +
-          " Close this popup and click Populate All."
+          " Close this popup and click Match All Contacts."
         );
       } catch (err) {
         console.error(
