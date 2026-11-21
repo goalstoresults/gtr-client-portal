@@ -31,6 +31,7 @@ function getStagingState(project = getProject()) {
       total: 0,
       openRowId: null,
       contactSearch: "",
+      contactLookups: new Map(),
       defaultContactType: "",
       matchedExpanded: false,
       finalizing: false,
@@ -1180,6 +1181,24 @@ function renderStagingGrid() {
   });
 
   container.querySelectorAll(
+    "[data-contact-query]"
+  ).forEach((input) => {
+    input.addEventListener("input", () => {
+      getContactLookup(
+        state,
+        input.dataset.contactQuery
+      ).query = input.value;
+    });
+
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        runContactSearch(input.dataset.contactQuery);
+      }
+    });
+  });
+
+  container.querySelectorAll(
     "[data-action]"
   ).forEach((element) => {
     element.addEventListener("click", (event) => {
@@ -1201,6 +1220,17 @@ function renderStagingGrid() {
           window.autoMatchContact(id);
           break;
 
+        case "search-contacts":
+          runContactSearch(id);
+          break;
+
+        case "use-contact":
+          useStagingContact(
+            id,
+            element.dataset.contactId
+          );
+          break;
+
         case "save":
           window.saveEdit(id);
           break;
@@ -1211,6 +1241,357 @@ function renderStagingGrid() {
       }
     });
   });
+}
+
+/* =========================================================
+   EXISTING CONTACT SEARCH AND SELECTION
+
+   Uses the contact-resolution routes in the Financials Worker.
+   No contact creation and no final revenue insertion.
+========================================================= */
+
+function getContactLookup(state, id) {
+  const key = String(id);
+
+  if (!state.contactLookups.has(key)) {
+    state.contactLookups.set(key, {
+      query: "",
+      contacts: [],
+      searched: false,
+      total: 0,
+      error: ""
+    });
+  }
+
+  return state.contactLookups.get(key);
+}
+
+function getContactDisplayName(contact) {
+  const personName = [
+    contact.first_name,
+    contact.last_name
+  ].filter(Boolean).join(" ");
+
+  return (
+    contact.search_name ||
+    personName ||
+    contact.business_name ||
+    contact.contact_id ||
+    ""
+  );
+}
+
+function renderContactCandidateRows(
+  contacts,
+  stagingId,
+  canSelect
+) {
+  return contacts.map((contact) => `
+    <tr>
+      <td>
+        ${escapeHtml(getContactDisplayName(contact))}
+        <div style="font-size:0.75em; color:#888;">
+          ${escapeHtml(contact.contact_id || "")}
+        </div>
+      </td>
+
+      <td>
+        ${escapeHtml(contact.business_name || "")}
+      </td>
+
+      <td>
+        ${escapeHtml(contact.email || "")}
+      </td>
+
+      <td>
+        ${escapeHtml(contact.contact_type || "")}
+      </td>
+
+      <td>
+        <button
+          type="button"
+          data-action="use-contact"
+          data-id="${escapeHtml(String(stagingId))}"
+          data-contact-id="${escapeHtml(contact.contact_id || "")}"
+          ${canSelect ? "" : "disabled"}
+        >
+          Use This
+        </button>
+      </td>
+    </tr>
+  `).join("");
+}
+
+function requireSavedContactReview(row, container) {
+  const fields = [
+    ["edit_customer", row.customer_name],
+    ["edit_invoice", row.invoice_number],
+    ["edit_description", row.description],
+    ["edit_date", row.transaction_date],
+    ["edit_amount", row.amount]
+  ];
+
+  const changed = fields.some(([prefix, original]) => {
+    const input = document.getElementById(
+      `${prefix}_${row.id}`
+    );
+
+    if (!input || !container.contains(input)) {
+      return false;
+    }
+
+    if (prefix === "edit_amount") {
+      return input.value.trim() === ""
+        ? original != null
+        : Number(input.value) !== Number(original);
+    }
+
+    return (
+      input.value.trim() !==
+      String(original ?? "").trim()
+    );
+  });
+
+  if (changed) {
+    throw new Error(
+      "Save your invoice corrections before searching or selecting a contact. " +
+      "Your current edits have not been discarded."
+    );
+  }
+}
+
+async function runContactSearch(id) {
+  let project;
+
+  try {
+    project = requireNonSnfProject();
+    requireEditPermission();
+  } catch (err) {
+    showActionError(err);
+    return;
+  }
+
+  const state = getStagingState(project);
+  const container = document.getElementById("stagingGrid");
+  const row = state.rows.find(
+    (item) => String(item.id) === String(id)
+  );
+
+  if (
+    state.busy ||
+    !container ||
+    !row ||
+    row.status === "imported" ||
+    row.imported_at
+  ) {
+    return;
+  }
+
+  const lookup = getContactLookup(state, id);
+
+  try {
+    requireSavedContactReview(row, container);
+
+    const input = document.getElementById(
+      `contact_search_${id}`
+    );
+
+    if (input && container.contains(input)) {
+      lookup.query = input.value;
+    }
+
+    if (
+      lookup.query.trim().length < 2 ||
+      lookup.query.trim().length > 200
+    ) {
+      throw new Error("Enter 2 to 200 characters to search.");
+    }
+  } catch (err) {
+    showActionError(err);
+    return;
+  }
+
+  state.busy = true;
+  state.error = "";
+  state.message = "Searching existing contacts...";
+  lookup.error = "";
+
+  renderStagingGrid();
+
+  try {
+    const data = await stagingRequest(
+      `/staging/contact-search?q=${encodeURIComponent(
+        lookup.query.trim()
+      )}`,
+      { project }
+    );
+
+    if (
+      data?.success !== true ||
+      data.project !== project ||
+      !Array.isArray(data.contacts)
+    ) {
+      throw new Error(
+        "The contact-search response could not be confirmed."
+      );
+    }
+
+    lookup.contacts = data.contacts;
+    lookup.total = data.total;
+    lookup.searched = true;
+
+    state.message =
+      "Contact search finished. Review the results before choosing.";
+  } catch (err) {
+    lookup.error = err.message || "Contact search failed.";
+    state.error = lookup.error;
+  } finally {
+    state.busy = false;
+
+    if (isCurrentGrid(project, container)) {
+      renderStagingGrid();
+    }
+  }
+}
+
+async function useStagingContact(id, contactId) {
+  let project;
+
+  try {
+    project = requireNonSnfProject();
+    requireEditPermission();
+  } catch (err) {
+    showActionError(err);
+    return;
+  }
+
+  const state = getStagingState(project);
+  const container = document.getElementById("stagingGrid");
+  const row = state.rows.find(
+    (item) => String(item.id) === String(id)
+  );
+
+  if (
+    state.busy ||
+    !container ||
+    !row ||
+    row.status === "imported" ||
+    row.imported_at
+  ) {
+    return;
+  }
+
+  const lookup = getContactLookup(state, id);
+  const result = getRowResult(row, state);
+  const candidates = [
+    ...(Array.isArray(result?.candidates)
+      ? result.candidates
+      : []),
+    ...lookup.contacts
+  ];
+
+  const contact = candidates.find(
+    (item) => String(item.contact_id) === String(contactId)
+  );
+
+  try {
+    requireSavedContactReview(row, container);
+
+    if (!contact) {
+      throw new Error(
+        "This suggestion is no longer available. " +
+        "Retry matching or search again."
+      );
+    }
+  } catch (err) {
+    showActionError(err);
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Use ${getContactDisplayName(contact)} for invoice ` +
+    `${row.invoice_number || "(no number)"}?\n\n` +
+    `Business: ${contact.business_name || "(none)"}\n` +
+    `Email: ${contact.email || "(none)"}\n` +
+    `Contact ID: ${contact.contact_id}\n\n` +
+    "This updates this staging record only. " +
+    "It does not rename a contact or add revenue."
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  state.busy = true;
+  state.error = "";
+  state.message =
+    "Assigning selected contact and checking its referral...";
+
+  renderStagingGrid();
+
+  try {
+    const data = await stagingRequest(
+      "/staging/assign-contact",
+      {
+        project,
+        method: "POST",
+        body: {
+          id: row.id,
+          contact_id: contact.contact_id,
+          expected_updated_at: row.updated_at || null
+        }
+      }
+    );
+
+    if (
+      data?.success !== true ||
+      data.project !== project ||
+      String(data.row?.id) !== String(row.id) ||
+      String(data.result?.id) !== String(row.id) ||
+      data.row.contact_id !== contact.contact_id ||
+      !["existing_assignment", "review_error"].includes(
+        data.result?.outcome
+      )
+    ) {
+      throw new Error(
+        "The contact-assignment result could not be confirmed. " +
+        "Refresh records before continuing."
+      );
+    }
+
+    Object.assign(row, data.row);
+    row.contact_name = getContactDisplayName(contact);
+
+    state.results.set(String(id), data.result);
+    state.message = data.result.message;
+
+    if (data.result.outcome === "existing_assignment") {
+      state.matchedExpanded = true;
+      state.openRowId = null;
+    }
+
+    if (isCurrentGrid(project, container)) {
+      try {
+        await loadStagingData();
+      } catch (err) {
+        state.error =
+          "The assignment was saved, but the grid could not refresh. " +
+          "Click Refresh Records.";
+      }
+    }
+  } catch (err) {
+    state.results.delete(String(id));
+    state.error = err.message || "Contact assignment failed.";
+    state.message =
+      "Assignment could not be confirmed. Refresh records and " +
+      "run matching before adding revenue.";
+  } finally {
+    state.busy = false;
+
+    if (isCurrentGrid(project, container)) {
+      renderStagingGrid();
+    }
+  }
 }
 
 /* =========================================================
@@ -1226,48 +1607,13 @@ function renderReviewEditor(row, state, canEdit) {
       ? result.candidates
       : [];
 
-  const candidateRows = candidates.map(
-    (candidate) => {
-      const personName = [
-        candidate.first_name,
-        candidate.last_name
-      ].filter(Boolean).join(" ");
+  const lookup = getContactLookup(state, row.id);
 
-      const name =
-        candidate.search_name ||
-        personName ||
-        candidate.business_name ||
-        candidate.contact_id;
-
-      return `
-        <tr>
-          <td>${escapeHtml(name || "")}</td>
-          <td>
-            ${escapeHtml(
-              candidate.business_name || ""
-            )}
-          </td>
-          <td>
-            ${escapeHtml(candidate.email || "")}
-          </td>
-          <td>
-            ${escapeHtml(
-              candidate.contact_type || ""
-            )}
-          </td>
-          <td>
-            <button
-              type="button"
-              disabled
-              title="Contact selection will be connected next."
-            >
-              Use This
-            </button>
-          </td>
-        </tr>
-      `;
-    }
-  ).join("");
+  const candidateRows = renderContactCandidateRows(
+    candidates,
+    row.id,
+    canEdit && !state.busy
+  );
 
   return `
     <tr id="edit-${id}" style="background:#f7f7f7;">
@@ -1342,16 +1688,96 @@ function renderReviewEditor(row, state, canEdit) {
             "
           >
             <input
+              id="contact_search_${id}"
               class="form-control"
               placeholder="Name, business, or email"
-              disabled
+              maxlength="200"
+              value="${escapeHtml(lookup.query)}"
+              data-contact-query="${id}"
+              ${canEdit && !state.busy ? "" : "disabled"}
             >
 
-            <button type="button" disabled>
+            <button
+              type="button"
+              data-action="search-contacts"
+              data-id="${id}"
+              ${canEdit && !state.busy ? "" : "disabled"}
+            >
               Search Contacts
             </button>
           </div>
         </div>
+
+        <p style="color:#666; font-size:0.9em;">
+          Search existing contacts in this project by name,
+          business, or email. Enter at least two characters.
+          Save invoice corrections before searching or selecting.
+        </p>
+
+        ${
+          lookup.error
+            ? `
+              <p role="alert" style="color:#b00020;">
+                ${escapeHtml(lookup.error)}
+              </p>
+            `
+            : ""
+        }
+
+        ${
+          lookup.searched
+            ? `
+              <div style="margin-top:16px;">
+                <h4>Contact Search Results</h4>
+
+                <p role="status">
+                  ${escapeHtml(String(lookup.total))}
+                  matching contact(s).
+                  ${
+                    lookup.total > 50
+                      ? "Showing the first 50. Refine your search for other results."
+                      : ""
+                  }
+                </p>
+
+                ${
+                  lookup.contacts.length
+                    ? `
+                      <div style="overflow-x:auto;">
+                        <table
+                          class="notes-table"
+                          style="width:100%; border-collapse:collapse;"
+                        >
+                          <thead>
+                            <tr>
+                              <th>Contact</th>
+                              <th>Business</th>
+                              <th>Email</th>
+                              <th>Contact Type</th>
+                              <th>Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            ${renderContactCandidateRows(
+                              lookup.contacts,
+                              row.id,
+                              canEdit && !state.busy
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    `
+                    : `
+                      <p>
+                        No contacts found. Try part of a name,
+                        business, or email.
+                      </p>
+                    `
+                }
+              </div>
+            `
+            : ""
+        }
 
         <details style="margin-top:16px;">
           <summary>Add New Contact</summary>
@@ -1420,9 +1846,10 @@ function renderReviewEditor(row, state, canEdit) {
             font-size:0.9em;
           "
         >
-          Contact selection, contact search, and creation
-          are not enabled in this test.
-          Invoice corrections below are available.
+          Choose an existing contact only after checking the
+          business and email. Selection updates this staging
+          record; it does not rename a contact or add revenue.
+          New-contact creation is not enabled in this pass.
         </p>
 
         <hr style="margin:20px 0;">
