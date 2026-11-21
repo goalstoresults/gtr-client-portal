@@ -1,5 +1,12 @@
 // financials/tab-add.js
-// Add tab: manual payment entry + bulk import + staging trigger.
+// Add tab: manual payment entry + project-specific staging.
+//
+// SNF:
+//   Preserve the existing toolbar and click-to-load workflow.
+//
+// Other projects:
+//   Show the staging workflow automatically.
+//   Import buttons are rendered inside Step 1 by tab-add-staging.js.
 
 import {
   escapeHtml,
@@ -8,16 +15,6 @@ import {
 
 /* =========================================================
    STAGING MODULE SELECTION
-
-   SNF:
-     ./snf_add_staging.js
-
-   Other projects:
-     ./tab-add-staging.js
-
-   Each staging module assigns window.* handlers.
-   Save those handlers and restore the correct set whenever
-   the Add tab is rendered, including after project changes.
 ========================================================= */
 
 const stagingHandlerNames = [
@@ -31,6 +28,12 @@ const stagingHandlerNames = [
   "reviewBulkData",
   "loadStagingData",
   "showBulkUploadModal"
+];
+
+// QuickBooks import belongs only to the standard staging module.
+// Do not require the SNF module to implement it.
+const standardOnlyHandlerNames = [
+  "showQuickBooksUploadModal"
 ];
 
 const stagingHandlerCache = new Map();
@@ -55,6 +58,18 @@ async function activateStagingModule(stagingVariant) {
       handlers[name] = window[name];
     }
 
+    if (stagingVariant !== "snf") {
+      for (const name of standardOnlyHandlerNames) {
+        if (typeof window[name] !== "function") {
+          throw new Error(
+            `Staging module "${stagingVariant}" is missing window.${name}`
+          );
+        }
+
+        handlers[name] = window[name];
+      }
+    }
+
     stagingHandlerCache.set(
       stagingVariant,
       handlers
@@ -68,13 +83,21 @@ async function activateStagingModule(stagingVariant) {
   for (const name of stagingHandlerNames) {
     window[name] = handlers[name];
   }
+
+  // Prevent the standard QuickBooks handler from remaining
+  // active while the SNF staging module is selected.
+  for (const name of standardOnlyHandlerNames) {
+    window[name] =
+      stagingVariant === "snf"
+        ? undefined
+        : handlers[name];
+  }
 }
 
 /* =========================================================
    BACKEND INSERT: Add Payment With Referral
 
-   Manual payment entry remains unchanged.
-   This is separate from staging insertion.
+   Manual payment entry remains separate from staging.
 ========================================================= */
 
 export async function addPaymentWithReferral({
@@ -85,7 +108,7 @@ export async function addPaymentWithReferral({
   invoice_number
 }) {
   const res = await fetch(
-    `https://financials-module.dennis-e64.workers.dev/payments/add`,
+    "https://financials-module.dennis-e64.workers.dev/payments/add",
     {
       method: "POST",
       headers: {
@@ -129,50 +152,47 @@ export async function renderFinancialAdd(
     portalState.project === "snf" ||
     stagingVariant === "snf";
 
-  // Activate the correct staging handlers before rendering
-  // or wiring buttons that use them.
   await activateStagingModule(stagingVariant);
+
+  // Capture the selected module's handlers for this render.
+  const loadStaging = window.loadStagingData;
+  const showBulkUpload = window.showBulkUploadModal;
 
   container.innerHTML = `
     <section class="card">
-      <h3>Financials – Add Payment </h3>
+      <h3>Financials – Add Payment</h3>
       <div id="contactPickerArea"></div>
     </section>
 
-    <div
-      style="
-        margin-top:16px;
-        display:flex;
-        gap:12px;
-      "
-    >
-      <button
-        id="btnLoadStaging"
-        class="btn-primary"
-      >
-        Review Bulk Data
-      </button>
-
-      <button
-        id="btnAddBulk"
-        class="btn-secondary"
-      >
-        ${isSnf ? "Add Bulk" : "Import CSV"}
-      </button>
-
-      ${
-        !isSnf
-          ? `
+    ${
+      isSnf
+        ? `
+          <div
+            style="
+              margin-top:16px;
+              display:flex;
+              gap:12px;
+            "
+          >
             <button
-              id="btnImportQuickBooks"
+              id="btnLoadStaging"
+              type="button"
               class="btn-primary"
             >
-              Import QuickBooks CSV
+              Review Bulk Data
             </button>
-          `
-          : ""
-      }
-    </div>
+
+            <button
+              id="btnAddBulk"
+              type="button"
+              class="btn-secondary"
+            >
+              Add Bulk
+            </button>
+          </div>
+        `
+        : ""
+    }
 
     <div
       id="stagingGrid"
@@ -180,11 +200,101 @@ export async function renderFinancialAdd(
     ></div>
   `;
 
-  // Render contact picker.
   const pickerArea = container.querySelector(
     "#contactPickerArea"
   );
 
+  const stagingGrid = container.querySelector(
+    "#stagingGrid"
+  );
+
+  /*
+   * SNF retains its existing toolbar.
+   * Standard staging renders its own import buttons in Step 1.
+   */
+  if (isSnf) {
+    container
+      .querySelector("#btnLoadStaging")
+      .addEventListener("click", () => {
+        loadStaging();
+      });
+
+    container
+      .querySelector("#btnAddBulk")
+      .addEventListener("click", () => {
+        if (typeof showBulkUpload === "function") {
+          showBulkUpload();
+        } else {
+          alert("Bulk upload modal not available.");
+        }
+      });
+  }
+
+  /*
+   * Start standard staging immediately, independently of the
+   * contact picker. The numbered workflow should not require
+   * a toolbar click or a selected contact.
+   */
+  let stagingReady = Promise.resolve();
+
+  if (!isSnf) {
+    stagingGrid.innerHTML = `
+      <p role="status" aria-live="polite">
+        Loading invoice import workflow...
+      </p>
+    `;
+
+    stagingReady = (async () => {
+      try {
+        await loadStaging();
+      } catch (err) {
+        console.error(
+          "Initial staging load failed:",
+          err
+        );
+
+        // The staging module normally renders its own error
+        // inside the workflow. Preserve that when available.
+        if (
+          stagingGrid.isConnected &&
+          container.querySelector("#stagingGrid") ===
+            stagingGrid &&
+          !stagingGrid.querySelector(
+            "#stagingImportHeading"
+          )
+        ) {
+          stagingGrid.innerHTML = `
+            <section
+              class="card"
+              style="padding:20px;"
+            >
+              <h3 style="margin-top:0;">
+                Invoice Import
+              </h3>
+
+              <p
+                role="alert"
+                style="color:#b00020;"
+              >
+                ${escapeHtml(
+                  err.message ||
+                  "Could not load the invoice import workflow."
+                )}
+              </p>
+
+              <p>
+                Reopen the Add tab to try again.
+                Do not upload the file again if an
+                earlier upload already completed.
+              </p>
+            </section>
+          `;
+        }
+      }
+    })();
+  }
+
+  // Manual payment contact picker remains available.
   await renderContactPicker(
     pickerArea,
     portalState,
@@ -201,45 +311,7 @@ export async function renderFinancialAdd(
     }
   );
 
-  // Wire staging button.
-  container
-    .querySelector("#btnLoadStaging")
-    .addEventListener("click", () => {
-      window.loadStagingData();
-    });
-
-  // Wire existing generic bulk upload button.
-  container
-    .querySelector("#btnAddBulk")
-    .addEventListener("click", () => {
-      if (
-        typeof window.showBulkUploadModal === "function"
-      ) {
-        window.showBulkUploadModal();
-      } else {
-        alert("Bulk upload modal not available.");
-      }
-    });
-
-  // QuickBooks import is available only on the non-SNF screen.
-  const quickBooksBtn = container.querySelector(
-    "#btnImportQuickBooks"
-  );
-
-  if (quickBooksBtn) {
-    quickBooksBtn.addEventListener("click", () => {
-      if (
-        typeof window.showQuickBooksUploadModal === "function"
-      ) {
-        window.showQuickBooksUploadModal();
-      } else {
-        alert(
-          "The QuickBooks import button is ready. " +
-          "The QuickBooks upload popup is not connected yet."
-        );
-      }
-    });
-  }
+  await stagingReady;
 }
 
 /* =========================================================
