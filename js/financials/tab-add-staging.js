@@ -417,6 +417,8 @@ async function runPopulateAll(onlyIds = null) {
     return;
   }
 
+  const batchSize = 5;
+
   state.busy = true;
   state.error = "";
   state.message = onlyIds
@@ -468,7 +470,7 @@ async function runPopulateAll(onlyIds = null) {
     for (
       let offset = 0;
       offset < ids.length;
-      offset += 25
+      offset += batchSize
     ) {
       if (!isCurrentGrid(project, container)) {
         throw new Error(
@@ -481,7 +483,7 @@ async function runPopulateAll(onlyIds = null) {
 
       const batchIds = ids.slice(
         offset,
-        offset + 25
+        offset + batchSize
       );
 
       state.message =
