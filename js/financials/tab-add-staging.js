@@ -1,3 +1,4 @@
+
 // financials/tab-add-staging.js
 // Non-SNF staging subsystem for the Financials "Add" tab.
 
@@ -33,6 +34,11 @@ function getStagingState(project = getProject()) {
       contactSearch: "",
       contactLookups: new Map(),
       defaultContactType: "",
+      contactTypes: [],
+      contactTypesLoaded: false,
+      contactTypesLoading: false,
+      contactTypesError: "",
+      newContacts: new Map(),
       matchedExpanded: false,
       finalizing: false,
       insertionResults: []
@@ -232,6 +238,8 @@ export async function loadStagingData() {
   }
 
   try {
+    await loadStagingContactTypes(project, container);
+
     const rows = await stagingRequest(path, {
       project
     });
@@ -1027,13 +1035,43 @@ function renderStagingGrid() {
       <p style="margin:12px 0;color:#666;font-size:0.9em;">Matching summaries and suggestions are held in this browser session. After a page reload, run Match All Contacts again to rebuild them.</p>
 
       <details style="margin:16px 0;">
-        <summary>New contact settings — not enabled yet</summary>
+        <summary>New contact settings</summary>
+
         <div style="margin-top:12px;">
-          <label for="defaultNewContactType">Default type for new contacts:</label>
-          <select id="defaultNewContactType" disabled title="Contact-type lookup is not connected yet." style="padding:4px 6px;">
-            <option value="">Contact types — connection pending</option>
+          <label for="defaultNewContactType">
+            Default type for new contacts:
+          </label>
+
+          <select
+            id="defaultNewContactType"
+            style="padding:4px 6px;"
+            ${
+              !canEdit || state.busy || !state.contactTypes.length
+                ? "disabled"
+                : ""
+            }
+          >
+            ${renderStagingContactTypeOptions(
+              state,
+              state.defaultContactType
+            )}
           </select>
-          <p style="color:#666;font-size:0.9em;">This setting will apply only to new contacts. Existing contact types will not be changed.</p>
+
+          <button
+            type="button"
+            data-action="reload-contact-types"
+            ${state.busy ? "disabled" : ""}
+          >
+            Reload Contact Types
+          </button>
+
+          ${renderStagingContactTypeMessage(state)}
+
+          <p style="color:#666; font-size:0.9em;">
+            This default applies only to new contacts.
+            Each form can override it. Existing contacts
+            and their contact types will not be changed.
+          </p>
         </div>
       </details>
 
@@ -1180,6 +1218,53 @@ function renderStagingGrid() {
     });
   });
 
+  container.querySelector(
+    "#defaultNewContactType"
+  )?.addEventListener("change", (event) => {
+    try {
+      const openRow = state.rows.find(
+        (row) => String(row.id) === state.openRowId
+      );
+
+      if (openRow) {
+        requireSavedContactReview(openRow, container);
+      }
+
+      state.defaultContactType = event.target.value;
+      renderStagingGrid();
+    } catch (err) {
+      event.target.value = state.defaultContactType;
+      showActionError(err);
+    }
+  });
+
+  container.querySelectorAll(
+    "[data-new-contact-field]"
+  ).forEach((input) => {
+    const remember = () => {
+      getStagingNewContact(
+        state,
+        input.dataset.id
+      )[input.dataset.newContactField] = input.value;
+    };
+
+    input.addEventListener("input", remember);
+    input.addEventListener("change", remember);
+  });
+
+  container.querySelectorAll(
+    "[data-new-contact-panel]"
+  ).forEach((panel) => {
+    panel.addEventListener("toggle", () => {
+      if (panel.isConnected) {
+        getStagingNewContact(
+          state,
+          panel.dataset.newContactPanel
+        ).open = panel.open;
+      }
+    });
+  });
+
   container.querySelectorAll(
     "[data-contact-query]"
   ).forEach((input) => {
@@ -1219,6 +1304,28 @@ function renderStagingGrid() {
         case "retry":
           window.autoMatchContact(id);
           break;
+
+        case "reload-contact-types":
+          reloadStagingContactTypes();
+          break;
+
+        case "create-contact":
+          createStagingContact(id);
+          break;
+
+        case "recover-created-contact":
+          createStagingContact(id, true);
+          break;
+
+        case "use-created-contact": {
+          const form = getStagingNewContact(state, id);
+
+          if (form.createdContact) {
+            useStagingContact(id, form.createdContact.contact_id);
+          }
+
+          break;
+        }
 
         case "search-contacts":
           runContactSearch(id);
@@ -1454,7 +1561,7 @@ async function runContactSearch(id) {
   }
 }
 
-async function useStagingContact(id, contactId) {
+async function useStagingContact(id, contactId, options = {}) {
   let project;
 
   try {
@@ -1508,7 +1615,7 @@ async function useStagingContact(id, contactId) {
     return;
   }
 
-  const confirmed = window.confirm(
+  const confirmed = options.confirmed === true || window.confirm(
     `Use ${getContactDisplayName(contact)} for invoice ` +
     `${row.invoice_number || "(no number)"}?\n\n` +
     `Business: ${contact.business_name || "(none)"}\n` +
@@ -1591,6 +1698,397 @@ async function useStagingContact(id, contactId) {
     if (isCurrentGrid(project, container)) {
       renderStagingGrid();
     }
+  }
+}
+
+/* =========================================================
+   NEW CONTACT TYPES AND CREATION
+========================================================= */
+
+async function loadStagingContactTypes(project, container, force = false) {
+  const state = getStagingState(project);
+
+  if (state.contactTypesLoaded && !force) return;
+
+  state.contactTypesLoading = true;
+  state.contactTypesError = "";
+
+  try {
+    const data = await stagingRequest(
+      "/staging/contact-types",
+      { project }
+    );
+
+    if (
+      data?.success !== true ||
+      data.project !== project ||
+      !Array.isArray(data.types) ||
+      data.types.some((type) => typeof type.value !== "string")
+    ) {
+      throw new Error("The contact-type response could not be confirmed.");
+    }
+
+    state.contactTypes = data.types;
+    state.contactTypesLoaded = true;
+
+    if (!data.types.some((type) => type.value === state.defaultContactType)) {
+      state.defaultContactType = "";
+    }
+  } catch (err) {
+    state.contactTypes = [];
+    state.contactTypesLoaded = false;
+    state.contactTypesError = err.message || "Contact types could not load.";
+  } finally {
+    state.contactTypesLoading = false;
+  }
+}
+
+function renderStagingContactTypeOptions(state, selected) {
+  const placeholder = state.contactTypesLoading
+    ? "Loading contact types..."
+    : state.contactTypes.length
+      ? "Choose a contact type"
+      : "No active contact types available";
+
+  return `
+    <option value="">${escapeHtml(placeholder)}</option>
+    ${state.contactTypes.map((type) => `
+      <option
+        value="${escapeHtml(type.value)}"
+        ${type.value === selected ? "selected" : ""}
+      >
+        ${escapeHtml(type.value)}
+      </option>
+    `).join("")}
+  `;
+}
+
+function renderStagingContactTypeMessage(state) {
+  if (state.contactTypesError) {
+    return `
+      <p role="alert" style="color:#b00020;">
+        ${escapeHtml(state.contactTypesError)}
+        Contact creation is blocked until types load.
+      </p>
+    `;
+  }
+
+  if (state.contactTypesLoaded && !state.contactTypes.length) {
+    return `
+      <p style="color:#9a4500;">
+        No active contact_type lookups were found for this project.
+        Add or activate a lookup, then reload contact types.
+      </p>
+    `;
+  }
+
+  return "";
+}
+
+async function reloadStagingContactTypes() {
+  let project;
+
+  try {
+    project = requireNonSnfProject();
+  } catch (err) {
+    showActionError(err);
+    return;
+  }
+
+  const state = getStagingState(project);
+  const container = document.getElementById("stagingGrid");
+
+  if (state.busy || !container) return;
+
+  try {
+    const row = state.rows.find(
+      (item) => String(item.id) === state.openRowId
+    );
+
+    if (row) requireSavedContactReview(row, container);
+  } catch (err) {
+    showActionError(err);
+    return;
+  }
+
+  state.busy = true;
+
+  try {
+    await loadStagingContactTypes(project, container, true);
+  } finally {
+    state.busy = false;
+
+    if (isCurrentGrid(project, container)) renderStagingGrid();
+  }
+}
+
+function getStagingNewContact(state, id) {
+  const key = String(id);
+
+  if (!state.newContacts.has(key)) {
+    state.newContacts.set(key, {
+      first_name: "",
+      last_name: "",
+      business_name: "",
+      email: "",
+      contact_type: null,
+      createdContact: null,
+      attempted: false,
+      open: false,
+      error: ""
+    });
+  }
+
+  return state.newContacts.get(key);
+}
+
+function renderStagingNewContactForm(row, state, canEdit) {
+  const form = getStagingNewContact(state, row.id);
+  const id = escapeHtml(String(row.id));
+  const selectedType = form.contact_type === null
+    ? state.defaultContactType
+    : form.contact_type;
+  const disabled = !canEdit || state.busy || !!form.createdContact;
+  const createDisabled = disabled || !state.contactTypes.length || !!row.contact_id;
+  const fields = [
+    ["first_name", "First Name", "text"],
+    ["last_name", "Last Name", "text"],
+    ["business_name", "Business", "text"],
+    ["email", "Email", "email"]
+  ];
+
+  return `
+    <details
+      data-new-contact-panel="${id}"
+      style="margin-top:16px;"
+      ${form.open ? "open" : ""}
+    >
+      <summary>Add New Contact</summary>
+
+      <div
+        style="
+          display:grid;
+          grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
+          gap:12px;
+          margin-top:12px;
+        "
+      >
+        ${fields.map(([key, label, type]) => `
+          <div>
+            <label for="new_contact_${key}_${id}">${label}</label>
+            <input
+              id="new_contact_${key}_${id}"
+              class="form-control"
+              type="${type}"
+              data-new-contact-field="${key}"
+              data-id="${id}"
+              value="${escapeHtml(form[key])}"
+              maxlength="${key === "email" ? 254 : key === "business_name" ? 500 : 200}"
+              ${disabled ? "disabled" : ""}
+            >
+          </div>
+        `).join("")}
+
+        <div>
+          <label for="new_contact_contact_type_${id}">Contact Type</label>
+          <select
+            id="new_contact_contact_type_${id}"
+            class="form-control"
+            data-new-contact-field="contact_type"
+            data-id="${id}"
+            ${disabled || !state.contactTypes.length ? "disabled" : ""}
+          >
+            ${renderStagingContactTypeOptions(state, selectedType)}
+          </select>
+        </div>
+      </div>
+
+      ${renderStagingContactTypeMessage(state)}
+
+      <p style="color:#555;">
+        The review default is preselected unless you override it here.
+        Enter a person name or business name. Email is optional.
+        Search existing contacts before creating a new contact.
+      </p>
+
+      ${form.error ? `
+        <p role="alert" style="color:#b00020; white-space:pre-wrap;">
+          ${escapeHtml(form.error)}
+        </p>
+      ` : ""}
+
+      ${form.createdContact ? `
+        <p role="status">
+          Saved contact: ${escapeHtml(getContactDisplayName(form.createdContact))}
+          (${escapeHtml(form.createdContact.contact_id)}).
+          Use this contact instead of creating another one.
+        </p>
+        <button
+          type="button"
+          data-action="use-created-contact"
+          data-id="${id}"
+          ${!canEdit || state.busy ? "disabled" : ""}
+        >
+          Use Created Contact
+        </button>
+      ` : `
+        <button
+          type="button"
+          data-action="create-contact"
+          data-id="${id}"
+          ${createDisabled ? "disabled" : ""}
+        >
+          ${form.attempted ? "Check / Retry Creation" : "Create Contact &amp; Use"}
+        </button>
+      `}
+
+      <button
+        type="button"
+        data-action="recover-created-contact"
+        data-id="${id}"
+        ${!canEdit || state.busy ? "disabled" : ""}
+      >
+        Check Previous Creation
+      </button>
+
+      <p style="color:#666; font-size:0.9em;">
+        Check Previous Creation only looks for a contact previously
+        created from this staging record. It does not create one.
+        Contact creation and revenue insertion are separate actions.
+      </p>
+    </details>
+  `;
+}
+
+async function createStagingContact(id, recoverOnly = false) {
+  let project;
+
+  try {
+    project = requireNonSnfProject();
+    requireEditPermission();
+  } catch (err) {
+    showActionError(err);
+    return;
+  }
+
+  const state = getStagingState(project);
+  const container = document.getElementById("stagingGrid");
+  const row = state.rows.find((item) => String(item.id) === String(id));
+
+  if (state.busy || !container || !row || row.status === "imported" || row.imported_at) return;
+
+  const form = getStagingNewContact(state, id);
+  let payload;
+
+  try {
+    requireSavedContactReview(row, container);
+
+    if (recoverOnly) {
+      payload = { id: row.id, recover_only: true };
+    } else {
+      if (row.contact_id) throw new Error("A contact is already assigned. Review it before creating a new contact.");
+
+      for (const key of ["first_name", "last_name", "business_name", "email", "contact_type"]) {
+        const input = document.getElementById(`new_contact_${key}_${id}`);
+
+        if (input && container.contains(input)) form[key] = input.value;
+      }
+
+      const type = form.contact_type === null
+        ? state.defaultContactType
+        : form.contact_type;
+
+      if (!state.contactTypes.some((item) => item.value === type)) {
+        throw new Error("Choose an active contact type for this project.");
+      }
+
+      payload = {
+        id: row.id,
+        expected_updated_at: row.updated_at || null,
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
+        business_name: form.business_name.trim(),
+        email: form.email.trim(),
+        contact_type: type
+      };
+
+      if (!payload.first_name && !payload.last_name && !payload.business_name) {
+        throw new Error("Enter a person name or business name.");
+      }
+
+      if (payload.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+        throw new Error("Enter a valid email address, or leave it blank.");
+      }
+
+      const confirmed = window.confirm(
+        "Create and use this contact?\n\n" +
+        `First name: ${payload.first_name || "(none)"}\n` +
+        `Last name: ${payload.last_name || "(none)"}\n` +
+        `Business: ${payload.business_name || "(none)"}\n` +
+        `Email: ${payload.email || "(none)"}\n` +
+        `Contact type: ${payload.contact_type}\n\n` +
+        "This creates a contact and assigns it to this staging record. " +
+        "It does not insert revenue."
+      );
+
+      if (!confirmed) return;
+      form.attempted = true;
+    }
+  } catch (err) {
+    showActionError(err);
+    return;
+  }
+
+  form.error = "";
+  form.open = true;
+  state.busy = true;
+  state.error = "";
+  state.message = recoverOnly ? "Checking previous contact creation..." : "Creating contact...";
+  let assignContactId = null;
+
+  renderStagingGrid();
+
+  try {
+    const data = await stagingRequest(
+      "/staging/create-contact",
+      { project, method: "POST", body: payload }
+    );
+
+    if (
+      data?.success !== true ||
+      data.project !== project ||
+      data.contact?.project !== project ||
+      data.contact?.contact_id !== `stg-${String(id).toLowerCase()}`
+    ) {
+      throw new Error("Contact creation could not be confirmed. Use Check Previous Creation before trying again.");
+    }
+
+    form.createdContact = data.contact;
+    const lookup = getContactLookup(state, id);
+    lookup.contacts = [data.contact, ...lookup.contacts.filter(
+      (contact) => contact.contact_id !== data.contact.contact_id
+    )];
+    lookup.total = lookup.contacts.length;
+    lookup.searched = true;
+
+    if (data.reused || recoverOnly) {
+      state.message = data.message || "Saved contact found. Review it, then click Use Created Contact.";
+    } else {
+      assignContactId = data.contact.contact_id;
+      state.message = "Contact created. Assigning it to the staging record...";
+    }
+  } catch (err) {
+    form.error = err.message || "Contact creation could not be confirmed.";
+    state.error = form.error;
+    state.message = "No revenue was inserted. Check previous creation before making another contact.";
+  } finally {
+    state.busy = false;
+
+    if (isCurrentGrid(project, container)) renderStagingGrid();
+  }
+
+  if (assignContactId && isCurrentGrid(project, container)) {
+    await useStagingContact(id, assignContactId, { confirmed: true });
   }
 }
 
@@ -1779,77 +2277,12 @@ function renderReviewEditor(row, state, canEdit) {
             : ""
         }
 
-        <details style="margin-top:16px;">
-          <summary>Add New Contact</summary>
+        ${renderStagingNewContactForm(row, state, canEdit)}
 
-          <div
-            style="
-              display:grid;
-              grid-template-columns:repeat(
-                auto-fit,
-                minmax(200px, 1fr)
-              );
-              gap:12px;
-              margin-top:12px;
-            "
-          >
-            <div>
-              <label>First Name</label>
-              <input class="form-control" disabled>
-            </div>
-
-            <div>
-              <label>Last Name</label>
-              <input class="form-control" disabled>
-            </div>
-
-            <div>
-              <label>Business</label>
-              <input class="form-control" disabled>
-            </div>
-
-            <div>
-              <label>Email</label>
-              <input
-                class="form-control"
-                type="email"
-                disabled
-              >
-            </div>
-
-            <div>
-              <label>Contact Type</label>
-              <select class="form-control" disabled>
-                <option>
-                  Contact types — connection pending
-                </option>
-              </select>
-            </div>
-          </div>
-
-          <p style="color:#555;">
-            The review default will be preselected,
-            with an override for this contact.
-            Contact creation will be connected after
-            matching is tested.
-          </p>
-
-          <button type="button" disabled>
-            Create Contact &amp; Use
-          </button>
-        </details>
-
-        <p
-          style="
-            margin-top:16px;
-            color:#666;
-            font-size:0.9em;
-          "
-        >
-          Choose an existing contact only after checking the
-          business and email. Selection updates this staging
-          record; it does not rename a contact or add revenue.
-          New-contact creation is not enabled in this pass.
+        <p style="margin-top:16px; color:#666; font-size:0.9em;">
+          Use an existing contact when it is the correct person
+          or business. Creating a contact does not add revenue;
+          Step 3 remains a separate action.
         </p>
 
         <hr style="margin:20px 0;">
