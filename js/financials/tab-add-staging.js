@@ -32,7 +32,9 @@ function getStagingState(project = getProject()) {
       openRowId: null,
       contactSearch: "",
       defaultContactType: "",
-      matchedExpanded: false
+      matchedExpanded: false,
+      finalizing: false,
+      insertionResults: []
     });
   }
 
@@ -138,7 +140,11 @@ async function stagingRequest(
       text
     );
 
-    throw new Error(message);
+    const error = new Error(message);
+    error.uncertain = data?.uncertain === true;
+    error.setupRequired = data?.setup_required === true;
+    error.httpStatus = res.status;
+    throw error;
   }
 
   return data;
@@ -583,15 +589,105 @@ window.autoMatchContact = function (id) {
 /* =========================================================
    INSERTION GATE
 
-   Final insertion is intentionally disabled during
-   Populate All testing.
+   Final insertion uses the transactional database function
+   through the non-SNF Worker route.
 ========================================================= */
 
-window.insertStagingRow = function () {
-  alert(
-    "Invoice insertion is disabled during Populate All testing. " +
-    "The single Insert Ready Rows action will be connected next."
+function readyRowsForInsertion(state) {
+  return state.rows.filter((row) =>
+    isRowPrepared(row, state) &&
+    ["matched", "ready"].includes(row.status) &&
+    !row.imported_at && !row.error_message
   );
+}
+
+async function runInsertReady(onlyIds = null) {
+  let project;
+  try {
+    project = requireNonSnfProject();
+    requireEditPermission();
+  } catch (err) { showActionError(err); return; }
+  const state = getStagingState(project);
+  const container = document.getElementById("stagingGrid");
+  if (!container || state.busy) return;
+  const requested = onlyIds ? new Set(onlyIds.map(String)) : null;
+  const selected = readyRowsForInsertion(state).filter((row) =>
+    !requested || requested.has(String(row.id))
+  );
+  if (!selected.length) {
+    alert("No ready records are loaded for this filter. Run Match All Contacts and review the results.");
+    return;
+  }
+  const total = selected.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const confirmed = window.confirm(
+    `Add these ${selected.length} ready revenue record(s)?\n` +
+    `Total amount: ${total.toFixed(2)}\n\n` +
+    selected.map((row) => `${row.customer_name || "(unnamed)"} | ${row.invoice_number || "no invoice number"} | ${Number(row.amount || 0).toFixed(2)}`).join("\n") +
+    "\n\nOnly ready records loaded for the current filter will be processed. Unresolved records will remain in staging."
+  );
+  if (!confirmed) return;
+  state.busy = true;
+  state.finalizing = true;
+  state.error = "";
+  state.openRowId = null;
+  state.insertionResults = [];
+  let attempted = 0;
+  try {
+    for (const row of selected) {
+      if (!isCurrentGrid(project, container)) {
+        throw new Error("Stopped because the project or screen changed. Completed records remain saved.");
+      }
+      requireEditPermission();
+      state.message = `Adding ready record ${attempted + 1} of ${selected.length}...`;
+      renderStagingGrid();
+      attempted++;
+      try {
+        const result = await stagingRequest(
+          `/payments/add-from-staging?id=${encodeURIComponent(row.id)}`,
+          { project, method: "POST" }
+        );
+        if (result?.success !== true ||
+            !["inserted", "already_imported"].includes(result?.outcome) ||
+            String(result?.id) !== String(row.id)) {
+          const error = new Error("The result could not be confirmed. Refresh records before retrying.");
+          error.uncertain = true;
+          throw error;
+        }
+        state.insertionResults.push({ id: row.id, name: row.customer_name || "", outcome: result.outcome, message: result.outcome === "inserted" ? "Added successfully." : "Already processed; skipped." });
+        // Update the local row immediately, even if a later refresh fails.
+        row.status = "imported";
+        row.imported_at = new Date().toISOString();
+        state.results.delete(String(row.id));
+      } catch (err) {
+        const uncertain = err.uncertain || !err.httpStatus;
+        state.insertionResults.push({ id: row.id, name: row.customer_name || "", outcome: uncertain ? "unconfirmed" : "failed", message: err.message || "Could not add this record." });
+        if (uncertain || err.setupRequired) {
+          state.error = err.message || "Finalization stopped. Refresh records before retrying.";
+          break;
+        }
+      }
+    }
+  } catch (err) {
+    state.error = err.message || "Finalization stopped.";
+  } finally {
+    const count = (outcome) => state.insertionResults.filter((item) => item.outcome === outcome).length;
+    state.message =
+      `Finished: ${count("inserted")} added; ${count("already_imported")} already processed; ` +
+      `${count("failed")} failed; ${count("unconfirmed")} unconfirmed; ` +
+      `${selected.length - attempted} not attempted. Unresolved records remain in staging.`;
+    if (isCurrentGrid(project, container)) {
+      try { await loadStagingData(); } catch {
+        state.error += (state.error ? "\n\n" : "") + "Refresh Records before continuing. Do not re-upload the file.";
+      }
+    }
+    state.busy = false;
+    state.finalizing = false;
+    if (isCurrentGrid(project, container)) renderStagingGrid();
+  }
+}
+
+window.insertStagingRow = function (id) {
+  return runInsertReady(id == null ? null : [String(id)]);
 };
 
 /* =========================================================
@@ -614,6 +710,7 @@ function renderStagingGrid() {
 
   const state = getStagingState(project);
   const summary = getRunSummary(state);
+  const insertionReady = readyRowsForInsertion(state);
 
   const canEdit =
     !!window.portalState?.canEdit;
@@ -943,7 +1040,7 @@ function renderStagingGrid() {
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
           <label for="stagingFilter">Show:</label>
           <select id="stagingFilter" style="padding:4px 6px;" ${state.busy ? "disabled" : ""}>
-            <option value="">All (except imported)</option>
+            <option value="">All Pending Records</option>
             <option value="uploaded">Uploaded / unresolved</option>
             <option value="matched">Matched — self-referral fallback</option>
             <option value="ready">Matched with referral</option>
@@ -982,14 +1079,28 @@ function renderStagingGrid() {
 
     <section class="card" aria-labelledby="stagingFinishHeading" style="padding:20px;margin-bottom:20px;">
       <h3 id="stagingFinishHeading" style="margin:0 0 8px;">Step 3: Review &amp; Finish</h3>
-      <p style="margin:0 0 16px;color:#555;">Review matched invoices before adding them to your final records.</p>
+      <p style="margin:0 0 12px;color:#555;">${insertionReady.length} revenue record(s) ready to add in the current filter. Unresolved records will remain in staging.</p>
       <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
-        <button id="stagingReviewReady" type="button" class="btn-secondary" ${state.busy ? "disabled" : ""}>Review Ready Invoices</button>
-        <button id="btnInsertReady" type="button" class="btn-primary" disabled title="Final insertion remains disabled while matching and contact resolution are tested.">Add Ready Invoices</button>
+        <button id="stagingReviewReady" type="button" class="btn-secondary" ${state.busy ? "disabled" : ""}>Review Ready Records</button>
+        <button id="btnInsertReady" type="button" class="btn-primary" ${!canEdit || state.busy || !insertionReady.length ? "disabled" : ""}>${state.finalizing ? "Adding Records..." : `Add All ${insertionReady.length} Ready Records`}</button>
       </div>
-      <p style="margin:12px 0 0;color:#666;font-size:0.9em;">Final insertion is not enabled yet. Review Ready Invoices displays the matched group above; it does not insert anything.</p>
+      <p style="margin:12px 0;color:#666;font-size:0.9em;">Adds ready records currently loaded for the selected filter. Choose All Pending Records in Step 2 to include all loaded pending records. Only the same staging ID is protected against repeat insertion; separate records are not compared for duplicates.</p>
+      <div role="status" aria-live="polite" style="white-space:pre-wrap;">${escapeHtml(state.message)}</div>
+      ${state.error ? `<p role="alert" style="color:#b00020;white-space:pre-wrap;">${escapeHtml(state.error)}</p>` : ""}
+      ${state.insertionResults.length ? `
+        <div style="overflow-x:auto;margin-top:12px;">
+          <table class="notes-table" style="width:100%;border-collapse:collapse;">
+            <thead><tr><th>Record</th><th>Result</th><th>Details</th></tr></thead>
+            <tbody>${state.insertionResults.map((item) => `
+              <tr><td>${escapeHtml(item.name)}<div style="font-size:0.8em;">${escapeHtml(String(item.id))}</div></td><td>${escapeHtml(item.outcome)}</td><td>${escapeHtml(item.message)}</td></tr>
+            `).join("")}</tbody>
+          </table>
+        </div>
+      ` : ""}
     </section>
   `;
+
+  container.querySelector("#btnInsertReady").addEventListener("click", () => runInsertReady());
 
   container.querySelector("#stagingImportQuickBooks")?.addEventListener("click", () => window.showQuickBooksUploadModal());
   container.querySelector("#stagingImportCsv")?.addEventListener("click", () => window.showBulkUploadModal());
