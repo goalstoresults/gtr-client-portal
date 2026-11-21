@@ -564,7 +564,7 @@ async function runPopulateAll(onlyIds = null) {
       } catch (err) {
         state.error +=
           (state.error ? "\n\n" : "") +
-          "The grid could not refresh. Click Refresh Grid.";
+          "The grid could not refresh. Click Refresh Records.";
       }
     }
 
@@ -878,7 +878,10 @@ function renderStagingGrid() {
   );
   const pendingRows = rows.filter((row) => !importedRows.includes(row));
   const matchedRows = pendingRows.filter((row) => isRowPrepared(row, state));
-  const reviewRows = pendingRows.filter((row) => !isRowPrepared(row, state));
+  const uncheckedRows = pendingRows.filter((row) => !getRowResult(row, state));
+  const reviewRows = pendingRows.filter((row) =>
+    !!getRowResult(row, state) && !isRowPrepared(row, state)
+  );
   const tableFor = (groupRows, emptyMessage) => `
     <div style="overflow-x:auto;">
       <table class="notes-table" style="width:100%;border-collapse:collapse;margin-top:12px;">
@@ -890,28 +893,27 @@ function renderStagingGrid() {
 
   container.innerHTML = `
     <section class="card" aria-labelledby="stagingImportHeading" style="padding:20px;margin-bottom:20px;">
-      <h3 id="stagingImportHeading" style="margin:0 0 8px;">Step 1: Import File</h3>
-      <p style="margin:0 0 16px;color:#555;">Upload your invoice file and review the imported data.</p>
+      <h3 id="stagingImportHeading" style="margin:0 0 8px;">Step 1: Import File — Optional</h3>
+      <p style="margin:0 0 16px;color:#555;">Upload a new file, or continue to Step 2 to review records already in staging.</p>
       <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
         ${canEdit ? `
           <button id="stagingImportQuickBooks" type="button" class="btn-primary" ${state.busy ? "disabled" : ""}>Import QuickBooks File</button>
           <button id="stagingImportCsv" type="button" class="btn-secondary" ${state.busy ? "disabled" : ""}>Import CSV</button>
         ` : ""}
-        <button id="stagingReviewBulk" type="button" class="btn-secondary" ${state.busy ? "disabled" : ""}>Review Bulk Data</button>
       </div>
       <p style="margin:12px 0 0;color:#666;font-size:0.9em;">QuickBooks: upload the original Invoice List by Date CSV. Import CSV: upload a prepared file. Uploading adds invoices to staging only.</p>
     </section>
 
     <section class="card" aria-labelledby="stagingMatchHeading" style="padding:20px;margin-bottom:20px;">
-      <h3 id="stagingMatchHeading" style="margin:0 0 8px;">Step 2: Match Contacts</h3>
-      <p style="margin:0 0 16px;color:#555;">Find the contact associated with each imported invoice, then review anything that needs attention.</p>
+      <h3 id="stagingMatchHeading" style="margin:0 0 8px;">Step 2: Review &amp; Match Contacts</h3>
+      <p style="margin:0 0 16px;color:#555;">Review pending records, correct any details, then match them to your contacts.</p>
       <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
         ${canEdit ? `
           <button id="btnPopulateAll" type="button" class="btn-primary" ${state.busy ? "disabled" : ""}>${state.busy ? "Working..." : "Match All Contacts"}</button>
         ` : ""}
-        <button id="refreshStagingGrid" type="button" class="btn-secondary" ${state.busy ? "disabled" : ""}>Refresh Grid</button>
+        <button id="refreshStagingGrid" type="button" class="btn-secondary" ${state.busy ? "disabled" : ""}>Refresh Records</button>
       </div>
-      <p style="margin:12px 0;color:#555;font-size:0.9em;">Match All Contacts checks every pending invoice in this project, regardless of the selected filter. It does not create contacts or add final financial records.</p>
+      <p style="margin:12px 0;color:#555;font-size:0.9em;">Match All Contacts checks every pending record in this project, regardless of the selected filter. It does not create contacts or add final financial records.</p>
       <div role="status" aria-live="polite" style="white-space:pre-wrap;">${escapeHtml(state.message)}</div>
       ${state.error ? `<div role="alert" style="margin-top:12px;color:#b00020;white-space:pre-wrap;">${escapeHtml(state.error)}</div>` : ""}
       ${summary.checked ? `
@@ -923,7 +925,7 @@ function renderStagingGrid() {
           <span>Errors: ${summary.errors}</span>
           <span>Already imported: ${summary.skipped}</span>
         </div>
-      ` : `<p style="margin:12px 0;color:#666;">Run Match All Contacts to check your pending invoices.</p>`}
+      ` : `<p style="margin:12px 0;color:#666;">Review the pending records below, then click Match All Contacts.</p>`}
       <p style="margin:12px 0;color:#666;font-size:0.9em;">Matching summaries and suggestions are held in this browser session. After a page reload, run Match All Contacts again to rebuild them.</p>
 
       <details style="margin:16px 0;">
@@ -951,12 +953,19 @@ function renderStagingGrid() {
             <option value="missing_referral">Missing Referral</option>
             <option value="needs_review">Needs Review</option>
           </select>
-          <span style="color:#666;">${rows.length} invoice(s) loaded for this filter</span>
+          <span style="color:#666;">${rows.length} record(s) loaded for this filter</span>
         </div>
-        <div id="stagingNeedsReview">
-          <h4 style="margin:0 0 8px;">Needs Review — ${reviewRows.length}</h4>
-          <p style="margin:0;color:#666;font-size:0.9em;">Includes invoices not checked yet and invoices requiring a correction or contact review. Counts below apply to the selected filter.</p>
-          ${tableFor(reviewRows, rows.length ? "No invoices need review in this filter." : "No staging invoices found for this filter.")}
+        <p style="margin:0 0 16px;color:#666;font-size:0.9em;">The groups below reflect the selected filter. Not checked means no matching result is available in this browser session; it does not mean matching failed.</p>
+        ${reviewRows.length ? `
+          <div id="stagingNeedsReview" style="margin-bottom:20px;">
+            <h4 style="margin:0 0 8px;">Needs Review — ${reviewRows.length}</h4>
+            <p style="margin:0;color:#666;font-size:0.9em;">These checked records need a contact decision, correction, or error review.</p>
+            ${tableFor(reviewRows, "No checked records need review in this filter.")}
+          </div>
+        ` : ""}
+        <div id="stagingPendingRecords">
+          <h4 style="margin:0 0 8px;">Pending Records — Not Checked — ${uncheckedRows.length}</h4>
+          ${tableFor(uncheckedRows, pendingRows.length ? "All pending records in this filter have a matching result for this session. See Needs Review or Matched." : "No pending records found for this filter.")}
         </div>
         <details id="stagingMatchedGroup" style="margin-top:20px;" ${state.matchedExpanded ? "open" : ""}>
           <summary style="cursor:pointer;">Matched — ${matchedRows.length}</summary>
@@ -984,7 +993,6 @@ function renderStagingGrid() {
 
   container.querySelector("#stagingImportQuickBooks")?.addEventListener("click", () => window.showQuickBooksUploadModal());
   container.querySelector("#stagingImportCsv")?.addEventListener("click", () => window.showBulkUploadModal());
-  container.querySelector("#stagingReviewBulk").addEventListener("click", () => window.reviewBulkData());
   const matchedGroup = container.querySelector("#stagingMatchedGroup");
   matchedGroup.addEventListener("toggle", () => {
     if (matchedGroup.isConnected) state.matchedExpanded = matchedGroup.open;
@@ -2041,7 +2049,7 @@ function openStagingUploadModal(kind) {
       state.filter = "";
       state.error = "";
       state.message =
-        "Upload complete. Run Match All Contacts to prepare the invoices.";
+        "Upload complete. Review the records in Step 2, then run Match All Contacts.";
 
       const filterEl = document.getElementById(
         "stagingFilter"
@@ -2067,7 +2075,7 @@ function openStagingUploadModal(kind) {
               ? "Upload complete."
               : `${count} invoice(s) uploaded.`
           ) +
-          " Close this popup and click Match All Contacts."
+          " Close this popup to review the records in Step 2, then click Match All Contacts."
         );
       } catch (err) {
         console.error(
@@ -2077,7 +2085,7 @@ function openStagingUploadModal(kind) {
 
         showStatus(
           "Upload succeeded, but the review area could not refresh. " +
-          "Close this popup and click Review Bulk Data. " +
+          "Close this popup and click Refresh Records in Step 2. " +
           "Do not upload the file again.",
           true
         );
