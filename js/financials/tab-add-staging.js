@@ -1313,20 +1313,6 @@ function renderStagingGrid() {
           createStagingContact(id);
           break;
 
-        case "recover-created-contact":
-          createStagingContact(id, true);
-          break;
-
-        case "use-created-contact": {
-          const form = getStagingNewContact(state, id);
-
-          if (form.createdContact) {
-            useStagingContact(id, form.createdContact.contact_id);
-          }
-
-          break;
-        }
-
         case "search-contacts":
           runContactSearch(id);
           break;
