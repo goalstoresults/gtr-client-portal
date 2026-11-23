@@ -235,6 +235,7 @@ const portalState = {
   isDemoAccount: false,
   canSeeFinancials: false,
   full_admin: false,
+  allow_import: false,
   notes_summary_enabled: false,
   can_view_notes_summary: false,
   can_generate_notes_summary: false
@@ -903,6 +904,9 @@ async function completeLoginAfterSecurity({ project, email }) {
   portalState.notes_summary_enabled =
     match.notes_summary_enabled === true;
 
+  portalState.allow_import =
+    match.allow_import === true;
+
   const friendly = result.first_name || result.staff_name || "";
   welcomeHeader.textContent = `Welcome ${friendly}!`;
 
@@ -1283,4 +1287,3 @@ if ('serviceWorker' in navigator) {
 
 </body>
 </html>
-
