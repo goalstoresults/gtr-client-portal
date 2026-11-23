@@ -1,7 +1,5 @@
 // js/contacts/tab-add.js
 
-// Modularized Add Contact Tab
-
 import { escapeHtml } from "../utilities.js";
 import { renderContactList } from "./tab-list.js";
 
@@ -13,13 +11,17 @@ export async function renderAddContactForm(container, portalState) {
   const projectId = portalState.project;
 
   if (!projectId) {
-    container.innerHTML = `<section class="card"><p>No project selected.</p></section>`;
+    container.innerHTML = `
+<section class="card">
+  <p>No project selected.</p>
+</section>
+`;
     return;
   }
 
-  // Fetch configured fields
+  // Fetch configured fields.
   const fieldsRes = await fetch(
-    `https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${projectId}`,
+    `https://contacts-module.dennis-e64.workers.dev/contact_fields?project=${encodeURIComponent(projectId)}`,
     { cache: "no-cache" }
   );
 
@@ -28,7 +30,7 @@ export async function renderAddContactForm(container, portalState) {
 
   fields.sort((a, b) => a.sort_order - b.sort_order);
 
-  // Use Add tab fields for consistency
+  // Use Add tab fields for consistency.
   fields = fields.filter((f) => f.contact_tab === "add");
 
   /* -------------------------------------------------------
@@ -37,15 +39,22 @@ export async function renderAddContactForm(container, portalState) {
 
   container.innerHTML = `
 <div id="contactImportContainer" hidden></div>
+
 <section class="card">
   <form id="addContactForm" class="notes-form">
-    <div class="form-header" style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+    <div
+      class="form-header"
+      style="display:flex;align-items:center;gap:12px;margin-bottom:12px;"
+    >
       <h2 style="margin:0;">Add Contact for ${escapeHtml(
         portalState.display_name || projectId
       )}</h2>
-      ${portalState.canEdit
-        ? `<button type="submit" class="btn-primary">Save Contact</button>`
-        : ``}
+
+      ${
+        portalState.canEdit
+          ? `<button type="submit" class="btn-primary">Save Contact</button>`
+          : ""
+      }
     </div>
   </form>
 </section>
@@ -62,8 +71,13 @@ export async function renderAddContactForm(container, portalState) {
 
   const grouped = fields.reduce((acc, f) => {
     const section = f.section || "General";
-    if (!acc[section]) acc[section] = [];
+
+    if (!acc[section]) {
+      acc[section] = [];
+    }
+
     acc[section].push(f);
+
     return acc;
   }, {});
 
@@ -87,14 +101,14 @@ export async function renderAddContactForm(container, portalState) {
 
       let input;
 
-      // Group dropdown
+      // Group dropdown.
       if (f.field_key === "group_id") {
         input = document.createElement("select");
         input.name = "group_id";
         input.className = "form-control";
 
         fetch(
-          `https://groups-module.dennis-e64.workers.dev/groups/list?project=${projectId}`
+          `https://groups-module.dennis-e64.workers.dev/groups/list?project=${encodeURIComponent(projectId)}`
         )
           .then((r) => r.json())
           .then((data) => {
@@ -103,6 +117,7 @@ export async function renderAddContactForm(container, portalState) {
               : Array.isArray(data)
               ? data
               : [];
+
             rows.sort((a, b) =>
               (a.group_name || "").localeCompare(b.group_name || "")
             );
@@ -120,18 +135,20 @@ export async function renderAddContactForm(container, portalState) {
             });
           });
 
-        // Lookup dropdown
+      // Lookup dropdown.
       } else if (f.lookup_type) {
         input = document.createElement("select");
         input.name = f.field_key;
         input.className = "form-control";
 
         fetch(
-          `https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=${f.lookup_type}&project=${projectId}`
+          `https://lookups-module.dennis-e64.workers.dev/lookups?lookup_type=${encodeURIComponent(f.lookup_type)}&project=${encodeURIComponent(projectId)}`
         )
           .then((r) => r.json())
           .then((values) => {
-            if (!Array.isArray(values)) return;
+            if (!Array.isArray(values)) {
+              return;
+            }
 
             values.sort((a, b) =>
               (a.label || a.value || "").localeCompare(
@@ -152,7 +169,7 @@ export async function renderAddContactForm(container, portalState) {
             });
           });
 
-        // Text input
+      // Text input.
       } else {
         input = document.createElement("input");
         input.type = "text";
@@ -167,7 +184,7 @@ export async function renderAddContactForm(container, portalState) {
   }
 
   /* -------------------------------------------------------
-  SEARCH NAME MODE (PER-CONTACT OVERRIDE)
+  SEARCH NAME MODE — PER-CONTACT OVERRIDE
   ------------------------------------------------------- */
 
   const searchSectionHeader = document.createElement("h3");
@@ -186,7 +203,7 @@ export async function renderAddContactForm(container, portalState) {
   searchSelect.name = "search_name_source";
   searchSelect.className = "form-control";
 
-  // Placeholder: let backend use project default if left blank
+  // Let the backend use the project default when left blank.
   const optDefault = document.createElement("option");
   optDefault.value = "";
   optDefault.textContent = "Use project default";
@@ -213,14 +230,21 @@ export async function renderAddContactForm(container, portalState) {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
+    if (
+      !portalState.canEdit ||
+      String(portalState.project) !== String(projectId)
+    ) {
+      return;
+    }
+
     const formData = new FormData(form);
     const payload = {};
 
-    // Populate from dynamic fields
+    // Populate from dynamic fields.
     fields.forEach((f) => {
-      let val = formData.get(f.field_key);
+      const val = formData.get(f.field_key);
 
-      if (val === "") {
+      if (val === "" || val === null) {
         payload[f.field_key] = null;
       } else if (f.data_type === "integer") {
         const parsed = parseInt(val, 10);
@@ -230,8 +254,9 @@ export async function renderAddContactForm(container, portalState) {
       }
     });
 
-    // Per-contact override for search_name_source (optional)
+    // Optional per-contact search-name override.
     const searchMode = formData.get("search_name_source");
+
     if (searchMode === "contact" || searchMode === "business") {
       payload.search_name_source = searchMode;
     }
@@ -240,11 +265,12 @@ export async function renderAddContactForm(container, portalState) {
     payload.project = projectId;
     payload.created_at = new Date().toISOString();
 
-    // Build contact_name with fallback to business_name
+    // Build contact_name with fallback to business_name.
     const first = formData.get("first_name") || "";
     const last = formData.get("last_name") || "";
     const business = formData.get("business_name") || "";
     const contactName = `${first} ${last}`.trim();
+
     payload.contact_name = contactName || business || null;
 
     try {
@@ -252,25 +278,44 @@ export async function renderAddContactForm(container, portalState) {
         "https://contacts-module.dennis-e64.workers.dev/contacts/add",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
         }
       );
 
-      await res.json();
+      const result = await res.json();
 
-      // Return to List tab after save
+      if (
+        !res.ok ||
+        result?.success === false ||
+        result?.status === "error"
+      ) {
+        throw new Error(
+          result?.error ||
+          result?.message ||
+          "Unable to save contact."
+        );
+      }
+
+      // Return to List tab after save.
       const listBtn = document.querySelector(
         '#contacts-subtabs button[data-subtab="list"]'
       );
+
       if (listBtn) {
         document
           .querySelectorAll("#contacts-subtabs button")
           .forEach((b) => b.classList.remove("active"));
+
         listBtn.classList.add("active");
 
         const content = document.querySelector("#contactsContent");
-        await renderContactList(content, portalState);
+
+        if (content) {
+          await renderContactList(content, portalState);
+        }
       }
     } catch (err) {
       container.innerHTML = `
@@ -282,72 +327,72 @@ export async function renderAddContactForm(container, portalState) {
   });
 
   /* -------------------------------------------------------
-  LOAD CONTACT IMPORT ONLY WHEN ENABLED BY BACKEND
+  CONDITIONAL CONTACT IMPORT
+
+  Uses project configuration already loaded by index.html.
 
   No static import of contact-import.js.
-
-  Expected backend response:
-  {
-    "status": "ok",
-    "allow_import": true
-  }
-
-  Fail closed if configuration is unavailable.
+  No separate import configuration request.
   ------------------------------------------------------- */
 
+  function importIsAllowed() {
+    return (
+      Boolean(portalState.canEdit) &&
+      portalState.allow_import === true &&
+      String(projectId).trim().toLowerCase() !== "csi"
+    );
+  }
+
+  function isCurrentView() {
+    return (
+      container.isConnected &&
+      container.contains(form) &&
+      container.contains(importContainer) &&
+      String(portalState.project) === String(projectId)
+    );
+  }
+
   async function initializeContactImport() {
-    if (!portalState.canEdit) return;
-
-    // Preserve the explicit CSI exclusion.
-    if (String(projectId).trim().toLowerCase() === "csi") return;
-
-    // Do not mount into an old form after navigation/project changes.
-    function isCurrentView() {
-      return (
-        container.contains(form) &&
-        container.contains(importContainer) &&
-        String(portalState.project) === String(projectId) &&
-        Boolean(portalState.canEdit)
-      );
+    if (!importIsAllowed() || !isCurrentView()) {
+      return;
     }
 
     try {
-      const configRes = await fetch(
-        `https://contacts-module.dennis-e64.workers.dev/contacts/import/config?project=${encodeURIComponent(projectId)}`,
-        { cache: "no-store" }
-      );
-
-      if (!configRes.ok) {
-        throw new Error("Import configuration request failed.");
-      }
-
-      const config = await configRes.json();
-
-      if (!isCurrentView()) return;
-
-      // Only an explicit true enables import.
-      if (
-        config?.status !== "ok" ||
-        config.allow_import !== true
-      ) {
-        return;
-      }
-
-      // Download the import module only after the availability check.
+      // Load only after the project and edit checks pass.
       const { renderContactImport } = await import(
         "./contact-import.js"
       );
 
-      if (!isCurrentView()) return;
+      // Recheck after the asynchronous module load.
+      if (!importIsAllowed() || !isCurrentView()) {
+        return;
+      }
 
-      renderContactImport(importContainer, portalState);
+      if (typeof renderContactImport !== "function") {
+        throw new Error(
+          "The contact import module could not be initialized."
+        );
+      }
+
+      await renderContactImport(importContainer, portalState);
+
+      // Do not reveal a delayed render after navigation.
+      if (!importIsAllowed() || !isCurrentView()) {
+        importContainer.hidden = true;
+        importContainer.replaceChildren();
+        return;
+      }
+
       importContainer.hidden = false;
-    } catch {
-      if (!isCurrentView()) return;
+    } catch (err) {
+      console.error("[Contact import]", err);
 
-      // Keep manual entry available even if import cannot load.
+      if (!importIsAllowed() || !isCurrentView()) {
+        return;
+      }
+
+      // Import failures do not prevent manual contact entry.
       importContainer.replaceChildren();
-      importContainer.hidden = false;
 
       const notice = document.createElement("p");
       notice.textContent =
@@ -355,13 +400,10 @@ export async function renderAddContactForm(container, portalState) {
         "You can still add a contact using the form below.";
 
       importContainer.appendChild(notice);
-
-      console.warn(
-        "Contact import could not be initialized. Manual entry remains available."
-      );
+      importContainer.hidden = false;
     }
   }
 
-  // Initialize separately so import does not block manual entry.
+  // Do not block manual entry while the import module loads.
   void initializeContactImport();
 }
