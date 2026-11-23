@@ -36,6 +36,7 @@ export async function renderAddContactForm(container, portalState) {
   ------------------------------------------------------- */
 
   container.innerHTML = `
+<div id="contactImportContainer" hidden></div>
 <section class="card">
   <form id="addContactForm" class="notes-form">
     <div class="form-header" style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
@@ -51,6 +52,9 @@ export async function renderAddContactForm(container, portalState) {
 `;
 
   const form = container.querySelector("#addContactForm");
+  const importContainer = container.querySelector(
+    "#contactImportContainer"
+  );
 
   /* -------------------------------------------------------
   GROUP FIELDS BY SECTION
@@ -276,5 +280,88 @@ export async function renderAddContactForm(container, portalState) {
 `;
     }
   });
-}
 
+  /* -------------------------------------------------------
+  LOAD CONTACT IMPORT ONLY WHEN ENABLED BY BACKEND
+
+  No static import of contact-import.js.
+
+  Expected backend response:
+  {
+    "status": "ok",
+    "allow_import": true
+  }
+
+  Fail closed if configuration is unavailable.
+  ------------------------------------------------------- */
+
+  async function initializeContactImport() {
+    if (!portalState.canEdit) return;
+
+    // Preserve the explicit CSI exclusion.
+    if (String(projectId).trim().toLowerCase() === "csi") return;
+
+    // Do not mount into an old form after navigation/project changes.
+    function isCurrentView() {
+      return (
+        container.contains(form) &&
+        container.contains(importContainer) &&
+        String(portalState.project) === String(projectId) &&
+        Boolean(portalState.canEdit)
+      );
+    }
+
+    try {
+      const configRes = await fetch(
+        `https://contacts-module.dennis-e64.workers.dev/contacts/import/config?project=${encodeURIComponent(projectId)}`,
+        { cache: "no-store" }
+      );
+
+      if (!configRes.ok) {
+        throw new Error("Import configuration request failed.");
+      }
+
+      const config = await configRes.json();
+
+      if (!isCurrentView()) return;
+
+      // Only an explicit true enables import.
+      if (
+        config?.status !== "ok" ||
+        config.allow_import !== true
+      ) {
+        return;
+      }
+
+      // Download the import module only after the availability check.
+      const { renderContactImport } = await import(
+        "./contact-import.js"
+      );
+
+      if (!isCurrentView()) return;
+
+      renderContactImport(importContainer, portalState);
+      importContainer.hidden = false;
+    } catch {
+      if (!isCurrentView()) return;
+
+      // Keep manual entry available even if import cannot load.
+      importContainer.replaceChildren();
+      importContainer.hidden = false;
+
+      const notice = document.createElement("p");
+      notice.textContent =
+        "Contact import is currently unavailable. " +
+        "You can still add a contact using the form below.";
+
+      importContainer.appendChild(notice);
+
+      console.warn(
+        "Contact import could not be initialized. Manual entry remains available."
+      );
+    }
+  }
+
+  // Initialize separately so import does not block manual entry.
+  void initializeContactImport();
+}
